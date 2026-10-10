@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>SkicaCAD Beta</title>
+  <meta name="description" content="SkicaCAD – jednoduchá CAD aplikace: 2D náčrty, vytažení do 3D, export STL. Funguje i offline.">
+  <meta name="theme-color" content="#0f1b2d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="SkicaCAD">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="version.js"></script>
+</head>
+<body data-mode="model">
+
+<!-- Ikony -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-select" viewBox="0 0 24 24"><path d="M6 3l13 7.5-5.8 1.7L11 18.5z"/></symbol>
+    <symbol id="i-line" viewBox="0 0 24 24"><path d="M5.5 18.5l13-13"/><circle cx="5" cy="19" r="1.8"/><circle cx="19" cy="5" r="1.8"/></symbol>
+    <symbol id="i-rect" viewBox="0 0 24 24"><rect x="4" y="6.5" width="16" height="11" rx="1"/></symbol>
+    <symbol id="i-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V4.5h4V7M7 7l1 13h8l1-13M10.5 11v6M13.5 11v6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-sketch" viewBox="0 0 24 24"><path d="M4 20l1-4.5L16.5 4l3.5 3.5L8.5 19z"/><path d="M14 6.5l3.5 3.5"/></symbol>
+    <symbol id="i-extrude" viewBox="0 0 24 24"><path d="M4 20.5h16M6.5 20.5V13h11v7.5"/><path d="M12 3.5V10M9 6.5l3-3 3 3"/></symbol>
+    <symbol id="i-cube" viewBox="0 0 24 24"><path d="M12 3l8 4.2v9.6L12 21l-8-4.2V7.2z"/><path d="M4 7.2l8 4.3 8-4.3M12 11.5V21"/></symbol>
+    <symbol id="i-front" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1"/><path d="M5 19h14" stroke-width="3.4"/></symbol>
+    <symbol id="i-top" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1"/><path d="M5 5h14" stroke-width="3.4"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1"/><path d="M19 5v14" stroke-width="3.4"/></symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+    <symbol id="i-grid" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 12h16M12 4v16"/></symbol>
+    <symbol id="i-snap" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.2"/><path d="M12 4v4M12 16v4M4 12h4M16 12h4"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 6L4 11l5 5"/><path d="M4.5 11H14a6 6 0 010 9h-3"/></symbol>
+    <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 6l5 5-5 5"/><path d="M19.5 11H10a6 6 0 000 9h3"/></symbol>
+    <symbol id="i-open" viewBox="0 0 24 24"><path d="M3 6.5h6l2 2.5h10V19H3z"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></symbol>
+    <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 20h14"/></symbol>
+    <symbol id="i-new" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M12 11v6M9 14h6"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></symbol>
+    <symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/><path d="M4 4l16 16"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M4 20l1-4.5L16.5 4l3.5 3.5L8.5 19z"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.6v.4"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></symbol>
+    <symbol id="i-sketchfeat" viewBox="0 0 24 24"><rect x="4.5" y="6.5" width="15" height="11" rx="1" stroke-dasharray="3 2.4"/></symbol>
+    <symbol id="i-install" viewBox="0 0 24 24"><rect x="4" y="3.5" width="16" height="17" rx="2.5"/><path d="M12 8v7M8.8 12L12 15.2 15.2 12"/></symbol>
+  </defs>
+</svg>
+
+<header id="topbar">
+  <button class="icon-btn only-mobile" id="btnBrowser" title="Prvky projektu" aria-label="Prvky projektu"><svg class="ic"><use href="#i-menu"/></svg></button>
+  <img class="logo" src="icons/icon.svg" alt="" width="30" height="30">
+  <div class="brand"><span class="brand-name" id="brandName">SkicaCAD</span><span class="badge" id="brandBadge">Beta</span></div>
+  <input id="projName" type="text" value="Bez názvu" maxlength="60" aria-label="Název projektu" spellcheck="false">
+  <div class="spacer"></div>
+  <button class="tb-btn" id="btnInstall" hidden><svg class="ic"><use href="#i-install"/></svg><span>Instalovat</span></button>
+  <button class="tb-btn" id="btnNew" title="Nový projekt"><svg class="ic"><use href="#i-new"/></svg><span>Nový</span></button>
+  <button class="tb-btn" id="btnOpen" title="Otevřít projekt (.skica)"><svg class="ic"><use href="#i-open"/></svg><span>Otevřít</span></button>
+  <button class="tb-btn" id="btnSave" title="Uložit projekt (Ctrl+S)"><svg class="ic"><use href="#i-save"/></svg><span>Uložit</span></button>
+  <div class="menu-wrap">
+    <button class="tb-btn primary" id="btnExport" aria-haspopup="true" aria-expanded="false"><svg class="ic"><use href="#i-export"/></svg><span>Export</span></button>
+    <div class="menu" id="menuExport" hidden>
+      <button data-export="stl"><b>STL</b><small>3D těleso pro 3D tisk</small></button>
+      <button data-export="svg"><b>SVG</b><small>aktuální náčrt</small></button>
+      <button data-export="dxf"><b>DXF</b><small>aktuální náčrt</small></button>
+    </div>
+  </div>
+  <span class="sep"></span>
+  <button class="icon-btn" id="btnUndo" title="Zpět (Ctrl+Z)" aria-label="Zpět"><svg class="ic"><use href="#i-undo"/></svg></button>
+  <button class="icon-btn" id="btnRedo" title="Znovu (Ctrl+Y)" aria-label="Znovu"><svg class="ic"><use href="#i-redo"/></svg></button>
+  <button class="icon-btn" id="btnAbout" title="O aplikaci" aria-label="O aplikaci"><svg class="ic"><use href="#i-info"/></svg></button>
+</header>
+
+<nav id="ribbon" aria-label="Nástroje">
+  <div class="rgroup" data-for="model">
+    <span class="rtitle">Vytvořit</span>
+    <div class="rbtns">
+      <button class="rbtn" id="btnNewSketch"><svg class="ic"><use href="#i-sketch"/></svg><span>Nový náčrt</span></button>
+      <button class="rbtn" id="btnExtrude"><svg class="ic"><use href="#i-extrude"/></svg><span>Vytáhnout</span></button>
+    </div>
+  </div>
+  <div class="rgroup" data-for="model">
+    <span class="rtitle">Pohled</span>
+    <div class="rbtns">
+      <button class="rbtn" data-view="iso"><svg class="ic"><use href="#i-cube"/></svg><span>Izometrie</span></button>
+      <button class="rbtn" data-view="front"><svg class="ic"><use href="#i-front"/></svg><span>Zepředu</span></button>
+      <button class="rbtn" data-view="top"><svg class="ic"><use href="#i-top"/></svg><span>Shora</span></button>
+      <button class="rbtn" data-view="right"><svg class="ic"><use href="#i-right"/></svg><span>Zprava</span></button>
+      <button class="rbtn" id="btnFit3d"><svg class="ic"><use href="#i-fit"/></svg><span>Zobrazit vše</span></button>
+      <button class="rbtn toggle" id="btnGrid3d" aria-pressed="true"><svg class="ic"><use href="#i-grid"/></svg><span>Mřížka</span></button>
+    </div>
+  </div>
+
+  <div class="rgroup" data-for="sketch">
+    <span class="rtitle">Náčrt</span>
+    <div class="rbtns">
+      <button class="rbtn toggle" data-tool="select" aria-pressed="true"><svg class="ic"><use href="#i-select"/></svg><span>Výběr <kbd>V</kbd></span></button>
+      <button class="rbtn toggle" data-tool="line"><svg class="ic"><use href="#i-line"/></svg><span>Čára <kbd>L</kbd></span></button>
+      <button class="rbtn toggle" data-tool="rect"><svg class="ic"><use href="#i-rect"/></svg><span>Obdélník <kbd>R</kbd></span></button>
+      <button class="rbtn toggle" data-tool="circle"><svg class="ic"><use href="#i-circle"/></svg><span>Kružnice <kbd>C</kbd></span></button>
+    </div>
+  </div>
+  <div class="rgroup" data-for="sketch">
+    <span class="rtitle">Upravit</span>
+    <div class="rbtns">
+      <button class="rbtn" id="btnDelShape"><svg class="ic"><use href="#i-trash"/></svg><span>Smazat</span></button>
+      <button class="rbtn" id="btnFit2d"><svg class="ic"><use href="#i-fit"/></svg><span>Zobrazit vše</span></button>
+      <button class="rbtn toggle" id="btnSnap" aria-pressed="true"><svg class="ic"><use href="#i-snap"/></svg><span>Přichytávat</span></button>
+    </div>
+  </div>
+  <div class="rgroup" data-for="sketch">
+    <span class="rtitle">Hotovo</span>
+    <div class="rbtns">
+      <button class="rbtn accent" id="btnFinishSketch"><svg class="ic"><use href="#i-check"/></svg><span>Dokončit náčrt</span></button>
+    </div>
+  </div>
+
+  <div class="rgroup" data-for="extrude">
+    <span class="rtitle">Vytažení</span>
+    <div class="rbtns"><span class="rnote">Vyberte profil a zadejte vzdálenost.</span></div>
+  </div>
+</nav>
+
+<main id="work">
+  <aside id="browser" aria-label="Prvky projektu">
+    <div class="panel-head"><span>Prohlížeč</span><button class="icon-btn only-mobile" id="btnBrowserClose" aria-label="Zavřít"><svg class="ic"><use href="#i-close"/></svg></button></div>
+    <div class="panel-body">
+      <div class="mobile-project">
+        <button class="btn" id="mbNew"><svg class="ic sm"><use href="#i-new"/></svg>Nový</button>
+        <button class="btn" id="mbOpen"><svg class="ic sm"><use href="#i-open"/></svg>Otevřít</button>
+        <button class="btn" id="mbSave"><svg class="ic sm"><use href="#i-save"/></svg>Uložit</button>
+        <button class="btn" id="mbStl"><svg class="ic sm"><use href="#i-export"/></svg>Export STL</button>
+      </div>
+      <div class="tree-title">Počátek</div>
+      <ul class="tree flat" id="originList">
+        <li><svg class="ic sm"><use href="#i-grid"/></svg><span>Roviny XY · XZ · YZ</span></li>
+      </ul>
+      <div class="tree-title">Časová osa</div>
+      <ul class="tree" id="timeline"></ul>
+      <p class="empty" id="timelineEmpty">Zatím prázdno.<br>Začněte tlačítkem <b>Nový náčrt</b>.</p>
+    </div>
+  </aside>
+
+  <section id="stage">
+    <canvas id="gl" aria-label="3D zobrazení"></canvas>
+    <canvas id="cv2d" aria-label="Náčrt" hidden></canvas>
+    <div id="hint" hidden></div>
+    <div id="nogl" hidden></div>
+    <aside id="props" hidden></aside>
+    <div id="splash">
+      <img src="icons/icon.svg" alt="" width="84" height="84">
+      <h1>SkicaCAD <span class="badge" id="splashBadge">Beta</span></h1>
+      <p>Nakreslete náčrt, vytáhněte ho do 3D a exportujte STL.</p>
+      <button class="rbtn accent big" id="btnSplashSketch"><svg class="ic"><use href="#i-sketch"/></svg><span>Nový náčrt</span></button>
+    </div>
+  </section>
+</main>
+
+<footer id="status">
+  <span id="stCoords">&nbsp;</span>
+  <span id="stGrid"></span>
+  <span class="spacer"></span>
+  <span id="stOffline" title="Aplikace je připravena pro offline použití" hidden>● offline připraveno</span>
+  <span id="stVersion"></span>
+</footer>
+
+<dialog id="planeDlg">
+  <form method="dialog">
+    <h2>Vyberte rovinu náčrtu</h2>
+    <div class="plane-list">
+      <button value="XY" class="plane"><b>XY</b><span>Půdorys – kreslíte shora, vytažení míří nahoru (osa Z)</span></button>
+      <button value="XZ" class="plane"><b>XZ</b><span>Nárys – kreslíte zepředu, vytažení míří dozadu (osa −Y)</span></button>
+      <button value="YZ" class="plane"><b>YZ</b><span>Bokorys – kreslíte zprava, vytažení míří doprava (osa X)</span></button>
+    </div>
+    <div class="dlg-actions"><button value="" class="ghost">Zrušit</button></div>
+  </form>
+</dialog>
+
+<dialog id="aboutDlg">
+  <form method="dialog">
+    <div class="about-head">
+      <img src="icons/icon.svg" alt="" width="56" height="56">
+      <div><h2 id="aboutTitle">SkicaCAD</h2><p class="muted" id="aboutVer"></p></div>
+    </div>
+    <p>Zjednodušená CAD aplikace inspirovaná Fusion 360. Nakreslíte 2D náčrt na zvolené rovině, vytáhnete ho do 3D tělesa a exportujete jako STL pro 3D tisk. Všechno běží přímo v prohlížeči, data zůstávají ve vašem zařízení.</p>
+    <h3>Klávesy v náčrtu</h3>
+    <ul class="kbd-list">
+      <li><kbd>V</kbd> výběr · <kbd>L</kbd> čára · <kbd>R</kbd> obdélník · <kbd>C</kbd> kružnice</li>
+      <li>číslice při kreslení = přesný rozměr, <kbd>Enter</kbd> potvrdí, <kbd>Tab</kbd> přepíná pole</li>
+      <li><kbd>Esc</kbd> ukončí nástroj · <kbd>Delete</kbd> smaže vybraný tvar</li>
+      <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> zpět · <kbd>Ctrl</kbd>+<kbd>Y</kbd> znovu · <kbd>Ctrl</kbd>+<kbd>S</kbd> uložit</li>
+    </ul>
+    <h3>Ve 3D</h3>
+    <ul class="kbd-list">
+      <li>levé tlačítko / jeden prst: otáčení · pravé či prostřední tlačítko nebo <kbd>Shift</kbd>: posun</li>
+      <li>kolečko / dva prsty: přiblížení a posun</li>
+    </ul>
+    <h3>Omezení verze Beta</h3>
+    <ul class="kbd-list">
+      <li>Tělesa se zatím neslučují ani neodečítají (bez booleovských operací).</li>
+      <li>Náčrt lze zakreslit pouze na roviny XY, XZ a YZ.</li>
+    </ul>
+    <div class="dlg-actions"><button class="primary" value="close">Zavřít</button></div>
+  </form>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite" hidden></div>
+<input type="file" id="fileInput" accept=".skica,.json,application/json" hidden>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

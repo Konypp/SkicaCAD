@@ -1,0 +1,20 @@
+{
+  "name": "SkicaCAD",
+  "short_name": "SkicaCAD",
+  "description": "Jednoduchá CAD aplikace: 2D náčrty, vytažení do 3D a export STL. Funguje i offline.",
+  "lang": "cs",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f1b2d",
+  "theme_color": "#0f1b2d",
+  "categories": ["productivity", "utilities", "graphics"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
