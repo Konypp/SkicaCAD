@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.18
+- Instalační tlačítko už nepotlačuje vlastní nabídku instalace v Chrome.
+
 ## Beta 0.17
 - Tlačítko „Nainstalovat aplikaci“ v nabídce Soubor (u iOS návod).
 
