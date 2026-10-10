@@ -1445,10 +1445,28 @@ function primVals(type, p) {
   if (type === 'sphere') return { D: p.r * 2 };
   return { R: p.R, t: p.t };
 }
+/* drag handles for primitive dimensions: anchor (relative to base point), direction, distance and setter */
+const DIAG = [Math.SQRT1_2, -Math.SQRT1_2, 0];
+function primHandles(type, v) {
+  const q = (k, label, a, dir, dist, set) => ({ k, label, a, dir, dist, set });
+  if (type === 'box') return [
+    q('w', 'Šířka', [0, 0, v.h / 2], [1, 0, 0], v.w / 2, s => ({ w: 2 * s })),
+    q('d', 'Hloubka', [0, 0, v.h / 2], [0, 1, 0], v.d / 2, s => ({ d: 2 * s })),
+    q('h', 'Výška', [0, 0, 0], [0, 0, 1], v.h, s => ({ h: s }))];
+  if (type === 'cylinder' || type === 'cone') return [
+    q('D', 'Průměr', [0, 0, type === 'cone' ? 0 : v.h / 2], DIAG, v.D / 2, s => ({ D: 2 * s })),
+    q('h', 'Výška', [0, 0, 0], [0, 0, 1], v.h, s => ({ h: s }))];
+  if (type === 'sphere') return [q('D', 'Průměr', [0, 0, v.D / 2], DIAG, v.D / 2, s => ({ D: 2 * s }))];
+  return [
+    q('R', 'Poloměr', [0, 0, v.t], DIAG, v.R + v.t, s => ({ R: s - v.t })),
+    q('t', 'Poloměr trubice', [-DIAG[0] * v.R, -DIAG[1] * v.R, v.t], [0, 0, 1], v.t, s => ({ t: s }))];
+}
 function startPrimitive(type, editIndex, f) {
   const defs = PRIM_FIELDS[type], vals = f ? primVals(type, f.p) : Object.fromEntries(defs.map(d => [d[0], d[2]]));
+  const pivot = new THREE.Object3D(); scene.add(pivot);
   const c = {
     editIndex, vals, pos: f ? f.pos.slice() : [0, 0, 0], op: f ? f.op : 'new', autoOp: !f, tool: null,
+    hgrp: null, handles: [], drag: null, hover: null, gizmoDrag: false,
     init() {
       openDialog({
         title: Engine.FEATURE_LABEL[type], icon: type,
@@ -1461,12 +1479,27 @@ function startPrimitive(type, editIndex, f) {
           this.update();
         }
       });
-      setPrompt('Klepnutím do pohledu umístíte těleso, rozměry zadejte v dialogu');
+      this.hgrp = new THREE.Group(); G.overlay.add(this.hgrp);
+      for (let i = 0; i < defs.length; i++) {
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(1, 2.6, 18), new THREE.MeshBasicMaterial({ color: tok.orange, depthTest: false, transparent: true }));
+        cone.renderOrder = 12;
+        const ball = noRay(new THREE.Mesh(new THREE.SphereGeometry(0.55, 12, 8), new THREE.MeshBasicMaterial({ color: tok.orange, depthTest: false, transparent: true })));
+        ball.renderOrder = 12;
+        const shaft = noRay(new THREE.Line(lineGeo([0, 0, 0, 0, 0, 0]), new THREE.LineBasicMaterial({ color: tok.orange, depthTest: false, transparent: true })));
+        shaft.frustumCulled = false; shaft.renderOrder = 12;
+        this.hgrp.add(cone, ball, shaft); this.handles.push({ cone, ball, shaft });
+      }
+      transform.setMode('translate'); transform.setSpace('world');
+      transform.addEventListener('objectChange', this.onGizmo);
+      transform.addEventListener('dragging-changed', this.onDragChange);
+      transform.attach(pivot);
+      setPrompt('Táhněte oranžovými šipkami pro změnu rozměrů, manipulátorem pro posun, nebo klepněte do pohledu');
       this.update();
     },
     feature() { return { id: f ? f.id : 'tmp', type, p: primParams(type, this.vals), pos: this.pos.slice(), op: this.op }; },
     update() {
       clearGroup(G.preview); this.tool = null;
+      if (!this.gizmoDrag) pivot.position.set(this.pos[0], this.pos[1], this.pos[2]);
       try {
         this.tool = Engine.toolForPrimitive(this.feature());
         if (this.autoOp) { const o = anyOverlap(this.tool) ? 'join' : 'new'; if (o !== this.op) { this.op = o; dlg.set('op', o); } }
@@ -1474,8 +1507,59 @@ function startPrimitive(type, editIndex, f) {
       } catch (e) { dlg.set('n', '!' + e.message); dlg.okEnabled(false); }
       requestRender();
     },
-    onMove() { dom.style.cursor = 'crosshair'; },
+    onFrame() {
+      const hs = primHandles(type, this.vals), base = v3(this.pos);
+      hs.forEach((h, i) => {
+        const o = this.handles[i]; if (!o) return;
+        const dir = v3(h.dir), a = base.clone().add(v3(h.a)), tip = a.clone().addScaledVector(dir, h.dist);
+        const s = cam().position.distanceTo(tip) * (isOrtho ? 0 : 0.012) || (orthoH / ortho.zoom) * 0.03;
+        o.cone.scale.setScalar(s); o.cone.quaternion.setFromUnitVectors(new V3(0, 1, 0), dir);
+        o.cone.position.copy(tip).addScaledVector(dir, s * 2.2);
+        o.ball.scale.setScalar(s); o.ball.position.copy(tip);
+        const b = tip.clone().addScaledVector(dir, s * 1.2), pa = o.shaft.geometry.attributes.position;
+        pa.setXYZ(0, tip.x, tip.y, tip.z); pa.setXYZ(1, b.x, b.y, b.z); pa.needsUpdate = true;
+        const on = this.drag ? this.drag.i === i : this.hover === i, col = on ? tok.accent : tok.orange;
+        o.cone.material.color.copy(col); o.ball.material.color.copy(col); o.shaft.material.color.copy(col);
+      });
+    },
+    handleAt(ev) {
+      ray.setFromCamera(evNdc(ev), cam());
+      for (let i = 0; i < this.handles.length; i++) { const cn = this.handles[i].cone; cn.updateMatrixWorld(true); if (ray.intersectObject(cn, false).length) return i; }
+      return -1;
+    },
+    onDown(ev) {
+      const i = this.handleAt(ev); if (i < 0) return false;
+      const h = primHandles(type, this.vals)[i];
+      this.drag = { i, a: v3(this.pos).add(v3(h.a)), dir: v3(h.dir) };
+      controls.enabled = false; transform.enabled = false;
+      return true;
+    },
+    onDrag(ev) {
+      const d = this.drag; if (!d) return;
+      ray.setFromCamera(evNdc(ev), cam());
+      const o = ray.ray.origin, r = ray.ray.direction, w0 = d.a.clone().sub(o), b = d.dir.dot(r), dd = d.dir.dot(w0), e = r.dot(w0), den = 1 - b * b;
+      if (Math.abs(den) < 1e-6) return;
+      const s = (b * e - dd) / den, h = primHandles(type, this.vals)[d.i];
+      const st = settings.gridSnap ? settings.snap : 0.01;
+      const nv = h.set(s);
+      for (const k in nv) {
+        let v = Math.round(nv[k] / st) * st; v = Math.max(st, Math.round(v * 1000) / 1000);
+        if (type === 'torus' && k === 'R') v = Math.max(v, this.vals.t + st);
+        if (type === 'torus' && k === 't') v = Math.min(v, this.vals.R - st);
+        if (v > 0 && v !== this.vals[k]) { this.vals[k] = v; dlg.set(k, v); this.update(); }
+      }
+      const el = $('#dim'), px = evPx(ev), label = defs.find(x => x[0] === h.k)[1];
+      el.textContent = `${label}: ${fmtc(this.vals[h.k], 2)} mm`; el.hidden = false;
+      el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px';
+    },
+    onUp() { this.drag = null; controls.enabled = true; transform.enabled = true; $('#dim').hidden = true; requestRender(); },
+    onMove(ev) {
+      const i = this.handleAt(ev), hv = i >= 0 ? i : null;
+      if (hv !== this.hover) { this.hover = hv; requestRender(); }
+      dom.style.cursor = hv !== null ? 'grab' : 'crosshair';
+    },
     onClick(ev) {
+      if (this.handleAt(ev) >= 0) return;
       const h = hitBodies(ev);
       let p;
       if (h) p = h.point;
@@ -1484,8 +1568,21 @@ function startPrimitive(type, editIndex, f) {
       this.pos = [snapV(p.x), snapV(p.y), Math.round(p.z * 1000) / 1000];
       dlg.set('pos', this.pos); this.update();
     },
-    ok() { if (!this.tool) return null; const out = this.feature(); out.id = f ? f.id : newId(); return out; }
+    onGizmo: null, onDragChange: null,
+    ok() { if (!this.tool) return null; const out = this.feature(); out.id = f ? f.id : newId(); return out; },
+    cleanup() {
+      transform.removeEventListener('objectChange', this.onGizmo);
+      transform.removeEventListener('dragging-changed', this.onDragChange);
+      transform.detach(); transform.enabled = true; scene.remove(pivot);
+      controls.enabled = true; $('#dim').hidden = true;
+    }
   };
+  c.onGizmo = () => {
+    const p = pivot.position;
+    c.pos = [snapV(p.x), snapV(p.y), snapV(p.z)];
+    dlg.set('pos', c.pos); c.update();
+  };
+  c.onDragChange = e => { controls.enabled = !e.value; c.gizmoDrag = e.value; if (!e.value) { pivot.position.set(c.pos[0], c.pos[1], c.pos[2]); requestRender(); } };
   beginCmd(c); c.init();
 }
 

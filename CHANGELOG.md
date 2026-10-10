@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 0.16
+- Kvádr, válec, koule, kužel a anuloid: rozměry lze měnit tažením oranžových šipek přímo v pohledu (šířka, hloubka, výška, průměr, poloměry), během tažení se ukazuje aktuální rozměr.
+- Polohu vkládaného tělesa lze posouvat manipulátorem stejně jako u Přesunout.
+
 ## Beta 0.15
 - Po spuštění se už nenačítá ukázkový model, aplikace začíná prázdným návrhem. Ukázku lze načíst v nabídce Soubor.
 
