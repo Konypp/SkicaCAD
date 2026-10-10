@@ -204,7 +204,7 @@ function validDoc(d) {
 }
 let doc = null;
 try { doc = validDoc(JSON.parse(localStorage.getItem(KEY))); } catch (e) {}
-if (!doc) doc = exampleDoc();
+if (!doc) doc = emptyDoc();
 
 let hist = [], hi = -1;
 const saveDoc = () => { try { localStorage.setItem(KEY, JSON.stringify(doc)); } catch (e) {} };
