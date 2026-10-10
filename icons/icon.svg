@@ -1,14 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <title>SkicaCAD</title>
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1c3463"/>
-      <stop offset="1" stop-color="#0a1220"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <polygon points="113.1,179.5 256,262 256,427 113.1,344.5" fill="#2f7bff"/>
-  <polygon points="256,262 398.9,179.5 398.9,344.5 256,427" fill="#1a4cc2"/>
-  <polygon points="256,97 398.9,179.5 256,262 113.1,179.5" fill="#9ad8ff"/>
-  <polyline points="256,97 398.9,179.5 256,262 113.1,179.5 256,97" fill="none" stroke="#ff9f1c" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 148 148" width="512" height="512">
+  <rect width="148" height="148" rx="34" fill="#1B2430"/>
+  <g transform="translate(14 11) scale(1.0)" fill="none" stroke="#F2EFE7" stroke-width="6" stroke-linejoin="round" stroke-linecap="round">
+    <polyline points="60,110 18,86 18,38" stroke-dasharray="8 6.73" stroke-linecap="butt"/>
+    <polygon points="60,14 102,38 60,62 18,38" fill="#E4572E"/>
+    <polygon points="102,38 102,86 60,110 60,62" fill="#F2EFE7"/>
+  </g>
 </svg>
