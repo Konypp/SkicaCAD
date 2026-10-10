@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>SkicaCAD Beta 0.16</title>
+<title>SkicaCAD Beta 0.17</title>
 <meta name="description" content="SkicaCAD – parametrické 3D CAD v prohlížeči (testovací verze).">
 <meta name="theme-color" content="#1B2430">
 <link rel="manifest" href="manifest.webmanifest">
@@ -25,7 +25,7 @@
   <header class="appbar">
     <div class="brand">
       <svg width="26" height="18" viewBox="0 0 30 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3v14M28 3v14M4.5 10h21M4.5 10l3-2.4M4.5 10l3 2.4M25.5 10l-3-2.4M25.5 10l-3 2.4"/></svg>
-      <span>SkicaCAD</span><span class="beta" id="ver-badge" title="Testovací verze">Beta 0.16</span>
+      <span>SkicaCAD</span><span class="beta" id="ver-badge" title="Testovací verze">Beta 0.17</span>
     </div>
     <button class="abtn" id="filebtn" aria-haspopup="true" aria-expanded="false" title="Soubor"><span class="ico" data-ic="menu" data-s="18"></span><span class="lbltxt">Soubor</span></button>
     <button class="abtn" id="undo" title="Zpět (Ctrl+Z)" aria-label="Zpět"><span class="ico" data-ic="undo" data-s="18"></span></button>
@@ -41,6 +41,8 @@
       <hr>
       <button id="m-import">Importovat…<small>.stl .obj .dxf .svg .zip</small></button>
       <button id="m-export">Exportovat STL + OBJ<small>.zip</small></button>
+      <hr>
+      <button id="m-install" hidden>Nainstalovat aplikaci</button>
     </div>
     <input type="file" id="fileinput" accept=".json,.zip,application/json,application/zip" hidden>
     <input type="file" id="importinput" accept=".stl,.obj,.dxf,.svg,.zip" hidden>
@@ -107,6 +109,23 @@
 <script src="js/features.js"></script>
 <script src="js/importers.js"></script>
 <script src="js/app.js"></script>
+<script>
+  // Instalace PWA: prohlížeč sám nabídku nezobrazí vždy, proto je v nabídce Soubor tlačítko.
+  (() => {
+    const btn = document.getElementById('m-install');
+    let deferred = null;
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferred = e; btn.hidden = false; });
+    window.addEventListener('appinstalled', () => { deferred = null; btn.hidden = true; });
+    btn.addEventListener('click', async () => {
+      if (!deferred) return;
+      const d = deferred; deferred = null; btn.hidden = true;
+      d.prompt(); try { await d.userChoice; } catch (e) {}
+    });
+    // iOS Safari instalaci přes skript neumí – jednorázově ukážeme návod.
+    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.navigator.standalone;
+    if (ios) { btn.hidden = false; btn.textContent = 'Jak nainstalovat (iOS)'; btn.addEventListener('click', () => alert('V Safari klepněte na Sdílet a zvolte „Přidat na plochu“.')); }
+  })();
+</script>
 <script>
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

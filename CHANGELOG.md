@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.17
+- Tlačítko „Nainstalovat aplikaci“ v nabídce Soubor (u iOS návod).
+
 ## Beta 0.16
 - Kvádr, válec, koule, kužel a anuloid: rozměry lze měnit tažením oranžových šipek přímo v pohledu (šířka, hloubka, výška, průměr, poloměry), během tažení se ukazuje aktuální rozměr.
 - Polohu vkládaného tělesa lze posouvat manipulátorem stejně jako u Přesunout.
