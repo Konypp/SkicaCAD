@@ -318,3 +318,4 @@ return { readZip, parseSTL, parseOBJ, parseDXF, parseSVG, svgPathSubpaths, chain
 
 
 
+

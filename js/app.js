@@ -3228,6 +3228,7 @@ $('#nav-step').addEventListener('change', e => { settings.snap = parseFloat(e.ta
 
 /* ================= file menu, export ================= */
 /* samostatná verze (PWA): soubory se stahují přes odkaz s atributem download */
+/* samostatná verze (PWA): soubory se stahují přes odkaz s atributem download */
 const dl = { async save({ filename, data }) {
   const blob = data instanceof Blob ? data : new Blob([data], { type: typeof data === 'string' ? 'application/json' : 'application/octet-stream' });
   const url = URL.createObjectURL(blob), el = document.createElement('a');
@@ -3327,7 +3328,7 @@ function showStart(first) {
       <button class="btn primary" data-act="new">Nový návrh</button>
       ${last ? `<button class="btn" data-open="${last.uid}">Pokračovat: ${esc(last.name)}</button>` : ''}
     </div>
-    ${list.length ? `<div class="sd-label">Předchozí návrhy</div><ul class="sd-list">${rows}</ul>` : '<p class="sd-empty">Zatím tu nejsou žádné uložené návrhy.</p>'}
+    ${list.length ? `<div class="sd-label">Předchozí návrhy</div><ul class="sd-list">${rows}</ul>` : '<p class="sd-empty">Zatím tu nejsou žádné uložené návrhy. Jakmile začnete modelovat, návrh se sám uloží a příště ho najdete tady.</p>'}
     <div class="sd-foot"><button class="btn sm" data-act="file">Otevřít ze souboru…</button><button class="btn sm" data-act="example">Ukázkový model</button></div>
     <p class="sd-note">Návrhy se ukládají automaticky jen v tomto prohlížeči. Zálohu uděláte přes Soubor › Uložit návrh.</p></div>`;
   ov.hidden = false;
@@ -3399,9 +3400,10 @@ if (window.matchMedia('(max-width: 760px)').matches) $('#bw-toggle').innerHTML =
 pushHist();
 loadStoredBlobs();
 refreshBusy(() => fitView(VIEW_ISO, true));
-if (libList().length) showStart(true);
+showStart(true);
 if (window.__KOTA_TEST__) window.__kota = { get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart,
   get doc() { return doc; }, get cur() { return cur; }, get cmd() { return cmd; }, get sk() { return sk; }, get dlg() { return dlg; }, get sel() { return sel; }, meshes, chainsFor };
 })();
+
 
 
