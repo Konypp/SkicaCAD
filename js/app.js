@@ -2349,39 +2349,7 @@ function startThread(editIndex, f) {
 }
 
 /* ================= scale finished bodies ================= */
-/* shared orange drag arrows (used by scale) */
-function makeArrowHandles(n) {
-  const grp = new THREE.Group(), list = [];
-  for (let i = 0; i < n; i++) {
-    const mk = g => { const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: tok.orange, depthTest: false, transparent: true })); m.renderOrder = 12; return m; };
-    const cone = mk(new THREE.ConeGeometry(1, 2.6, 18)), ball = noRay(mk(new THREE.SphereGeometry(0.55, 12, 8)));
-    const shaft = noRay(new THREE.Line(lineGeo([0, 0, 0, 0, 0, 0]), new THREE.LineBasicMaterial({ color: tok.orange, depthTest: false, transparent: true })));
-    shaft.frustumCulled = false; shaft.renderOrder = 12;
-    grp.add(cone, ball, shaft); list.push({ cone, ball, shaft });
-  }
-  G.overlay.add(grp);
-  return { grp, list };
-}
-function placeArrow(o, tip, dir, on) {
-  const s = cam().position.distanceTo(tip) * (isOrtho ? 0 : 0.012) || (orthoH / ortho.zoom) * 0.03;
-  o.cone.scale.setScalar(s); o.cone.quaternion.setFromUnitVectors(new V3(0, 1, 0), dir); o.cone.position.copy(tip).addScaledVector(dir, s * 2.2);
-  o.ball.scale.setScalar(s); o.ball.position.copy(tip);
-  const b = tip.clone().addScaledVector(dir, s * 1.2), pa = o.shaft.geometry.attributes.position;
-  pa.setXYZ(0, tip.x, tip.y, tip.z); pa.setXYZ(1, b.x, b.y, b.z); pa.needsUpdate = true;
-  const col = on ? tok.accent : tok.orange;
-  o.cone.material.color.copy(col); o.ball.material.color.copy(col); o.shaft.material.color.copy(col);
-}
-function arrowAt(ev, list) {
-  ray.setFromCamera(evNdc(ev), cam());
-  for (let i = 0; i < list.length; i++) { const cn = list[i].cone; if (!cn.visible) continue; cn.updateMatrixWorld(true); if (ray.intersectObject(cn, false).length) return i; }
-  return -1;
-}
-/* parameter along the line a + t*dir closest to the pointer ray, or null when the line faces the viewer */
-function lineParam(ev, a, dir) {
-  ray.setFromCamera(evNdc(ev), cam());
-  const o = ray.ray.origin, r = ray.ray.direction, w0 = a.clone().sub(o), b = dir.dot(r), dd = dir.dot(w0), e = r.dot(w0), den = 1 - b * b;
-  return Math.abs(den) < 1e-6 ? null : (b * e - dd) / den;
-}
+/* dimension label next to the pointer while dragging */
 function showDimAt(ev, text) { const el = $('#dim'), px = evPx(ev); el.textContent = text; el.hidden = false; el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px'; }
 
 function startScale(editIndex, f) {
@@ -2417,47 +2385,33 @@ function startScale(editIndex, f) {
         },
         onBtn: (id, v) => { const k = parseFloat(v); this.s = this.s.map(x => x * k); this.refreshFields(); this.apply(); }
       });
-      this.arrows = makeArrowHandles(3);
+      transform.setMode('scale'); transform.setSpace('local');
+      transform.addEventListener('objectChange', this.onGizmo);
+      transform.addEventListener('dragging-changed', this.onDragChange);
+      dom.addEventListener('pointermove', this.onPtr);
       this.recenter();
     },
-    arrows: null, drag: null, hoverH: null,
+    pivotObj: null, onGizmo: null, onDragChange: null, onPtr: null, lastEv: null, dragging: false, s0: null,
     pivotPt() { const mid = this.box.getCenter(new V3()); return this.pivot === 'origin' ? [0, 0, 0] : this.pivot === 'base' ? [mid.x, mid.y, this.box.min.z] : [mid.x, mid.y, mid.z]; },
-    scaledBox() {
-      const cc = this.pivotPt(), mn = this.box.min, mx = this.box.max, f = (v, k) => cc[k] + this.s[k] * (v - cc[k]);
-      const min = new V3(f(mn.x, 0), f(mn.y, 1), f(mn.z, 2)), max = new V3(f(mx.x, 0), f(mx.y, 1), f(mx.z, 2));
-      return { min, max, center: () => new V3((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2) };
+    /* place the manipulator at the scaling centre and mirror the current factors in it */
+    syncGizmo() {
+      if (this.box.isEmpty()) { transform.detach(); return; }
+      const cc = this.pivotPt();
+      this.pivotObj.position.set(cc[0], cc[1], cc[2]); this.pivotObj.rotation.set(0, 0, 0);
+      this.pivotObj.scale.set(this.s[0], this.s[1], this.s[2]);
+      if (transform.object !== this.pivotObj) transform.attach(this.pivotObj);
+      requestRender();
     },
-    onFrame() {
-      if (!this.arrows) return;
-      const ok = !this.box.isEmpty(); this.arrows.grp.visible = ok; if (!ok) return;
-      const sb = this.scaledBox(), mid = sb.center();
-      for (let k = 0; k < 3; k++) {
-        const dir = new V3(k === 0 ? 1 : 0, k === 1 ? 1 : 0, k === 2 ? 1 : 0), tip = mid.clone(); tip.setComponent(k, sb.max.getComponent(k));
-        placeArrow(this.arrows.list[k], tip, dir, this.drag ? this.drag.k === k : this.hoverH === k);
-      }
-    },
-    onDown(ev) {
-      if (!this.arrows || this.box.isEmpty()) return false;
-      const k = arrowAt(ev, this.arrows.list); if (k < 0) return false;
-      const sb = this.scaledBox(), a = sb.center(); a.setComponent(k, 0);
-      this.drag = { k, a, dir: new V3(k === 0 ? 1 : 0, k === 1 ? 1 : 0, k === 2 ? 1 : 0), min: sb.min.getComponent(k) };
-      controls.enabled = false; return true;
-    },
-    onDrag(ev) {
-      const d = this.drag; if (!d) return;
-      const t = lineParam(ev, d.a, d.dir); if (t === null) return;
-      const k = d.k, o = this.orig()[k]; if (!(o > 1e-9)) return;
-      const cc = this.pivotPt()[k], mx = this.box.max.getComponent(k);
-      let fk = Math.abs(mx - cc) > 1e-6 * Math.max(1, o) ? (t - cc) / (mx - cc) : (t - d.min) / o;
+    fromGizmo() {
+      const sc = this.pivotObj.scale, raw = [sc.x, sc.y, sc.z].map(v => Math.max(1e-3, Math.abs(v))), o = this.orig();
       const st = settings.gridSnap ? settings.snap : 0.01;
-      let size = Math.max(st, Math.round(o * fk / st) * st); fk = size / o;
-      if (!(fk > 0) || Math.abs(fk - this.s[k]) < 1e-9) return;
-      if (this.uniform) this.s = [fk, fk, fk]; else this.s[k] = fk;
+      const snapF = (fk, k) => (o[k] > 1e-9 ? Math.max(st, Math.round(o[k] * fk / st) * st) / o[k] : fk);
+      const s0 = this.s0 || this.s; let k = 0; for (let j = 1; j < 3; j++) if (Math.abs(raw[j] / s0[j] - 1) > Math.abs(raw[k] / s0[k] - 1)) k = j;
+      if (this.uniform) { const fk = snapF(raw[k], k); this.s = [fk, fk, fk]; }
+      else this.s = raw.map((v, j) => snapF(v, j));
       this.refreshFields(); this.apply();
-      const sz = this.orig().map((v, j) => v * this.s[j]);
-      showDimAt(ev, `${'XYZ'[k]}: ${fmtc(sz[k], 2)} mm · ${fmtc(this.s[k] * 100, 1)} %`);
+      if (this.lastEv) { const sz = o.map((v, j) => v * this.s[j]); showDimAt(this.lastEv, this.uniform ? `${fmtc(this.s[0] * 100, 1)} % · ${sz.map(v => fmtc(v, 1)).join(' × ')} mm` : `${'XYZ'[k]}: ${fmtc(sz[k], 2)} mm · ${fmtc(this.s[k] * 100, 1)} %`); }
     },
-    onUp() { this.drag = null; controls.enabled = true; $('#dim').hidden = true; requestRender(); },
     orig() { const s = this.box.getSize(new V3()); return [s.x, s.y, s.z]; },
     recenter() {
       const ids = this.ids(); this.box = new THREE.Box3();
@@ -2465,7 +2419,7 @@ function startScale(editIndex, f) {
       this.highlight = new Set(ids);
       dlg.show('bodies', !this.all);
       dlg.set('bodies', this.all ? { text: 'Celý model', has: true, active: false } : bodySelText(new Set(ids)));
-      setPrompt(this.all ? 'Táhněte oranžovými šipkami nebo zadejte měřítko či rozměry' : ids.length ? 'Táhněte oranžovými šipkami. Klepnutím na těleso výběr změníte.' : 'Vyberte tělesa, jejichž velikost chcete změnit');
+      setPrompt(this.all ? 'Táhněte kostičkami manipulátoru (střed = všechny osy) nebo zadejte měřítko či rozměry' : ids.length ? 'Táhněte kostičkami manipulátoru (střed = všechny osy). Klepnutím na těleso výběr změníte.' : 'Vyberte tělesa, jejichž velikost chcete změnit');
       dlg.okEnabled(ids.length > 0);
       this.refreshFields(); this.apply();
     },
@@ -2492,24 +2446,29 @@ function startScale(editIndex, f) {
         if (ids.has(id)) { e.mesh.matrixAutoUpdate = false; e.mesh.matrix.copy(M); e.mesh.matrixWorldNeedsUpdate = true; }
         else { e.mesh.matrixAutoUpdate = true; e.mesh.matrix.identity(); e.mesh.updateMatrix(); }
       }
+      if (!this.dragging) this.syncGizmo();
       styleBodies();
     },
     onBody(id) { if (this.all) return; if (this.bodies.has(id)) this.bodies.delete(id); else this.bodies.add(id); this.recenter(); },
-    onMove(ev) {
-      const k = this.arrows ? arrowAt(ev, this.arrows.list) : -1, hv = k >= 0 ? k : null;
-      if (hv !== this.hoverH) { this.hoverH = hv; requestRender(); }
-      dom.style.cursor = hv !== null ? 'grab' : hitBodies(ev) ? 'pointer' : '';
-    },
-    onClick(ev) { if (this.arrows && arrowAt(ev, this.arrows.list) >= 0) return; const h = hitBodies(ev); if (h) this.onBody(h.object.userData.bodyId); },
+    onMove(ev) { dom.style.cursor = transform.axis ? 'grab' : hitBodies(ev) ? 'pointer' : ''; },
+    onClick(ev) { const h = hitBodies(ev); if (h) this.onBody(h.object.userData.bodyId); },
     ok() {
       const ids = this.ids(); if (!ids.length || !this.s.every(x => x > 0)) return null;
       return { id: f ? f.id : newId(), type: 'scale', all: this.all, bodies: this.all ? [] : ids, s: this.s.slice(), pivot: this.pivot };
     },
     cleanup() {
+      transform.removeEventListener('objectChange', this.onGizmo);
+      transform.removeEventListener('dragging-changed', this.onDragChange);
+      dom.removeEventListener('pointermove', this.onPtr);
+      transform.detach(); scene.remove(this.pivotObj); transform.setMode('translate'); transform.setSpace('world');
       for (const e of meshes.values()) { e.mesh.matrixAutoUpdate = true; e.mesh.matrix.identity(); e.mesh.position.set(0, 0, 0); e.mesh.rotation.set(0, 0, 0); e.mesh.updateMatrix(); }
       this.highlight = null; controls.enabled = true; $('#dim').hidden = true;
     }
   };
+  c.pivotObj = new THREE.Object3D(); scene.add(c.pivotObj);
+  c.onGizmo = () => { if (c.dragging) c.fromGizmo(); };
+  c.onDragChange = e => { controls.enabled = !e.value; c.dragging = !!e.value; if (e.value) c.s0 = c.s.slice(); else { c.s0 = null; $('#dim').hidden = true; c.syncGizmo(); } };
+  c.onPtr = e => { c.lastEv = e; };
   beginCmd(c); c.init();
 }
 
@@ -2585,6 +2544,7 @@ function startRotate(editIndex, f) {
         if (ids.has(id)) { e.mesh.matrixAutoUpdate = false; e.mesh.matrix.copy(M); e.mesh.matrixWorldNeedsUpdate = true; }
         else { e.mesh.matrixAutoUpdate = true; e.mesh.matrix.identity(); e.mesh.updateMatrix(); }
       }
+      if (!this.dragging) this.syncGizmo();
       styleBodies();
     },
     onBody(id) { if (this.all) return; if (this.bodies.has(id)) this.bodies.delete(id); else this.bodies.add(id); this.recenter(); },
@@ -3446,7 +3406,7 @@ pushHist();
 loadStoredBlobs();
 refreshBusy(() => fitView(VIEW_ISO, true));
 showStart(true);
-if (window.__KOTA_TEST__) window.__kota = { get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart, makeThumb, libThumb,
+if (window.__KOTA_TEST__) window.__kota = { get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart, makeThumb, libThumb, transform, persp, toPx, startMove,
   get doc() { return doc; }, get cur() { return cur; }, get cmd() { return cmd; }, get sk() { return sk; }, get dlg() { return dlg; }, get sel() { return sel; }, meshes, chainsFor };
 })();
 
