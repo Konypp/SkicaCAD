@@ -660,8 +660,9 @@ function renderBrowser() {
   const sks = Array.from(cur.sketches.values());
   li('lv2' + (sketchesVisible() ? '' : ' off'), `${tw('sketches', sks.length)}${eye('__sketches', sketchesVisible())}<span class="ico">${svg('folder', 16)}</span><span class="lbl">Skici</span><span class="cnt">${sks.length}</span>`);
   if (open.sketches) for (const f of sks) {
-    const n = li('lv3' + (isVis(f.id) ? '' : ' off'), `${eye(f.id, isVis(f.id))}<span class="ico">${svg('sketchi', 16)}</span>`);
-    const lb = document.createElement('button'); lb.className = 'lbl'; lb.textContent = f.name || 'Skica'; lb.dataset.sketch = f.id; lb.title = 'Dvojklikem upravíte skicu'; n.appendChild(lb);
+    const selSk = (cmd && cmd.sketch === f.id) || (tlSel !== null && doc.features[tlSel] && doc.features[tlSel].id === f.id);
+    const n = li('lv3' + (selSk ? ' sel' : '') + (isVis(f.id) ? '' : ' off'), `${eye(f.id, isVis(f.id))}<span class="ico">${svg('sketchi', 16)}</span>`);
+    const lb = document.createElement('button'); lb.className = 'lbl'; lb.textContent = f.name || 'Skica'; lb.dataset.sketch = f.id; lb.title = 'Klepnutím vyberete (např. pro Vysunutí), dvojklikem upravíte skicu'; n.appendChild(lb);
   }
 }
 $('#tree').addEventListener('click', e => {
@@ -671,6 +672,13 @@ $('#tree').addEventListener('click', e => {
   const b = e.target.closest('[data-body]');
   if (b) { bodyClick(b.dataset.body, e.ctrlKey || e.metaKey || e.shiftKey); return; }
   if (e.target.closest('[data-selall]')) { selectAll(); return; }
+  const sk1 = e.target.closest('[data-sketch]');
+  if (sk1) {
+    if (cmd && cmd.onSketch) { cmd.onSketch(sk1.dataset.sketch); return; }
+    if (cmd || sk) return;
+    const i = doc.features.findIndex(x => x.id === sk1.dataset.sketch);
+    if (i >= 0) { sel = new Set(); tlSel = i; styleBodies(); renderBrowser(); renderTimeline(); updateInfo(); }
+  }
 });
 $('#tree').addEventListener('dblclick', e => {
   const b = e.target.closest('[data-body]'); if (b && !cmd && !sk) { renaming = b.dataset.body; renderBrowser(); return; }
@@ -1360,19 +1368,20 @@ function startExtrude(editIndex, f) {
       const sketches = Array.from(cur.sketches.values());
       if (!sketches.length) { endCmd(false); toast('Nejprve vytvořte skicu s uzavřeným profilem (S).'); return; }
       if (!this.sketch) {
-        const last = sketches[sketches.length - 1], regs = Engine.regions(last);
-        if (regs.length === 1) { this.sketch = last.id; this.regions = new Set([regs[0].ei]); }
+        /* which sketch to start with: the one selected in the timeline or browser, otherwise the newest sketch not yet used by any feature */
+        const used = new Set(doc.features.map(x => x.sketch).filter(Boolean));
+        const pre = this.preSketch && cur.sketches.get(this.preSketch);
+        const pick = pre || [...sketches].reverse().find(s => !used.has(s.id) && Engine.regions(s).length);
+        if (pick) this.chooseSketch(pick.id, false);
       }
-      for (const s of sketches) {
-        if (!isVis(s.id) && s.id !== this.sketch && sketches.length > 1 && s !== sketches[sketches.length - 1]) continue;
-        for (const r of Engine.regions(s)) { const m = regionMesh(s.plane, r, tok.orange, 0.22, 0.02); m.userData = { sid: s.id, ei: r.ei }; this.regionMeshes.push(m); G.overlay.add(m); }
-        G.overlay.add(sketchLines(s.plane, s.ents, tok.sketch, 0.05));
-      }
+      this.buildOverlay();
       openDialog({
         title: 'Vysunutí', icon: 'extrude',
-        fields: [{ k: 'sel', id: 'prof', label: 'Profil' }, { k: 'seg', id: 'dir', label: 'Směr', options: [['one', 'Jedna strana'], ['sym', 'Symetricky']], value: this.sym ? 'sym' : 'one' },
+        fields: [{ k: 'opt', id: 'sk', label: 'Skica', options: [['', '– vyberte –'], ...sketches.map(s => [s.id, s.name || 'Skica'])], value: this.sketch || '' },
+          { k: 'sel', id: 'prof', label: 'Profil' }, { k: 'seg', id: 'dir', label: 'Směr', options: [['one', 'Jedna strana'], ['sym', 'Symetricky']], value: this.sym ? 'sym' : 'one' },
           { k: 'num', id: 'dist', label: 'Vzdálenost', value: this.dist }, { k: 'opt', id: 'op', label: 'Operace', options: OPS, value: this.op }, { k: 'note', id: 'n' }],
         onChange: (id, live) => {
+          if (id === 'sk') { const v = dlg.get('sk'); if (v) { this.chooseSketch(v, true); this.buildOverlay(); } }
           if (id === 'dist') { const v = dlg.get('dist'); if (isFinite(v)) this.dist = v; }
           if (id === 'dir') this.sym = dlg.get('dir') === 'sym';
           if (id === 'op') { this.op = dlg.get('op'); this.autoOp = false; }
@@ -1381,8 +1390,27 @@ function startExtrude(editIndex, f) {
       });
       this.update();
     },
+    preSketch: (() => { if (f || tlSel === null) return null; const t = doc.features[tlSel]; return t && t.type === 'sketch' ? t.id : null; })(),
+    /* select a sketch; a single closed profile is selected straight away */
+    chooseSketch(id, fromUser) {
+      const s = cur.sketches.get(id); if (!s) return;
+      this.sketch = id; const regs = Engine.regions(s);
+      this.regions = new Set(regs.length === 1 ? [regs[0].ei] : []);
+      if (fromUser && dlg) dlg.set('sk', id);
+    },
+    /* show profiles of visible sketches, of sketches not used yet, and of the chosen one */
+    buildOverlay() {
+      clearGroup(G.overlay); this.regionMeshes = [];
+      const used = new Set(doc.features.filter(x => x.id !== (f && f.id)).map(x => x.sketch).filter(Boolean));
+      for (const s of cur.sketches.values()) {
+        if (s.id !== this.sketch && !isVis(s.id) && used.has(s.id)) continue;
+        for (const r of Engine.regions(s)) { const m = regionMesh(s.plane, r, tok.orange, 0.22, 0.02); m.userData = { sid: s.id, ei: r.ei }; this.regionMeshes.push(m); G.overlay.add(m); }
+        G.overlay.add(sketchLines(s.plane, s.ents, s.id === this.sketch ? tok.accent : tok.sketch, 0.05));
+      }
+    },
     update() {
       this.regionMeshes.forEach(m => { const on = m.userData.sid === this.sketch && this.regions.has(m.userData.ei); m.material.color.copy(on ? tok.accent : tok.orange); m.material.opacity = on ? 0.4 : 0.22; });
+      if (dlg) dlg.set('sk', this.sketch || '');
       clearGroup(G.preview); this.tool = null; this.arrow = null;
       const n = this.regions.size;
       dlg.set('prof', { text: n ? `${n} ${n === 1 ? 'profil' : n < 5 ? 'profily' : 'profilů'}` : 'Vyberte profil', has: n > 0, active: true });
@@ -1460,10 +1488,11 @@ function startExtrude(editIndex, f) {
       this.regionMeshes.forEach(m => m.updateMatrixWorld(true));
       const h = ray.intersectObjects(this.regionMeshes, false)[0]; if (!h) return;
       const { sid, ei } = h.object.userData;
-      if (sid !== this.sketch) { this.sketch = sid; this.regions = new Set([ei]); }
+      if (sid !== this.sketch) { this.sketch = sid; this.regions = new Set([ei]); this.buildOverlay(); }
       else if (this.regions.has(ei)) this.regions.delete(ei); else this.regions.add(ei);
       this.update();
     },
+    onSketch(id) { this.chooseSketch(id, true); this.buildOverlay(); this.update(); },
     ok() {
       if (!this.tool) return null;
       const out = this.feature(); out.id = f ? f.id : newId();
