@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 0.25
+- Oprava offline režimu: three.js (r128, licence MIT) je nově přímo v aplikaci ve složce `vendor/three` místo načítání z CDN. Service worker ho ukládá hned při instalaci, takže se aplikace spustí i bez internetu, také po aktualizaci (dřív se při každé nové verzi knihovna z mezipaměti smazala).
+- Service worker: nová verze se aktivuje jen s úplnou mezipamětí (jinak zůstane funkční předchozí), stránka i soubory mají při pomalé síti časový limit 4 s a pak se použije uložená kopie. Písma mají vlastní trvalou mezipaměť.
+
 ## Beta 0.24
 - Úvodní nabídka: u předchozích návrhů je náhled modelu (izometrický pohled). Náhled se vytvoří automaticky chvíli po každé změně návrhu; starší návrhy ho dostanou při prvním otevření.
 
