@@ -204,16 +204,17 @@ function validDoc(d) {
   return out;
 }
 /* local library of designs: index under LKEY, every design under its own key. Empty designs are never stored. */
-const LKEY = 'skicacad-library', DKEY = uid => 'skicacad-doc-' + uid, LIB_MAX = 60;
+const LKEY = 'skicacad-library', DKEY = uid => 'skicacad-doc-' + uid, TKEY = uid => 'skicacad-thumb-' + uid, LIB_MAX = 60;
+const libThumb = uid => { try { return localStorage.getItem(TKEY(uid)); } catch (e) { return null; } };
 function libList() { try { const l = JSON.parse(localStorage.getItem(LKEY)); return Array.isArray(l) ? l.filter(x => x && typeof x.uid === 'string') : []; } catch (e) { return []; } }
 function libWrite(list) { try { localStorage.setItem(LKEY, JSON.stringify(list)); } catch (e) { /* ignore */ } }
 function libGet(uid) { try { return validDoc(JSON.parse(localStorage.getItem(DKEY(uid)))); } catch (e) { return null; } }
-function libDelete(uid) { libWrite(libList().filter(x => x.uid !== uid)); try { localStorage.removeItem(DKEY(uid)); } catch (e) { /* ignore */ } }
+function libDelete(uid) { libWrite(libList().filter(x => x.uid !== uid)); try { localStorage.removeItem(DKEY(uid)); localStorage.removeItem(TKEY(uid)); } catch (e) { /* ignore */ } }
 function libStore(d) {
   localStorage.setItem(DKEY(d.uid), JSON.stringify(d));
   const l = libList().filter(x => x.uid !== d.uid);
   l.unshift({ uid: d.uid, name: d.name, t: Date.now(), n: d.features.length });
-  for (const x of l.splice(LIB_MAX)) { try { localStorage.removeItem(DKEY(x.uid)); } catch (e) { /* ignore */ } }
+  for (const x of l.splice(LIB_MAX)) { try { localStorage.removeItem(DKEY(x.uid)); localStorage.removeItem(TKEY(x.uid)); } catch (e) { /* ignore */ } }
   libWrite(l);
 }
 /* one-time move of the old single autosaved design into the library */
@@ -228,6 +229,7 @@ let hist = [], hi = -1, quotaWarned = false;
 const saveDoc = () => {
   if (!doc.uid) doc.uid = newUid();
   if (!doc.features.length) return;
+  scheduleThumb();
   try { libStore(doc); } catch (e) { if (!quotaWarned) { quotaWarned = true; toast('Úložiště prohlížeče je plné. Smažte staré návrhy (Soubor › Moje návrhy) nebo návrh uložte do souboru.'); } }
 };
 function pushHist() {
@@ -3315,13 +3317,56 @@ document.addEventListener('click', e => { if (!menu.contains(e.target) && e.targ
 $('#m-new').addEventListener('click', () => { closeMenu(); loadDoc(emptyDoc(), 'Nový návrh'); });
 $('#m-library').addEventListener('click', () => { closeMenu(); showStart(false); });
 
+/* ================= design thumbnails for the library ================= */
+/* rendered from a fixed isometric view into a small JPEG, independent of the user's current view */
+let thumbTimer = null;
+function scheduleThumb(delay = 1500) {
+  clearTimeout(thumbTimer);
+  thumbTimer = setTimeout(() => {
+    if (cmd || sk || !$('#busy').hidden || viewMarker !== null) { scheduleThumb(1500); return; }
+    const uid = doc.uid; if (!uid || !doc.features.length) return;
+    const url = makeThumb();
+    if (url) { try { localStorage.setItem(TKEY(uid), url); } catch (e) { /* storage full: keep going without a picture */ } }
+  }, delay);
+}
+function makeThumb() {
+  const box = new THREE.Box3();
+  for (const e of meshes.values()) { if (!e.mesh.visible) continue; e.mesh.geometry.computeBoundingBox(); box.union(e.mesh.geometry.boundingBox); }
+  if (box.isEmpty()) return null;
+  const W = 240, H = 160, sp = box.getBoundingSphere(new THREE.Sphere());
+  const tc = new THREE.PerspectiveCamera(30, W / H, 0.5, 20000); tc.up.set(0, 0, 1);
+  const dist = Math.max(sp.radius, 1) / Math.sin(15 * D2R) * 1.08;
+  tc.position.copy(sp.center).add(VIEW_ISO.clone().normalize().multiplyScalar(dist)); tc.lookAt(sp.center); tc.updateProjectionMatrix();
+  const hide = [G.grid, G.origin, G.overlay, G.preview, G.sketches, G.planes, G.skwork, transform], was = hide.map(o => o.visible);
+  const pr = renderer.getPixelRatio(), vw = vp.clientWidth, vh = vp.clientHeight;
+  let url = null;
+  try {
+    hide.forEach(o => { o.visible = false; });
+    sun.position.copy(tc.position).add(new V3(0.3, 0.2, 0.5).multiplyScalar(dist)); sun.target.position.copy(sp.center);
+    renderer.setPixelRatio(1); renderer.setSize(W * 2, H * 2, false);
+    renderer.render(scene, tc);
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const g = cv.getContext('2d');
+    g.fillStyle = css(tok.panel); g.fillRect(0, 0, W, H);
+    g.drawImage(dom, 0, 0, W * 2, H * 2, 0, 0, W, H);
+    url = cv.toDataURL('image/jpeg', 0.78);
+    if (!url.startsWith('data:image/jpeg')) url = null;
+  } catch (e) { url = null; }
+  finally {
+    hide.forEach((o, i) => { o.visible = was[i]; });
+    renderer.setPixelRatio(pr); if (vw && vh) renderer.setSize(vw, vh);
+    render();
+  }
+  return url;
+}
+
 /* ================= start screen and library of designs ================= */
 const fmtDate = t => { const d = new Date(t), p = n => String(n).padStart(2, '0'); return `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()} ${d.getHours()}:${p(d.getMinutes())}`; };
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const krok = n => (n === 1 ? '1 krok' : n >= 2 && n <= 4 ? `${n} kroky` : `${n} kroků`);
 function showStart(first) {
   const ov = $('#startdlg'), list = libList(), last = list[0];
-  const rows = list.map(x => `<li data-uid="${x.uid}"${doc.uid === x.uid && doc.features.length ? ' class="cur"' : ''}><button class="sd-open" data-open="${x.uid}"><span class="sd-name">${esc(x.name)}</span><span class="sd-meta">${fmtDate(x.t)} · ${krok(x.n)}${doc.uid === x.uid && doc.features.length ? ' · otevřený' : ''}</span></button><button class="ibtn sd-del" data-del="${x.uid}" title="Smazat návrh" aria-label="Smazat návrh ${esc(x.name)}">${svg('skdel', 15)}</button></li>`).join('');
+  const rows = list.map(x => `<li data-uid="${x.uid}"${doc.uid === x.uid && doc.features.length ? ' class="cur"' : ''}><button class="sd-open" data-open="${x.uid}">${(t => (t ? `<img class="sd-thumb" src="${t}" alt="" loading="lazy">` : `<span class="sd-thumb sd-nothumb">${svg('box', 22)}</span>`))(libThumb(x.uid))}<span class="sd-txt"><span class="sd-name">${esc(x.name)}</span><span class="sd-meta">${fmtDate(x.t)} · ${krok(x.n)}${doc.uid === x.uid && doc.features.length ? ' · otevřený' : ''}</span></span></button><button class="ibtn sd-del" data-del="${x.uid}" title="Smazat návrh" aria-label="Smazat návrh ${esc(x.name)}">${svg('skdel', 15)}</button></li>`).join('');
   ov.innerHTML = `<div class="sd-box" role="dialog" aria-modal="true" aria-labelledby="sd-title">
     <div class="sd-head"><h2 id="sd-title">${first ? 'Vítejte ve ' + esc(SKICA.full) : 'Moje návrhy'}</h2><button class="ibtn" data-act="close" aria-label="Zavřít" title="Zavřít">${svg('close', 16)}</button></div>
     <div class="sd-actions">
@@ -3341,7 +3386,7 @@ $('#startdlg').addEventListener('click', e => {
   if (t.dataset.open) {
     const d = libGet(t.dataset.open);
     if (!d) { toast('Návrh se nepodařilo načíst.'); libDelete(t.dataset.open); showStart(false); return; }
-    hideStart(); loadDoc(d, `Otevřen návrh „${d.name}“`); return;
+    hideStart(); loadDoc(d, `Otevřen návrh „${d.name}“`); if (!libThumb(d.uid)) scheduleThumb(2500); return;
   }
   if (t.dataset.del) {
     if (t.dataset.confirm !== '1') { t.dataset.confirm = '1'; t.classList.add('warn'); t.title = 'Klepněte znovu pro smazání'; toast('Klepněte znovu na koš pro trvalé smazání návrhu.'); return; }
@@ -3401,7 +3446,7 @@ pushHist();
 loadStoredBlobs();
 refreshBusy(() => fitView(VIEW_ISO, true));
 showStart(true);
-if (window.__KOTA_TEST__) window.__kota = { get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart,
+if (window.__KOTA_TEST__) window.__kota = { get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart, makeThumb, libThumb,
   get doc() { return doc; }, get cur() { return cur; }, get cmd() { return cmd; }, get sk() { return sk; }, get dlg() { return dlg; }, get sel() { return sel; }, meshes, chainsFor };
 })();
 

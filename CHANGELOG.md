@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.24
+- Úvodní nabídka: u předchozích návrhů je náhled modelu (izometrický pohled). Náhled se vytvoří automaticky chvíli po každé změně návrhu; starší návrhy ho dostanou při prvním otevření.
+
 ## Beta 0.23
 - Oznámení o nové verzi: když se za běhu stáhne aktualizace, objeví se lišta „Je k dispozici nová verze aplikace“ s tlačítky Obnovit / Později. Aplikace hledá aktualizace při návratu do popředí a každou půlhodinu.
 
