@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.27
+- Základní těleso Kvádr nahrazeno Krychlí: výchozí rozměry 30 × 30 × 30 mm a šipky ji ve výchozím stavu mění rovnoměrně, takže zůstane krychlí. Po vypnutí volby nebo ručním zadání rozměrů z ní lze dál udělat kvádr.
+
 ## Beta 0.26
 - Měřítko: místo oranžových šipek stejný manipulátor jako u Přesunout a Otočit (v režimu měřítka). Kostičky na osách X, Y, Z mění velikost v dané ose, prostřední úchyt mění všechny osy najednou. Manipulátor stojí ve zvoleném středu změny, rozměry se přichytávají podle kroku mřížky a u kurzoru se ukazuje nový rozměr.
 

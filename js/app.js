@@ -766,7 +766,7 @@ document.addEventListener('pointerdown', e => { const m = $('#ctxmenu'); if (!m.
 /* ================= ribbon ================= */
 const RIBBON = {
   solid: [
-    ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'], ['box', 'Kvádr'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus']]],
+    ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'], ['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus']]],
     ['Upravit', [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení'], ['combine', 'Kombinovat'], ['move', 'Přesunout', 'M'], ['rotate', 'Otočit', 'R'], ['scale', 'Měřítko'], ['center', 'Vycentrovat'], ['pressface', 'Upravit plochu'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole'], ['del', 'Odstranit', 'Del']]],
     ['Výběr', [['selall', 'Vybrat vše', 'Ctrl+A'], ['facemode', 'Plochy', 'G']]],
     ['Kontrola', [['measure', 'Měřit', 'I']]],
@@ -1472,7 +1472,7 @@ function startExtrude(editIndex, f) {
 
 /* ================= primitives ================= */
 const PRIM_FIELDS = {
-  box: [['w', 'Šířka (X)', 40], ['d', 'Hloubka (Y)', 30], ['h', 'Výška (Z)', 20]],
+  box: [['w', 'Šířka (X)', 30], ['d', 'Hloubka (Y)', 30], ['h', 'Výška (Z)', 30]],
   cylinder: [['D', 'Průměr', 30], ['h', 'Výška', 30]],
   sphere: [['D', 'Průměr', 30]],
   cone: [['D', 'Průměr', 30], ['h', 'Výška', 30]],
@@ -1511,7 +1511,9 @@ function startPrimitive(type, editIndex, f) {
   const pivot = new THREE.Object3D(); scene.add(pivot);
   const c = {
     editIndex, vals, pos: f ? f.pos.slice() : [0, 0, 0], op: f ? f.op : 'new', autoOp: !f, tool: null,
-    hgrp: null, handles: [], drag: null, hover: null, gizmoDrag: false, uniform: false,
+    hgrp: null, handles: [], drag: null, hover: null, gizmoDrag: false,
+    /* a cube keeps its shape when dragged; any shape being edited keeps it if all its sides are equal */
+    uniform: type === 'box' && (!f || (f.p.w === f.p.d && f.p.d === f.p.h)),
     init() {
       openDialog({
         title: Engine.FEATURE_LABEL[type], icon: type,
