@@ -1,7 +1,16 @@
 # Changelog
 
+## Beta 0.20
+- Aplikace se vždy otevře s prázdnou plochou. Pokud jsou v prohlížeči uložené dřívější návrhy, zobrazí se úvodní nabídka: Nový návrh, Pokračovat v posledním návrhu a seznam předchozích návrhů (datum, počet kroků, mazání).
+- Každý návrh se průběžně ukládá do knihovny v prohlížeči zvlášť (až 60 návrhů), prázdné návrhy se neukládají. Seznam je dostupný i přes Soubor › Moje návrhy.
+- Dříve automaticky uložený návrh se při prvním spuštění přesune do knihovny.
+
 ## Beta 0.19
-- Převzato z artefaktu SkicaCAD Beta 0.19 (úpravy skic a rozměrů těles, závit lze měřit od spodního nebo horního konce, rovnoměrná změna rozměrů šipkami).
+- Převzato z artefaktu SkicaCAD Beta 0.19, obsahuje:
+  - Závit: začátek a konec závitu lze nastavit tažením šipek na válci (závit jen na části válce), volba „Měřit od“ spodního nebo horního konce.
+  - Měřítko: oranžové šipky X, Y, Z pro změnu velikosti tažením (se zachováním poměru stran nebo jen v jedné ose).
+  - Paleta skici: lze upravit všechny strany uzavřeného obrysu včetně uzavírací, změna délky tvar protáhne (obdélník zůstane obdélníkem).
+  - Rovnoměrná změna velikosti tažením bodu obrysu nebo křivky a volba „Šipkami měnit rovnoměrně všechny rozměry“ u základních těles.
 - PWA části (stahování souborů, instalace, service worker) zůstávají zachované.
 
 ## Beta 0.18

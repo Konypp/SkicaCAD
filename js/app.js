@@ -179,7 +179,7 @@ const XY = Engine.PLANES.XY;
 function exampleDoc() {
   const edges = [[-40, -25], [40, -25], [40, 25], [-40, 25]].map(([x, y]) => ({ k: 'line', a: [x, y, 0], b: [x, y, 12] }));
   return {
-    name: 'Držák s nábojem', seq: 8, vis: { f1: false, f3: false }, names: {},
+    uid: newUid(), name: 'Držák s nábojem', seq: 8, vis: { f1: false, f3: false }, names: {},
     features: [
       { id: 'f1', type: 'sketch', name: 'Skica 1', plane: XY, ents: [{ t: 'rect', x: -40, y: -25, w: 80, h: 50 }, { t: 'circle', x: -25, y: 0, r: 5 }, { t: 'circle', x: 25, y: 0, r: 5 }] },
       { id: 'f2', type: 'extrude', sketch: 'f1', regions: [0], dist: 12, sym: false, op: 'new' },
@@ -193,21 +193,43 @@ function exampleDoc() {
     marker: 8
   };
 }
-const emptyDoc = () => ({ name: 'Bez názvu', seq: 0, vis: {}, names: {}, features: [], marker: 0 });
+const newUid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const emptyDoc = () => ({ uid: newUid(), name: 'Bez názvu', seq: 0, vis: {}, names: {}, features: [], marker: 0 });
 function validDoc(d) {
   if (!d || !Array.isArray(d.features)) return null;
-  const out = { name: String(d.name || 'Bez názvu').slice(0, 60), seq: Number(d.seq) || 0, vis: (d.vis && typeof d.vis === 'object') ? d.vis : {},
+  const out = { uid: typeof d.uid === 'string' && /^[a-z0-9]{4,24}$/.test(d.uid) ? d.uid : newUid(), name: String(d.name || 'Bez názvu').slice(0, 60), seq: Number(d.seq) || 0, vis: (d.vis && typeof d.vis === 'object') ? d.vis : {},
     names: (d.names && typeof d.names === 'object') ? d.names : {}, features: d.features.filter(f => f && typeof f.id === 'string' && Engine.FEATURE_LABEL[f.type]).slice(0, 400) };
   out.marker = Math.max(0, Math.min(out.features.length, Number.isFinite(+d.marker) ? +d.marker : out.features.length));
   out.features.forEach(f => { const n = parseInt(f.id.replace(/\D/g, ''), 10); if (n > out.seq) out.seq = n; });
   return out;
 }
-let doc = null;
-try { doc = validDoc(JSON.parse(localStorage.getItem(KEY))); } catch (e) {}
-if (!doc) doc = emptyDoc();
+/* local library of designs: index under LKEY, every design under its own key. Empty designs are never stored. */
+const LKEY = 'skicacad-library', DKEY = uid => 'skicacad-doc-' + uid, LIB_MAX = 60;
+function libList() { try { const l = JSON.parse(localStorage.getItem(LKEY)); return Array.isArray(l) ? l.filter(x => x && typeof x.uid === 'string') : []; } catch (e) { return []; } }
+function libWrite(list) { try { localStorage.setItem(LKEY, JSON.stringify(list)); } catch (e) { /* ignore */ } }
+function libGet(uid) { try { return validDoc(JSON.parse(localStorage.getItem(DKEY(uid)))); } catch (e) { return null; } }
+function libDelete(uid) { libWrite(libList().filter(x => x.uid !== uid)); try { localStorage.removeItem(DKEY(uid)); } catch (e) { /* ignore */ } }
+function libStore(d) {
+  localStorage.setItem(DKEY(d.uid), JSON.stringify(d));
+  const l = libList().filter(x => x.uid !== d.uid);
+  l.unshift({ uid: d.uid, name: d.name, t: Date.now(), n: d.features.length });
+  for (const x of l.splice(LIB_MAX)) { try { localStorage.removeItem(DKEY(x.uid)); } catch (e) { /* ignore */ } }
+  libWrite(l);
+}
+/* one-time move of the old single autosaved design into the library */
+try {
+  const old = validDoc(JSON.parse(localStorage.getItem(KEY)));
+  if (old && old.features.length && !libList().some(x => x.uid === old.uid)) libStore(old);
+  localStorage.removeItem(KEY);
+} catch (e) { /* ignore */ }
 
-let hist = [], hi = -1;
-const saveDoc = () => { try { localStorage.setItem(KEY, JSON.stringify(doc)); } catch (e) {} };
+let doc = emptyDoc();
+let hist = [], hi = -1, quotaWarned = false;
+const saveDoc = () => {
+  if (!doc.uid) doc.uid = newUid();
+  if (!doc.features.length) return;
+  try { libStore(doc); } catch (e) { if (!quotaWarned) { quotaWarned = true; toast('Úložiště prohlížeče je plné. Smažte staré návrhy (Soubor › Moje návrhy) nebo návrh uložte do souboru.'); } }
+};
 function pushHist() {
   const s = JSON.stringify(doc);
   if (hist[hi] === s) return;
@@ -2850,6 +2872,7 @@ async function saveBlobs() {
 }
 function pruneBlobs() {
   const keep = new Set(); for (const h of hist) { try { for (const f of JSON.parse(h).features) if (f.type === 'import') keep.add(f.blob); } catch (e) { /* ignore */ } }
+  for (const x of libList()) { const d = libGet(x.uid); if (d) for (const f of d.features) if (f.type === 'import') keep.add(f.blob); }
   for (const id of Object.keys(blobs)) if (!keep.has(id)) { delete blobs[id]; persisted.delete(id); if (idbOk) IDB.del(id).catch(() => {}); }
   if (!idbOk) saveBlobsLocal();
 }
@@ -3279,9 +3302,9 @@ function exportZip(tris, n) {
 function loadDoc(d, msg) {
   if (sk) finishSketch(false);
   if (cmd) endCmd(false);
-  doc = d; viewMarker = null; sel = new Set(); tlSel = null;
+  doc = d; if (!doc.uid) doc.uid = newUid(); viewMarker = null; sel = new Set(); tlSel = null;
   $('#docname').value = doc.name;
-  pushHist(); saveDoc();
+  hist = []; hi = -1; pushHist(); saveDoc();
   refreshBusy(() => { fitView(VIEW_ISO); if (msg) toast(msg); });
 }
 const menu = $('#filemenu'), fbtn = $('#filebtn');
@@ -3289,6 +3312,49 @@ const closeMenu = () => { menu.hidden = true; fbtn.setAttribute('aria-expanded',
 fbtn.addEventListener('click', e => { e.stopPropagation(); menu.hidden = !menu.hidden; fbtn.setAttribute('aria-expanded', String(!menu.hidden)); });
 document.addEventListener('click', e => { if (!menu.contains(e.target) && e.target !== fbtn) closeMenu(); });
 $('#m-new').addEventListener('click', () => { closeMenu(); loadDoc(emptyDoc(), 'Nový návrh'); });
+$('#m-library').addEventListener('click', () => { closeMenu(); showStart(false); });
+
+/* ================= start screen and library of designs ================= */
+const fmtDate = t => { const d = new Date(t), p = n => String(n).padStart(2, '0'); return `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()} ${d.getHours()}:${p(d.getMinutes())}`; };
+const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const krok = n => (n === 1 ? '1 krok' : n >= 2 && n <= 4 ? `${n} kroky` : `${n} kroků`);
+function showStart(first) {
+  const ov = $('#startdlg'), list = libList(), last = list[0];
+  const rows = list.map(x => `<li data-uid="${x.uid}"${doc.uid === x.uid && doc.features.length ? ' class="cur"' : ''}><button class="sd-open" data-open="${x.uid}"><span class="sd-name">${esc(x.name)}</span><span class="sd-meta">${fmtDate(x.t)} · ${krok(x.n)}${doc.uid === x.uid && doc.features.length ? ' · otevřený' : ''}</span></button><button class="ibtn sd-del" data-del="${x.uid}" title="Smazat návrh" aria-label="Smazat návrh ${esc(x.name)}">${svg('skdel', 15)}</button></li>`).join('');
+  ov.innerHTML = `<div class="sd-box" role="dialog" aria-modal="true" aria-labelledby="sd-title">
+    <div class="sd-head"><h2 id="sd-title">${first ? 'Vítejte ve ' + esc(SKICA.full) : 'Moje návrhy'}</h2><button class="ibtn" data-act="close" aria-label="Zavřít" title="Zavřít">${svg('close', 16)}</button></div>
+    <div class="sd-actions">
+      <button class="btn primary" data-act="new">Nový návrh</button>
+      ${last ? `<button class="btn" data-open="${last.uid}">Pokračovat: ${esc(last.name)}</button>` : ''}
+    </div>
+    ${list.length ? `<div class="sd-label">Předchozí návrhy</div><ul class="sd-list">${rows}</ul>` : '<p class="sd-empty">Zatím tu nejsou žádné uložené návrhy.</p>'}
+    <div class="sd-foot"><button class="btn sm" data-act="file">Otevřít ze souboru…</button><button class="btn sm" data-act="example">Ukázkový model</button></div>
+    <p class="sd-note">Návrhy se ukládají automaticky jen v tomto prohlížeči. Zálohu uděláte přes Soubor › Uložit návrh.</p></div>`;
+  ov.hidden = false;
+  const b = ov.querySelector('.btn.primary'); if (b) b.focus();
+}
+const hideStart = () => { $('#startdlg').hidden = true; };
+$('#startdlg').addEventListener('click', e => {
+  const t = e.target.closest('button');
+  if (!t) { if (e.target.id === 'startdlg') hideStart(); return; }
+  if (t.dataset.open) {
+    const d = libGet(t.dataset.open);
+    if (!d) { toast('Návrh se nepodařilo načíst.'); libDelete(t.dataset.open); showStart(false); return; }
+    hideStart(); loadDoc(d, `Otevřen návrh „${d.name}“`); return;
+  }
+  if (t.dataset.del) {
+    if (t.dataset.confirm !== '1') { t.dataset.confirm = '1'; t.classList.add('warn'); t.title = 'Klepněte znovu pro smazání'; toast('Klepněte znovu na koš pro trvalé smazání návrhu.'); return; }
+    const uid = t.dataset.del; libDelete(uid);
+    if (doc.uid === uid) doc.uid = newUid();
+    pruneBlobs(); showStart(false); return;
+  }
+  const a = t.dataset.act;
+  if (a === 'close') hideStart();
+  else if (a === 'new') { hideStart(); if (doc.features.length) loadDoc(emptyDoc(), 'Nový návrh'); }
+  else if (a === 'file') { hideStart(); $('#fileinput').click(); }
+  else if (a === 'example') { hideStart(); loadDoc(exampleDoc(), 'Ukázkový model načten'); }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#startdlg').hidden) { e.stopPropagation(); hideStart(); } }, true);
 $('#m-example').addEventListener('click', () => { closeMenu(); loadDoc(exampleDoc(), 'Ukázkový model načten'); });
 $('#m-open').addEventListener('click', () => { closeMenu(); $('#fileinput').click(); });
 $('#m-import').addEventListener('click', () => { closeMenu(); pickImportFile('.stl,.obj,.dxf,.svg,.zip'); });
@@ -3333,7 +3399,8 @@ if (window.matchMedia('(max-width: 760px)').matches) $('#bw-toggle').innerHTML =
 pushHist();
 loadStoredBlobs();
 refreshBusy(() => fitView(VIEW_ISO, true));
-if (window.__KOTA_TEST__) window.__kota = { get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool,
+if (libList().length) showStart(true);
+if (window.__KOTA_TEST__) window.__kota = { get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart,
   get doc() { return doc; }, get cur() { return cur; }, get cmd() { return cmd; }, get sk() { return sk; }, get dlg() { return dlg; }, get sel() { return sel; }, meshes, chainsFor };
 })();
 
