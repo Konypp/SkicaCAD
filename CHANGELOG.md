@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 0.19
+- Převzato z artefaktu SkicaCAD Beta 0.19 (úpravy skic a rozměrů těles, závit lze měřit od spodního nebo horního konce, rovnoměrná změna rozměrů šipkami).
+- PWA části (stahování souborů, instalace, service worker) zůstávají zachované.
+
 ## Beta 0.18
 - Instalační tlačítko už nepotlačuje vlastní nabídku instalace v Chrome.
 

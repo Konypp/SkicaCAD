@@ -141,7 +141,8 @@ function threadTool(f) {
   const start = Math.max(0, Math.min(L, Number(f.start) || 0));
   const len = f.full ? L - start : Math.max(0, Math.min(L - start, Number(f.length) || 0));
   if (len < P / 2) throw new Error('Závit je příliš krátký');
-  const ax = KK.vnorm(f.ax), o = KK.vadd(f.c, KK.vmul(ax, start)), inner = r * Math.cos(Math.PI / 40);
+  const z0 = f.fromEnd ? L - start - len : start;
+  const ax = KK.vnorm(f.ax), o = KK.vadd(f.c, KK.vmul(ax, z0)), inner = r * Math.cos(Math.PI / 40);
   let sp;
   if (f.internal) {
     sp = { rConst: inner - 0.05, rCrest: r + 0.02, rRoot: d / 2, crestF: 0.25, rootF: 0.125 };
@@ -151,7 +152,7 @@ function threadTool(f) {
     if (sp.rRoot > sp.rCrest - 0.02) throw new Error('Válec je pro zvolenou velikost závitu příliš tenký');
     if (sp.rRoot <= 0.05) throw new Error('Stoupání je pro tento průměr příliš velké');
   }
-  return KK.threadGroove({ ...sp, o, ax, len, pitch: P, left: !!f.left, z0: start, segs: Math.max(36, Math.min(72, Math.round(Math.PI * d / 0.6))) });
+  return KK.threadGroove({ ...sp, o, ax, len, pitch: P, left: !!f.left, z0, segs: Math.max(36, Math.min(72, Math.round(Math.PI * d / 0.6))) });
 }
 /* column-major matrix mapping local (x, y, z) to a frame with z along ax starting at o */
 function frameMatrix(o, ax) {
@@ -386,5 +387,6 @@ function makeRebuilder() {
 
 return { offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
+
 
 

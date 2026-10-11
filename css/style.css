@@ -243,3 +243,4 @@ button { cursor: pointer; }
   .tlname { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+

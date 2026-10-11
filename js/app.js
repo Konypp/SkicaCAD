@@ -1122,7 +1122,15 @@ function sketchDrag(ev) {
   const hit = ray.ray.intersectPlane(new THREE.Plane().setFromNormalAndCoplanarPoint(v3(P.n), v3(P.o)), new V3());
   if (!hit) return;
   const p = P2(P, hit);
-  e.pts[sk.drag.pi] = [snapV(p[0]), snapV(p[1])];
+  if (sk.uniform && e.pts.length >= 2) {
+    const d = sk.drag;
+    if (!d.orig) { d.orig = e.pts.map(q => q.slice()); d.c = [0, 1].map(k => d.orig.reduce((t, q) => t + q[k], 0) / d.orig.length); }
+    const c = d.c, o = d.orig[d.pi], ov = [o[0] - c[0], o[1] - c[1]], l2 = ov[0] * ov[0] + ov[1] * ov[1];
+    if (l2 < 1e-12) return;
+    const fct = Math.max(0.01, Math.round(((p[0] - c[0]) * ov[0] + (p[1] - c[1]) * ov[1]) / l2 * 100) / 100), r4 = x => Math.round(x * 1e4) / 1e4;
+    e.pts = d.orig.map(q => [r4(c[0] + (q[0] - c[0]) * fct), r4(c[1] + (q[1] - c[1]) * fct)]);
+    const el = $('#dim'), px = evPx(ev); el.textContent = `Velikost ${fmtc(fct * 100, 0)} %`; el.hidden = false; el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px';
+  } else e.pts[sk.drag.pi] = [snapV(p[0]), snapV(p[1])];
   redrawSketch();
 }
 function sketchMove(ev) {
@@ -1239,6 +1247,7 @@ function renderPalette() {
   }
   $('#pal-note').textContent = ents.length ? `${sk.f.name} · ${nr} ${nr === 1 ? 'uzavřený profil' : nr >= 2 && nr <= 4 ? 'uzavřené profily' : 'uzavřených profilů'}` : 'Skica je prázdná. Nakreslete obdélník, kružnici nebo čáru.';
   const num = (i, k, label, val) => `<label class="fnum" title="${label}"><span class="ax">${label}</span><input id="ent-${i}-${k}" data-ent="${i}" data-k="${k}" value="${fmtc(val, 3)}" inputmode="decimal" autocomplete="off" aria-label="${label}"></label>`;
+  const uniChk = i => `<label class="chk"><input type="checkbox" id="ent-${i}-uni" data-ent="${i}" data-k="uni"${sk.uniform ? ' checked' : ''}><span>Tažením bodu měnit velikost rovnoměrně</span></label>`;
   box.innerHTML = ents.map((e, i) => {
     let body = '';
     if (e.t === 'rect') body = `<div class="grid2">${num(i, 'x', 'X', e.x)}${num(i, 'y', 'Y', e.y)}${num(i, 'w', 'Š', e.w)}${num(i, 'h', 'V', e.h)}${num(i, 'fr', 'R', e.fr || 0)}</div>`;
@@ -1246,15 +1255,14 @@ function renderPalette() {
     else if (e.t === 'ngon') body = `<div class="grid2">${num(i, 'x', 'X', e.x)}${num(i, 'y', 'Y', e.y)}${num(i, 'r', 'R', e.r)}${num(i, 'n', 'n', e.n)}${num(i, 'a', '∠', e.a || 0)}${num(i, 'fr', 'Rz', e.fr || 0)}</div>`;
     else if (e.t === 'ellipse') body = `<div class="grid2">${num(i, 'x', 'X', e.x)}${num(i, 'y', 'Y', e.y)}${num(i, 'rx', 'a', e.rx)}${num(i, 'ry', 'b', e.ry)}${num(i, 'a', '∠', e.a || 0)}</div>`;
     else if (e.t === 'slot') body = `<div class="grid2">${num(i, 'x1', 'X1', e.x1)}${num(i, 'y1', 'Y1', e.y1)}${num(i, 'x2', 'X2', e.x2)}${num(i, 'y2', 'Y2', e.y2)}${num(i, 'w', 'Š', e.w)}</div>`;
-    else if (e.t === 'spline') body = `<div class="note">${e.pts.length} bodů · body přesunete tažením ve skice</div><label class="chk"><input type="checkbox" id="ent-${i}-closed" data-ent="${i}" data-k="closed"${e.closed ? ' checked' : ''}${e.pts.length < 3 ? ' disabled' : ''}><span>Uzavřená křivka</span></label>`;
+    else if (e.t === 'spline') body = `<div class="note">${e.pts.length} bodů · body přesunete tažením ve skice</div><label class="chk"><input type="checkbox" id="ent-${i}-closed" data-ent="${i}" data-k="closed"${e.closed ? ' checked' : ''}${e.pts.length < 3 ? ' disabled' : ''}><span>Uzavřená křivka</span></label>${uniChk(i)}`;
     else {
       const n = e.pts.length, segs = e.closed ? n : n - 1, rows = [];
       for (let k = 0; k < Math.min(segs, 40); k++) {
         const a = e.pts[k], b = e.pts[(k + 1) % n], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
-        if (e.closed && k === n - 1) rows.push(`<div class="seglbl">Úsečka ${k + 1} (uzavírací): ${fmtc(L, 2)} mm · ${fmtc(dirAngle(a, b), 1)}°</div>`);
-        else rows.push(`<div class="seglbl">Úsečka ${k + 1}</div><div class="grid2">${num(i, 'L' + k, 'L', L)}${num(i, 'A' + k, '∠', dirAngle(a, b))}</div>`);
+        rows.push(`<div class="seglbl">Úsečka ${k + 1}${e.closed && k === n - 1 ? ' (uzavírací)' : ''}</div><div class="grid2">${num(i, 'L' + k, 'L', L)}${num(i, 'A' + k, '∠', dirAngle(a, b))}</div>`);
       }
-      body = `<div class="note">${n} bodů · ${e.closed ? 'uzavřený obrys' : 'otevřená čára (lze použít jako osu rotace)'}</div>${rows.join('')}${e.closed ? `<div class="grid2">${num(i, 'fr', 'R', e.fr || 0)}</div>` : ''}`;
+      body = `<div class="note">${n} bodů · ${e.closed ? 'uzavřený obrys' : 'otevřená čára (lze použít jako osu rotace)'}</div>${rows.join('')}${e.closed ? `<div class="grid2">${num(i, 'fr', 'R', e.fr || 0)}</div>${uniChk(i)}` : ''}`;
     }
     return `<div class="ent${sk.selEnt === i ? ' sel' : ''}" data-ent-row="${i}"><div class="eh"><span class="ico">${svg(e.t === 'poly' ? 'line' : e.t, 16)}</span>${ENT_LABEL[e.t]} ${i + 1}<button class="ibtn" data-entdel="${i}" aria-label="Smazat prvek" title="Smazat">${svg('skdel', 14)}</button></div>${body}</div>`;
   }).join('');
@@ -1266,14 +1274,27 @@ $('#dialog').addEventListener('click', e => {
 });
 function onPaletteChange(inp) {
   const i = +inp.dataset.ent, k = inp.dataset.k, e = sk.f.ents[i];
+  if (k === 'uni') { sk.uniform = inp.checked; renderPalette(); return; }
   if (e && k === 'closed') { e.closed = inp.checked && e.pts.length >= 3; renderPalette(); redrawSketch(); return; }
   const v = parseNum(inp.value);
   if (e && e.t === 'poly' && /^[LA]\d+$/.test(k) && isFinite(v)) {
     const j = +k.slice(1), n = e.pts.length, a = e.pts[j], b = e.pts[(j + 1) % n];
     let L = Math.hypot(b[0] - a[0], b[1] - a[1]), A = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    const r4 = x => Math.round(x * 1e4) / 1e4;
+    if (e.closed && k[0] === 'L') {
+      /* stretch: move every vertex lying beyond the middle of the edited side, so parallel sides stay parallel */
+      if (!(v > 0) || L < 1e-9) { renderPalette(); return; }
+      const u = [(b[0] - a[0]) / L, (b[1] - a[1]) / L], d = v - L, m = ((a[0] + b[0]) * u[0] + (a[1] + b[1]) * u[1]) / 2;
+      e.pts = e.pts.map(q => (q[0] * u[0] + q[1] * u[1] > m + 1e-7 ? [r4(q[0] + u[0] * d), r4(q[1] + u[1] * d)] : q));
+      renderPalette(); redrawSketch(); return;
+    }
+    if (e.closed && k[0] === 'A' && j === n - 1) {
+      /* closing side: keep the first point, turn the side around it */
+      const A2 = v * D2R; e.pts[j] = [r4(b[0] - L * Math.cos(A2)), r4(b[1] - L * Math.sin(A2))];
+      renderPalette(); redrawSketch(); return;
+    }
     if (k[0] === 'L') { if (v > 0) L = v; } else A = v * D2R;
     const nb = [a[0] + L * Math.cos(A), a[1] + L * Math.sin(A)], dx = nb[0] - b[0], dy = nb[1] - b[1];
-    const r4 = x => Math.round(x * 1e4) / 1e4;
     for (let q = j + 1; q < n; q++) e.pts[q] = [r4(e.pts[q][0] + dx), r4(e.pts[q][1] + dy)];
     renderPalette(); redrawSketch(); return;
   }
@@ -1466,13 +1487,15 @@ function startPrimitive(type, editIndex, f) {
   const pivot = new THREE.Object3D(); scene.add(pivot);
   const c = {
     editIndex, vals, pos: f ? f.pos.slice() : [0, 0, 0], op: f ? f.op : 'new', autoOp: !f, tool: null,
-    hgrp: null, handles: [], drag: null, hover: null, gizmoDrag: false,
+    hgrp: null, handles: [], drag: null, hover: null, gizmoDrag: false, uniform: false,
     init() {
       openDialog({
         title: Engine.FEATURE_LABEL[type], icon: type,
         fields: [...defs.map(([k, l]) => ({ k: 'num', id: k, label: l, value: this.vals[k] })), { k: 'xyz', id: 'pos', label: 'Poloha základny', value: this.pos },
+          { k: 'chk', id: 'uni', label: 'Šipkami měnit rovnoměrně všechny rozměry', value: this.uniform },
           { k: 'opt', id: 'op', label: 'Operace', options: OPS, value: this.op }, { k: 'note', id: 'n' }],
         onChange: id => {
+          if (id === 'uni') { this.uniform = dlg.get('uni'); return; }
           if (id === 'pos') this.pos = dlg.get('pos');
           else if (id === 'op') { this.op = dlg.get('op'); this.autoOp = false; }
           else { const v = dlg.get(id); if (isFinite(v) && v > 0) this.vals[id] = v; }
@@ -1542,7 +1565,14 @@ function startPrimitive(type, editIndex, f) {
       const s = (b * e - dd) / den, h = primHandles(type, this.vals)[d.i];
       const st = settings.gridSnap ? settings.snap : 0.01;
       const nv = h.set(s);
-      for (const k in nv) {
+      if (this.uniform) {
+        const k0 = Object.keys(nv)[0], fct = nv[k0] / this.vals[k0];
+        if (!(fct > 0)) return;
+        let v0 = Math.max(st, Math.round(nv[k0] / st) * st); const f2 = v0 / this.vals[k0];
+        if (Math.abs(f2 - 1) < 1e-9) return;
+        for (const k in this.vals) { this.vals[k] = Math.round(this.vals[k] * f2 * 1000) / 1000; dlg.set(k, this.vals[k]); }
+        this.update();
+      } else for (const k in nv) {
         let v = Math.round(nv[k] / st) * st; v = Math.max(st, Math.round(v * 1000) / 1000);
         if (type === 'torus' && k === 'R') v = Math.max(v, this.vals.t + st);
         if (type === 'torus' && k === 't') v = Math.min(v, this.vals.R - st);
@@ -2113,14 +2143,19 @@ function cylinderAt(polys, pi) {
   const onAxis = K.vadd(K.vadd(K.vmul(e1, cx), K.vmul(e2, cy)), K.vmul(axis, K.vdot(cen, axis)));
   const internal = K.vdot(p0.n, K.vsub(cen, onAxis)) < 0;
   const r6 = x => Math.round(x * 1e4) / 1e4;
-  return { c: base.map(r6), ax: axis.map(r6), r: r6(r), len: r6(t1 - t0), internal, group };
+  /* orient the axis so it points up (or along the dominant positive world axis): offsets are then measured from the bottom */
+  const dom3 = [0, 1, 2].reduce((m, k) => (Math.abs(axis[k]) > Math.abs(axis[m]) ? k : m), 2);
+  let cOut = base, aOut = axis;
+  if (axis[dom3] < 0) { cOut = K.vadd(base, K.vmul(axis, t1 - t0)); aOut = K.vmul(axis, -1); }
+  return { c: cOut.map(r6), ax: aOut.map(r6), r: r6(r), len: r6(t1 - t0), internal, group };
 }
 const threadLabel = (d, p) => `M${fmtc(d, 1)} × ${fmtc(p, 2)}`;
 function startThread(editIndex, f) {
   const c = {
     editIndex, body: f ? f.body : null, face: f ? { c: f.c, ax: f.ax, r: f.r, len: f.len, internal: f.internal } : null,
     size: f ? f.size : 10, pitch: f ? f.pitch : 1.5, left: f ? !!f.left : false, full: f ? f.full !== false : true,
-    length: f ? (f.length || 10) : 10, start: f ? (f.start || 0) : 0, hover: null, timer: null, tool: null,
+    length: f ? (f.length || 10) : 10, start: f ? (f.start || 0) : 0, fromEnd: f ? !!f.fromEnd : false,
+    hover: null, timer: null, tool: null, handles: [], hgrp: null, drag: null, hoverH: null,
     init() {
       if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
       openDialog({
@@ -2130,41 +2165,69 @@ function startThread(editIndex, f) {
           { k: 'num', id: 'pitch', label: 'Stoupání', value: this.pitch },
           { k: 'seg', id: 'hand', label: 'Směr', options: [['r', 'Pravý'], ['l', 'Levý']], value: this.left ? 'l' : 'r' },
           { k: 'chk', id: 'full', label: 'Po celé délce plochy', value: this.full },
-          { k: 'num', id: 'length', label: 'Délka', value: this.length }, { k: 'num', id: 'start', label: 'Odsazení', value: this.start },
+          { k: 'seg', id: 'from', label: 'Měřit od', options: [['a', 'Spodní konec'], ['b', 'Horní konec']], value: this.fromEnd ? 'b' : 'a' },
+          { k: 'num', id: 'start', label: 'Odsazení', value: this.start }, { k: 'num', id: 'length', label: 'Délka závitu', value: this.length },
           { k: 'note', id: 'n' }],
         onChange: id => {
           if (id === 'size') { this.size = parseFloat(dlg.get('size')); const t = Engine.THREADS.find(x => x[0] === this.size); if (t) { this.pitch = t[1]; dlg.set('pitch', t[1]); } }
           else if (id === 'pitch') { const v = dlg.get('pitch'); if (v > 0) this.pitch = v; }
           else if (id === 'hand') this.left = dlg.get('hand') === 'l';
           else if (id === 'full') this.full = dlg.get('full');
-          else if (id === 'length') { const v = dlg.get('length'); if (v > 0) this.length = v; }
+          else if (id === 'from') this.fromEnd = dlg.get('from') === 'b';
+          else if (id === 'length') { const v = dlg.get('length'); if (v > 0) { this.length = v; this.full = false; dlg.set('full', false); } }
           else if (id === 'start') { const v = dlg.get('start'); if (v >= 0) this.start = v; }
           this.update();
         }
       });
+      this.hgrp = new THREE.Group(); G.overlay.add(this.hgrp);
+      for (let i = 0; i < 2; i++) {
+        const mk = g => { const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: tok.orange, depthTest: false, transparent: true })); m.renderOrder = 12; return m; };
+        const cone = mk(new THREE.ConeGeometry(1, 2.6, 18)), ball = noRay(mk(new THREE.SphereGeometry(0.55, 12, 8)));
+        const shaft = noRay(new THREE.Line(lineGeo([0, 0, 0, 0, 0, 0]), new THREE.LineBasicMaterial({ color: tok.orange, depthTest: false, transparent: true })));
+        shaft.frustumCulled = false; shaft.renderOrder = 12;
+        this.hgrp.add(cone, ball, shaft); this.handles.push({ cone, ball, shaft });
+      }
       this.update();
     },
     setFace(bodyId, cyl) {
       this.body = bodyId; this.face = { c: cyl.c, ax: cyl.ax, r: cyl.r, len: cyl.len, internal: cyl.internal };
       const s = Engine.suggestThread(cyl.r, cyl.internal); this.size = s.d; this.pitch = s.p;
       dlg.set('size', String(s.d)); dlg.set('pitch', s.p);
+      if (this.start > cyl.len) { this.start = 0; dlg.set('start', 0); }
       this.update();
+    },
+    /* thread region on the face as [a, b] measured from c along ax */
+    span() {
+      const L = this.face.len, st = Math.max(0, Math.min(L, this.start)), len = this.full ? L - st : Math.max(0, Math.min(L - st, this.length));
+      return this.fromEnd ? [L - st - len, L - st] : [st, st + len];
+    },
+    setSpan(a, b) {
+      const L = this.face.len;
+      this.full = false; dlg.set('full', false);
+      this.length = Math.round((b - a) * 1000) / 1000; this.start = Math.round((this.fromEnd ? L - b : a) * 1000) / 1000;
+      dlg.set('length', this.length); dlg.set('start', this.start);
     },
     feature() {
       return { id: f ? f.id : 'tmp', type: 'thread', body: this.body, ...this.face, size: this.size, pitch: this.pitch, left: this.left, full: this.full,
-        length: this.length, start: this.start };
+        length: this.length, start: this.start, fromEnd: this.fromEnd };
     },
     update() {
       const fc = this.face;
       dlg.set('face', { text: fc ? `Válcová plocha Ø${fmtc(fc.r * 2, 2)}` : 'Klepněte na válcovou plochu', has: !!fc, active: true });
       dlg.set('kind', fc ? `${fc.internal ? 'Vnitřní závit (díra)' : 'Vnější závit (čep)'} · délka plochy ${fmtc(fc.len, 2)} mm` : 'Vyberte vnější plochu čepu nebo vnitřní plochu díry.');
-      dlg.show('length', !this.full); dlg.show('start', !this.full);
-      setPrompt(fc ? 'Klepnutím na jinou válcovou plochu výběr změníte' : 'Klepněte na válcovou plochu tělesa');
+      dlg.show('length', !this.full);
+      if (fc) {
+        const vert = Math.abs(fc.ax[2]) > 0.7, lb = vert ? ['Spodní konec', 'Horní konec'] : ['Začátek plochy', 'Konec plochy'];
+        $$('#dlg-from button').forEach((b, i) => { b.textContent = lb[i]; });
+      }
+      setPrompt(fc ? 'Oranžovými šipkami nastavíte začátek a konec závitu. Klepnutím na jinou válcovou plochu výběr změníte.' : 'Klepněte na válcovou plochu tělesa');
+      this.hgrp.visible = !!fc;
       clearTimeout(this.timer);
-      if (!fc) { dlg.set('n', ''); dlg.okEnabled(false); return; }
+      if (!fc) { dlg.set('n', ''); dlg.okEnabled(false); requestRender(); return; }
       const ref = fc.internal ? this.size - 1.0825 * this.pitch : this.size, dia = fc.r * 2;
       const warn = Math.abs(ref - dia) > Math.max(0.15 * ref, 0.3) ? `Průměr plochy Ø${fmtc(dia, 2)} neodpovídá velikosti ${threadLabel(this.size, this.pitch)} (${fc.internal ? 'díra pro ni má mít' : 'čep má mít'} Ø${fmtc(ref, 2)}). ` : '';
       dlg.set('n', warn + 'Počítám náhled…'); dlg.okEnabled(false);
+      requestRender();
       this.timer = setTimeout(() => {
         if (cmd !== this) return;
         clearGroup(G.preview); this.tool = null;
@@ -2174,8 +2237,60 @@ function startThread(editIndex, f) {
           dlg.set('n', warn ? '!' + warn.trim() : 'Červeně je materiál, který závit odebere.'); dlg.okEnabled(true);
         } catch (e) { dlg.set('n', '!' + e.message); }
         requestRender();
-      }, 150);
+      }, this.drag ? 250 : 150);
     },
+    /* handle geometry: point on the side of the cylinder facing the camera */
+    frame() {
+      const fc = this.face, ax = v3(fc.ax), c0 = v3(fc.c);
+      const mid = c0.clone().addScaledVector(ax, fc.len / 2);
+      let side = cam().position.clone().sub(mid); side.addScaledVector(ax, -side.dot(ax));
+      if (side.lengthSq() < 1e-9) side = new V3(1, 0, 0).addScaledVector(ax, -ax.x);
+      side.normalize();
+      return { ax, c0, side, rr: fc.internal ? fc.r * 0.5 : fc.r + Math.max(1.5, fc.r * 0.15) };
+    },
+    onFrame() {
+      if (!this.face) return;
+      const { ax, c0, side, rr } = this.frame(), sp = this.span();
+      [0, 1].forEach(i => {
+        const o = this.handles[i], dir = ax.clone().multiplyScalar(i ? 1 : -1);
+        const tip = c0.clone().addScaledVector(ax, sp[i]).addScaledVector(side, rr);
+        const s = cam().position.distanceTo(tip) * (isOrtho ? 0 : 0.012) || (orthoH / ortho.zoom) * 0.03;
+        o.cone.scale.setScalar(s); o.cone.quaternion.setFromUnitVectors(new V3(0, 1, 0), dir); o.cone.position.copy(tip).addScaledVector(dir, s * 2.2);
+        o.ball.scale.setScalar(s); o.ball.position.copy(tip);
+        const b = tip.clone().addScaledVector(dir, s * 1.2), pa = o.shaft.geometry.attributes.position;
+        pa.setXYZ(0, tip.x, tip.y, tip.z); pa.setXYZ(1, b.x, b.y, b.z); pa.needsUpdate = true;
+        const col = (this.drag ? this.drag.i === i : this.hoverH === i) ? tok.accent : tok.orange;
+        o.cone.material.color.copy(col); o.ball.material.color.copy(col); o.shaft.material.color.copy(col);
+      });
+    },
+    handleAt(ev) {
+      if (!this.face) return -1;
+      ray.setFromCamera(evNdc(ev), cam());
+      for (let i = 0; i < 2; i++) { const cn = this.handles[i].cone; cn.updateMatrixWorld(true); if (ray.intersectObject(cn, false).length) return i; }
+      return -1;
+    },
+    onDown(ev) {
+      const i = this.handleAt(ev); if (i < 0) return false;
+      const { ax, c0, side, rr } = this.frame();
+      this.drag = { i, a: c0.clone().addScaledVector(side, rr), dir: ax };
+      controls.enabled = false; return true;
+    },
+    onDrag(ev) {
+      const d = this.drag; if (!d) return;
+      ray.setFromCamera(evNdc(ev), cam());
+      const o = ray.ray.origin, r = ray.ray.direction, w0 = d.a.clone().sub(o), b = d.dir.dot(r), dd = d.dir.dot(w0), e = r.dot(w0), den = 1 - b * b;
+      if (Math.abs(den) < 1e-6) return;
+      const L = this.face.len, st = settings.gridSnap ? settings.snap : 0.01, minL = Math.max(this.pitch, st);
+      let t = Math.round(((b * e - dd) / den) / st) * st;
+      const sp = this.span();
+      if (d.i === 0) { t = Math.max(0, Math.min(t, sp[1] - minL)); if (Math.abs(t - sp[0]) < 1e-9) return; this.setSpan(t, sp[1]); }
+      else { t = Math.min(L, Math.max(t, sp[0] + minL)); if (Math.abs(t - sp[1]) < 1e-9) return; this.setSpan(sp[0], t); }
+      this.update();
+      const el = $('#dim'), px = evPx(ev);
+      el.textContent = `Odsazení ${fmtc(this.start, 2)} mm · délka ${fmtc(this.length, 2)} mm`; el.hidden = false;
+      el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px';
+    },
+    onUp() { this.drag = null; controls.enabled = true; $('#dim').hidden = true; this.update(); },
     pick(ev) {
       const h = hitBodies(ev); if (!h) return null;
       const { pi } = polyOfHit(h), polys = h.object.userData.polys, id = h.object.userData.bodyId;
@@ -2183,28 +2298,68 @@ function startThread(editIndex, f) {
       return { id, polys, cyl: cylinderAt(polys, pi) };
     },
     onMove(ev) {
+      const hi = this.handleAt(ev), hv = hi >= 0 ? hi : null;
+      if (hv !== this.hoverH) { this.hoverH = hv; requestRender(); }
+      if (hv !== null) { dom.style.cursor = 'grab'; return; }
       const p = this.pick(ev);
       if (p !== this.hover) {
         this.hover = p;
-        clearGroup(G.overlay);
+        this.hgrp.parent && G.overlay.remove(this.hgrp);
+        clearGroup(G.overlay); G.overlay.add(this.hgrp);
         if (p && p.cyl) G.overlay.add(meshFromPolys([...p.cyl.group].map(i => p.polys[i]), new THREE.MeshBasicMaterial({ color: tok.accent, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
         requestRender();
       }
       dom.style.cursor = p && p.cyl ? 'pointer' : '';
     },
     onClick(ev) {
+      if (this.handleAt(ev) >= 0) return;
       const p = this.pick(ev);
       if (!p) return;
       if (!p.cyl) { toast('Závit lze vytvořit jen na celé válcové ploše (čep nebo díra).'); return; }
       this.setFace(p.id, p.cyl);
     },
     ok() { if (!this.tool || !this.face) return null; const out = this.feature(); out.id = f ? f.id : newId(); return out; },
-    cleanup() { clearTimeout(this.timer); }
+    cleanup() { clearTimeout(this.timer); controls.enabled = true; $('#dim').hidden = true; }
   };
   beginCmd(c); c.init();
 }
 
 /* ================= scale finished bodies ================= */
+/* shared orange drag arrows (used by scale) */
+function makeArrowHandles(n) {
+  const grp = new THREE.Group(), list = [];
+  for (let i = 0; i < n; i++) {
+    const mk = g => { const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: tok.orange, depthTest: false, transparent: true })); m.renderOrder = 12; return m; };
+    const cone = mk(new THREE.ConeGeometry(1, 2.6, 18)), ball = noRay(mk(new THREE.SphereGeometry(0.55, 12, 8)));
+    const shaft = noRay(new THREE.Line(lineGeo([0, 0, 0, 0, 0, 0]), new THREE.LineBasicMaterial({ color: tok.orange, depthTest: false, transparent: true })));
+    shaft.frustumCulled = false; shaft.renderOrder = 12;
+    grp.add(cone, ball, shaft); list.push({ cone, ball, shaft });
+  }
+  G.overlay.add(grp);
+  return { grp, list };
+}
+function placeArrow(o, tip, dir, on) {
+  const s = cam().position.distanceTo(tip) * (isOrtho ? 0 : 0.012) || (orthoH / ortho.zoom) * 0.03;
+  o.cone.scale.setScalar(s); o.cone.quaternion.setFromUnitVectors(new V3(0, 1, 0), dir); o.cone.position.copy(tip).addScaledVector(dir, s * 2.2);
+  o.ball.scale.setScalar(s); o.ball.position.copy(tip);
+  const b = tip.clone().addScaledVector(dir, s * 1.2), pa = o.shaft.geometry.attributes.position;
+  pa.setXYZ(0, tip.x, tip.y, tip.z); pa.setXYZ(1, b.x, b.y, b.z); pa.needsUpdate = true;
+  const col = on ? tok.accent : tok.orange;
+  o.cone.material.color.copy(col); o.ball.material.color.copy(col); o.shaft.material.color.copy(col);
+}
+function arrowAt(ev, list) {
+  ray.setFromCamera(evNdc(ev), cam());
+  for (let i = 0; i < list.length; i++) { const cn = list[i].cone; if (!cn.visible) continue; cn.updateMatrixWorld(true); if (ray.intersectObject(cn, false).length) return i; }
+  return -1;
+}
+/* parameter along the line a + t*dir closest to the pointer ray, or null when the line faces the viewer */
+function lineParam(ev, a, dir) {
+  ray.setFromCamera(evNdc(ev), cam());
+  const o = ray.ray.origin, r = ray.ray.direction, w0 = a.clone().sub(o), b = dir.dot(r), dd = dir.dot(w0), e = r.dot(w0), den = 1 - b * b;
+  return Math.abs(den) < 1e-6 ? null : (b * e - dd) / den;
+}
+function showDimAt(ev, text) { const el = $('#dim'), px = evPx(ev); el.textContent = text; el.hidden = false; el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px'; }
+
 function startScale(editIndex, f) {
   const c = {
     editIndex, all: f ? !!f.all : !sel.size, bodies: new Set(f ? (f.bodies || []) : [...sel]),
@@ -2238,8 +2393,47 @@ function startScale(editIndex, f) {
         },
         onBtn: (id, v) => { const k = parseFloat(v); this.s = this.s.map(x => x * k); this.refreshFields(); this.apply(); }
       });
+      this.arrows = makeArrowHandles(3);
       this.recenter();
     },
+    arrows: null, drag: null, hoverH: null,
+    pivotPt() { const mid = this.box.getCenter(new V3()); return this.pivot === 'origin' ? [0, 0, 0] : this.pivot === 'base' ? [mid.x, mid.y, this.box.min.z] : [mid.x, mid.y, mid.z]; },
+    scaledBox() {
+      const cc = this.pivotPt(), mn = this.box.min, mx = this.box.max, f = (v, k) => cc[k] + this.s[k] * (v - cc[k]);
+      const min = new V3(f(mn.x, 0), f(mn.y, 1), f(mn.z, 2)), max = new V3(f(mx.x, 0), f(mx.y, 1), f(mx.z, 2));
+      return { min, max, center: () => new V3((min.x + max.x) / 2, (min.y + max.y) / 2, (min.z + max.z) / 2) };
+    },
+    onFrame() {
+      if (!this.arrows) return;
+      const ok = !this.box.isEmpty(); this.arrows.grp.visible = ok; if (!ok) return;
+      const sb = this.scaledBox(), mid = sb.center();
+      for (let k = 0; k < 3; k++) {
+        const dir = new V3(k === 0 ? 1 : 0, k === 1 ? 1 : 0, k === 2 ? 1 : 0), tip = mid.clone(); tip.setComponent(k, sb.max.getComponent(k));
+        placeArrow(this.arrows.list[k], tip, dir, this.drag ? this.drag.k === k : this.hoverH === k);
+      }
+    },
+    onDown(ev) {
+      if (!this.arrows || this.box.isEmpty()) return false;
+      const k = arrowAt(ev, this.arrows.list); if (k < 0) return false;
+      const sb = this.scaledBox(), a = sb.center(); a.setComponent(k, 0);
+      this.drag = { k, a, dir: new V3(k === 0 ? 1 : 0, k === 1 ? 1 : 0, k === 2 ? 1 : 0), min: sb.min.getComponent(k) };
+      controls.enabled = false; return true;
+    },
+    onDrag(ev) {
+      const d = this.drag; if (!d) return;
+      const t = lineParam(ev, d.a, d.dir); if (t === null) return;
+      const k = d.k, o = this.orig()[k]; if (!(o > 1e-9)) return;
+      const cc = this.pivotPt()[k], mx = this.box.max.getComponent(k);
+      let fk = Math.abs(mx - cc) > 1e-6 * Math.max(1, o) ? (t - cc) / (mx - cc) : (t - d.min) / o;
+      const st = settings.gridSnap ? settings.snap : 0.01;
+      let size = Math.max(st, Math.round(o * fk / st) * st); fk = size / o;
+      if (!(fk > 0) || Math.abs(fk - this.s[k]) < 1e-9) return;
+      if (this.uniform) this.s = [fk, fk, fk]; else this.s[k] = fk;
+      this.refreshFields(); this.apply();
+      const sz = this.orig().map((v, j) => v * this.s[j]);
+      showDimAt(ev, `${'XYZ'[k]}: ${fmtc(sz[k], 2)} mm · ${fmtc(this.s[k] * 100, 1)} %`);
+    },
+    onUp() { this.drag = null; controls.enabled = true; $('#dim').hidden = true; requestRender(); },
     orig() { const s = this.box.getSize(new V3()); return [s.x, s.y, s.z]; },
     recenter() {
       const ids = this.ids(); this.box = new THREE.Box3();
@@ -2247,15 +2441,15 @@ function startScale(editIndex, f) {
       this.highlight = new Set(ids);
       dlg.show('bodies', !this.all);
       dlg.set('bodies', this.all ? { text: 'Celý model', has: true, active: false } : bodySelText(new Set(ids)));
-      setPrompt(this.all ? 'Zadejte měřítko nebo požadované rozměry' : ids.length ? 'Klepnutím na těleso výběr změníte' : 'Vyberte tělesa, jejichž velikost chcete změnit');
+      setPrompt(this.all ? 'Táhněte oranžovými šipkami nebo zadejte měřítko či rozměry' : ids.length ? 'Táhněte oranžovými šipkami. Klepnutím na těleso výběr změníte.' : 'Vyberte tělesa, jejichž velikost chcete změnit');
       dlg.okEnabled(ids.length > 0);
       this.refreshFields(); this.apply();
     },
     refreshFields() {
       dlg.show('factor', this.uniform); dlg.show('fxyz', !this.uniform);
       const r = x => Math.round(x * 1e5) / 1e5;
-      this.s = this.s.map(r);
-      dlg.set('factor', this.s[0]); dlg.set('fxyz', this.s);
+      this.s = this.s.map(x => Math.round(x * 1e9) / 1e9);
+      dlg.set('factor', r(this.s[0])); dlg.set('fxyz', this.s.map(r));
       const o = this.orig();
       if (!this.box.isEmpty()) {
         dlg.set('size', o.map((v, k) => r(v * this.s[k])));
@@ -2277,15 +2471,19 @@ function startScale(editIndex, f) {
       styleBodies();
     },
     onBody(id) { if (this.all) return; if (this.bodies.has(id)) this.bodies.delete(id); else this.bodies.add(id); this.recenter(); },
-    onMove(ev) { dom.style.cursor = hitBodies(ev) ? 'pointer' : ''; },
-    onClick(ev) { const h = hitBodies(ev); if (h) this.onBody(h.object.userData.bodyId); },
+    onMove(ev) {
+      const k = this.arrows ? arrowAt(ev, this.arrows.list) : -1, hv = k >= 0 ? k : null;
+      if (hv !== this.hoverH) { this.hoverH = hv; requestRender(); }
+      dom.style.cursor = hv !== null ? 'grab' : hitBodies(ev) ? 'pointer' : '';
+    },
+    onClick(ev) { if (this.arrows && arrowAt(ev, this.arrows.list) >= 0) return; const h = hitBodies(ev); if (h) this.onBody(h.object.userData.bodyId); },
     ok() {
       const ids = this.ids(); if (!ids.length || !this.s.every(x => x > 0)) return null;
       return { id: f ? f.id : newId(), type: 'scale', all: this.all, bodies: this.all ? [] : ids, s: this.s.slice(), pivot: this.pivot };
     },
     cleanup() {
       for (const e of meshes.values()) { e.mesh.matrixAutoUpdate = true; e.mesh.matrix.identity(); e.mesh.position.set(0, 0, 0); e.mesh.rotation.set(0, 0, 0); e.mesh.updateMatrix(); }
-      this.highlight = null;
+      this.highlight = null; controls.enabled = true; $('#dim').hidden = true;
     }
   };
   beginCmd(c); c.init();
@@ -2903,7 +3101,7 @@ dom.addEventListener('pointerleave', () => { if (cmd && cmd.onLeave) cmd.onLeave
 dom.addEventListener('pointerup', e => {
   if (!down) return;
   const d = down; down = null;
-  if (d.special) { if (sk && sk.drag) { sk.drag = null; controls.enabled = true; renderPalette(); redrawSketch(); return; } if (cmd && cmd.onUp) cmd.onUp(e); return; }
+  if (d.special) { if (sk && sk.drag) { sk.drag = null; controls.enabled = true; $('#dim').hidden = true; renderPalette(); redrawSketch(); return; } if (cmd && cmd.onUp) cmd.onUp(e); return; }
   const moved = Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5;
   if (d.gizmo || moved) { if (cmd && cmd.onLeave && moved) cmd.onLeave(); return; }
   if (d.btn === 2 && sk && isPolyTool(sk.tool) && sk.draft) { finishPolyline(false); return; }
@@ -3138,4 +3336,5 @@ refreshBusy(() => fitView(VIEW_ISO, true));
 if (window.__KOTA_TEST__) window.__kota = { get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool,
   get doc() { return doc; }, get cur() { return cur; }, get cmd() { return cmd; }, get sk() { return sk; }, get dlg() { return dlg; }, get sel() { return sel; }, meshes, chainsFor };
 })();
+
 

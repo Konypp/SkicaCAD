@@ -1217,3 +1217,4 @@ return { fromTrianglesFast, decimateTris, faceLoops, planarFace, pointInConvex, 
 })();
 
 
+
