@@ -515,6 +515,7 @@ function render() {
   sun.position.copy(c.position).add(new V3(0.3, 0.2, 0.5).multiplyScalar(dist));
   sun.target.position.copy(controls.target);
   if (cmd && cmd.onFrame) cmd.onFrame();
+  if (typeof syncFaceBar === 'function') syncFaceBar();
   renderer.render(scene, c);
   renderCube();
   if (sk) { updateDimLabel(); updateSegLabels(); } else if (segLabelsOn) updateSegLabels();
@@ -1360,19 +1361,36 @@ function finishSketch(apply) {
 }
 
 /* ================= extrude ================= */
-function startExtrude(editIndex, f) {
+/* profiles (sketch regions) already consumed by an extrude or revolve; a feature being edited does not count */
+function usedRegions(exceptId) {
+  const m = new Map();
+  for (const x of doc.features) {
+    if (x.id === exceptId || !x.sketch || !Array.isArray(x.regions)) continue;
+    let st = m.get(x.sketch); if (!st) m.set(x.sketch, st = new Set());
+    x.regions.forEach(r => st.add(r));
+  }
+  return m;
+}
+function freeRegions(s, used) { const u = used.get(s.id); return Engine.regions(s).filter(r => !u || !u.has(r.ei)); }
+function startExtrude(editIndex, f, opts) {
+  opts = opts || {};
+  const used = usedRegions(f && f.id);
   const c = {
     editIndex, sketch: f ? f.sketch : null, regions: new Set(f ? f.regions : []), dist: f ? f.dist : 10, sym: f ? !!f.sym : false,
     op: f ? f.op : 'new', autoOp: !f, regionMeshes: [], tool: null, arrow: null, drag: null,
     init() {
-      const sketches = Array.from(cur.sketches.values());
-      if (!sketches.length) { endCmd(false); toast('Nejprve vytvořte skicu s uzavřeným profilem (S).'); return; }
+      /* only sketches with a profile that has not been extruded yet (plus the one of the feature being edited) */
+      const sketches = Array.from(cur.sketches.values()).filter(s => freeRegions(s, used).length || s.id === this.sketch);
+      if (!sketches.length) {
+        endCmd(false);
+        toast(cur.sketches.size ? 'Všechny skici už jsou vysunuté. Nakreslete novou skicu (S), nebo v režimu Plochy (G) vyberte stěnu a zvolte Vysunout.' : 'Nejprve vytvořte skicu s uzavřeným profilem (S), nebo v režimu Plochy (G) vyberte stěnu a zvolte Vysunout.');
+        return;
+      }
       if (!this.sketch) {
-        /* which sketch to start with: the one selected in the timeline or browser, otherwise the newest sketch not yet used by any feature */
-        const used = new Set(doc.features.map(x => x.sketch).filter(Boolean));
-        const pre = this.preSketch && cur.sketches.get(this.preSketch);
-        const pick = pre || [...sketches].reverse().find(s => !used.has(s.id) && Engine.regions(s).length);
-        if (pick) this.chooseSketch(pick.id, false);
+        /* start with the sketch selected in the timeline or browser, otherwise the newest one with a free profile */
+        const pre = this.preSketch && sketches.find(s => s.id === this.preSketch);
+        const pick = pre || sketches[sketches.length - 1];
+        this.chooseSketch(pick.id, false, !!opts.fromFace);
       }
       this.buildOverlay();
       openDialog({
@@ -1390,21 +1408,24 @@ function startExtrude(editIndex, f) {
       });
       this.update();
     },
-    preSketch: (() => { if (f || tlSel === null) return null; const t = doc.features[tlSel]; return t && t.type === 'sketch' ? t.id : null; })(),
+    preSketch: opts.sketch || (() => { if (f || tlSel === null) return null; const t = doc.features[tlSel]; return t && t.type === 'sketch' ? t.id : null; })(),
+    applied: false,
     /* select a sketch; a single closed profile is selected straight away */
-    chooseSketch(id, fromUser) {
+    chooseSketch(id, fromUser, all) {
       const s = cur.sketches.get(id); if (!s) return;
-      this.sketch = id; const regs = Engine.regions(s);
-      this.regions = new Set(regs.length === 1 ? [regs[0].ei] : []);
+      const regs = freeRegions(s, used);
+      if (!regs.length && id !== this.sketch) { toast('Tato skica už je vysunutá.'); return; }
+      this.sketch = id;
+      this.regions = new Set(regs.length === 1 || all ? regs.map(r => r.ei) : []);
       if (fromUser && dlg) dlg.set('sk', id);
     },
     /* show profiles of visible sketches, of sketches not used yet, and of the chosen one */
     buildOverlay() {
       clearGroup(G.overlay); this.regionMeshes = [];
-      const used = new Set(doc.features.filter(x => x.id !== (f && f.id)).map(x => x.sketch).filter(Boolean));
       for (const s of cur.sketches.values()) {
-        if (s.id !== this.sketch && !isVis(s.id) && used.has(s.id)) continue;
-        for (const r of Engine.regions(s)) { const m = regionMesh(s.plane, r, tok.orange, 0.22, 0.02); m.userData = { sid: s.id, ei: r.ei }; this.regionMeshes.push(m); G.overlay.add(m); }
+        const regs = s.id === this.sketch && f ? Engine.regions(s).filter(r => !(used.get(s.id) || new Set()).has(r.ei) || this.regions.has(r.ei)) : freeRegions(s, used);
+        if (!regs.length) continue;
+        for (const r of regs) { const m = regionMesh(s.plane, r, tok.orange, 0.22, 0.02); m.userData = { sid: s.id, ei: r.ei }; this.regionMeshes.push(m); G.overlay.add(m); }
         G.overlay.add(sketchLines(s.plane, s.ents, s.id === this.sketch ? tok.accent : tok.sketch, 0.05));
       }
     },
@@ -1496,9 +1517,16 @@ function startExtrude(editIndex, f) {
     ok() {
       if (!this.tool) return null;
       const out = this.feature(); out.id = f ? f.id : newId();
+      this.applied = true;
       return out;
     },
-    after(out) { doc.vis[out.sketch] = false; }
+    after(out) { doc.vis[out.sketch] = false; },
+    /* a sketch made only for this extrude (Vysunout on a face) is removed again when the command is cancelled */
+    cleanup() {
+      if (!opts.tempSketch || this.applied) return;
+      const i = doc.features.findIndex(x => x.id === opts.tempSketch);
+      if (i >= 0) { doc.features.splice(i, 1); if (doc.marker > i) doc.marker--; setTimeout(commit, 0); }
+    }
   };
   beginCmd(c); c.init();
 }
@@ -1931,6 +1959,31 @@ function drawFaces() {
   if (selFace) faceGroup.add(faceMesh(selFace, tok.accent, 0.5));
   requestRender();
 }
+/* action bar for the selected face (works on touch screens, where there is no right click) */
+let faceBarKey = '';
+function syncFaceBar() {
+  const bar = $('#facebar'); if (!bar) return;
+  const show = faceMode && selFace && !cmd && !sk;
+  const key = show ? selFace.bodyId + ':' + selFace.kind + ':' + selFace.group[0] + ':' + selFace.group.length : '';
+  if (key === faceBarKey) return;
+  faceBarKey = key; bar.hidden = !show; document.body.classList.toggle('has-facebar', !!show); if (!show) { bar.innerHTML = ''; return; }
+  const pl = selFace.kind === 'plane', acts = pl
+    ? [['ext', 'Vysunout', 'extrude'], ['press', 'Posunout plochu', 'pressface'], ['sk', 'Skica z plochy', 'sketchi'], ['esk', 'Prázdná skica', 'sketch']]
+    : [['press', selFace.cyl.internal ? 'Průměr otvoru' : 'Změnit průměr', 'pressface'], ['thr', 'Závit', 'thread']];
+  bar.innerHTML = `<span class="fb-t"></span><div class="fb-a">${acts.map(([k, l, ic]) => `<button class="fb-b" data-fb="${k}"><span class="ico">${svg(ic, 18)}</span>${l}</button>`).join('')}<button class="ibtn" data-fb="x" aria-label="Zrušit výběr plochy" title="Zrušit výběr plochy">${svg('close', 16)}</button></div>`;
+  $('.fb-t', bar).textContent = faceText(selFace);
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('[data-fb]'); if (!b || !selFace) return;
+  const k = b.dataset.fb, s = selFace;
+  if (k === 'ext') extrudeFace();
+  else if (k === 'press') startPressFace();
+  else if (k === 'sk') faceToSketch();
+  else if (k === 'esk') enterSketch({ id: newId(), type: 'sketch', name: 'Skica ' + (doc.features.filter(x => x.type === 'sketch').length + 1), plane: Engine.basisFromPlane(s.n, s.w), ents: [] }, null);
+  else if (k === 'thr') { startThread(); if (cmd && cmd.setFace) cmd.setFace(s.bodyId, s.cyl); }
+  else if (k === 'x') { selFace = null; drawFaces(); updateInfo(); }
+  syncFaceBar();
+});
 function faceText(f) {
   if (f.kind === 'cyl') return `${f.cyl.internal ? 'Vnitřní válcová plocha (otvor)' : 'Vnější válcová plocha'} · Ø ${fmtc(f.cyl.r * 2, 2)} mm · délka ${fmtc(f.cyl.len, 2)} mm`;
   return `Rovinná plocha · ${fmtc(f.area, 2)} mm² · normála ${f.n.map(v => fmtc(v, 2)).join('; ')}`;
@@ -1940,7 +1993,7 @@ function setFaceMode(on) {
   if (!on) selFace = null;
   if (on) { sel = new Set(); styleBodies(); renderBrowser(); }
   drawFaces(); renderRibbon(); updateInfo();
-  toast(on ? 'Výběr ploch: klepněte na stěnu tělesa. Pravým tlačítkem zobrazíte možnosti.' : 'Výběr těles');
+  toast(on ? 'Výběr ploch: klepněte na stěnu tělesa, možnosti se ukážou v liště dole.' : 'Výběr těles');
 }
 function faceHover(e) {
   const h = hitBodies(e), f = h ? faceAtHit(h) : null;
@@ -1958,6 +2011,7 @@ function faceContext(e) {
   if (f) { selFace = f; drawFaces(); updateInfo(); }
   if (!selFace) return;
   showCtx(e.clientX, e.clientY + 4, [
+    ['Vysunout (nové těleso, přidat nebo vyříznout)…', () => extrudeFace(), selFace.kind !== 'plane'],
     [selFace.kind === 'cyl' ? (selFace.cyl.internal ? 'Změnit průměr otvoru…' : 'Změnit průměr…') : 'Posunout plochu (vysunout / zapustit)…', () => startPressFace()],
     ['Skica z plochy (Ctrl+D)', () => faceToSketch(), selFace.kind !== 'plane'],
     ['Nová prázdná skica na ploše', () => { const s = selFace; enterSketch({ id: newId(), type: 'sketch', name: 'Skica ' + (doc.features.filter(x => x.type === 'sketch').length + 1), plane: Engine.basisFromPlane(s.n, s.w), ents: [] }, null); }, selFace.kind !== 'plane'],
@@ -1966,10 +2020,19 @@ function faceContext(e) {
     ['Zrušit výběr plochy', () => { selFace = null; drawFaces(); updateInfo(); }]
   ]);
 }
-/* copy a planar face outline into a new sketch on the same plane (circles stay circles, so their size is editable) */
-function faceToSketch() {
+/* Vysunout on a selected face: its outline becomes a sketch and the Extrude command opens with it */
+function extrudeFace() {
   const s = selFace;
-  if (!s || s.kind !== 'plane') { toast('Vyberte rovinnou plochu (třeba horní stěnu válce).'); return; }
+  if (!s || s.kind !== 'plane') { toast('Vysunout lze rovinnou plochu.'); return; }
+  const fs = faceSketch(s);
+  if (!fs) { toast('Obrys plochy se nepodařilo převést na skicu.'); return; }
+  setFaceMode(false);
+  doc.features.splice(doc.marker, 0, fs); doc.marker++; doc.vis[fs.id] = false;
+  pushHist(); saveDoc();
+  refreshBusy(() => startExtrude(undefined, undefined, { sketch: fs.id, tempSketch: fs.id, fromFace: true }));
+}
+/* copy a planar face outline into a new sketch on the same plane (circles stay circles, so their size is editable) */
+function faceSketch(s) {
   const B = Engine.basisFromPlane(s.n, s.w), r4 = x => Math.round(x * 1e4) / 1e4;
   const ents = [];
   for (const loop of K.faceLoops(s.polys, s.group)) {
@@ -1982,10 +2045,17 @@ function faceToSketch() {
     if (pts.length >= 12 && rs.every(r => Math.abs(r - rm) < 0.01 * rm + 1e-3)) ents.push({ t: 'circle', x: r4(cx), y: r4(cy), r: r4(Math.max(...rs)) });
     else ents.push({ t: 'poly', pts: pts.map(p => [r4(p[0]), r4(p[1])]), closed: true });
   }
-  if (!ents.length) { toast('Obrys plochy se nepodařilo převést na skicu.'); return; }
+  if (!ents.length) return null;
   const n = doc.features.filter(x => x.type === 'sketch').length + 1;
+  return { id: newId(), type: 'sketch', name: `Skica ${n} (z plochy)`, plane: { o: B.o.map(r4), u: B.u.map(r4), v: B.v.map(r4), n: B.n.map(r4) }, ents };
+}
+function faceToSketch() {
+  const s = selFace;
+  if (!s || s.kind !== 'plane') { toast('Vyberte rovinnou plochu (třeba horní stěnu válce).'); return; }
+  const fs = faceSketch(s);
+  if (!fs) { toast('Obrys plochy se nepodařilo převést na skicu.'); return; }
   setFaceMode(false);
-  enterSketch({ id: newId(), type: 'sketch', name: `Skica ${n} (z plochy)`, plane: { o: B.o.map(r4), u: B.u.map(r4), v: B.v.map(r4), n: B.n.map(r4) }, ents }, null);
+  enterSketch(fs, null);
   sk.selEnt = 0; setSketchTool(null); renderPalette(); redrawSketch();
   toast('Obrys plochy je ve skice. Upravte rozměr v paletě, dokončete skicu a vysuňte ji (E), záporná vzdálenost vytvoří otvor.');
 }
@@ -3103,14 +3173,25 @@ function deleteSelected() {
 }
 
 /* ================= pointer routing ================= */
-let down = null, hoverQueued = false, lastMoveEv = null;
+let down = null, hoverQueued = false, lastMoveEv = null, longPressT = null;
 dom.addEventListener('pointerdown', e => {
   try { dom.focus({ preventScroll: true }); } catch (er) {}
   down = { x: e.clientX, y: e.clientY, btn: e.button, gizmo: !!(transform.object && transform.axis), special: false };
+  /* touch: holding a finger still for a moment opens the same menu as a right click */
+  clearTimeout(longPressT);
+  if (e.pointerType === 'touch' && e.button === 0 && !sk && !cmd) {
+    const d0 = down, ev0 = { clientX: e.clientX, clientY: e.clientY, button: 2 };
+    longPressT = setTimeout(() => {
+      if (down !== d0 || d0.moved) return;
+      d0.longpress = true;
+      if (faceMode) faceContext(ev0); else { const h = hitBodies(ev0); if (h) bodyContext(ev0, h.object.userData.bodyId); }
+    }, 550);
+  }
   if (e.button === 0 && cmd && cmd.onDown && cmd.onDown(e)) { down.special = true; try { dom.setPointerCapture(e.pointerId); } catch (er) {} }
   else if (e.button === 0 && sk && !sk.tool) { const h = sketchHandleAt(e); if (h) { sk.drag = h; sk.selEnt = h.ei; down.special = true; controls.enabled = false; try { dom.setPointerCapture(e.pointerId); } catch (er) {} } }
 }, true);
 dom.addEventListener('pointermove', e => {
+  if (down && !down.moved && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) { down.moved = true; clearTimeout(longPressT); }
   if (down && down.special && sk && sk.drag) { sketchDrag(e); return; }
   if (down && down.special && cmd && cmd.onDrag) { cmd.onDrag(e); return; }
   if (e.buttons) return;
@@ -3120,7 +3201,8 @@ dom.addEventListener('pointermove', e => {
 dom.addEventListener('pointerleave', () => { if (cmd && cmd.onLeave) cmd.onLeave(); if (hoverBody) { hoverBody = null; styleBodies(); } $('#dim').hidden = true; });
 dom.addEventListener('pointerup', e => {
   if (!down) return;
-  const d = down; down = null;
+  const d = down; down = null; clearTimeout(longPressT);
+  if (d.longpress) return;
   if (d.special) { if (sk && sk.drag) { sk.drag = null; controls.enabled = true; $('#dim').hidden = true; renderPalette(); redrawSketch(); return; } if (cmd && cmd.onUp) cmd.onUp(e); return; }
   const moved = Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5;
   if (d.gizmo || moved) { if (cmd && cmd.onLeave && moved) cmd.onLeave(); return; }

@@ -1,5 +1,11 @@
 # Changelog
 
+## Beta 0.30
+- Vysunutí nabízí jen profily, které ještě nebyly vysunuté (už použitá skica se v nabídce neukáže; u skici s více profily zůstanou ty nepoužité). Když není co vysunout, aplikace poradí novou skicu nebo Vysunout z plochy.
+- Režim Plochy: po výběru stěny se dole objeví lišta s akcemi (Vysunout, Posunout plochu / Změnit průměr, Skica z plochy, Prázdná skica, Závit), takže vše funguje i na mobilu bez pravého tlačítka.
+- Nová akce Vysunout u rovinné plochy: obrys stěny se rovnou vysune (nové těleso, přidat nebo vyříznout) bez ruční práce se skicou. Při zrušení se pomocná skica zase smaže.
+- Na dotykové obrazovce otevře podržení prstu na tělese nebo ploše stejnou nabídku jako pravé tlačítko.
+
 ## Beta 0.29
 - Vysunutí: v dialogu je nové pole „Skica“, kterým vyberete libovolnou skicu, i takovou, která už byla použita a je skrytá. Skicu lze vybrat také klepnutím v Prohlížeči nebo na časové ose před spuštěním Vysunutí, případně klepnutím na její profil v pohledu.
 - Bez výběru se nabídne nejnovější dosud nepoužitá skica (dřív vždy poslední vytvořená). Pokud má skica jediný uzavřený profil, vybere se rovnou.

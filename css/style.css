@@ -275,3 +275,18 @@ button { cursor: pointer; }
 .updbar { position: fixed; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 120; display: flex; align-items: center; gap: 8px; max-width: calc(100% - 24px); padding: 8px 10px 8px 14px; background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; box-shadow: var(--shadow); font-size: 12.5px; }
 .updbar span { min-width: 0; }
 .updbar .btn { height: 28px; padding: 0 12px; flex: none; }
+
+/* action bar for a selected face */
+.facebar { left: 50%; bottom: 60px; transform: translateX(-50%); z-index: 7; display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; max-width: calc(100% - 24px); }
+.facebar .fb-t { font: 11.5px var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.facebar .fb-a { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.facebar .fb-b { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); white-space: nowrap; }
+.facebar .fb-b:hover { background: var(--panel-2); }
+.facebar .fb-b .ico { display: flex; }
+@media (max-width: 760px) {
+  .facebar { bottom: 12px; left: 12px; right: 12px; transform: none; max-width: none; }
+  .facebar .fb-a { justify-content: center; }
+  .facebar .fb-b { flex: 1 1 auto; justify-content: center; height: 40px; }
+  .has-facebar .toast { bottom: 150px; }
+}
+.has-facebar .toast { bottom: 150px; }
