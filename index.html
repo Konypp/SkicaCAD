@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>SkicaCAD Beta 0.22</title>
+<title>SkicaCAD Beta 0.23</title>
 <meta name="description" content="SkicaCAD – parametrické 3D CAD v prohlížeči (testovací verze).">
 <meta name="theme-color" content="#1B2430">
 <link rel="manifest" href="manifest.webmanifest" crossorigin="use-credentials">
@@ -24,8 +24,31 @@
   // PWA: service worker se registruje hned (nečeká na načtení three.js z CDN),
   // aby Chrome mohl aplikaci co nejdřív nabídnout k instalaci jako plnohodnotnou aplikaci.
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js').then((reg) => {
+      // běžící aplikace si novou verzi vyhledá při návratu do popředí a pak každou půlhodinu
+      const check = () => reg.update().catch(() => {});
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+      setInterval(check, 30 * 60 * 1000);
+    }).catch(() => {});
     navigator.serviceWorker.ready.then((r) => { if (r.active) r.active.postMessage('cache-cdn'); }).catch(() => {});
+    // Nový service worker převzal řízení (a stránka už jednou řízená byla) = je dostupná nová verze.
+    let notified = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || notified) return;
+      notified = true;
+      const showBar = () => {
+        const bar = document.createElement('div');
+        bar.className = 'updbar'; bar.setAttribute('role', 'status');
+        const t = document.createElement('span'); t.textContent = 'Je k dispozici nová verze aplikace.';
+        const ok = document.createElement('button'); ok.className = 'btn primary sm'; ok.textContent = 'Obnovit';
+        ok.addEventListener('click', () => location.reload());
+        const no = document.createElement('button'); no.className = 'btn sm'; no.textContent = 'Později';
+        no.addEventListener('click', () => bar.remove());
+        bar.append(t, ok, no); document.body.append(bar);
+      };
+      if (document.body) showBar(); else document.addEventListener('DOMContentLoaded', showBar);
+    });
   }
   // Tlačítko „Nainstalovat aplikaci“ v nabídce Soubor (Chrome ukazuje i vlastní nabídku).
   window.__skicaInstall = null;
@@ -56,7 +79,7 @@
   <header class="appbar">
     <div class="brand">
       <svg width="26" height="18" viewBox="0 0 30 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3v14M28 3v14M4.5 10h21M4.5 10l3-2.4M4.5 10l3 2.4M25.5 10l-3-2.4M25.5 10l-3 2.4"/></svg>
-      <span>SkicaCAD</span><span class="beta" id="ver-badge" title="Testovací verze">Beta 0.22</span>
+      <span>SkicaCAD</span><span class="beta" id="ver-badge" title="Testovací verze">Beta 0.23</span>
     </div>
     <button class="abtn" id="filebtn" aria-haspopup="true" aria-expanded="false" title="Soubor"><span class="ico" data-ic="menu" data-s="18"></span><span class="lbltxt">Soubor</span></button>
     <button class="abtn" id="undo" title="Zpět (Ctrl+Z)" aria-label="Zpět"><span class="ico" data-ic="undo" data-s="18"></span></button>

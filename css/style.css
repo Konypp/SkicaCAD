@@ -267,3 +267,8 @@ button { cursor: pointer; }
 .sd-foot .btn.sm { padding: 0 10px; }
 .sd-note { margin: 0; font-size: 12px; color: var(--muted); }
 
+
+/* oznámení o nové verzi (PWA) */
+.updbar { position: fixed; left: 50%; bottom: 64px; transform: translateX(-50%); z-index: 120; display: flex; align-items: center; gap: 8px; max-width: calc(100% - 24px); padding: 8px 10px 8px 14px; background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; box-shadow: var(--shadow); font-size: 12.5px; }
+.updbar span { min-width: 0; }
+.updbar .btn { height: 28px; padding: 0 12px; flex: none; }

@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.23
+- Oznámení o nové verzi: když se za běhu stáhne aktualizace, objeví se lišta „Je k dispozici nová verze aplikace“ s tlačítky Obnovit / Později. Aplikace hledá aktualizace při návratu do popředí a každou půlhodinu.
+
 ## Beta 0.22
 - Převzato z artefaktu SkicaCAD Beta 0.22: úvodní nabídka se zobrazí při každém spuštění, i když zatím nejsou žádné uložené návrhy (s textem, že se návrh uloží sám, jakmile začnete modelovat).
 - PWA části (stahování souborů, instalace, service worker) zůstávají zachované.
