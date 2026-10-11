@@ -330,10 +330,14 @@ function styleBodies() {
     m.visible = settings.style !== 'w';
     m.transparent = false; m.opacity = 1;
     e.edges.visible = settings.style !== 's';
-    e.edges.material.color.copy(isSel || tint ? (tint === 'tool' ? tok.orange : tok.accent) : (hoverBody === id ? tok['accent-hover'] : tok.edge));
+    /* sharp edges are drawn softly (a shade darker than the body); selection and hover keep strong colours */
+    const strong = isSel || tint || hoverBody === id;
+    e.edges.material.color.copy(isSel || tint ? (tint === 'tool' ? tok.orange : tok.accent) : (hoverBody === id ? tok['accent-hover'] : softEdge()));
+    e.edges.material.transparent = !strong; e.edges.material.opacity = strong ? 1 : 0.55; e.edges.material.depthWrite = strong;
   }
   requestRender();
 }
+function softEdge() { return tok.body.clone().lerp(tok.edge, 0.6); }
 function visibleMeshes() { return Array.from(meshes.values()).filter(e => e.mesh.visible).map(e => e.mesh); }
 
 /* sketches (finished) */

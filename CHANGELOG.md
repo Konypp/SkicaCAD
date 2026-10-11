@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.28
+- Hrany těles se kreslí jemně (o odstín tmavší než těleso, poloprůhledně) místo téměř černé čáry. Výrazná barva zůstává jen u vybraného tělesa a pod kurzorem. Zaoblení se jako hrana nekreslí, čáry zůstávají jen na skutečných ostrých hranách.
+
 ## Beta 0.27
 - Základní těleso Kvádr nahrazeno Krychlí: výchozí rozměry 30 × 30 × 30 mm a šipky ji ve výchozím stavu mění rovnoměrně, takže zůstane krychlí. Po vypnutí volby nebo ručním zadání rozměrů z ní lze dál udělat kvádr.
 
