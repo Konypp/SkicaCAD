@@ -544,7 +544,7 @@ function updateSketchDims() {
   const P = sk.f.plane, W = dom.clientWidth, H = dom.clientHeight, out = [];
   const px = (x, y) => toPx(P3(P, x, y));
   const f1 = v => fmtc(v, 2);
-  const arrow = (t, d) => { const n = [-d[1], d[0]]; return `<path class="ah" d="M${t[0]},${t[1]}L${t[0] - d[0] * 8 + n[0] * 3},${t[1] - d[1] * 8 + n[1] * 3}L${t[0] - d[0] * 8 - n[0] * 3},${t[1] - d[1] * 8 - n[1] * 3}Z"/>`; };
+  const arrow = (t, d) => { const n = [-d[1], d[0]]; return `<path class="ah" d="M${t[0]},${t[1]}L${t[0] - d[0] * 6 + n[0] * 1.8},${t[1] - d[1] * 6 + n[1] * 1.8}L${t[0] - d[0] * 6 - n[0] * 1.8},${t[1] - d[1] * 6 - n[1] * 1.8}Z"/>`; };
   const text = (x, y, s, ang = 0, anchor = 'middle') => `<text x="${x}" y="${y}" text-anchor="${anchor}"${ang ? ` transform="rotate(${ang} ${x} ${y})"` : ''}>${s}</text>`;
   const ok = (...q) => q.every(v => v[2] < 1 && v[0] > -W && v[0] < 2 * W && v[1] > -H && v[1] < 2 * H);
   /* aligned linear dimension between plane points a and b, pushed away from plane point c */
@@ -554,8 +554,8 @@ function updateSketchDims() {
     const u = [dx / L, dy / L]; let n = [-u[1], u[0]];
     const side = (A[0] + B[0]) / 2 - C[0], sideY = (A[1] + B[1]) / 2 - C[1], dot = n[0] * side + n[1] * sideY;
     if (Math.abs(dot) < 1e-3 ? n[1] > 0 : dot < 0) n = [-n[0], -n[1]];
-    const o = 22, a1 = [A[0] + n[0] * o, A[1] + n[1] * o], b1 = [B[0] + n[0] * o, B[1] + n[1] * o];
-    out.push(`<path d="M${A[0] + n[0] * 4},${A[1] + n[1] * 4}L${A[0] + n[0] * (o + 5)},${A[1] + n[1] * (o + 5)}M${B[0] + n[0] * 4},${B[1] + n[1] * 4}L${B[0] + n[0] * (o + 5)},${B[1] + n[1] * (o + 5)}M${a1[0]},${a1[1]}L${b1[0]},${b1[1]}"/>`);
+    const o = 16, a1 = [A[0] + n[0] * o, A[1] + n[1] * o], b1 = [B[0] + n[0] * o, B[1] + n[1] * o];
+    out.push(`<path d="M${A[0] + n[0] * 4},${A[1] + n[1] * 4}L${A[0] + n[0] * (o + 3)},${A[1] + n[1] * (o + 3)}M${B[0] + n[0] * 4},${B[1] + n[1] * 4}L${B[0] + n[0] * (o + 3)},${B[1] + n[1] * (o + 3)}M${a1[0]},${a1[1]}L${b1[0]},${b1[1]}"/>`);
     out.push(arrow(a1, [-u[0], -u[1]]), arrow(b1, u));
     let ang = Math.atan2(u[1], u[0]) / D2R; if (ang > 90) ang -= 180; if (ang <= -90) ang += 180;
     out.push(text((a1[0] + b1[0]) / 2, (a1[1] + b1[1]) / 2, label || f1(Math.hypot(b[0] - a[0], b[1] - a[1])), Math.round(ang * 10) / 10));
@@ -564,7 +564,7 @@ function updateSketchDims() {
   const across = (p1, p2, label, both) => {
     const A = px(p1[0], p1[1]), B = px(p2[0], p2[1]); if (!ok(A, B)) return;
     const dx = B[0] - A[0], dy = B[1] - A[1], L = Math.hypot(dx, dy); if (L < 10) return;
-    const u = [dx / L, dy / L], E = [B[0] + u[0] * 10, B[1] + u[1] * 10], hz = E[0] + (u[0] >= 0 ? 12 : -12);
+    const u = [dx / L, dy / L], E = [B[0] + u[0] * 8, B[1] + u[1] * 8], hz = E[0] + (u[0] >= 0 ? 9 : -9);
     out.push(`<path d="M${A[0]},${A[1]}L${E[0]},${E[1]}L${hz},${E[1]}"/>`, arrow(B, u));
     if (both) out.push(arrow(A, [-u[0], -u[1]]));
     out.push(text(hz + (u[0] >= 0 ? 3 : -3), E[1], label, 0, u[0] >= 0 ? 'start' : 'end'));
