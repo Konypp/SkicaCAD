@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta 0.33
+- Vycentrovat rozšířeno a přejmenováno na Zarovnat se třemi režimy:
+  - Počátku: dosavadní vycentrování (X, Y, položení na podložku), beze změny.
+  - Tělesu: pro každou osu zvolíte zarovnání začátků, středů nebo konců, případně přiložení za konec / před začátek (u osy Z položit navrch / dát pod), vybraná tělesa se zarovnají k vybranému tělesu.
+  - Ploše: klepnete na plochu tělesa, které se má přesunout, a na cílovou plochu jiného tělesa; těleso se natočí a přisune tak, aby plochy dosedly (volitelně vystředit, otočit opačně, mezera). Dvě válcové plochy (válce, díry) se zarovnají do jedné osy.
+- V režimu Plochy přibyla akce Zarovnat k… (lišta i nabídka), která rovnou předvybere zvolenou plochu.
+
 ## Beta 0.32
 - Anglická verze: tlačítko CZ / EN v horní liště přepíná jazyk celé aplikace za běhu (pás nástrojů, dialogy, paleta skici, nabídky, hlášení, úvodní obrazovka, kostka pohledů). Volba se pamatuje; při prvním spuštění se jazyk řídí nastavením prohlížeče. V angličtině se čísla píší s desetinnou tečkou. Překlad je v souboru `js/i18n.js`.
 - Šipky pro změnu rozměrů (základní tělesa, Vysunutí, Závit) mají stálou velikost na obrazovce a jsou menší (na dotykových zařízeních o něco větší, aby se daly chytit).

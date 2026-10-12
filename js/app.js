@@ -795,7 +795,7 @@ document.addEventListener('pointerdown', e => { const m = $('#ctxmenu'); if (!m.
 const RIBBON = {
   solid: [
     ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'], ['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus']]],
-    ['Upravit', [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení'], ['combine', 'Kombinovat'], ['move', 'Přesunout', 'M'], ['rotate', 'Otočit', 'R'], ['scale', 'Měřítko'], ['center', 'Vycentrovat'], ['facemode', 'Plochy', 'G'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole'], ['del', 'Odstranit', 'Del']]],
+    ['Upravit', [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení'], ['combine', 'Kombinovat'], ['move', 'Přesunout', 'M'], ['rotate', 'Otočit', 'R'], ['scale', 'Měřítko'], ['center', 'Zarovnat'], ['facemode', 'Plochy', 'G'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole'], ['del', 'Odstranit', 'Del']]],
     ['Výběr', [['selall', 'Vybrat vše', 'Ctrl+A']]],
     ['Kontrola', [['measure', 'Měřit', 'I']]],
     ['Vložit', [['import', 'Importovat']]]
@@ -1983,8 +1983,8 @@ function syncFaceBar() {
   if (key === faceBarKey) return;
   faceBarKey = key; bar.hidden = !show; document.body.classList.toggle('has-facebar', !!show); if (!show) { bar.innerHTML = ''; return; }
   const pl = selFace.kind === 'plane', acts = pl
-    ? [['ext', 'Vysunout', 'extrude'], ['press', 'Posunout plochu', 'pressface'], ['sk', 'Skica z plochy', 'sketchi'], ['esk', 'Prázdná skica', 'sketch']]
-    : [['press', selFace.cyl.internal ? 'Průměr otvoru' : 'Změnit průměr', 'pressface'], ['thr', 'Závit', 'thread']];
+    ? [['ext', 'Vysunout', 'extrude'], ['press', 'Posunout plochu', 'pressface'], ['al', 'Zarovnat k…', 'center'], ['sk', 'Skica z plochy', 'sketchi'], ['esk', 'Prázdná skica', 'sketch']]
+    : [['press', selFace.cyl.internal ? 'Průměr otvoru' : 'Změnit průměr', 'pressface'], ['al', 'Zarovnat k…', 'center'], ['thr', 'Závit', 'thread']];
   bar.innerHTML = `<span class="fb-t"></span><div class="fb-a">${acts.map(([k, l, ic]) => `<button class="fb-b" data-fb="${k}"><span class="ico">${svg(ic, 18)}</span>${l}</button>`).join('')}<button class="ibtn" data-fb="x" aria-label="Zrušit výběr plochy" title="Zrušit výběr plochy">${svg('close', 16)}</button></div>`;
   $('.fb-t', bar).textContent = faceText(selFace);
 }
@@ -1996,6 +1996,7 @@ document.addEventListener('click', e => {
   else if (k === 'sk') faceToSketch();
   else if (k === 'esk') enterSketch({ id: newId(), type: 'sketch', name: 'Skica ' + (doc.features.filter(x => x.type === 'sketch').length + 1), plane: Engine.basisFromPlane(s.n, s.w), ents: [] }, null);
   else if (k === 'thr') { startThread(); if (cmd && cmd.setFace) cmd.setFace(s.bodyId, s.cyl); }
+  else if (k === 'al') { setFaceMode(false, true); startCenter(undefined, undefined, { face: s }); }
   else if (k === 'x') { selFace = null; drawFaces(); updateInfo(); }
   syncFaceBar();
 });
@@ -2003,12 +2004,12 @@ function faceText(f) {
   if (f.kind === 'cyl') return `${f.cyl.internal ? 'Vnitřní válcová plocha (otvor)' : 'Vnější válcová plocha'} · Ø ${fmtc(f.cyl.r * 2, 2)} mm · délka ${fmtc(f.cyl.len, 2)} mm`;
   return `Rovinná plocha · ${fmtc(f.area, 2)} mm² · normála ${f.n.map(v => fmtc(v, 2)).join('; ')}`;
 }
-function setFaceMode(on) {
+function setFaceMode(on, quiet) {
   faceMode = on; hoverFace = null;
   if (!on) selFace = null;
   if (on) { sel = new Set(); styleBodies(); renderBrowser(); }
   drawFaces(); renderRibbon(); updateInfo();
-  toast(on ? 'Výběr ploch: klepněte na stěnu tělesa, možnosti se ukážou v liště dole.' : 'Výběr těles');
+  if (!quiet) toast(on ? 'Výběr ploch: klepněte na stěnu tělesa, možnosti se ukážou v liště dole.' : 'Výběr těles');
 }
 function faceHover(e) {
   const h = hitBodies(e), f = h ? faceAtHit(h) : null;
@@ -2031,6 +2032,7 @@ function faceContext(e) {
     ['Skica z plochy (Ctrl+D)', () => faceToSketch(), selFace.kind !== 'plane'],
     ['Nová prázdná skica na ploše', () => { const s = selFace; enterSketch({ id: newId(), type: 'sketch', name: 'Skica ' + (doc.features.filter(x => x.type === 'sketch').length + 1), plane: Engine.basisFromPlane(s.n, s.w), ents: [] }, null); }, selFace.kind !== 'plane'],
     ['Závit na této ploše…', () => { const s = selFace; startThread(); if (cmd && cmd.setFace) cmd.setFace(s.bodyId, s.cyl); }, selFace.kind !== 'cyl'],
+    ['Zarovnat k jiné ploše…', () => { const s = selFace; setFaceMode(false, true); startCenter(undefined, undefined, { face: s }); }],
     null,
     ['Zrušit výběr plochy', () => { selFace = null; drawFaces(); updateInfo(); }]
   ]);
@@ -2041,7 +2043,7 @@ function extrudeFace() {
   if (!s || s.kind !== 'plane') { toast('Vysunout lze rovinnou plochu.'); return; }
   const fs = faceSketch(s);
   if (!fs) { toast('Obrys plochy se nepodařilo převést na skicu.'); return; }
-  setFaceMode(false);
+  setFaceMode(false, true);
   doc.features.splice(doc.marker, 0, fs); doc.marker++; doc.vis[fs.id] = false;
   pushHist(); saveDoc();
   refreshBusy(() => startExtrude(undefined, undefined, { sketch: fs.id, tempSketch: fs.id, fromFace: true }));
@@ -2069,7 +2071,7 @@ function faceToSketch() {
   if (!s || s.kind !== 'plane') { toast('Vyberte rovinnou plochu (třeba horní stěnu válce).'); return; }
   const fs = faceSketch(s);
   if (!fs) { toast('Obrys plochy se nepodařilo převést na skicu.'); return; }
-  setFaceMode(false);
+  setFaceMode(false, true);
   enterSketch(fs, null);
   sk.selEnt = 0; setSketchTool(null); renderPalette(); redrawSketch();
   toast('Obrys plochy je ve skice. Upravte rozměr v paletě, dokončete skicu a vysuňte ji (E), záporná vzdálenost vytvoří otvor.');
@@ -2130,47 +2132,113 @@ function startPressFace(editIndex, f) {
 }
 
 /* ================= centre bodies on the origin ================= */
-function startCenter(editIndex, f) {
+/* face / axis descriptor used by Zarovnat (plane: outward normal and centre; cylinder: axis and its midpoint) */
+function alignDesc(face) {
+  if (!face) return null;
+  const r6 = x => Math.round(x * 1e6) / 1e6;
+  if (face.kind === 'cyl') { const cy = face.cyl; return { kind: 'cyl', a: cy.ax.map(r6), c: K.vadd(cy.c, K.vmul(cy.ax, cy.len / 2)).map(r6) }; }
+  let A = 0; const c = [0, 0, 0];
+  for (const i of face.group) { const p = face.polys[i], a = K.surfaceArea([p]); let q = [0, 0, 0]; for (const v of p.v) q = K.vadd(q, v); q = K.vmul(q, 1 / p.v.length); A += a; for (let k = 0; k < 3; k++) c[k] += q[k] * a; }
+  return { kind: 'plane', n: face.n.map(r6), c: c.map(v => r6(v / (A || 1))) };
+}
+const ALIGN_AX = [['keep', 'Neměnit'], ['min', 'Zarovnat začátky'], ['center', 'Na střed'], ['max', 'Zarovnat konce'], ['after', 'Přiložit za konec'], ['before', 'Přiložit před začátek']];
+const ALIGN_AXZ = [['keep', 'Neměnit'], ['min', 'Zarovnat spodky'], ['center', 'Na střed'], ['max', 'Zarovnat vršky'], ['after', 'Položit navrch'], ['before', 'Dát pod']];
+function startCenter(editIndex, f, preset) {
   const c = {
-    editIndex, all: f ? !!f.all : !sel.size, bodies: new Set(f ? (f.bodies || []) : [...sel]),
-    x: f ? f.x !== false : true, y: f ? f.y !== false : true, z: f ? (f.z || 'ground') : 'ground', each: f ? !!f.each : false, highlight: new Set(),
+    editIndex, mode: f ? (f.target || 'origin') : (preset && preset.face ? 'face' : 'origin'),
+    all: f ? !!f.all : !sel.size, bodies: new Set(f ? (f.bodies || []) : [...sel]),
+    x: f ? f.x !== false : true, y: f ? f.y !== false : true, z: f ? (f.z || 'ground') : 'ground', each: f ? !!f.each : false,
+    ref: f ? f.ref || null : null, ax: f && f.ax ? f.ax.slice() : ['center', 'center', 'keep'],
+    body: f ? f.body || null : null, src: f ? f.src || null : null, dst: f ? f.dst || null : null, srcFace: null, dstFace: null,
+    flip: f ? !!f.flip : false, centerOn: f ? f.centerOn !== false : true, gap: f ? Number(f.gap) || 0 : 0,
+    pick: 'bodies', highlight: new Set(), hoverFace: null,
     ids() { return this.all ? cur.bodies.map(b => b.id) : [...this.bodies].filter(id => meshes.has(id)); },
     init() {
       if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
+      if (preset && preset.face) { this.srcFace = preset.face; this.src = alignDesc(preset.face); this.body = preset.face.bodyId; this.pick = 'dst'; }
+      if (this.mode === 'face' && !this.src) this.pick = 'src';
+      if (this.mode === 'body') this.pick = this.ref ? 'bodies' : (this.ids().length ? 'ref' : 'bodies');
       openDialog({
-        title: 'Vycentrovat', icon: 'center',
-        fields: [{ k: 'chk', id: 'all', label: 'Celý model', value: this.all }, { k: 'sel', id: 'bodies', label: 'Tělesa' },
+        title: 'Zarovnat', icon: 'center',
+        fields: [{ k: 'seg', id: 'mode', label: 'Zarovnat k', options: [['origin', 'Počátku'], ['body', 'Tělesu'], ['face', 'Ploše']], value: this.mode },
+          { k: 'chk', id: 'all', label: 'Celý model', value: this.all }, { k: 'sel', id: 'bodies', label: 'Tělesa' },
+          { k: 'sel', id: 'ref', label: 'Ke tělesu' },
           { k: 'chk', id: 'x', label: 'Vycentrovat v ose X', value: this.x }, { k: 'chk', id: 'y', label: 'Vycentrovat v ose Y', value: this.y },
           { k: 'opt', id: 'z', label: 'Osa Z', options: [['ground', 'Položit na podložku (Z = 0)'], ['center', 'Vycentrovat'], ['keep', 'Neměnit']], value: this.z },
-          { k: 'chk', id: 'each', label: 'Každé těleso zvlášť', value: this.each }, { k: 'note', id: 'n' }],
+          { k: 'opt', id: 'ax0', label: 'Osa X', options: ALIGN_AX, value: this.ax[0] }, { k: 'opt', id: 'ax1', label: 'Osa Y', options: ALIGN_AX, value: this.ax[1] },
+          { k: 'opt', id: 'ax2', label: 'Osa Z', options: ALIGN_AXZ, value: this.ax[2] },
+          { k: 'chk', id: 'each', label: 'Každé těleso zvlášť', value: this.each },
+          { k: 'sel', id: 'src', label: 'Plocha, která se přesune' }, { k: 'sel', id: 'dst', label: 'Cílová plocha' },
+          { k: 'chk', id: 'centerOn', label: 'Vystředit na cílovou plochu', value: this.centerOn },
+          { k: 'chk', id: 'flip', label: 'Otočit opačně', value: this.flip },
+          { k: 'num', id: 'gap', label: 'Mezera', value: this.gap }, { k: 'note', id: 'n' }],
+        onSel: id => { this.pick = id === 'bodies' && this.all ? this.pick : id; this.update(); },
         onChange: id => {
+          if (id === 'mode') { this.mode = dlg.get('mode'); this.pick = this.mode === 'face' ? (this.src ? 'dst' : 'src') : this.mode === 'body' ? (this.ref ? 'bodies' : (this.ids().length ? 'ref' : 'bodies')) : 'bodies'; }
           if (id === 'all') this.all = dlg.get('all');
           if (id === 'x') this.x = dlg.get('x');
           if (id === 'y') this.y = dlg.get('y');
           if (id === 'z') this.z = dlg.get('z');
+          if (/^ax\d$/.test(id)) this.ax[+id[2]] = dlg.get(id);
           if (id === 'each') this.each = dlg.get('each');
+          if (id === 'centerOn') this.centerOn = dlg.get('centerOn');
+          if (id === 'flip') this.flip = dlg.get('flip');
+          if (id === 'gap') { const v = dlg.get('gap'); if (isFinite(v)) this.gap = v; }
           this.update();
         }
       });
       this.update();
     },
-    feature() { return { id: f ? f.id : 'tmp', type: 'center', all: this.all, bodies: this.all ? [] : this.ids(), x: this.x, y: this.y, z: this.z, each: this.each }; },
+    feature() {
+      const base = { id: f ? f.id : 'tmp', type: 'center', target: this.mode };
+      if (this.mode === 'face') return { ...base, body: this.body, src: this.src, dst: this.dst, flip: this.flip, centerOn: this.centerOn, gap: this.gap };
+      if (this.mode === 'body') return { ...base, all: this.all, bodies: this.all ? [] : this.ids(), ref: this.ref, ax: this.ax.slice(), each: this.each };
+      return { ...base, all: this.all, bodies: this.all ? [] : this.ids(), x: this.x, y: this.y, z: this.z, each: this.each };
+    },
+    ready() {
+      if (this.mode === 'face') return !!(this.src && this.dst && this.body);
+      if (this.mode === 'body') return !!(this.ref && this.ids().length && !this.ids().includes(this.ref));
+      return this.ids().length > 0;
+    },
     update() {
-      const ids = this.ids();
-      this.highlight = new Set(ids);
-      dlg.show('bodies', !this.all);
-      dlg.set('bodies', this.all ? { text: 'Celý model', has: true, active: false } : bodySelText(new Set(ids)));
-      dlg.okEnabled(ids.length > 0);
-      setPrompt(this.all ? 'Model se posune tak, aby jeho střed ležel v počátku' : ids.length ? 'Klepnutím na těleso výběr změníte' : 'Vyberte tělesa k vycentrování');
-      let moved = new Map();
-      if (ids.length) {
+      const m = this.mode, ids = this.ids(), bodyName2 = id => { const b = bodyById(id); return b ? bodyName(b) : '?'; };
+      ['all', 'bodies', 'each'].forEach(k => dlg.show(k, m !== 'face'));
+      dlg.show('bodies', m !== 'face' && !this.all);
+      ['x', 'y', 'z'].forEach(k => dlg.show(k, m === 'origin'));
+      ['ref', 'ax0', 'ax1', 'ax2'].forEach(k => dlg.show(k, m === 'body'));
+      ['src', 'dst', 'centerOn', 'flip', 'gap'].forEach(k => dlg.show(k, m === 'face'));
+      const bs = bodySelText(new Set(ids)); bs.active = this.pick === 'bodies';
+      dlg.set('bodies', this.all ? { text: 'Celý model', has: true, active: false } : bs);
+      dlg.set('ref', { text: this.ref ? bodyName2(this.ref) : 'Vyberte těleso', has: !!this.ref, active: this.pick === 'ref' });
+      const fdesc = d => (!d ? null : d.kind === 'cyl' ? 'Osa válcové plochy' : 'Rovinná plocha');
+      dlg.set('src', { text: fdesc(this.src) || 'Klepněte na plochu', has: !!this.src, active: this.pick === 'src' });
+      dlg.set('dst', { text: fdesc(this.dst) || 'Klepněte na plochu', has: !!this.dst, active: this.pick === 'dst' });
+      setPrompt(m === 'face' ? (this.pick === 'src' ? 'Klepněte na plochu tělesa, které se má přesunout (rovnou stěnu nebo válec)' : 'Klepněte na cílovou plochu (k rovné stěně rovnou, k válci válcovou)')
+        : m === 'body' ? (this.pick === 'ref' ? 'Klepněte na těleso, ke kterému se zarovná' : 'Klepnutím na těleso výběr změníte')
+          : this.all ? 'Model se posune tak, aby jeho střed ležel v počátku' : ids.length ? 'Klepnutím na těleso výběr změníte' : 'Vyberte tělesa k vycentrování');
+      this.highlight = new Set(m === 'face' ? (this.body ? [this.body] : []) : ids);
+      bodyTint.clear(); if (m === 'body' && this.ref) bodyTint.set(this.ref, 'target');
+      clearGroup(G.preview); clearGroup(G.overlay);
+      if (m === 'face') {
+        if (this.srcFace) G.overlay.add(faceMesh(this.srcFace, tok.orange, 0.55));
+        if (this.dstFace) G.overlay.add(faceMesh(this.dstFace, tok.accent, 0.55));
+        if (this.hoverFace) G.overlay.add(faceMesh(this.hoverFace, tok['accent-hover'], 0.3));
+      }
+      const ok = this.ready(); dlg.okEnabled(ok);
+      const moved = new Map();
+      if (ok) {
         try {
           const st = Engine.step({ bodies: cur.bodies, sketches: new Map(), n: 0 }, this.feature());
-          for (const b of st.bodies) { const old = bodyById(b.id); if (old && old.polys !== b.polys) { const a = K.bbox(old.polys).min, z = K.bbox(b.polys).min; moved.set(b.id, [z[0] - a[0], z[1] - a[1], z[2] - a[2]]); } }
+          for (const b of st.bodies) {
+            const old = bodyById(b.id); if (!old || old.polys === b.polys) continue;
+            if (m === 'face') {
+              G.preview.add(noRay(meshFromPolys(b.polys, new THREE.MeshStandardMaterial({ color: tok.accent.clone(), transparent: true, opacity: 0.55, roughness: 0.5, depthWrite: false, side: THREE.DoubleSide }))));
+            } else { const a = K.bbox(old.polys).min, z = K.bbox(b.polys).min; moved.set(b.id, [z[0] - a[0], z[1] - a[1], z[2] - a[2]]); }
+          }
           const any = [...moved.values()][0] || [0, 0, 0];
-          dlg.set('n', this.each ? 'Každé těleso se posune do počátku samostatně.' : `Posun: X ${fmtc(any[0], 2)} · Y ${fmtc(any[1], 2)} · Z ${fmtc(any[2], 2)} mm`);
-        } catch (e) { dlg.set('n', '!' + e.message); }
-      }
+          dlg.set('n', m === 'face' ? 'Modře je nová poloha tělesa.' : this.each ? 'Každé těleso se posune samostatně.' : `Posun: X ${fmtc(any[0], 2)} · Y ${fmtc(any[1], 2)} · Z ${fmtc(any[2], 2)} mm`);
+        } catch (e) { dlg.set('n', '!' + e.message); dlg.okEnabled(false); }
+      } else dlg.set('n', m === 'body' && this.ref && ids.includes(this.ref) ? '!Vztažné těleso nemůže být mezi zarovnávanými' : '');
       for (const [id, e] of meshes) {
         const d = moved.get(id);
         if (d) { e.mesh.matrixAutoUpdate = false; e.mesh.matrix.makeTranslation(d[0], d[1], d[2]); e.mesh.matrixWorldNeedsUpdate = true; }
@@ -2178,11 +2246,37 @@ function startCenter(editIndex, f) {
       }
       styleBodies();
     },
-    onBody(id) { if (this.all) return; if (this.bodies.has(id)) this.bodies.delete(id); else this.bodies.add(id); this.update(); },
-    onMove(ev) { dom.style.cursor = hitBodies(ev) ? 'pointer' : ''; },
-    onClick(ev) { const h = hitBodies(ev); if (h) this.onBody(h.object.userData.bodyId); },
-    ok() { if (!this.ids().length) return null; const out = this.feature(); out.id = f ? f.id : newId(); return out; },
-    cleanup() { for (const e of meshes.values()) { e.mesh.matrixAutoUpdate = true; e.mesh.matrix.identity(); e.mesh.position.set(0, 0, 0); e.mesh.rotation.set(0, 0, 0); e.mesh.updateMatrix(); } this.highlight = null; }
+    onBody(id) {
+      if (this.mode === 'face') return;
+      if (this.mode === 'body' && this.pick === 'ref') { this.ref = id; this.bodies.delete(id); this.pick = 'bodies'; this.update(); return; }
+      if (this.all) return;
+      if (this.bodies.has(id)) this.bodies.delete(id); else this.bodies.add(id);
+      if (this.mode === 'body' && !this.ref && this.bodies.size) this.pick = 'ref';
+      this.update();
+    },
+    faceUnder(ev) { const h = hitBodies(ev); return h ? faceAtHit(h) : null; },
+    onMove(ev) {
+      if (this.mode !== 'face') { dom.style.cursor = hitBodies(ev) ? 'pointer' : ''; return; }
+      const fc = this.faceUnder(ev), same = (a, b) => (!a && !b) || (a && b && a.bodyId === b.bodyId && a.group[0] === b.group[0]);
+      if (!same(fc, this.hoverFace)) { this.hoverFace = fc; this.update(); }
+      dom.style.cursor = fc ? 'pointer' : '';
+    },
+    onClick(ev) {
+      if (this.mode !== 'face') { const h = hitBodies(ev); if (h) this.onBody(h.object.userData.bodyId); return; }
+      const fc = this.faceUnder(ev);
+      if (!fc) { if (hitBodies(ev)) toast('Tuto plochu nelze vybrat samostatně (zakřivená plocha, která není válcem).'); return; }
+      if (this.pick === 'src') { this.srcFace = fc; this.src = alignDesc(fc); this.body = fc.bodyId; this.pick = 'dst'; if (this.dstFace && this.dstFace.bodyId === fc.bodyId) { this.dst = null; this.dstFace = null; } }
+      else {
+        if (fc.bodyId === this.body) { toast('Cílová plocha musí patřit jinému tělesu.'); return; }
+        this.dstFace = fc; this.dst = alignDesc(fc);
+      }
+      this.hoverFace = null; this.update();
+    },
+    ok() { if (!this.ready()) return null; const out = this.feature(); out.id = f ? f.id : newId(); return out; },
+    cleanup() {
+      for (const e of meshes.values()) { e.mesh.matrixAutoUpdate = true; e.mesh.matrix.identity(); e.mesh.position.set(0, 0, 0); e.mesh.rotation.set(0, 0, 0); e.mesh.updateMatrix(); }
+      this.highlight = null; bodyTint.clear();
+    }
   };
   beginCmd(c); c.init();
 }
@@ -3570,7 +3664,7 @@ pushHist();
 loadStoredBlobs();
 refreshBusy(() => fitView(VIEW_ISO, true));
 showStart(true);
-if (window.__KOTA_TEST__) window.__kota = { get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart, makeThumb, libThumb, transform, persp, toPx, startMove,
+if (window.__KOTA_TEST__) window.__kota = { get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart, makeThumb, libThumb, transform, persp, toPx, startMove, alignDesc,
   get doc() { return doc; }, get cur() { return cur; }, get cmd() { return cmd; }, get sk() { return sk; }, get dlg() { return dlg; }, get sel() { return sel; }, meshes, chainsFor };
 })();
 

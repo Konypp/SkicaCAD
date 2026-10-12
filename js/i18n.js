@@ -191,6 +191,19 @@
     // view cube
     'PŘEDNÍ': 'FRONT', 'ZADNÍ': 'BACK', 'LEVÝ': 'LEFT', 'PRAVÝ': 'RIGHT', 'HORNÍ': 'TOP', 'DOLNÍ': 'BOTTOM',
     'Klepnutím na těleso výběr změníte': 'Tap a body to change the selection', 'Š': 'W', 'V': 'H',
+    // align
+    'Zarovnat': 'Align', 'Zarovnat k': 'Align to', 'Počátku': 'Origin', 'Tělesu': 'Body', 'Ploše': 'Face', 'Ke tělesu': 'To body',
+    'Zarovnat začátky': 'Align starts', 'Na střed': 'Centre', 'Zarovnat konce': 'Align ends', 'Přiložit za konec': 'Place after the end', 'Přiložit před začátek': 'Place before the start',
+    'Zarovnat spodky': 'Align bottoms', 'Zarovnat vršky': 'Align tops', 'Položit navrch': 'Place on top', 'Dát pod': 'Place below',
+    'Plocha, která se přesune': 'Face to move', 'Cílová plocha': 'Target face', 'Vystředit na cílovou plochu': 'Centre on the target face', 'Otočit opačně': 'Reverse direction',
+    'Mezera': 'Gap', 'Osa válcové plochy': 'Axis of cylindrical face', 'Klepněte na plochu': 'Tap a face', 'Modře je nová poloha tělesa.': 'Blue shows the new position of the body.',
+    'Každé těleso se posune samostatně.': 'Each body moves separately.', 'Vztažné těleso nemůže být mezi zarovnávanými': 'The reference body cannot be one of the aligned bodies',
+    '!Vztažné těleso nemůže být mezi zarovnávanými': '!The reference body cannot be one of the aligned bodies',
+    'Cílová plocha musí patřit jinému tělesu.': 'The target face must belong to another body.', 'Zarovnat k…': 'Align to…', 'Zarovnat k jiné ploše…': 'Align to another face…',
+    'Klepněte na těleso, ke kterému se zarovná': 'Tap the body to align to', 'Vyberte těleso, ke kterému se zarovná': 'Select the body to align to', 'Vyberte obě plochy': 'Select both faces',
+    'Rovnou plochu lze zarovnat jen s rovnou plochou, válcovou jen s válcovou': 'A flat face can only be aligned with a flat face, a cylindrical one with a cylindrical one',
+    'Klepněte na plochu tělesa, které se má přesunout (rovnou stěnu nebo válec)': 'Tap a face of the body that should move (a flat face or a cylinder)',
+    'Klepněte na cílovou plochu (k rovné stěně rovnou, k válci válcovou)': 'Tap the target face (flat to flat, cylinder to cylinder)',
     // keys
     'Akce': 'Action', 'Del': 'Del'
   };
@@ -230,7 +243,7 @@
     [/^Krychle (\d+)$/, 'Cube $1'], [/^Válec (\d+)$/, 'Cylinder $1'], [/^Koule (\d+)$/, 'Sphere $1'], [/^Kužel (\d+)$/, 'Cone $1'], [/^Torus (\d+)$/, 'Torus $1'],
     [/^Vysunutí (\d+)$/, 'Extrude $1'], [/^Rotace (\d+)$/, 'Revolve $1'], [/^Zaoblení (\d+)$/, 'Fillet $1'], [/^Zkosení (\d+)$/, 'Chamfer $1'],
     [/^Kombinovat (\d+)$/, 'Combine $1'], [/^Přesunout (\d+)$/, 'Move $1'], [/^Otočit (\d+)$/, 'Rotate $1'], [/^Vycentrovat (\d+)$/, 'Center $1'],
-    [/^Upravit plochu (\d+)$/, 'Edit face $1'], [/^Závit (\d+)$/, 'Thread $1'], [/^Měřítko (\d+)$/, 'Scale $1'], [/^Zrcadlit (\d+)$/, 'Mirror $1'],
+    [/^Upravit plochu (\d+)$/, 'Edit face $1'], [/^Zarovnat (\d+)$/, 'Align $1'], [/^Závit (\d+)$/, 'Thread $1'], [/^Měřítko (\d+)$/, 'Scale $1'], [/^Zrcadlit (\d+)$/, 'Mirror $1'],
     [/^Pole (\d+)$/, 'Pattern $1'], [/^Odstranit těleso (\d+)$/, 'Delete body $1'], [/^Čára (\d+)$/, 'Line $1'], [/^Křivka (\d+)$/, 'Spline $1'],
     [/^Obdélník (\d+)$/, 'Rectangle $1'], [/^Kružnice (\d+)$/, 'Circle $1'], [/^Elipsa (\d+)$/, 'Ellipse $1'], [/^Mnohoúhelník (\d+)$/, 'Polygon $1'], [/^Drážka (\d+)$/, 'Slot $1'],
     [/^(.+) \(vytvořen v (.+)\)$/, '$1 (made in $2)'],

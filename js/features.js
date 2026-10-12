@@ -8,7 +8,7 @@ const PLANES = {
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
 const FEATURE_LABEL = { sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
-  fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Vycentrovat', offsetface: 'Upravit plochu', thread: 'Závit', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
+  fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', thread: 'Závit', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
 function blobPolys(id) {
@@ -46,6 +46,39 @@ function eulerMatrix(c, t, rdeg) {
   const ae = a * e, af = a * f, be = b * e, bf = b * f;
   /* THREE 'XYZ' order, row-major rows */
   const R = [[cc * e, -cc * f, d], [af + be * d, ae - bf * d, -b * cc], [bf - ae * d, be + af * d, a * cc]];
+  const T = [0, 1, 2].map(i => c[i] + t[i] - (R[i][0] * c[0] + R[i][1] * c[1] + R[i][2] * c[2]));
+  return [R[0][0], R[1][0], R[2][0], 0, R[0][1], R[1][1], R[2][1], 0, R[0][2], R[1][2], R[2][2], 0, T[0], T[1], T[2], 1];
+}
+/* rotation (3x3, row-major) turning unit vector a onto unit vector b */
+function rotBetween(a, b) {
+  const c = KK.vdot(a, b);
+  if (c > 1 - 1e-12) return [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+  let ax;
+  if (c < -1 + 1e-12) { ax = KK.vnorm(Math.abs(a[0]) < 0.9 ? KK.cross(a, [1, 0, 0]) : KK.cross(a, [0, 1, 0])); }
+  else ax = KK.vnorm(KK.cross(a, b));
+  const th = Math.acos(Math.max(-1, Math.min(1, c))), s = Math.sin(th), t = 1 - Math.cos(th), [x, y, z] = ax;
+  return [[t * x * x + Math.cos(th), t * x * y - s * z, t * x * z + s * y], [t * x * y + s * z, t * y * y + Math.cos(th), t * y * z - s * x], [t * x * z - s * y, t * y * z + s * x, t * z * z + Math.cos(th)]];
+}
+const mulRv = (R, v) => [0, 1, 2].map(i => R[i][0] * v[0] + R[i][1] * v[1] + R[i][2] * v[2]);
+/* face to face: src {kind:'plane', n, c} lands on dst plane (normals opposite, or the same with flip);
+   axis to axis: src {kind:'cyl', a, c} becomes coaxial with dst. centerOn also matches the centres. */
+function alignFaceMatrix(src, dst, flip, centerOn, gap) {
+  if (!src || !dst) throw new Error('Vyberte obě plochy');
+  if (src.kind !== dst.kind) throw new Error('Rovnou plochu lze zarovnat jen s rovnou plochou, válcovou jen s válcovou');
+  const sa = KK.vnorm(src.kind === 'plane' ? src.n : src.a), da = KK.vnorm(dst.kind === 'plane' ? dst.n : dst.a);
+  let target;
+  if (src.kind === 'plane') target = flip ? da : KK.vmul(da, -1);
+  else target = (KK.vdot(sa, da) >= 0) !== !!flip ? da : KK.vmul(da, -1);
+  const R = rotBetween(sa, target), c = src.c, c2 = c; /* rotation about the source centre keeps it in place */
+  let t;
+  if (src.kind === 'plane') {
+    const off = KK.vdot(KK.vsub(dst.c, c2), da) + gap;
+    if (centerOn) { const inPlane = KK.vsub(KK.vsub(dst.c, c2), KK.vmul(da, KK.vdot(KK.vsub(dst.c, c2), da))); t = KK.vadd(inPlane, KK.vmul(da, off)); }
+    else t = KK.vmul(da, off);
+  } else {
+    const d = KK.vsub(c2, dst.c), along = KK.vdot(d, da), foot = KK.vadd(dst.c, KK.vmul(da, centerOn ? 0 : along));
+    t = KK.vadd(KK.vsub(foot, c2), KK.vmul(da, centerOn ? gap : 0));
+  }
   const T = [0, 1, 2].map(i => c[i] + t[i] - (R[i][0] * c[0] + R[i][1] * c[1] + R[i][2] * c[2]));
   return [R[0][0], R[1][0], R[2][0], 0, R[0][1], R[1][1], R[2][1], 0, R[0][2], R[1][2], R[2][2], 0, T[0], T[1], T[2], 1];
 }
@@ -312,10 +345,36 @@ function step(state, f) {
       break;
     }
     case 'center': {
+      /* Zarovnat (align): to the origin (original Vycentrovat), to another body per axis, or face to face / axis to axis */
+      const mode = f.target || 'origin';
+      if (mode === 'face') {
+        const b = bodies.find(x => x.id === f.body);
+        if (!b) throw new Error('Těleso neexistuje');
+        const m = alignFaceMatrix(f.src, f.dst, !!f.flip, !!f.centerOn, Number(f.gap) || 0);
+        out = bodies.map(x => (x === b ? { ...x, polys: KK.transform(x.polys, m) } : x));
+        break;
+      }
       const sel = f.all ? bodies.slice() : bodies.filter(x => (f.bodies || []).includes(x.id));
       if (!sel.length) throw new Error('Vyberte tělesa');
-      const shift = bb => [f.x !== false ? -(bb.min[0] + bb.max[0]) / 2 : 0, f.y !== false ? -(bb.min[1] + bb.max[1]) / 2 : 0,
-        f.z === 'center' ? -(bb.min[2] + bb.max[2]) / 2 : f.z === 'keep' ? 0 : -bb.min[2]];
+      let shift;
+      if (mode === 'body') {
+        const ref = bodies.find(x => x.id === f.ref);
+        if (!ref) throw new Error('Vyberte těleso, ke kterému se zarovná');
+        if (sel.some(x => x.id === ref.id)) throw new Error('Vztažné těleso nemůže být mezi zarovnávanými');
+        const R = KK.bbox(ref.polys), ax = f.ax || ['center', 'center', 'keep'];
+        shift = bb => [0, 1, 2].map(k => {
+          const m = ax[k];
+          if (m === 'min') return R.min[k] - bb.min[k];
+          if (m === 'max') return R.max[k] - bb.max[k];
+          if (m === 'center') return (R.min[k] + R.max[k]) / 2 - (bb.min[k] + bb.max[k]) / 2;
+          if (m === 'after') return R.max[k] - bb.min[k];
+          if (m === 'before') return R.min[k] - bb.max[k];
+          return 0;
+        });
+      } else {
+        shift = bb => [f.x !== false ? -(bb.min[0] + bb.max[0]) / 2 : 0, f.y !== false ? -(bb.min[1] + bb.max[1]) / 2 : 0,
+          f.z === 'center' ? -(bb.min[2] + bb.max[2]) / 2 : f.z === 'keep' ? 0 : -bb.min[2]];
+      }
       const gs = shift(KK.bbox(sel.flatMap(x => x.polys)));
       const map = new Map(sel.map(x => [x.id, { ...x, polys: KK.translate(x.polys, f.each ? shift(KK.bbox(x.polys)) : gs) }]));
       out = bodies.map(x => map.get(x.id) || x);
