@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.36
+- Paleta skici, Drážka: místo středů obou oblouků (X1, Y1, X2, Y2) se zadává střed (X, Y), celková délka (L), šířka (Š) a natočení (∠). Při změně šířky zůstává celková délka zachovaná.
+
 ## Beta 0.35
 - Skica: volba Kreslit z rohu / ze středu je u všech tvarů – obdélník, kružnice, elipsa, mnohoúhelník a drážka. Z rohu: tvar vyplní obdélník (u kružnice a mnohoúhelníku čtverec) mezi dvěma klepnutími. Ze středu: první klepnutí je střed. Volba se pamatuje pro každý nástroj zvlášť.
 

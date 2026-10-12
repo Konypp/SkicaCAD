@@ -216,6 +216,7 @@
     'Mnohoúhelník z rohu: klepněte na roh čtverce, do kterého se vepíše, pak na protější roh. Počet stran nastavíte v paletě.': 'Polygon from corner: tap a corner of the square it fits in, then the opposite corner. Set the number of sides in the palette.',
     'Drážka z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se drážka vejde': 'Slot from corner: tap a corner, then the opposite corner of the box the slot fits in',
     'Elipsa z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se elipsa vepíše': 'Ellipse from corner: tap a corner, then the opposite corner of the box the ellipse fits in',
+    'X, Y střed · L celková délka · Š šířka · ∠ natočení': 'X, Y centre · L overall length · W width · ∠ angle',
     // keys
     'Akce': 'Action', 'Del': 'Del'
   };

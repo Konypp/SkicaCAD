@@ -1398,7 +1398,7 @@ function renderPalette() {
     else if (e.t === 'circle') body = `<div class="grid2">${num(i, 'x', 'X', e.x)}${num(i, 'y', 'Y', e.y)}${num(i, 'd', 'Ø', e.r * 2)}</div>`;
     else if (e.t === 'ngon') body = `<div class="grid2">${num(i, 'x', 'X', e.x)}${num(i, 'y', 'Y', e.y)}${num(i, 'r', 'R', e.r)}${num(i, 'n', 'n', e.n)}${num(i, 'a', '∠', e.a || 0)}${num(i, 'fr', 'Rz', e.fr || 0)}</div>`;
     else if (e.t === 'ellipse') body = `<div class="grid2">${num(i, 'x', 'X', e.x)}${num(i, 'y', 'Y', e.y)}${num(i, 'rx', 'a', e.rx)}${num(i, 'ry', 'b', e.ry)}${num(i, 'a', '∠', e.a || 0)}</div>`;
-    else if (e.t === 'slot') body = `<div class="grid2">${num(i, 'x1', 'X1', e.x1)}${num(i, 'y1', 'Y1', e.y1)}${num(i, 'x2', 'X2', e.x2)}${num(i, 'y2', 'Y2', e.y2)}${num(i, 'w', 'Š', e.w)}</div>`;
+    else if (e.t === 'slot') { const g = slotGeom(e); body = `<div class="grid2">${num(i, 'scx', 'X', g.cx)}${num(i, 'scy', 'Y', g.cy)}${num(i, 'slen', 'L', g.len)}${num(i, 'w', 'Š', e.w)}${num(i, 'sang', '∠', g.ang)}</div><div class="note">X, Y střed · L celková délka · Š šířka · ∠ natočení</div>`; }
     else if (e.t === 'spline') body = `<div class="note">${e.pts.length} bodů · body přesunete tažením ve skice</div><label class="chk"><input type="checkbox" id="ent-${i}-closed" data-ent="${i}" data-k="closed"${e.closed ? ' checked' : ''}${e.pts.length < 3 ? ' disabled' : ''}><span>Uzavřená křivka</span></label>${uniChk(i)}`;
     else {
       const n = e.pts.length, segs = e.closed ? n : n - 1, rows = [];
@@ -1417,11 +1417,29 @@ $('#dialog').addEventListener('click', e => {
   const d = e.target.closest('[data-entdel]'); if (d) { sk.f.ents.splice(+d.dataset.entdel, 1); sk.selEnt = -1; renderPalette(); redrawSketch(); return; }
   const r = e.target.closest('[data-ent-row]'); if (r && !e.target.closest('input')) { sk.selEnt = +r.dataset.entRow; renderPalette(); redrawSketch(); }
 });
+/* slot shown as centre, overall length, width and angle; stored as the two arc centres and the width */
+function slotGeom(e) {
+  const dx = e.x2 - e.x1, dy = e.y2 - e.y1, d = Math.hypot(dx, dy);
+  let ang = Math.round(Math.atan2(dy, dx) / D2R * 100) / 100; if (Object.is(ang, -0)) ang = 0;
+  return { cx: (e.x1 + e.x2) / 2, cy: (e.y1 + e.y2) / 2, d, len: d + e.w, ang };
+}
+function setSlotGeom(e, g) {
+  const r4 = x => Math.round(x * 1e4) / 1e4, a = g.ang * D2R, h = Math.max(0.005, g.d) / 2;
+  e.x1 = r4(g.cx - Math.cos(a) * h); e.y1 = r4(g.cy - Math.sin(a) * h); e.x2 = r4(g.cx + Math.cos(a) * h); e.y2 = r4(g.cy + Math.sin(a) * h);
+}
 function onPaletteChange(inp) {
   const i = +inp.dataset.ent, k = inp.dataset.k, e = sk.f.ents[i];
   if (k === 'uni') { sk.uniform = inp.checked; renderPalette(); return; }
   if (e && k === 'closed') { e.closed = inp.checked && e.pts.length >= 3; renderPalette(); redrawSketch(); return; }
   const v = parseNum(inp.value);
+  if (e && e.t === 'slot' && ['scx', 'scy', 'slen', 'sang', 'w'].includes(k)) {
+    if (!isFinite(v)) { renderPalette(); return; }
+    const g = slotGeom(e);
+    if (k === 'scx') g.cx = v; else if (k === 'scy') g.cy = v; else if (k === 'sang') g.ang = v;
+    else if (k === 'slen') { if (v > 0) g.d = Math.max(0.01, v - e.w); }
+    else if (k === 'w') { if (v > 0) { const L = g.len; e.w = v; g.d = Math.max(0.01, L - v); } }
+    setSlotGeom(e, g); renderPalette(); redrawSketch(); return;
+  }
   if (e && e.t === 'poly' && /^[LA]\d+$/.test(k) && isFinite(v)) {
     const j = +k.slice(1), n = e.pts.length, a = e.pts[j], b = e.pts[(j + 1) % n];
     let L = Math.hypot(b[0] - a[0], b[1] - a[1]), A = Math.atan2(b[1] - a[1], b[0] - a[0]);
