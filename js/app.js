@@ -539,19 +539,26 @@ function render() {
   updateSketchDims();
 }
 /* ---------- sketch dimensions (kóty): drawn in screen space in an SVG overlay, recomputed every frame ---------- */
-let skDimsOn = false;
+let skDimsOn = false, dimMeta = [];
 const showSkDims = () => settings.skDims !== false;
 function updateSketchDims() {
   const box = $('#skdims'); if (!box) return;
   if (!sk || !showSkDims()) { if (skDimsOn) { box.innerHTML = ''; skDimsOn = false; } return; }
-  const P = sk.f.plane, W = dom.clientWidth, H = dom.clientHeight, out = [];
+  const P = sk.f.plane, W = dom.clientWidth, H = dom.clientHeight, out = []; dimMeta = [];
   const px = (x, y) => toPx(P3(P, x, y));
   const f1 = v => fmtc(v, 2);
   const arrow = (t, d) => { const n = [-d[1], d[0]]; return `<path class="ah" d="M${t[0]},${t[1]}L${t[0] - d[0] * 6 + n[0] * 1.8},${t[1] - d[1] * 6 + n[1] * 1.8}L${t[0] - d[0] * 6 - n[0] * 1.8},${t[1] - d[1] * 6 - n[1] * 1.8}Z"/>`; };
   const text = (x, y, s, ang = 0, anchor = 'middle') => `<text x="${x}" y="${y}" text-anchor="${anchor}"${ang ? ` transform="rotate(${ang} ${x} ${y})"` : ''}>${s}</text>`;
+  /* an editable label gets an invisible, finger-sized hit area; tapping it opens a number field (openDimEdit) */
+  const hit = (ed, x, y, label, ang = 0, anchor = 'middle') => {
+    if (!ed || ed.i < 0) return '';
+    const w = Math.max(40, label.length * 6.5 + 16), x0 = anchor === 'start' ? x - 6 : anchor === 'end' ? x - w + 6 : x - w / 2;
+    const di = dimMeta.push({ ...ed, x: anchor === 'middle' ? x : anchor === 'start' ? x + w / 2 - 6 : x - w / 2 + 6, y }) - 1;
+    return `<rect class="dhit" data-di="${di}" x="${x0}" y="${y - 12}" width="${w}" height="24" rx="4"${ang ? ` transform="rotate(${ang} ${x} ${y})"` : ''}/>`;
+  };
   const ok = (...q) => q.every(v => v[2] < 1 && v[0] > -W && v[0] < 2 * W && v[1] > -H && v[1] < 2 * H);
   /* aligned linear dimension between plane points a and b, pushed away from plane point c */
-  const lin = (a, b, c, label) => {
+  const lin = (a, b, c, label, ed) => {
     const A = px(a[0], a[1]), B = px(b[0], b[1]), C = px(c[0], c[1]); if (!ok(A, B)) return;
     const dx = B[0] - A[0], dy = B[1] - A[1], L = Math.hypot(dx, dy); if (L < 18) return;
     const u = [dx / L, dy / L]; let n = [-u[1], u[0]];
@@ -561,47 +568,73 @@ function updateSketchDims() {
     out.push(`<path d="M${A[0] + n[0] * 4},${A[1] + n[1] * 4}L${A[0] + n[0] * (o + 3)},${A[1] + n[1] * (o + 3)}M${B[0] + n[0] * 4},${B[1] + n[1] * 4}L${B[0] + n[0] * (o + 3)},${B[1] + n[1] * (o + 3)}M${a1[0]},${a1[1]}L${b1[0]},${b1[1]}"/>`);
     out.push(arrow(a1, [-u[0], -u[1]]), arrow(b1, u));
     let ang = Math.atan2(u[1], u[0]) / D2R; if (ang > 90) ang -= 180; if (ang <= -90) ang += 180;
-    out.push(text((a1[0] + b1[0]) / 2, (a1[1] + b1[1]) / 2, label || f1(Math.hypot(b[0] - a[0], b[1] - a[1])), Math.round(ang * 10) / 10));
+    const lb = label || f1(Math.hypot(b[0] - a[0], b[1] - a[1])), tx = (a1[0] + b1[0]) / 2, ty = (a1[1] + b1[1]) / 2, ra = Math.round(ang * 10) / 10;
+    out.push(hit(ed, tx, ty, lb, ra), text(tx, ty, lb, ra));
   };
   /* line through or from a centre with arrows at the ends that touch the curve; the label sits past the end */
-  const across = (p1, p2, label, both) => {
+  const across = (p1, p2, label, both, ed) => {
     const A = px(p1[0], p1[1]), B = px(p2[0], p2[1]); if (!ok(A, B)) return;
     const dx = B[0] - A[0], dy = B[1] - A[1], L = Math.hypot(dx, dy); if (L < 10) return;
     const u = [dx / L, dy / L], E = [B[0] + u[0] * 8, B[1] + u[1] * 8], hz = E[0] + (u[0] >= 0 ? 9 : -9);
     out.push(`<path d="M${A[0]},${A[1]}L${E[0]},${E[1]}L${hz},${E[1]}"/>`, arrow(B, u));
     if (both) out.push(arrow(A, [-u[0], -u[1]]));
-    out.push(text(hz + (u[0] >= 0 ? 3 : -3), E[1], label, 0, u[0] >= 0 ? 'start' : 'end'));
+    const tx = hz + (u[0] >= 0 ? 3 : -3), an = u[0] >= 0 ? 'start' : 'end';
+    out.push(hit(ed, tx, E[1], label, 0, an), text(tx, E[1], label, 0, an));
   };
   const rot = (cx, cy, a, x, y) => [cx + x * Math.cos(a) - y * Math.sin(a), cy + x * Math.sin(a) + y * Math.cos(a)];
   const ents = sk.f.ents.map((e, i) => [e, i]).filter(([e, i]) => !(i === sk.selEnt && e.t === 'poly' && !sk.tool));
   const d = draftEntity(); if (d) ents.push([d, -1]);
   if (ents.length > 80) { box.innerHTML = ''; return; }
-  for (const [e] of ents) {
+  for (const [e, i] of ents) {
+    const ed = (k, v, map) => ({ i, k, v, map });
     if (e.t === 'rect') {
       const x0 = Math.min(e.x, e.x + e.w), x1 = Math.max(e.x, e.x + e.w), y0 = Math.min(e.y, e.y + e.h), y1 = Math.max(e.y, e.y + e.h), c = [(x0 + x1) / 2, (y0 + y1) / 2];
-      lin([x0, y0], [x1, y0], c); lin([x1, y0], [x1, y1], c);
+      lin([x0, y0], [x1, y0], c, null, ed('w', x1 - x0, v => (e.w < 0 ? -v : v))); lin([x1, y0], [x1, y1], c, null, ed('h', y1 - y0, v => (e.h < 0 ? -v : v)));
     } else if (e.t === 'circle') {
-      const a = Math.PI / 4; across([e.x - e.r * Math.cos(a), e.y - e.r * Math.sin(a)], [e.x + e.r * Math.cos(a), e.y + e.r * Math.sin(a)], 'Ø ' + f1(e.r * 2), true);
+      const a = Math.PI / 4; across([e.x - e.r * Math.cos(a), e.y - e.r * Math.sin(a)], [e.x + e.r * Math.cos(a), e.y + e.r * Math.sin(a)], 'Ø ' + f1(e.r * 2), true, ed('d', e.r * 2));
     } else if (e.t === 'ngon') {
-      const a = (e.a || 0) * D2R; across([e.x, e.y], [e.x + e.r * Math.cos(a), e.y + e.r * Math.sin(a)], 'R ' + f1(e.r));
+      const a = (e.a || 0) * D2R; across([e.x, e.y], [e.x + e.r * Math.cos(a), e.y + e.r * Math.sin(a)], 'R ' + f1(e.r), false, ed('r', e.r));
       /* side length on the side opposite the radius line so the two labels don't collide */
-      const s1 = a + Math.floor(e.n / 2) * 2 * Math.PI / e.n, s2 = s1 + 2 * Math.PI / e.n; lin([e.x + e.r * Math.cos(s1), e.y + e.r * Math.sin(s1)], [e.x + e.r * Math.cos(s2), e.y + e.r * Math.sin(s2)], [e.x, e.y]);
+      const s1 = a + Math.floor(e.n / 2) * 2 * Math.PI / e.n, s2 = s1 + 2 * Math.PI / e.n; lin([e.x + e.r * Math.cos(s1), e.y + e.r * Math.sin(s1)], [e.x + e.r * Math.cos(s2), e.y + e.r * Math.sin(s2)], [e.x, e.y], null, ed('r', 2 * e.r * Math.sin(Math.PI / e.n), v => v / (2 * Math.sin(Math.PI / e.n))));
     } else if (e.t === 'ellipse') {
       const a = (e.a || 0) * D2R, c = [e.x, e.y];
-      lin(rot(e.x, e.y, a, -e.rx, -e.ry), rot(e.x, e.y, a, e.rx, -e.ry), c, f1(e.rx * 2));
-      lin(rot(e.x, e.y, a, e.rx, -e.ry), rot(e.x, e.y, a, e.rx, e.ry), c, f1(e.ry * 2));
+      lin(rot(e.x, e.y, a, -e.rx, -e.ry), rot(e.x, e.y, a, e.rx, -e.ry), c, f1(e.rx * 2), ed('rx', e.rx * 2, v => v / 2));
+      lin(rot(e.x, e.y, a, e.rx, -e.ry), rot(e.x, e.y, a, e.rx, e.ry), c, f1(e.ry * 2), ed('ry', e.ry * 2, v => v / 2));
     } else if (e.t === 'slot') {
       const g = slotGeom(e), a = g.ang * D2R, h = e.w / 2, c = [g.cx, g.cy];
-      lin(rot(g.cx, g.cy, a, -g.len / 2, -h), rot(g.cx, g.cy, a, g.len / 2, -h), c, f1(g.len));
-      lin(rot(g.cx, g.cy, a, g.len / 2 - h, -h), rot(g.cx, g.cy, a, g.len / 2 - h, h), rot(g.cx, g.cy, a, 0, 0), f1(e.w));
+      lin(rot(g.cx, g.cy, a, -g.len / 2, -h), rot(g.cx, g.cy, a, g.len / 2, -h), c, f1(g.len), ed('slen', g.len));
+      lin(rot(g.cx, g.cy, a, g.len / 2 - h, -h), rot(g.cx, g.cy, a, g.len / 2 - h, h), rot(g.cx, g.cy, a, 0, 0), f1(e.w), ed('w', e.w));
     } else if (e.t === 'poly') {
       const n = e.pts.length, segs = e.closed ? n : n - 1; if (segs > 40 || n < 2) continue;
       const c = e.pts.reduce((s, q) => [s[0] + q[0] / n, s[1] + q[1] / n], [0, 0]);
-      for (let k = 0; k < segs; k++) lin(e.pts[k], e.pts[(k + 1) % n], c);
+      for (let k = 0; k < segs; k++) { const a = e.pts[k], b = e.pts[(k + 1) % n]; lin(a, b, c, null, ed('L' + k, Math.hypot(b[0] - a[0], b[1] - a[1]))); }
     }
   }
   box.innerHTML = out.join(''); skDimsOn = true;
 }
+/* editing a dimension in place: a number field over the label, Enter or leaving the field applies, Esc cancels */
+function openDimEdit(m) {
+  closeDimEdit(false);
+  const box = $('#skdims').parentNode, inp = document.createElement('input');
+  inp.className = 'dimedit'; inp.id = 'dimedit'; inp.inputMode = 'decimal'; inp.autocomplete = 'off'; inp.value = fmtc(m.v, 3);
+  inp.setAttribute('aria-label', EN() ? 'Dimension' : 'Kóta');
+  inp.style.left = m.x + 'px'; inp.style.top = m.y + 'px';
+  inp._m = m; box.appendChild(inp); inp.focus(); inp.select();
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); closeDimEdit(true); } else if (e.key === 'Escape') { e.preventDefault(); closeDimEdit(false); } e.stopPropagation(); });
+  inp.addEventListener('blur', () => closeDimEdit(true));
+}
+function closeDimEdit(apply) {
+  const inp = $('#dimedit'); if (!inp || inp._closing) return; inp._closing = true;
+  const m = inp._m, v = parseNum(inp.value); inp.remove();
+  if (!apply || !sk || !sk.f.ents[m.i] || !(v > 0) || Math.abs(v - m.v) < 1e-9) { requestRender(); return; }
+  onPaletteChange({ dataset: { ent: String(m.i), k: m.k }, value: String(m.map ? m.map(v) : v) });
+  requestRender();
+}
+$('#skdims').addEventListener('pointerdown', e => {
+  const h = e.target.closest && e.target.closest('.dhit'); if (!h || !sk) return;
+  e.preventDefault(); e.stopPropagation();
+  const m = dimMeta[+h.dataset.di]; if (m) openDimEdit(m);
+});
 let segLabelsOn = false;
 /* length and angle labels for the selected polyline */
 function updateSegLabels() {
@@ -1189,9 +1222,11 @@ function draftEntity() {
   if (!d.p) return sk.tool === 'line' ? { t: 'poly', pts: d.pts.concat([c]), closed: false } : sk.tool === 'spline' ? { t: 'spline', pts: d.pts.concat([c]), closed: false } : null;
   const dx = c[0] - d.p[0], dy = c[1] - d.p[1], corner = drawMode(sk.tool) === 'corner';
   /* "from corner": the shape fills the box between the two clicks (circle and polygon use a square anchored at the first click) */
+  /* with grid snapping on, radii and widths measured from a centre snap to the step too (unless the cursor sits on an existing point) */
+  const sr = r => (settings.gridSnap && !sk.snapPt ? Math.max(settings.snap, Math.round(r / settings.snap) * settings.snap) : r);
   const sq = () => { const sd = Math.max(Math.abs(dx), Math.abs(dy)); return { cx: d.p[0] + Math.sign(dx || 1) * sd / 2, cy: d.p[1] + Math.sign(dy || 1) * sd / 2, r: sd / 2 }; };
   if (sk.tool === 'rect') return corner ? { t: 'rect', x: d.p[0], y: d.p[1], w: dx, h: dy } : { t: 'rect', x: d.p[0] - dx, y: d.p[1] - dy, w: 2 * dx, h: 2 * dy };
-  if (sk.tool === 'circle') { if (corner) { const q = sq(); return { t: 'circle', x: q.cx, y: q.cy, r: q.r }; } return { t: 'circle', x: d.p[0], y: d.p[1], r: Math.hypot(dx, dy) }; }
+  if (sk.tool === 'circle') { if (corner) { const q = sq(); return { t: 'circle', x: q.cx, y: q.cy, r: q.r }; } return { t: 'circle', x: d.p[0], y: d.p[1], r: sr(Math.hypot(dx, dy)) }; }
   if (corner && sk.tool === 'ngon') { const q = sq(); return { t: 'ngon', x: q.cx, y: q.cy, r: q.r, n: sk.ngonN, a: 90 }; }
   if (corner && sk.tool === 'ellipse') return { t: 'ellipse', x: d.p[0] + dx / 2, y: d.p[1] + dy / 2, rx: Math.max(0.01, Math.abs(dx) / 2), ry: Math.max(0.01, Math.abs(dy) / 2), a: 0 };
   if (corner && sk.tool === 'slot') {
@@ -1201,11 +1236,11 @@ function draftEntity() {
   }
   if (sk.tool === 'line') return { t: 'poly', pts: d.pts.concat([c]), closed: false };
   if (sk.tool === 'spline') return { t: 'spline', pts: d.pts.concat([c]), closed: false };
-  if (sk.tool === 'ngon') return { t: 'ngon', x: d.p[0], y: d.p[1], r: Math.hypot(c[0] - d.p[0], c[1] - d.p[1]), n: sk.ngonN, a: Math.atan2(c[1] - d.p[1], c[0] - d.p[0]) / D2R };
+  if (sk.tool === 'ngon') return { t: 'ngon', x: d.p[0], y: d.p[1], r: sr(Math.hypot(c[0] - d.p[0], c[1] - d.p[1])), n: sk.ngonN, a: Math.atan2(c[1] - d.p[1], c[0] - d.p[0]) / D2R };
   if (sk.tool === 'ellipse') {
-    if (!d.p2) { const rx = Math.hypot(c[0] - d.p[0], c[1] - d.p[1]); return { t: 'ellipse', x: d.p[0], y: d.p[1], rx, ry: rx * 0.5, a: Math.atan2(c[1] - d.p[1], c[0] - d.p[0]) / D2R }; }
-    const rx = Math.hypot(d.p2[0] - d.p[0], d.p2[1] - d.p[1]);
-    return { t: 'ellipse', x: d.p[0], y: d.p[1], rx, ry: Math.max(0.01, slotHalfWidth(d.p, d.p2, c)), a: Math.atan2(d.p2[1] - d.p[1], d.p2[0] - d.p[0]) / D2R };
+    if (!d.p2) { const rx = sr(Math.hypot(c[0] - d.p[0], c[1] - d.p[1])); return { t: 'ellipse', x: d.p[0], y: d.p[1], rx, ry: rx * 0.5, a: Math.atan2(c[1] - d.p[1], c[0] - d.p[0]) / D2R }; }
+    const rx = sr(Math.hypot(d.p2[0] - d.p[0], d.p2[1] - d.p[1]));
+    return { t: 'ellipse', x: d.p[0], y: d.p[1], rx, ry: Math.max(0.01, sr(slotHalfWidth(d.p, d.p2, c))), a: Math.atan2(d.p2[1] - d.p[1], d.p2[0] - d.p[0]) / D2R };
   }
   if (sk.tool === 'slot') {
     if (!d.p2) return { t: 'poly', pts: [d.p, c], closed: false };
@@ -1279,7 +1314,7 @@ function sketchPoint(ev) {
   let p = P2(P, hit);
   const [mx, my] = evPx(ev);
   /* snap to existing points */
-  let best = null, bd = 10;
+  let best = null, bd = TOUCH ? 16 : 10;
   const pts = keyPoints(sk.f.ents).concat(sk.draft && isPolyTool(sk.tool) ? sk.draft.pts : []).concat(sk.draft && sk.draft.p ? [sk.draft.p] : []).concat(sk.draft && sk.draft.p2 ? [sk.draft.p2] : []);
   for (const q of pts) { const s = toPx(P3(P, q[0], q[1])); const d = Math.hypot(s[0] - mx, s[1] - my); if (d < bd) { bd = d; best = q; } }
   sk.snapPt = best;
@@ -1353,7 +1388,7 @@ function sketchClick(ev) {
   const f = sk.f;
   if (sk.tool === 'rect') {
     if (!sk.draft) sk.draft = { p };
-    else { sk.cursor = p; const d = draftEntity(); if (d && Math.abs(d.w) > 1e-6 && Math.abs(d.h) > 1e-6) { f.ents.push(d); sk.selEnt = f.ents.length - 1; } sk.draft = null; renderPalette(); }
+    else { sk.cursor = p; const d = draftEntity(); if (d && Math.abs(d.w) > 1e-6 && Math.abs(d.h) > 1e-6) { for (const k of ['x', 'y', 'w', 'h']) d[k] = Math.round(d[k] * 1e4) / 1e4; f.ents.push(d); sk.selEnt = f.ents.length - 1; } sk.draft = null; renderPalette(); }
   } else if (sk.tool === 'circle') {
     if (!sk.draft) sk.draft = { p };
     else { sk.cursor = p; const d = draftEntity(); if (d && d.r > 1e-6) { f.ents.push({ ...d, r: Math.round(d.r * 1000) / 1000 }); sk.selEnt = f.ents.length - 1; } sk.draft = null; renderPalette(); }
@@ -1732,7 +1767,7 @@ function startExtrude(editIndex, f, opts) {
       const o = ray.ray.origin, d = ray.ray.direction, w0 = ax.o.clone().sub(o), b = ax.n.dot(d), dd = ax.n.dot(w0), e = d.dot(w0), den = 1 - b * b;
       if (Math.abs(den) < 1e-6) return;
       let s = (b * e - dd) / den;
-      s = Math.round(s / settings.snap) * settings.snap;
+      const st = settings.gridSnap ? settings.snap : 0.01; s = Math.round(s / st) * st;
       const v = this.sym ? Math.abs(s) * 2 : s;
       if (Math.abs(v) < 1e-9 || v === this.dist) return;
       this.dist = v; dlg.set('dist', v); this.update();
