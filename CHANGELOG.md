@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 0.39
+- Pracovní plocha: osy X (červená) a Y (zelená) vedou přes celou mřížku od kraje ke kraji, svislá osa Z se nekreslí. Počátek je malá kružnice místo kuličky.
+- Kostka pohledů: osy jsou označené písmeny X, Y a Z v barvě osy.
+
 ## Beta 0.38
 - Paleta skici, Drážka: nové pole R (rozteč středů zaoblení) vedle celkové délky L. Hodnoty jsou provázané (L = R + Š), změna jedné dopočítá druhou.
 

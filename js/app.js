@@ -142,10 +142,11 @@ const gridMajor = new THREE.LineBasicMaterial({ color: 0x999999, transparent: tr
   for (let i = -ext; i <= ext; i += 10) (i % 50 === 0 ? ma : mi).push(i, -ext, 0, i, ext, 0, -ext, i, 0, ext, i, 0);
   G.grid.add(noRay(new THREE.LineSegments(lineGeo(mi), gridMinor)), noRay(new THREE.LineSegments(lineGeo(ma), gridMajor)));
   G.grid.renderOrder = -1;
-  const ax = (to, c) => G.origin.add(noRay(new THREE.Line(lineGeo([0, 0, 0.01, ...to]), new THREE.LineBasicMaterial({ color: c }))));
-  ax([120, 0, 0.01], 0xe5484d); ax([0, 120, 0.01], 0x2f9e6a); ax([0, 0, 120], 0x4f7ae0);
-  const dot = new THREE.Mesh(new THREE.SphereGeometry(1.2, 12, 8), new THREE.MeshBasicMaterial({ color: 0xe2862c }));
-  G.origin.add(noRay(dot));
+  /* X and Y axes across the whole grid (no Z axis line); the origin is a small circle */
+  const ax = (a, b, c) => G.origin.add(noRay(new THREE.Line(lineGeo([...a, ...b]), new THREE.LineBasicMaterial({ color: c }))));
+  ax([-ext, 0, 0.02], [ext, 0, 0.02], 0xe5484d); ax([0, -ext, 0.02], [0, ext, 0.02], 0x2f9e6a);
+  const ring = []; for (let i = 0; i <= 48; i++) { const a = i / 48 * Math.PI * 2; ring.push(Math.cos(a) * 2.5, Math.sin(a) * 2.5, 0.03); }
+  G.origin.add(noRay(new THREE.Line(lineGeo(ring), new THREE.LineBasicMaterial({ color: 0xe2862c }))));
 })();
 
 /* origin planes for sketch placement */
@@ -460,7 +461,16 @@ try {
   const ce = noRay(new THREE.LineSegments(new THREE.EdgesGeometry(cubeMesh.geometry), new THREE.LineBasicMaterial({ color: 0x777777 })));
   cubeMesh.add(ce); cubeMesh.userData.edges = ce;
   const axes = [[[1.15, 0, 0], 0xe5484d], [[0, 1.15, 0], 0x2f9e6a], [[0, 0, 1.15], 0x4f7ae0]];
-  axes.forEach(([to, c]) => cubeScene.add(noRay(new THREE.Line(lineGeo([-0.8, -0.8, -0.8, to[0] - 0.8, to[1] - 0.8, to[2] - 0.8]), new THREE.LineBasicMaterial({ color: c })))));
+  axes.forEach(([to, c], k) => {
+    cubeScene.add(noRay(new THREE.Line(lineGeo([-0.8, -0.8, -0.8, to[0] - 0.8, to[1] - 0.8, to[2] - 0.8]), new THREE.LineBasicMaterial({ color: c }))));
+    /* axis letter at the end of each axis */
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d');
+    g.font = 'bold 44px IBM Plex Sans, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = '#' + new THREE.Color(c).getHexString(); g.fillText('XYZ'[k], 32, 34);
+    const tex = new THREE.CanvasTexture(cv), sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: true, depthWrite: false, transparent: true }));
+    sp.scale.set(0.42, 0.42, 1); sp.position.set(to[0] * 1.16 - 0.8, to[1] * 1.16 - 0.8, to[2] * 1.16 - 0.8); sp.renderOrder = 5;
+    cubeScene.add(noRay(sp));
+  });
 } catch (e) { cubeR = null; $('#cubewrap').hidden = true; }
 const CUBE_FACES = ['PRAVÝ', 'LEVÝ', 'HORNÍ', 'DOLNÍ', 'PŘEDNÍ', 'ZADNÍ']; /* local +X -X +Y -Y +Z -Z (cube rotated so local +Y = world +Z) */
 function buildCubeMaterials() {
