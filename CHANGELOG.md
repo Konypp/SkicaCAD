@@ -1,9 +1,9 @@
 # Changelog
 
-## Beta 0.42 (pracovní verze)
+## Beta 0.42
 - Skica: jemnější kóty – tenčí a průhlednější čáry, menší šipky a písmo, kóty blíž k tvaru.
 
-## Beta 0.41 (pracovní verze)
+## Beta 0.41
 - Skica: kóty u všech prvků – obdélník (šířka a výška), kružnice (Ø), mnohoúhelník (R a délka strany), elipsa (obě osy), drážka (celková délka a šířka) a čáry (délka každého úseku). Kóty se ukazují i při kreslení. V paletě skici je lze vypnout volbou Zobrazit kóty.
 
 ## Beta 0.40
