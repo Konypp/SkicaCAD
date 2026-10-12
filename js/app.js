@@ -6,7 +6,8 @@ const V3 = THREE.Vector3;
 const D2R = Math.PI / 180;
 const KEY = 'kota-cad-v2', SKEY = 'kota-cad-settings', BKEY = 'kota-cad-blobs';
 const fmt = (n, d = 2) => { const s = (Math.round(n * 10 ** d) / 10 ** d + 0).toString(); return s; };
-const fmtc = (n, d = 2) => fmt(n, d).replace('.', ',');
+const EN = () => !!(window.I18N && I18N.lang === 'en');
+const fmtc = (n, d = 2) => (EN() ? fmt(n, d) : fmt(n, d).replace('.', ','));
 const parseNum = s => parseFloat(String(s).trim().replace(',', '.'));
 const clone = o => JSON.parse(JSON.stringify(o));
 const v3 = a => new V3(a[0], a[1], a[2]);
@@ -49,6 +50,7 @@ const ICONS = {
   skdel: '<path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/>',
   finish: '<circle class="g" cx="12" cy="12" r="9" opacity=".2"/><circle cx="12" cy="12" r="9" style="stroke:var(--ok)"/><path d="m7.5 12.5 3 3 6-6.5" style="stroke:var(--ok);stroke-width:2.2"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5s1.2-6.2 3.6-8.5z"/>',
   tfirst: '<path d="M6 5v14M18 5l-9 7 9 7z"/>',
   tprev: '<path d="M16 5l-9 7 9 7z"/>',
   tnext: '<path d="M8 5l9 7-9 7z"/>',
@@ -194,7 +196,7 @@ function exampleDoc() {
   };
 }
 const newUid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-const emptyDoc = () => ({ uid: newUid(), name: 'Bez názvu', seq: 0, vis: {}, names: {}, features: [], marker: 0 });
+const emptyDoc = () => ({ uid: newUid(), name: EN() ? 'Untitled' : 'Bez názvu', seq: 0, vis: {}, names: {}, features: [], marker: 0 });
 function validDoc(d) {
   if (!d || !Array.isArray(d.features)) return null;
   const out = { uid: typeof d.uid === 'string' && /^[a-z0-9]{4,24}$/.test(d.uid) ? d.uid : newUid(), name: String(d.name || 'Bez názvu').slice(0, 60), seq: Number(d.seq) || 0, vis: (d.vis && typeof d.vis === 'object') ? d.vis : {},
@@ -463,7 +465,7 @@ const CUBE_FACES = ['PRAVÝ', 'LEVÝ', 'HORNÍ', 'DOLNÍ', 'PŘEDNÍ', 'ZADNÍ']
 function buildCubeMaterials() {
   if (!cubeR) return;
   cubeMesh.material.forEach && cubeMesh.material.forEach(m => { if (m.map) m.map.dispose(); m.dispose(); });
-  cubeMesh.material = CUBE_FACES.map(txt => {
+  cubeMesh.material = CUBE_FACES.map(t0 => { const txt = window.I18N ? I18N.t(t0) : t0;
     const c = document.createElement('canvas'); c.width = c.height = 128;
     const g = c.getContext('2d');
     g.fillStyle = css(tok.cube); g.fillRect(0, 0, 128, 128);
@@ -555,6 +557,19 @@ ray.params.Line = { threshold: 1 };
 ray.params.Points = { threshold: 1 };
 function evNdc(ev) { const r = dom.getBoundingClientRect(); return new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1); }
 function evPx(ev) { const r = dom.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; }
+/* world size of the drag arrows so that they stay about the same on screen (a bit larger on touch screens) */
+const TOUCH = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+function worldPerPx(p) {
+  const h = dom.clientHeight || 600;
+  return isOrtho ? (2 * orthoH / ortho.zoom) / h : 2 * cam().position.distanceTo(p) * Math.tan(persp.fov * D2R / 2) / h;
+}
+function arrowSize(tip) { return worldPerPx(tip) * (TOUCH ? 26 : 20) / 2.6; }
+/* parameter along the line a + t*dir closest to the pointer ray, or null when the line points at the viewer */
+function lineParam(ev, a, dir) {
+  ray.setFromCamera(evNdc(ev), cam());
+  const o = ray.ray.origin, r = ray.ray.direction, w0 = a.clone().sub(o), b = dir.dot(r), dd = dir.dot(w0), e = r.dot(w0), den = 1 - b * b;
+  return Math.abs(den) < 1e-6 ? null : (b * e - dd) / den;
+}
 function toPx(p) { const v = p.clone().project(cam()); return [(v.x + 1) / 2 * dom.clientWidth, (1 - v.y) / 2 * dom.clientHeight, v.z]; }
 function pickableMeshes() { const hb = cmd && cmd.hideBody; return Array.from(meshes.entries()).filter(([id, e]) => e.mesh.visible || (id === hb && bodiesVisible() && isVis(id))).map(([, e]) => e.mesh); }
 function hitBodies(ev) { ray.setFromCamera(evNdc(ev), cam()); return ray.intersectObjects(visibleMeshes(), false)[0] || null; }
@@ -1471,7 +1486,7 @@ function startExtrude(editIndex, f, opts) {
       if (!this.arrow) return;
       const { cone, shaft, ax, end } = this.arrow;
       const tip = ax.o.clone().addScaledVector(ax.n, end);
-      const s = cam().position.distanceTo(tip) * (isOrtho ? 0 : 0.012) || (orthoH / ortho.zoom) * 0.03;
+      const s = arrowSize(tip);
       const dirn = ax.n.clone().multiplyScalar(end >= 0 ? 1 : -1);
       cone.scale.setScalar(s); cone.position.copy(tip).addScaledVector(dirn, s * 2.2);
       const a = tip, b = tip.clone().addScaledVector(dirn, s * 1.2);
@@ -1622,7 +1637,7 @@ function startPrimitive(type, editIndex, f) {
       hs.forEach((h, i) => {
         const o = this.handles[i]; if (!o) return;
         const dir = v3(h.dir), a = base.clone().add(v3(h.a)), tip = a.clone().addScaledVector(dir, h.dist);
-        const s = cam().position.distanceTo(tip) * (isOrtho ? 0 : 0.012) || (orthoH / ortho.zoom) * 0.03;
+        const s = arrowSize(tip);
         o.cone.scale.setScalar(s); o.cone.quaternion.setFromUnitVectors(new V3(0, 1, 0), dir);
         o.cone.position.copy(tip).addScaledVector(dir, s * 2.2);
         o.ball.scale.setScalar(s); o.ball.position.copy(tip);
@@ -2383,7 +2398,7 @@ function startThread(editIndex, f) {
       [0, 1].forEach(i => {
         const o = this.handles[i], dir = ax.clone().multiplyScalar(i ? 1 : -1);
         const tip = c0.clone().addScaledVector(ax, sp[i]).addScaledVector(side, rr);
-        const s = cam().position.distanceTo(tip) * (isOrtho ? 0 : 0.012) || (orthoH / ortho.zoom) * 0.03;
+        const s = arrowSize(tip);
         o.cone.scale.setScalar(s); o.cone.quaternion.setFromUnitVectors(new V3(0, 1, 0), dir); o.cone.position.copy(tip).addScaledVector(dir, s * 2.2);
         o.ball.scale.setScalar(s); o.ball.position.copy(tip);
         const b = tip.clone().addScaledVector(dir, s * 1.2), pa = o.shaft.geometry.attributes.position;
@@ -2494,28 +2509,39 @@ function startScale(editIndex, f) {
       transform.addEventListener('objectChange', this.onGizmo);
       transform.addEventListener('dragging-changed', this.onDragChange);
       dom.addEventListener('pointermove', this.onPtr);
+      dom.addEventListener('pointerdown', this.onPtrDown, true);
       this.recenter();
     },
-    pivotObj: null, onGizmo: null, onDragChange: null, onPtr: null, lastEv: null, dragging: false, s0: null,
+    pivotObj: null, onGizmo: null, onDragChange: null, onPtr: null, onPtrDown: null, lastEv: null, downEv: null, startEv: null, axis: null, dragging: false, s0: null,
     pivotPt() { const mid = this.box.getCenter(new V3()); return this.pivot === 'origin' ? [0, 0, 0] : this.pivot === 'base' ? [mid.x, mid.y, this.box.min.z] : [mid.x, mid.y, mid.z]; },
     /* place the manipulator at the scaling centre and mirror the current factors in it */
     syncGizmo() {
       if (this.box.isEmpty()) { transform.detach(); return; }
       const cc = this.pivotPt();
       this.pivotObj.position.set(cc[0], cc[1], cc[2]); this.pivotObj.rotation.set(0, 0, 0);
-      this.pivotObj.scale.set(this.s[0], this.s[1], this.s[2]);
+      this.pivotObj.scale.set(1, 1, 1);
       if (transform.object !== this.pivotObj) transform.attach(this.pivotObj);
       requestRender();
     },
-    fromGizmo() {
-      const sc = this.pivotObj.scale, raw = [sc.x, sc.y, sc.z].map(v => Math.max(1e-3, Math.abs(v))), o = this.orig();
-      const st = settings.gridSnap ? settings.snap : 0.01;
-      const snapF = (fk, k) => (o[k] > 1e-9 ? Math.max(st, Math.round(o[k] * fk / st) * st) / o[k] : fk);
-      const s0 = this.s0 || this.s; let k = 0; for (let j = 1; j < 3; j++) if (Math.abs(raw[j] / s0[j] - 1) > Math.abs(raw[k] / s0[k] - 1)) k = j;
-      if (this.uniform) { const fk = snapF(raw[k], k); this.s = [fk, fk, fk]; }
-      else this.s = raw.map((v, j) => snapF(v, j));
+    /* size follows the pointer 1:1 in millimetres (independent of the current scale), snapped to the grid step */
+    dragTo(ev) {
+      const d0 = this.startEv; if (!d0) return;
+      const ax = this.axis || 'XYZ', o = this.orig(), S0 = o.map((v, k) => v * this.s0[k]);
+      const ks = [0, 1, 2].filter(k => ax.includes('XYZ'[k]));
+      if (!ks.length) return;
+      let delta;
+      if (ks.length === 1) {
+        const k = ks[0], dir = new V3(k === 0 ? 1 : 0, k === 1 ? 1 : 0, k === 2 ? 1 : 0), p = this.pivotObj.position;
+        const t1 = lineParam(ev, p, dir), t0 = lineParam(d0, p, dir); if (t1 === null || t0 === null) return;
+        delta = t1 - t0;
+      } else delta = ((ev.clientX - d0.clientX) - (ev.clientY - d0.clientY)) * worldPerPx(this.pivotObj.position);
+      const st = settings.gridSnap ? settings.snap : 0.01, snapS = v => Math.max(st, Math.round(v / st) * st);
+      let k = ks[0]; for (const j of ks) if (S0[j] > S0[k]) k = j;
+      if (this.uniform) { if (!(S0[k] > 1e-9)) return; const f = snapS(S0[k] + delta) / S0[k]; this.s = this.s0.map(v => v * f); }
+      else { this.s = this.s0.slice(); for (const j of ks) if (o[j] > 1e-9) this.s[j] = snapS(S0[j] + delta) / o[j]; }
       this.refreshFields(); this.apply();
-      if (this.lastEv) { const sz = o.map((v, j) => v * this.s[j]); showDimAt(this.lastEv, this.uniform ? `${fmtc(this.s[0] * 100, 1)} % · ${sz.map(v => fmtc(v, 1)).join(' × ')} mm` : `${'XYZ'[k]}: ${fmtc(sz[k], 2)} mm · ${fmtc(this.s[k] * 100, 1)} %`); }
+      const sz = o.map((v, j) => v * this.s[j]);
+      showDimAt(ev, this.uniform ? `${fmtc(this.s[0] * 100, 1)} % · ${sz.map(v => fmtc(v, 1)).join(' × ')} mm` : ks.map(j => `${'XYZ'[j]}: ${fmtc(sz[j], 2)} mm`).join(' · '));
     },
     orig() { const s = this.box.getSize(new V3()); return [s.x, s.y, s.z]; },
     recenter() {
@@ -2565,15 +2591,21 @@ function startScale(editIndex, f) {
       transform.removeEventListener('objectChange', this.onGizmo);
       transform.removeEventListener('dragging-changed', this.onDragChange);
       dom.removeEventListener('pointermove', this.onPtr);
+      dom.removeEventListener('pointerdown', this.onPtrDown, true);
       transform.detach(); scene.remove(this.pivotObj); transform.setMode('translate'); transform.setSpace('world');
       for (const e of meshes.values()) { e.mesh.matrixAutoUpdate = true; e.mesh.matrix.identity(); e.mesh.position.set(0, 0, 0); e.mesh.rotation.set(0, 0, 0); e.mesh.updateMatrix(); }
       this.highlight = null; controls.enabled = true; $('#dim').hidden = true;
     }
   };
   c.pivotObj = new THREE.Object3D(); scene.add(c.pivotObj);
-  c.onGizmo = () => { if (c.dragging) c.fromGizmo(); };
-  c.onDragChange = e => { controls.enabled = !e.value; c.dragging = !!e.value; if (e.value) c.s0 = c.s.slice(); else { c.s0 = null; $('#dim').hidden = true; c.syncGizmo(); } };
-  c.onPtr = e => { c.lastEv = e; };
+  c.onGizmo = () => {};
+  c.onDragChange = e => {
+    controls.enabled = !e.value; c.dragging = !!e.value;
+    if (e.value) { c.s0 = c.s.slice(); c.axis = transform.axis; c.startEv = c.downEv ? { clientX: c.downEv.clientX, clientY: c.downEv.clientY } : null; }
+    else { c.s0 = null; c.startEv = null; $('#dim').hidden = true; c.syncGizmo(); }
+  };
+  c.onPtr = e => { c.lastEv = e; if (c.dragging) c.dragTo(e); };
+  c.onPtrDown = e => { c.downEv = e; };
   beginCmd(c); c.init();
 }
 
@@ -3501,6 +3533,21 @@ $('#docname').addEventListener('input', e => { doc.name = e.target.value; saveDo
 $('#docname').addEventListener('change', () => pushHist());
 $('#undo').addEventListener('click', undo);
 $('#redo').addEventListener('click', redo);
+
+/* ================= language ================= */
+function syncLangBtn() { const b = $('#langbtn'); if (!b) return; const en = EN(); b.querySelector('.lc').textContent = en ? 'EN' : 'CZ'; b.title = en ? 'Language: English (switch to Czech)' : 'Jazyk: čeština (přepnout do angličtiny)'; }
+if ($('#langbtn')) $('#langbtn').addEventListener('click', () => {
+  const l = EN() ? 'cs' : 'en';
+  settings.lang = l; saveSettings();
+  if (window.I18N) I18N.set(l);
+  if (doc.name === 'Bez názvu' || doc.name === 'Untitled') { doc.name = l === 'en' ? 'Untitled' : 'Bez názvu'; $('#docname').value = doc.name; }
+  buildCubeMaterials(); renderRibbon(); renderBrowser(); renderTimeline(); updateInfo(); applyNav();
+  if (sk) { renderPalette(); redrawSketch(); }
+  if (!$('#startdlg').hidden) showStart(false);
+  syncLangBtn(); requestRender();
+  toast(l === 'en' ? 'Language: English' : 'Jazyk: čeština');
+});
+syncLangBtn();
 
 /* ================= theme changes ================= */
 function onTheme() {

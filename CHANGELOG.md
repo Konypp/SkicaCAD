@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 0.32
+- Anglická verze: tlačítko CZ / EN v horní liště přepíná jazyk celé aplikace za běhu (pás nástrojů, dialogy, paleta skici, nabídky, hlášení, úvodní obrazovka, kostka pohledů). Volba se pamatuje; při prvním spuštění se jazyk řídí nastavením prohlížeče. V angličtině se čísla píší s desetinnou tečkou. Překlad je v souboru `js/i18n.js`.
+- Šipky pro změnu rozměrů (základní tělesa, Vysunutí, Závit) mají stálou velikost na obrazovce a jsou menší (na dotykových zařízeních o něco větší, aby se daly chytit).
+- Měřítko: manipulátor mění rozměr úměrně posunu ukazatele (v milimetrech) a stejně citlivě i při dalších taženích; dřív se změna s každým tažením násobila.
+
 ## Beta 0.31
 - Samostatné tlačítko Upravit plochu odstraněno; vše s plochami je pod tlačítkem Plochy (G), které se přesunulo na jeho místo ve skupině Upravit. Po výběru stěny nabídne lišta Vysunout, Posunout plochu / Změnit průměr, Skicu z plochy, Prázdnou skicu a Závit. Dříve vytvořené úpravy ploch lze dál upravit dvojklikem na časové ose.
 

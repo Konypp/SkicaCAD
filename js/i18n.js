@@ -1,0 +1,322 @@
+/* SkicaCAD – language layer.
+ * The app is written in Czech. In English mode every text that appears on the page (text, title, aria-label,
+ * placeholder) is translated when it is shown: exact phrases first, then patterns with numbers, then parts
+ * separated by " · ". Switching back restores the original Czech texts. */
+(() => {
+  const EXACT = {
+    // app bar, file menu
+    'Soubor': 'File', 'Zpět': 'Undo', 'Znovu': 'Redo', 'Zpět (Ctrl+Z)': 'Undo (Ctrl+Z)', 'Znovu (Ctrl+Y)': 'Redo (Ctrl+Y)',
+    'Název návrhu': 'Design name', 'Bez názvu': 'Untitled', 'Testovací verze': 'Test version',
+    'Nový návrh': 'New design', 'Moje návrhy…': 'My designs…', 'v prohlížeči': 'in browser', 'Otevřít ukázkový model': 'Open sample model',
+    'Otevřít návrh…': 'Open design…', 'Uložit návrh': 'Save design', 'Importovat…': 'Import…', 'Exportovat STL + OBJ': 'Export STL + OBJ',
+    'Nainstalovat aplikaci': 'Install app', 'Jak nainstalovat (iOS)': 'How to install (iOS)',
+    'Pás nástrojů': 'Toolbar', 'Navigace': 'Navigation', 'Časová osa': 'Timeline', 'Kostka pohledů': 'View cube', 'Výchozí pohled': 'Home view',
+    'PROHLÍŽEČ': 'BROWSER', 'Sbalit': 'Collapse', 'Sbalit prohlížeč': 'Collapse browser', 'Rozbalit': 'Expand',
+    'Přizpůsobit (F6)': 'Fit (F6)', 'Přizpůsobit': 'Fit', 'Ortogonální / perspektivní pohled': 'Orthographic / perspective view', 'Projekce': 'Projection',
+    'Styl zobrazení': 'Display style', 'Styl zobrazení:': 'Display style:', 'Mřížka': 'Grid', 'Přichytávání k mřížce': 'Snap to grid', 'Přichytávání': 'Snap',
+    'Krok přichytávání': 'Snap step', 'Stínování s hranami': 'Shaded with edges', 'Stínování': 'Shaded', 'Drátový model': 'Wireframe',
+    'Přepočítávám model…': 'Rebuilding model…', 'Načítám soubor…': 'Loading file…', 'Načítám síť…': 'Loading mesh…', 'Zjednodušuji síť…': 'Simplifying mesh…',
+    'Časová osa je prázdná. Začněte příkazem Vytvořit skicu.': 'The timeline is empty. Start with Create sketch.',
+    'Na začátek': 'To start', 'O krok zpět': 'Step back', 'O krok vpřed': 'Step forward', 'Na konec': 'To end', 'Značka historie': 'History marker',
+    // ribbon
+    'TĚLESO': 'SOLID', 'SKICA': 'SKETCH', 'Vytvořit': 'Create', 'Upravit': 'Modify', 'Výběr': 'Select', 'Kontrola': 'Inspect', 'Vložit': 'Insert', 'Dokončit': 'Finish',
+    'Vytvořit skicu': 'Create sketch', 'Vysunutí': 'Extrude', 'Rotace': 'Revolve', 'Závit': 'Thread', 'Krychle': 'Cube', 'Válec': 'Cylinder', 'Koule': 'Sphere',
+    'Kužel': 'Cone', 'Torus': 'Torus', 'Zaoblení': 'Fillet', 'Zkosení': 'Chamfer', 'Kombinovat': 'Combine', 'Přesunout': 'Move', 'Otočit': 'Rotate',
+    'Měřítko': 'Scale', 'Vycentrovat': 'Center', 'Plochy': 'Faces', 'Zrcadlit': 'Mirror', 'Pole': 'Pattern', 'Odstranit': 'Delete', 'Vybrat vše': 'Select all',
+    'Měřit': 'Measure', 'Importovat': 'Import', 'Import': 'Import', 'Upravit plochu': 'Edit face', 'Čára': 'Line', 'Křivka': 'Spline', 'Obdélník': 'Rectangle',
+    'Kružnice': 'Circle', 'Elipsa': 'Ellipse', 'Mnohoúhelník': 'Polygon', 'Drážka': 'Slot', 'Zaoblit rohy': 'Round corners', 'Smazat': 'Delete',
+    'DXF / SVG': 'DXF / SVG', 'Dokončit skicu': 'Finish sketch', 'Skica': 'Sketch', 'Skici': 'Sketches', 'Tělesa': 'Bodies', 'Těleso': 'Body', 'Počátek': 'Origin',
+    'Měřit od': 'Measure from', 'Odstranit těleso': 'Delete body', 'Upravit plochu ': 'Edit face',
+    // browser / context menus
+    'Skrýt': 'Hide', 'Zobrazit': 'Show', 'Dvojklikem přejmenujete': 'Double-click to rename', 'Klepnutím vyberete všechna tělesa': 'Click to select all bodies',
+    'Klepnutím vyberete (např. pro Vysunutí), dvojklikem upravíte skicu': 'Click to select (e.g. for Extrude), double-click to edit the sketch',
+    'Vybrat vše (Ctrl+A)': 'Select all (Ctrl+A)', 'Kopírovat (Ctrl+C)': 'Copy (Ctrl+C)', 'Duplikovat (Ctrl+D)': 'Duplicate (Ctrl+D)', 'Vložit kopii (Ctrl+V)': 'Paste copy (Ctrl+V)',
+    'Přesunout…': 'Move…', 'Zaoblit hrany…': 'Fillet edges…', 'Přejmenovat': 'Rename', 'Upravit prvek': 'Edit feature', 'Upravit prvek, který těleso vytvořil': 'Edit the feature that created the body',
+    'Potlačit prvek': 'Suppress feature', 'Obnovit prvek': 'Unsuppress feature', 'Přesunout značku sem': 'Move marker here', 'Odstranit prvek': 'Delete feature',
+    '(potlačeno)': '(suppressed)', 'Dvojklikem upravíte, pravým tlačítkem další volby': 'Double-click to edit, right-click for more options',
+    // dialogs: common
+    'Zrušit': 'Cancel', 'OK': 'OK', 'Zavřít': 'Close', 'Operace': 'Operation', 'Nové těleso': 'New body', 'Spojit': 'Join', 'Vyříznout': 'Cut', 'Průnik': 'Intersect',
+    'Počítám náhled…': 'Computing preview…', 'Neplatná hodnota': 'Invalid value', 'Chyba': 'Error', 'Typ': 'Type', 'Směr': 'Direction', 'Osa': 'Axis', 'Rovina': 'Plane',
+    'Profil': 'Profile', 'Vyberte profil': 'Select a profile', 'Jedna strana': 'One side', 'Symetricky': 'Symmetric', 'Vzdálenost': 'Distance', 'Úhel': 'Angle', 'Úhel (°)': 'Angle (°)',
+    'Tělesa ': 'Bodies', 'Vyberte tělesa': 'Select bodies', 'Vyberte těleso': 'Select a body', 'Rychle': 'Quick', 'Celý model': 'Whole model', 'Plocha': 'Face',
+    // sketch
+    'PALETA SKICI': 'SKETCH PALETTE', 'Zrušit skicu': 'Cancel sketch', 'Zrušit změny': 'Discard changes', 'Smazat prvek': 'Delete element', 'Počet stran': 'Number of sides',
+    'Poloměr rohů': 'Corner radius', 'Uzavřená křivka': 'Closed curve', 'Tažením bodu měnit velikost rovnoměrně': 'Dragging a point resizes uniformly',
+    'uzavřený obrys': 'closed outline', 'otevřená čára (lze použít jako osu rotace)': 'open line (can be used as a revolve axis)', '(uzavírací)': '(closing)',
+    'uzavřený profil': 'closed profile', 'uzavřené profily': 'closed profiles', 'uzavřených profilů': 'closed profiles',
+    'Skica je prázdná. Nakreslete obdélník, kružnici nebo čáru.': 'The sketch is empty. Draw a rectangle, circle or line.',
+    'Klepnutím vyberte prvek skici. Nástroje kreslení jsou v pásu nahoře.': 'Tap a sketch element to select it. Drawing tools are in the toolbar above.',
+    'Čára: klepejte na body; klepnutím na první bod obrys uzavřete, Enter ukončí': 'Line: tap points; tap the first point to close the outline, Enter finishes',
+    'Křivka: klepejte na body, kterými má křivka projít; klepnutím na první bod ji uzavřete, Enter ukončí. Body pak jde přetáhnout.': 'Spline: tap the points the curve should pass through; tap the first point to close it, Enter finishes. Points can be dragged afterwards.',
+    'Obdélník: klepněte na první roh, pak na protější roh': 'Rectangle: tap the first corner, then the opposite corner',
+    'Kružnice: klepněte na střed, pak určete poloměr': 'Circle: tap the centre, then set the radius',
+    'Elipsa: klepněte na střed, pak na konec hlavní osy, třetím klepnutím určíte šířku': 'Ellipse: tap the centre, then the end of the major axis, a third tap sets the width',
+    'Mnohoúhelník: klepněte na střed, pak na vrchol. Počet stran nastavíte v paletě.': 'Polygon: tap the centre, then a vertex. Set the number of sides in the palette.',
+    'Drážka: klepněte na střed prvního oblouku, pak druhého, třetím klepnutím určíte šířku': 'Slot: tap the centre of the first arc, then the second, a third tap sets the width',
+    'Zaoblení rohů: nastavte poloměr v paletě a klepněte na obdélník, mnohoúhelník nebo uzavřený obrys': 'Round corners: set the radius in the palette and tap a rectangle, polygon or closed outline',
+    'Zaoblit lze rohy obdélníku, mnohoúhelníku nebo uzavřeného obrysu.': 'Only corners of a rectangle, polygon or closed outline can be rounded.',
+    'Klepněte na jednu z rovin XY, XZ, YZ nebo na rovinnou plochu modelu.': 'Tap one of the XY, XZ, YZ planes or a flat face of the model.',
+    'Vyberte rovinu počátku nebo rovinnou plochu tělesa': 'Select an origin plane or a flat face of a body', 'Skicu lze umístit jen na rovinnou plochu.': 'A sketch can only be placed on a flat face.',
+    'XY (půdorys)': 'XY (top)', 'XZ (nárys)': 'XZ (front)', 'YZ (bokorys)': 'YZ (side)', 'Rovina skici': 'Sketch plane',
+    'Nejprve vyberte prvek skici.': 'Select a sketch element first.', 'Vyberte prvek skici, který chcete kopírovat.': 'Select the sketch element to copy.',
+    'Vyberte prvek skici, který chcete duplikovat.': 'Select the sketch element to duplicate.', 'Prvek skici zkopírován. Vložíte ho Ctrl+V.': 'Sketch element copied. Paste it with Ctrl+V.',
+    'Schránka neobsahuje prvek skici. Zkopírujte ho Ctrl+C.': 'The clipboard has no sketch element. Copy one with Ctrl+C.', 'Neznámý prvek': 'Unknown element',
+    'Úsečka': 'Segment',
+    // extrude / revolve
+    'Táhněte šipkou nebo zadejte vzdálenost. Klepnutím na profil výběr změníte.': 'Drag the arrow or enter a distance. Tap a profile to change the selection.',
+    'Vyberte uzavřený profil skici': 'Select a closed sketch profile', 'Tato skica už je vysunutá.': 'This sketch has already been extruded.', '– vyberte –': '– select –',
+    'Nejprve vytvořte skicu s uzavřeným profilem (S), nebo v režimu Plochy (G) vyberte stěnu a zvolte Vysunout.': 'Create a sketch with a closed profile first (S), or select a face in Faces mode (G) and choose Extrude.',
+    'Všechny skici už jsou vysunuté. Nakreslete novou skicu (S), nebo v režimu Plochy (G) vyberte stěnu a zvolte Vysunout.': 'All sketches have been extruded. Draw a new sketch (S), or select a face in Faces mode (G) and choose Extrude.',
+    'Nejprve vytvořte skicu s profilem a osou rotace (S).': 'Create a sketch with a profile and a revolve axis first (S).',
+    'Zvolte osu a úhel rotace. Klepnutím na profil výběr změníte.': 'Choose the axis and angle. Tap a profile to change the selection.',
+    'Osa X skici': 'Sketch X axis', 'Osa Y skici': 'Sketch Y axis', 'Osa X': 'X axis', 'Osa Y': 'Y axis', 'Osa Z': 'Z axis',
+    'Profil protíná osu rotace.': 'The profile crosses the revolve axis.', 'Osa rotace má nulovou délku': 'The revolve axis has zero length', 'Osa rotace neexistuje': 'The revolve axis does not exist',
+    'Nulový úhel': 'Zero angle', 'Nulová vzdálenost': 'Zero distance', 'Skica neexistuje': 'The sketch does not exist',
+    'Nástroj nezasahuje do žádného tělesa': 'The tool does not touch any body',
+    // primitives
+    'Šířka (X)': 'Width (X)', 'Hloubka (Y)': 'Depth (Y)', 'Výška (Z)': 'Height (Z)', 'Šířka': 'Width', 'Hloubka': 'Depth', 'Výška': 'Height', 'Průměr': 'Diameter',
+    'Poloměr': 'Radius', 'Poloměr trubice': 'Tube radius', 'Poloha základny': 'Base position', 'Šipkami měnit rovnoměrně všechny rozměry': 'Arrows change all dimensions uniformly',
+    'Táhněte oranžovými šipkami pro změnu rozměrů, manipulátorem pro posun, nebo klepněte do pohledu': 'Drag the orange arrows to resize, the manipulator to move, or tap in the view',
+    'Klepnutím do pohledu umístíte těleso, rozměry zadejte v dialogu': 'Tap in the view to place the body, enter the dimensions in the dialog',
+    'Trubice musí být menší než hlavní poloměr': 'The tube must be smaller than the main radius',
+    // fillet / chamfer
+    'Hrany': 'Edges', 'Vyberte hrany': 'Select edges', 'Vyberte hrany tělesa': 'Select edges of a body', 'Klepnutím přidáte nebo odeberete hranu': 'Tap to add or remove an edge',
+    'Tangentní řetěz': 'Tangent chain', 'Hrana je téměř rovná nebo příliš ostrá.': 'The edge is almost flat or too sharp.', 'Hrana nebyla nalezena': 'Edge not found',
+    'Hranu nelze upravit.': 'This edge cannot be modified.', 'Tento typ hrany zatím nelze upravit.': 'This type of edge cannot be modified yet.', 'Poloměr je pro tuto hranu příliš velký.': 'The radius is too large for this edge.',
+    // combine
+    'Cílové těleso': 'Target body', 'Vyberte cílové těleso': 'Select the target body', 'Vyberte nástrojová tělesa': 'Select the tool bodies', 'Nástroje': 'Tools',
+    'Ponechat nástrojová tělesa': 'Keep tool bodies', 'Kombinace potřebuje alespoň dvě tělesa.': 'Combine needs at least two bodies.', 'Cílové těleso neexistuje': 'The target body does not exist',
+    // move / copy
+    'Vložit kopii': 'Paste copy', 'Manipulátor': 'Manipulator', 'Posun': 'Move', 'Otočení': 'Rotate', 'Posun (mm)': 'Move (mm)', 'Otočení (°)': 'Rotation (°)',
+    'Vytvořit kopie (originál zůstane)': 'Create copies (keep the original)', 'Počet kopií': 'Number of copies', 'Podle posunu výše': 'By the move above',
+    'Podél osy X': 'Along X axis', 'Podél osy Y': 'Along Y axis', 'Podél osy Z': 'Along Z axis', 'Rozestup': 'Spacing', 'Vznikne 1 kopie.': '1 copy will be created.',
+    'Každá další kopie se posune o stejný krok.': 'Each further copy moves by the same step.', 'Vyberte tělesa k přesunu': 'Select bodies to move',
+    'Táhněte manipulátorem nebo zadejte hodnoty. Klepnutím na těleso výběr změníte.': 'Drag the manipulator or enter values. Tap a body to change the selection.',
+    'Příliš mnoho kopií (víc než 300).': 'Too many copies (more than 300).', 'Duplikováno': 'Duplicated',
+    'Duplikováno vedle originálu. Polohu upravíte dvojklikem na prvek v časové ose.': 'Duplicated next to the original. Adjust its position by double-clicking the feature in the timeline.',
+    'Schránka je prázdná. Těleso zkopírujete Ctrl+C.': 'The clipboard is empty. Copy a body with Ctrl+C.', 'Zkopírovaná tělesa už v modelu nejsou.': 'The copied bodies are no longer in the model.',
+    'Vyberte těleso, které chcete kopírovat.': 'Select the body to copy.', 'Vyberte těleso, které chcete duplikovat.': 'Select the body to duplicate.',
+    'Vyberte těleso, které chcete odstranit.': 'Select the body to delete.', 'Vloženo': 'Pasted',
+    // rotate
+    'Otočit celý model': 'Rotate whole model', 'Střed otáčení': 'Rotation centre', 'Střed výběru': 'Selection centre', 'Položit na podložku (Z = 0)': 'Place on the bed (Z = 0)',
+    'Plochou dolů': 'Face down', 'Vybrat plochu v modelu': 'Pick a face in the model', 'Vyberte tělesa k otočení': 'Select bodies to rotate',
+    'Otáčejte manipulátorem, rychlými tlačítky nebo zadejte úhly': 'Rotate with the manipulator, the quick buttons or enter angles',
+    'Klepněte na plochu, která má ležet na podložce': 'Tap the face that should lie on the bed', 'Klepněte na plochu…': 'Tap a face…',
+    // scale
+    'Zachovat poměr stran': 'Keep proportions', 'Měřítko (×)': 'Scale (×)', 'Rozměry (mm)': 'Dimensions (mm)', 'Střed změny': 'Scale centre',
+    'Spodní plocha (zůstane na podložce)': 'Bottom face (stays on the bed)', 'palce → mm': 'inches → mm', 'Měřítko musí být kladné číslo': 'Scale must be a positive number',
+    'Vyberte tělesa, jejichž velikost chcete změnit': 'Select the bodies to resize',
+    'Táhněte kostičkami manipulátoru (střed = všechny osy) nebo zadejte měřítko či rozměry': 'Drag the manipulator cubes (centre = all axes) or enter a scale or dimensions',
+    'Táhněte kostičkami manipulátoru (střed = všechny osy). Klepnutím na těleso výběr změníte.': 'Drag the manipulator cubes (centre = all axes). Tap a body to change the selection.',
+    'Tvar a rozměry modelu zůstanou zachované.': 'The shape and size of the model are kept.',
+    // center
+    'Vycentrovat v ose X': 'Center in X', 'Vycentrovat v ose Y': 'Center in Y', 'Osa Z ': 'Z axis', 'Neměnit': 'Keep', 'Každé těleso zvlášť': 'Each body separately',
+    'Model se posune tak, aby jeho střed ležel v počátku': 'The model moves so that its centre lies at the origin', 'Každé těleso se posune do počátku samostatně.': 'Each body moves to the origin separately.',
+    'Vyberte tělesa k vycentrování': 'Select bodies to center', 'Vycentrovat na počátek': 'Center on origin', 'Vycentrovat na počátek (X, Y)': 'Center on origin (X, Y)',
+    'Položit na rovinu XY': 'Place on the XY plane', 'Model neobsahuje žádná viditelná tělesa.': 'The model has no visible bodies.',
+    // mirror / pattern
+    'Rovina YZ (osa X)': 'YZ plane (X axis)', 'Rovina XZ (osa Y)': 'XZ plane (Y axis)', 'Rovina XY (osa Z)': 'XY plane (Z axis)', 'Spojit s originálem': 'Join with original',
+    'Vyberte tělesa, která chcete zrcadlit': 'Select the bodies to mirror', 'Kruhové': 'Circular', 'Obdélníkové': 'Rectangular', 'Počet': 'Count', 'Celkový úhel': 'Total angle',
+    'Počet v X': 'Count in X', 'Počet v Y': 'Count in Y', 'Rozteč X': 'Spacing X', 'Rozteč Y': 'Spacing Y', 'Vyberte tělesa pro pole': 'Select bodies for the pattern',
+    'Kruhové pole kolem osy procházející počátkem': 'Circular pattern around an axis through the origin', 'Obdélníkové pole ve směrech X a Y': 'Rectangular pattern in X and Y',
+    'Pole potřebuje alespoň dvě instance': 'A pattern needs at least two instances',
+    // thread
+    'Velikost': 'Size', 'Stoupání': 'Pitch', 'Pravý': 'Right', 'Levý': 'Left', 'Po celé délce plochy': 'Full length of the face', 'Spodní konec': 'Bottom end', 'Horní konec': 'Top end',
+    'Začátek plochy': 'Start of face', 'Konec plochy': 'End of face', 'Odsazení': 'Offset', 'Délka závitu': 'Thread length', 'Klepněte na válcovou plochu': 'Tap a cylindrical face',
+    'Klepněte na válcovou plochu tělesa': 'Tap a cylindrical face of a body', 'Vyberte vnější plochu čepu nebo vnitřní plochu díry.': 'Select the outer face of a pin or the inner face of a hole.',
+    'Vnitřní závit (díra)': 'Internal thread (hole)', 'Vnější závit (čep)': 'External thread (pin)', 'Červeně je materiál, který závit odebere.': 'Red shows the material the thread removes.',
+    'Oranžovými šipkami nastavíte začátek a konec závitu. Klepnutím na jinou válcovou plochu výběr změníte.': 'Use the orange arrows to set the start and end of the thread. Tap another cylindrical face to change the selection.',
+    'Závit lze vytvořit jen na celé válcové ploše (čep nebo díra).': 'A thread can only be made on a whole cylindrical face (pin or hole).',
+    'Závit je příliš krátký': 'The thread is too short', 'Neplatné parametry závitu': 'Invalid thread parameters', 'Díra je pro zvolenou velikost závitu příliš velká': 'The hole is too large for the chosen thread size',
+    'Válec je pro zvolenou velikost závitu příliš tenký': 'The cylinder is too thin for the chosen thread size', 'Stoupání je pro tento průměr příliš velké': 'The pitch is too large for this diameter',
+    'díra pro ni má mít': 'the hole should be', 'čep má mít': 'the pin should be',
+    // faces
+    'Vysunout': 'Extrude', 'Posunout plochu': 'Offset face', 'Skica z plochy': 'Sketch from face', 'Prázdná skica': 'Empty sketch', 'Změnit průměr': 'Change diameter',
+    'Průměr otvoru': 'Hole diameter', 'Zrušit výběr plochy': 'Clear face selection', 'Vysunout (nové těleso, přidat nebo vyříznout)…': 'Extrude (new body, join or cut)…',
+    'Posunout plochu (vysunout / zapustit)…': 'Offset face (push / pull)…', 'Skica z plochy (Ctrl+D)': 'Sketch from face (Ctrl+D)', 'Nová prázdná skica na ploše': 'New empty sketch on face',
+    'Závit na této ploše…': 'Thread on this face…', 'Změnit průměr otvoru…': 'Change hole diameter…', 'Změnit průměr…': 'Change diameter…',
+    'Výběr ploch: klepněte na stěnu tělesa, možnosti se ukážou v liště dole.': 'Face selection: tap a face of a body, the options appear in the bar below.', 'Výběr těles': 'Body selection',
+    'Tuto plochu nelze vybrat samostatně (zakřivená plocha, která není válcem).': 'This face cannot be selected on its own (a curved face that is not a cylinder).',
+    'Vyberte rovinnou plochu (třeba horní stěnu válce).': 'Select a flat face (for example the top of a cylinder).', 'Vysunout lze rovinnou plochu.': 'Only a flat face can be extruded.',
+    'Obrys plochy se nepodařilo převést na skicu.': 'The face outline could not be converted to a sketch.', 'Obrys plochy se nepodařilo určit': 'The face outline could not be determined',
+    'Obrys plochy je ve skice. Upravte rozměr v paletě, dokončete skicu a vysuňte ji (E), záporná vzdálenost vytvoří otvor.': 'The face outline is in the sketch. Adjust the size in the palette, finish the sketch and extrude it (E); a negative distance makes a hole.',
+    'Rovinná plocha': 'Flat face', 'Vnitřní válcová plocha (otvor)': 'Inner cylindrical face (hole)', 'Vnější válcová plocha': 'Outer cylindrical face',
+    'Klepněte na stěnu tělesa': 'Tap a face of a body', 'Klepnutím na jinou stěnu výběr změníte': 'Tap another face to change the selection', 'Posunutí': 'Offset',
+    'Nový průměr': 'New diameter', 'Vyberte rovnou stěnu nebo válcovou plochu.': 'Select a flat face or a cylindrical face.', 'Vyberte vnitřní stěnu otvoru, válec nebo rovnou stěnu.': 'Select the inner face of a hole, a cylinder or a flat face.',
+    'Kladné posunutí přidá materiál ve směru plochy, záporné ho odebere (zapustí plochu).': 'A positive offset adds material in the face direction, a negative one removes it (sinks the face).',
+    'Otvor: zadejte nový průměr, otvor se zvětší nebo zmenší.': 'Hole: enter a new diameter, the hole grows or shrinks.', 'Válec: zadejte nový průměr.': 'Cylinder: enter a new diameter.',
+    'Zadejte odsazení různé od nuly': 'Enter a non-zero offset', 'Průměr se nezměnil': 'The diameter did not change', 'Průměr musí být větší než 0,1 mm': 'The diameter must be larger than 0.1 mm',
+    'Úprava plochy by odstranila celé těleso': 'The face edit would remove the whole body', 'Plocha nebyla nalezena': 'Face not found',
+    // measure
+    'Bod 1': 'Point 1', 'Bod 2': 'Point 2', 'Klepněte na model': 'Tap the model', 'Klepněte na první bod': 'Tap the first point', 'Klepněte na druhý bod': 'Tap the second point',
+    'Klepnutím blízko vrcholu se bod přichytí k vrcholu.': 'Tapping near a vertex snaps to the vertex.',
+    // files, import
+    'Otevřít návrh': 'Open design', 'Otevřít archiv ZIP': 'Open ZIP archive', 'Vyberte, jak archiv otevřít': 'Choose how to open the archive', 'Vložit jako těleso': 'Insert as body',
+    'Otevřít návrh obnoví celou časovou osu a nahradí aktuální návrh (vrátíte ho Ctrl+Z). Vložit jako těleso přidá síť do aktuálního návrhu.': 'Open design restores the whole timeline and replaces the current design (undo with Ctrl+Z). Insert as body adds the mesh to the current design.',
+    'Import sítě': 'Mesh import', 'Jednotky souboru': 'File units', 'Nastavte jednotky a umístění importovaného modelu': 'Set the units and placement of the imported model',
+    'Jednotky v souboru nejsou uvedené, zkontrolujte měřítko.': 'The file does not state its units, check the scale.', 'Síť': 'Mesh', 'Velký model': 'Large model',
+    'Zvolte, jak podrobně model načíst': 'Choose how detailed the model should be', 'Zjednodušit na 150 000 (doporučeno)': 'Simplify to 150,000 (recommended)',
+    'Zjednodušit na 300 000 (víc detailů)': 'Simplify to 300,000 (more detail)', 'Zjednodušit na 75 000 (nejrychlejší)': 'Simplify to 75,000 (fastest)', 'Ponechat plné rozlišení': 'Keep full resolution',
+    'Načtení plného rozlišení chvíli potrvá.': 'Loading the full resolution takes a while.', 'Zkontrolujte velikost a umístění, pak potvrďte. Vznikne nová skica.': 'Check the size and placement, then confirm. A new sketch is created.',
+    'Skica z importu je hotová. Profily vysunete příkazem Vysunutí (E).': 'The imported sketch is ready. Extrude its profiles with Extrude (E).',
+    'Soubor uložen': 'File saved', 'Soubor se nepodařilo uložit.': 'The file could not be saved.', 'Soubor se nepodařilo načíst.': 'The file could not be loaded.',
+    'Návrh otevřen': 'Design opened', 'Ukládání souborů není v tomto zobrazení dostupné': 'Saving files is not available in this view', 'Ukládání souborů není v tomto zobrazení dostupné.': 'Saving files is not available in this view.',
+    'Uloženo. Archiv otevřete znovu ve SkicaCAD přetažením do okna nebo přes Soubor › Otevřít návrh.': 'Saved. Open the archive in SkicaCAD again by dropping it on the window or via File › Open design.',
+    'Není co exportovat, model neobsahuje viditelná tělesa.': 'Nothing to export, the model has no visible bodies.',
+    'Podporované formáty importu: STL, OBJ (tělesa), DXF a SVG (skica) a archiv ZIP ze SkicaCAD.': 'Supported import formats: STL, OBJ (bodies), DXF and SVG (sketch) and ZIP archives from SkicaCAD.',
+    'Soubor je příliš velký (víc než 400 MB).': 'The file is too large (more than 400 MB).', 'Do skici lze vložit jen DXF nebo SVG. Model STL nebo OBJ importujte mimo skicu.': 'Only DXF or SVG can be inserted into a sketch. Import STL or OBJ models outside the sketch.',
+    'Importovaný model je na úložiště prohlížeče příliš velký. Návrh si uložte do souboru (Soubor › Uložit návrh).': 'The imported model is too large for the browser storage. Save the design to a file (File › Save design).',
+    'Soubor neobsahuje platný návrh SkicaCAD.': 'The file does not contain a valid SkicaCAD design.', 'Soubor neobsahuje použitelnou síť.': 'The file has no usable mesh.',
+    'Soubor ZIP je poškozený nebo nemá platný formát.': 'The ZIP file is damaged or has an invalid format.', 'Tento prohlížeč neumí rozbalit komprimovaný ZIP.': 'This browser cannot unpack a compressed ZIP.',
+    'Archiv ZIP neobsahuje návrh SkicaCAD ani soubor STL, OBJ, DXF nebo SVG.': 'The ZIP archive contains no SkicaCAD design and no STL, OBJ, DXF or SVG file.',
+    'Archiv neobsahuje DXF ani SVG, které by šlo vložit do skici.': 'The archive contains no DXF or SVG to insert into a sketch.', 'Soubor STL nemá platný obsah.': 'The STL file has no valid content.',
+    'Soubor OBJ neobsahuje žádné plochy.': 'The OBJ file contains no faces.', 'Soubor není platné SVG.': 'The file is not a valid SVG.', 'Neplatná data cesty SVG.': 'Invalid SVG path data.',
+    'Neplatný oblouk v cestě SVG.': 'Invalid arc in SVG path.', 'Nepodporovaný příkaz cesty SVG:': 'Unsupported SVG path command:', 'Import SVG vyžaduje prohlížeč.': 'SVG import requires a browser.',
+    'V souboru nebyla nalezena žádná podporovaná geometrie.': 'No supported geometry was found in the file.', 'Síť se nepodařilo zpracovat.': 'The mesh could not be processed.',
+    'Data importu chybí': 'Import data is missing', 'Data tohoto importu už nejsou k dispozici. Importujte soubor znovu.': 'The data of this import is no longer available. Import the file again.',
+    'Přeskočeno:': 'Skipped:', 'Těleso neexistuje': 'The body does not exist', ', jednotky nebyly v souboru uvedené': ', the file does not state its units',
+    '!Načtení a práce s plným rozlišením bude pomalá a může zaplnit paměť prohlížeče.': '!Loading and working at full resolution will be slow and may fill the browser memory.',
+    // general messages
+    'Model zatím neobsahuje žádné těleso.': 'The model has no bodies yet.', 'Operace je pro tento model příliš složitá. Zkuste zjednodušit tělesa nebo operaci rozdělit.': 'The operation is too complex for this model. Try simplifying the bodies or splitting the operation.',
+    'Tento prvek nemá parametry k úpravě.': 'This feature has no parameters to edit.', 'Tento prohlížeč nepodporuje WebGL, 3D pohled nelze zobrazit.': 'This browser does not support WebGL, the 3D view cannot be shown.',
+    'Úložiště prohlížeče je plné. Smažte staré návrhy (Soubor › Moje návrhy) nebo návrh uložte do souboru.': 'The browser storage is full. Delete old designs (File › My designs) or save the design to a file.',
+    'Je k dispozici nová verze aplikace.': 'A new version of the app is available.', 'Obnovit': 'Reload', 'Později': 'Later',
+    'Ukázkový model načten': 'Sample model loaded', 'Držák s nábojem': 'Bracket with hub', 'Návrh se nepodařilo načíst.': 'The design could not be loaded.',
+    // start screen
+    'Moje návrhy': 'My designs', 'Předchozí návrhy': 'Previous designs', 'Otevřít ze souboru…': 'Open from file…', 'Ukázkový model': 'Sample model',
+    'Zatím tu nejsou žádné uložené návrhy. Jakmile začnete modelovat, návrh se sám uloží a příště ho najdete tady.': 'There are no saved designs yet. Once you start modelling, the design is saved automatically and you will find it here next time.',
+    'Návrhy se ukládají automaticky jen v tomto prohlížeči. Zálohu uděláte přes Soubor › Uložit návrh.': 'Designs are saved automatically, only in this browser. Make a backup via File › Save design.',
+    'Smazat návrh': 'Delete design', 'Klepněte znovu na koš pro trvalé smazání návrhu.': 'Tap the bin again to delete the design permanently.', 'Klepněte znovu pro smazání': 'Tap again to delete',
+    'Nový návrh ': 'New design',
+    // view cube
+    'PŘEDNÍ': 'FRONT', 'ZADNÍ': 'BACK', 'LEVÝ': 'LEFT', 'PRAVÝ': 'RIGHT', 'HORNÍ': 'TOP', 'DOLNÍ': 'BOTTOM',
+    'Klepnutím na těleso výběr změníte': 'Tap a body to change the selection', 'Š': 'W', 'V': 'H',
+    // keys
+    'Akce': 'Action', 'Del': 'Del'
+  };
+
+  /* patterns for texts that contain numbers or names: [regular expression, English template] */
+  const PATTERNS = [
+    [/^Vítejte ve (.+)$/, 'Welcome to $1'], [/^Pokračovat: (.+)$/, 'Continue: $1'],
+    [/^Otevřen návrh „(.+)“$/, 'Opened design “$1”'], [/^Smazat návrh (.+)$/, 'Delete design $1'],
+    [/^(\d+) krok$/, '$1 step'], [/^(\d+) kroky$/, '$1 steps'], [/^(\d+) kroků$/, '$1 steps'], [/^otevřený$/, 'open'],
+    [/^Skica (\d+) \(z plochy\)$/, 'Sketch $1 (from face)'], [/^Skica (\d+) \((.+)\)$/, 'Sketch $1 ($2)'], [/^Skica (\d+)$/, 'Sketch $1'],
+    [/^Těleso (\d+)$/, 'Body $1'], [/^Import (\d+)$/, 'Import $1'],
+    [/^Úsečka (\d+) \(uzavírací\)$/, 'Segment $1 (closing)'], [/^Úsečka (\d+)$/, 'Segment $1'],
+    [/^(\d+) bodů$/, '$1 points'], [/^body přesunete tažením ve skice$/, 'drag the points in the sketch'],
+    [/^Vybráno těles: (\d+)$/, 'Bodies selected: $1'], [/^Vybráno: (.+)$/, (m, a) => `Selected: ${tr(a)}`],
+    [/^Zkopírováno: (.+)\. Vložíte Ctrl\+V\.$/, (m, a) => `Copied: ${tr(a)}. Paste with Ctrl+V.`],
+    [/^(\d+) (těleso|tělesa|těles)$/, (m, n) => `${n} ${n === '1' ? 'body' : 'bodies'}`],
+    [/^(\d+) (profil|profily|profilů)$/, (m, n) => `${n} ${n === '1' ? 'profile' : 'profiles'}`],
+    [/^(\d+) (hrana|hrany|hran)$/, (m, n) => `${n} ${n === '1' ? 'edge' : 'edges'}`],
+    [/^(\d+) (prvek|prvky|prvků)$/, (m, n) => `${n} ${n === '1' ? 'element' : 'elements'}`],
+    [/^(\d+) (uzavřený profil|uzavřené profily|uzavřených profilů)$/, (m, n) => `${n} closed ${n === '1' ? 'profile' : 'profiles'}`],
+    [/^Vzniknou (\d+) kopie\.$/, '$1 copies will be created.'], [/^Vznikne (\d+) kopií\.$/, '$1 copies will be created.'],
+    [/^Otočí se (.+) najednou\.$/, '$1 will be rotated together.'],
+    [/^Velikost (.+) %$/, 'Size $1 %'], [/^Odsazení (.+) mm$/, 'Offset $1 mm'], [/^délka (.+) mm$/, 'length $1 mm'], [/^šířka (.+) mm$/, 'width $1 mm'],
+    [/^délka plochy (.+) mm$/, 'face length $1 mm'], [/^normála (.+)$/, 'normal $1'], [/^Válcová plocha Ø(.+)$/, 'Cylindrical face Ø$1'],
+    [/^Objem (.+) cm³$/, 'Volume $1 cm³'], [/^objem (.+) cm³$/, 'volume $1 cm³'], [/^povrch (.+) cm²$/, 'surface $1 cm²'],
+    [/^Posun: X (.+)$/, 'Move: X $1'], [/^Původní rozměry (.+) mm$/, 'Original dimensions $1 mm'],
+    [/^Vzdálenost (.+) mm$/, 'Distance $1 mm'], [/^Vzdálenost (.+)$/, 'Distance $1'],
+    [/^Průměr plochy Ø(.+) neodpovídá velikosti (.+) \((díra pro ni má mít|čep má mít) Ø(.+)\)\.$/, (m, a, b, c, d) => `The face diameter Ø${a} does not match size ${b} (${c === 'čep má mít' ? 'the pin should be' : 'the hole should be'} Ø${d}).`],
+    [/^Model má (.+) trojúhelníků, víc než zvládne prohlížeč \(6 milionů\)\. Zjednodušte ho prosím v jiném programu\.$/, 'The model has $1 triangles, more than the browser can handle (6 million). Please simplify it in another program.'],
+    [/^(.+) má (.+) trojúhelníků\. Pro plynulou práci doporučuji síť zjednodušit, jemné detaily se tím mírně vyhladí\.$/, '$1 has $2 triangles. For smooth work I recommend simplifying the mesh; fine details will be slightly smoothed.'],
+    [/^(.+) trojúhelníků \(zjednodušeno z (.+)\)$/, '$1 triangles (simplified from $2)'], [/^(.+) trojúhelníků$/, '$1 triangles'],
+    [/^(.+) jednotek$/, '$1 units'],
+    [/^Vloženo (.+) ze souboru (.+)\. Měřítko (.+) mm na jednotku(, jednotky nebyly v souboru uvedené)?\.$/, (m, a, b, c, d) => `Inserted ${tr(a)} from ${b}. Scale ${c} mm per unit${d ? ', the file does not state its units' : ''}.`],
+    [/^(.+)\.zip obsahuje upravitelný návrh „(.+)“(.*) i síť (STL|OBJ)\.$/, '$1.zip contains the editable design “$2”$3 and a $4 mesh.'],
+    [/^!Síť není uzavřená \((.+) otevřených hran\)\. Booleovské operace s ní nemusí fungovat\.$/, '!The mesh is not closed ($1 open edges). Boolean operations may not work with it.'],
+    [/^Styl zobrazení: (.+)$/, (m, a) => `Display style: ${tr(a)}`],
+    [/^Krychle (\d+)$/, 'Cube $1'], [/^Válec (\d+)$/, 'Cylinder $1'], [/^Koule (\d+)$/, 'Sphere $1'], [/^Kužel (\d+)$/, 'Cone $1'], [/^Torus (\d+)$/, 'Torus $1'],
+    [/^Vysunutí (\d+)$/, 'Extrude $1'], [/^Rotace (\d+)$/, 'Revolve $1'], [/^Zaoblení (\d+)$/, 'Fillet $1'], [/^Zkosení (\d+)$/, 'Chamfer $1'],
+    [/^Kombinovat (\d+)$/, 'Combine $1'], [/^Přesunout (\d+)$/, 'Move $1'], [/^Otočit (\d+)$/, 'Rotate $1'], [/^Vycentrovat (\d+)$/, 'Center $1'],
+    [/^Upravit plochu (\d+)$/, 'Edit face $1'], [/^Závit (\d+)$/, 'Thread $1'], [/^Měřítko (\d+)$/, 'Scale $1'], [/^Zrcadlit (\d+)$/, 'Mirror $1'],
+    [/^Pole (\d+)$/, 'Pattern $1'], [/^Odstranit těleso (\d+)$/, 'Delete body $1'], [/^Čára (\d+)$/, 'Line $1'], [/^Křivka (\d+)$/, 'Spline $1'],
+    [/^Obdélník (\d+)$/, 'Rectangle $1'], [/^Kružnice (\d+)$/, 'Circle $1'], [/^Elipsa (\d+)$/, 'Ellipse $1'], [/^Mnohoúhelník (\d+)$/, 'Polygon $1'], [/^Drážka (\d+)$/, 'Slot $1'],
+    [/^(.+) \(vytvořen v (.+)\)$/, '$1 (made in $2)'],
+    [/^(.+): (.+)$/, (m, a, b) => (EXACT[a] ? `${EXACT[a]}: ${tr(b)}` : m)]
+  ];
+
+  const CZ = /[áčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]/;
+  function tr(text) {
+    if (!text) return text;
+    const lead = text.match(/^\s*/)[0], tail = text.match(/\s*$/)[0], core = text.trim();
+    if (!core) return text;
+    const done = x => lead + x + tail;
+    if (Object.prototype.hasOwnProperty.call(EXACT, core)) return done(EXACT[core]);
+    for (const [re, rep] of PATTERNS) { if (re.test(core)) { const out = core.replace(re, rep); if (out !== core) return done(out); } }
+    /* parts separated by a middle dot, e.g. "Rovinná plocha · 900 mm² · normála 0; 0; 1" */
+    if (core.includes(' · ')) { const parts = core.split(' · '), t = parts.map(p => tr(p)); if (t.some((x, i) => x !== parts[i])) return done(t.join(' · ')); }
+    /* several lines (tooltips) */
+    if (core.includes('\n')) { const ls = core.split('\n'), t = ls.map(l => tr(l)); if (t.some((x, i) => x !== ls[i])) return done(t.join('\n')); }
+    /* label with a keyboard shortcut, e.g. "Čára (L)", "Dokončit skicu (Enter)" */
+    let m = core.match(/^(.+) \(([A-Za-z0-9+]{1,12})\)$/);
+    if (m) { const b = tr(m[1]); if (b !== m[1]) return done(`${b} (${m[2]})`); }
+    /* field label with an axis, e.g. "Poloha základny X" */
+    m = core.match(/^(.+) ([XYZ])$/);
+    if (m) { const b = tr(m[1]); if (b !== m[1]) return done(`${b} ${m[2]}`); }
+    return text;
+  }
+
+  let lang = 'cs';
+  try { const st = JSON.parse(localStorage.getItem('kota-cad-settings') || '{}'); lang = st.lang || ((navigator.language || 'cs').toLowerCase().startsWith('cs') || (navigator.language || '').toLowerCase().startsWith('sk') ? 'cs' : 'en'); } catch (e) { /* default Czech */ }
+
+  const ATTRS = ['title', 'aria-label', 'placeholder'];
+  const origText = new WeakMap(), origAttr = new WeakMap();
+  let busy = false;
+  function doText(n) {
+    const v = n.nodeValue; if (!v || !/[A-Za-zÀ-ž]/.test(v)) return;
+    const t = tr(v); if (t !== v) { origText.set(n, v); n.nodeValue = t; }
+  }
+  function doEl(el) {
+    for (const a of ATTRS) {
+      const v = el.getAttribute && el.getAttribute(a); if (!v) continue;
+      const t = tr(v); if (t !== v) { let m = origAttr.get(el); if (!m) origAttr.set(el, m = {}); m[a] = v; el.setAttribute(a, t); }
+    }
+  }
+  function walk(root) {
+    if (root.nodeType === 3) { doText(root); return; }
+    if (root.nodeType !== 1 || root.tagName === 'SCRIPT' || root.tagName === 'STYLE') return;
+    doEl(root);
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, { acceptNode: n => (n.nodeType === 1 && (n.tagName === 'SCRIPT' || n.tagName === 'STYLE') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
+    let n; while ((n = w.nextNode())) { if (n.nodeType === 3) doText(n); else doEl(n); }
+  }
+  const obs = new MutationObserver(list => {
+    if (lang !== 'en' || busy) return;
+    busy = true;
+    try {
+      for (const m of list) {
+        if (m.type === 'characterData') doText(m.target);
+        else if (m.type === 'attributes') doEl(m.target);
+        else m.addedNodes.forEach(walk);
+      }
+    } finally { busy = false; }
+  });
+  function start() {
+    obs.observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ATTRS });
+    if (lang === 'en') walk(document.body);
+    document.documentElement.lang = lang;
+  }
+  function restore(root) {
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    let n; while ((n = w.nextNode())) {
+      if (n.nodeType === 3) { const o = origText.get(n); if (o !== undefined) { n.nodeValue = o; origText.delete(n); } }
+      else { const m = origAttr.get(n); if (m) { for (const a in m) n.setAttribute(a, m[a]); origAttr.delete(n); } }
+    }
+  }
+  const listeners = [];
+  window.I18N = {
+    get lang() { return lang; },
+    t: s => (lang === 'en' ? tr(s) : s),
+    set(l) {
+      if (l === lang) return;
+      lang = l; document.documentElement.lang = l;
+      busy = true;
+      try { if (l === 'en') walk(document.body); else restore(document.body); } finally { busy = false; }
+      listeners.forEach(f => { try { f(l); } catch (e) { /* ignore */ } });
+    },
+    onChange: f => listeners.push(f),
+    tr
+  };
+  if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
+})();

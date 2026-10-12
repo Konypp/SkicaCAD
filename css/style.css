@@ -290,3 +290,7 @@ button { cursor: pointer; }
   .has-facebar .toast { bottom: 150px; }
 }
 .has-facebar .toast { bottom: 150px; }
+
+/* language switch */
+.langbtn { gap: 4px; font: 600 11.5px var(--mono); letter-spacing: .04em; }
+.langbtn .lc { min-width: 18px; text-align: left; }
