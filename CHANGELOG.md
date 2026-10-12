@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 0.44
+- Skica: kreslení tažením. S vybraným nástrojem (obdélník, kružnice, elipsa, mnohoúhelník, drážka, čára, křivka) jeden prst nebo levé tlačítko myši kreslí: položení = první bod, puštění = druhý bod, tvar a kóty se průběžně překreslují. Klepání funguje dál. Dvěma prsty se pohled posouvá a přibližuje, druhý prst rozkreslený tvar zruší.
+- Čára a křivka: každý tah přidá úsek, další tah navazuje na poslední bod. Dvojím klepnutím kreslení ukončíte (dosud jen Enter nebo pravé tlačítko).
+- Křivka: v paletě volba Kreslit bod po bodu / od ruky. Od ruky se tah po puštění převede na hladkou křivku s několika body; když tah skončí u začátku, křivka se uzavře.
+
 ## Beta 0.43
 - Horní lišta: nové tlačítko Vzhled přepíná automaticky (podle systému) → světlý → tmavý. Volba se pamatuje.
 - Oprava: při kreslení čáry a křivky se rozkreslený tvar nezobrazoval, dokud se obrys neuzavřel (chyba od verze 0.35, nejvíc patrná na mobilu).

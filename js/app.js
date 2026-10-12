@@ -1217,7 +1217,9 @@ function draftEntity() {
   return null;
 }
 /* drawing mode of a shape tool: from the corner (box) or from the centre; remembered in the settings */
-const DRAW_DEFAULT = { rect: 'corner', circle: 'center', ellipse: 'center', ngon: 'center', slot: 'center' };
+const DRAW_DEFAULT = { rect: 'corner', circle: 'center', ellipse: 'center', ngon: 'center', slot: 'center', spline: 'points' };
+const isDrawTool = t => ['rect', 'circle', 'ellipse', 'ngon', 'slot', 'line', 'spline'].includes(t);
+const isFreehand = () => sk && sk.tool === 'spline' && drawMode('spline') === 'free';
 const drawMode = t => ((settings.drawModes || {})[t] || DRAW_DEFAULT[t]);
 function slotHalfWidth(a, b, c) {
   const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy);
@@ -1230,8 +1232,8 @@ function setSketchTool(t) {
   const PROMPTS = {
     rect: drawMode('rect') === 'center' ? 'Obdélník ze středu: klepněte na střed, pak na roh' : 'Obdélník: klepněte na první roh, pak na protější roh',
     circle: drawMode('circle') === 'corner' ? 'Kružnice z rohu: klepněte na roh čtverce, do kterého se kružnice vepíše, pak na protější roh' : 'Kružnice: klepněte na střed, pak určete poloměr',
-    line: 'Čára: klepejte na body; klepnutím na první bod obrys uzavřete, Enter ukončí',
-    spline: 'Křivka: klepejte na body, kterými má křivka projít; klepnutím na první bod ji uzavřete, Enter ukončí. Body pak jde přetáhnout.',
+    line: 'Čára: klepejte na body nebo táhněte úseky; klepnutím na první bod obrys uzavřete, dvojím klepnutím nebo Enter ukončíte',
+    spline: drawMode('spline') === 'free' ? 'Křivka od ruky: táhněte prstem nebo myší, po puštění se tah převede na hladkou křivku. Když skončíte u začátku, křivka se uzavře.' : 'Křivka: klepejte nebo táhněte na body, kterými má křivka projít; klepnutím na první bod ji uzavřete, dvojím klepnutím nebo Enter ukončíte. Body pak jde přetáhnout.',
     ngon: drawMode('ngon') === 'corner' ? 'Mnohoúhelník z rohu: klepněte na roh čtverce, do kterého se vepíše, pak na protější roh. Počet stran nastavíte v paletě.' : 'Mnohoúhelník: klepněte na střed, pak na vrchol. Počet stran nastavíte v paletě.',
     slot: drawMode('slot') === 'corner' ? 'Drážka z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se drážka vejde' : 'Drážka: klepněte na jeden konec, pak na druhý konec drážky (celková délka), třetím klepnutím určíte šířku',
     ellipse: drawMode('ellipse') === 'corner' ? 'Elipsa z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se elipsa vepíše' : 'Elipsa: klepněte na střed, pak na konec hlavní osy, třetím klepnutím určíte šířku',
@@ -1241,6 +1243,32 @@ function setSketchTool(t) {
   setPrompt(PROMPTS[t] || 'Klepnutím vyberte prvek skici. Nástroje kreslení jsou v pásu nahoře.');
   dom.style.cursor = t && t !== 'skfillet' && t !== 'sktrim' ? 'crosshair' : '';
   renderRibbon(); redrawSketch(); renderPalette(); $('#dim').hidden = true;
+}
+/* freehand curve: the sampled stroke is thinned (Douglas–Peucker) to a few through-points of a smooth spline */
+function finishFreehand() {
+  if (!sk || !sk.draft) return;
+  const raw = sk.draft.pts; sk.draft = null; sk.cursor = null;
+  if (raw.length >= 2) {
+    const P = sk.f.plane, wpp = worldPerPx(P3(P, raw[0][0], raw[0][1]));
+    const dp = (pts, tol) => {
+      if (pts.length < 3) return pts.slice();
+      const a = pts[0], b = pts[pts.length - 1], dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy);
+      let im = -1, dm = 0;
+      for (let i = 1; i < pts.length - 1; i++) { const q = pts[i]; const d = L < 1e-9 ? Math.hypot(q[0] - a[0], q[1] - a[1]) : Math.abs((q[0] - a[0]) * dy - (q[1] - a[1]) * dx) / L; if (d > dm) { dm = d; im = i; } }
+      if (dm <= tol) return [a, b];
+      const l = dp(pts.slice(0, im + 1), tol), r = dp(pts.slice(im), tol); return l.slice(0, -1).concat(r);
+    };
+    const len = raw.reduce((s, q, i) => i ? s + Math.hypot(q[0] - raw[i - 1][0], q[1] - raw[i - 1][1]) : 0, 0);
+    if (len > wpp * 10) {
+      const closed = raw.length > 6 && Math.hypot(raw[0][0] - raw[raw.length - 1][0], raw[0][1] - raw[raw.length - 1][1]) < wpp * 18;
+      let tol = wpp * 3, pts = dp(raw, tol);
+      while (pts.length > 40) { tol *= 1.5; pts = dp(raw, tol); }
+      if (closed && pts.length > 3) pts.pop();
+      pts = pts.map(q => [Math.round(q[0] * 100) / 100, Math.round(q[1] * 100) / 100]);
+      if (pts.length >= 2) { sk.f.ents.push({ t: 'spline', pts, closed: closed && pts.length >= 3 }); sk.selEnt = sk.f.ents.length - 1; }
+    }
+  }
+  renderPalette(); redrawSketch(); $('#dim').hidden = true;
 }
 function sketchPoint(ev) {
   const P = sk.f.plane;
@@ -1467,7 +1495,8 @@ function renderPalette() {
     const hasMode = !!DRAW_DEFAULT[sk.tool], want = (hasMode ? 'm-' + sk.tool + '-' + drawMode(sk.tool) : '') + (sk.tool === 'ngon' ? '+ngon' : '') + (sk.tool === 'skfillet' ? 'fr' : '');
     if (tb.dataset.kind !== want) {
       tb.dataset.kind = want;
-      const modeRow = hasMode ? `<div class="frow"><span class="fl">Kreslit</span><div class="seg"><button data-rmode="corner" aria-pressed="${drawMode(sk.tool) === 'corner'}">Z rohu</button><button data-rmode="center" aria-pressed="${drawMode(sk.tool) === 'center'}">${sk.tool === 'slot' ? 'Od konce ke konci' : 'Ze středu'}</button></div></div>` : '';
+      const opts = sk.tool === 'spline' ? [['points', 'Bod po bodu'], ['free', 'Od ruky']] : [['corner', 'Z rohu'], ['center', sk.tool === 'slot' ? 'Od konce ke konci' : 'Ze středu']];
+      const modeRow = hasMode ? `<div class="frow"><span class="fl">Kreslit</span><div class="seg">${opts.map(([v, l]) => `<button data-rmode="${v}" aria-pressed="${drawMode(sk.tool) === v}">${l}</button>`).join('')}</div></div>` : '';
       tb.innerHTML = modeRow + (sk.tool === 'ngon' ? `<div class="frow"><label for="pal-ngon">Počet stran</label><span class="fnum"><input id="pal-ngon" value="${sk.ngonN}" inputmode="numeric" autocomplete="off"><span class="u">ks</span></span></div>`
         : want === 'fr' ? `<div class="frow"><label for="pal-fr">Poloměr rohů</label><span class="fnum"><input id="pal-fr" value="${fmtc(sk.frR, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div>`
         : '');
@@ -3496,7 +3525,10 @@ function deleteSelected() {
 }
 
 /* ================= pointer routing ================= */
-let down = null, hoverQueued = false, lastMoveEv = null, longPressT = null;
+let down = null, hoverQueued = false, lastMoveEv = null, longPressT = null, drawDrag = null, lastTap = null;
+/* drawing by dragging: with a sketch drawing tool active, one finger (or the left mouse button) draws instead of turning the view;
+   a second finger cancels the stroke and the two fingers pan and zoom as usual */
+function cancelDrawDrag() { if (!drawDrag) return; const dd = drawDrag; drawDrag = null; controls.enabled = true; if (dd.started && (dd.created || dd.free)) { sk.draft = null; sk.cursor = null; } if (sk) { redrawSketch(); $('#dim').hidden = true; } }
 dom.addEventListener('pointerdown', e => {
   try { dom.focus({ preventScroll: true }); } catch (er) {}
   down = { x: e.clientX, y: e.clientY, btn: e.button, gizmo: !!(transform.object && transform.axis), special: false };
@@ -3511,10 +3543,27 @@ dom.addEventListener('pointerdown', e => {
     }, 550);
   }
   if (e.button === 0 && cmd && cmd.onDown && cmd.onDown(e)) { down.special = true; try { dom.setPointerCapture(e.pointerId); } catch (er) {} }
+  else if (sk && isDrawTool(sk.tool) && (drawDrag || e.button === 0)) {
+    if (drawDrag) { cancelDrawDrag(); down.moved = true; }
+    else { drawDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, ev0: e, started: false }; controls.enabled = false; }
+  }
   else if (e.button === 0 && sk && !sk.tool) { const h = sketchHandleAt(e); if (h) { sk.drag = h; sk.selEnt = h.ei; down.special = true; controls.enabled = false; try { dom.setPointerCapture(e.pointerId); } catch (er) {} } }
 }, true);
 dom.addEventListener('pointermove', e => {
   if (down && !down.moved && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 8) { down.moved = true; clearTimeout(longPressT); }
+  if (drawDrag && e.pointerId === drawDrag.id && sk) {
+    const dd = drawDrag;
+    if (!dd.started && Math.hypot(e.clientX - dd.x, e.clientY - dd.y) > 8) {
+      dd.started = true;
+      if (isFreehand()) { dd.free = true; const p = sketchRawPoint(dd.ev0); sk.draft = { pts: p ? [p] : [] }; dd.lx = dd.x; dd.ly = dd.y; }
+      else if (!sk.draft) { sketchClick(dd.ev0); dd.created = true; }
+    }
+    if (dd.started) {
+      if (dd.free) { if (Math.hypot(e.clientX - dd.lx, e.clientY - dd.ly) >= 4) { const p = sketchRawPoint(e); if (p) { sk.draft.pts.push(p); sk.cursor = p; dd.lx = e.clientX; dd.ly = e.clientY; redrawSketch(); } } }
+      else sketchMove(e);
+    }
+    return;
+  }
   if (down && down.special && sk && sk.drag) { sketchDrag(e); return; }
   if (down && down.special && cmd && cmd.onDrag) { cmd.onDrag(e); return; }
   if (e.buttons) return;
@@ -3522,7 +3571,13 @@ dom.addEventListener('pointermove', e => {
   if (!hoverQueued) { hoverQueued = true; requestAnimationFrame(() => { hoverQueued = false; handleHover(lastMoveEv); }); }
 });
 dom.addEventListener('pointerleave', () => { if (cmd && cmd.onLeave) cmd.onLeave(); if (hoverBody) { hoverBody = null; styleBodies(); } $('#dim').hidden = true; });
+dom.addEventListener('pointercancel', e => { if (drawDrag && e.pointerId === drawDrag.id) cancelDrawDrag(); });
 dom.addEventListener('pointerup', e => {
+  if (drawDrag && e.pointerId === drawDrag.id) {
+    const dd = drawDrag; drawDrag = null; controls.enabled = true;
+    if (dd.started) { down = null; lastTap = null; if (dd.free) finishFreehand(); else sketchClick(e); return; }
+    if (isFreehand()) { down = null; return; }
+  }
   if (!down) return;
   const d = down; down = null; clearTimeout(longPressT);
   if (d.longpress) return;
@@ -3533,6 +3588,12 @@ dom.addEventListener('pointerup', e => {
   if (d.btn === 2 && !sk && !cmd && faceMode) { faceContext(e); return; }
   if (d.btn === 2 && !sk && !cmd) { const h = hitBodies(e); if (h) bodyContext(e, h.object.userData.bodyId); return; }
   if (d.btn !== 0) return;
+  /* double tap finishes a line or a point-by-point curve (touch has no Enter key or right button) */
+  if (sk && isPolyTool(sk.tool) && sk.draft) {
+    const now = performance.now();
+    if (lastTap && now - lastTap.t < 380 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 24) { lastTap = null; finishPolyline(false); return; }
+    lastTap = { t: now, x: e.clientX, y: e.clientY };
+  } else lastTap = { t: performance.now(), x: e.clientX, y: e.clientY };
   handleClick(e);
 });
 dom.addEventListener('dblclick', e => { if (sk && isPolyTool(sk.tool) && sk.draft) finishPolyline(false); });

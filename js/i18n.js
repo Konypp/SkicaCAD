@@ -218,7 +218,10 @@
     'Elipsa z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se elipsa vepíše': 'Ellipse from corner: tap a corner, then the opposite corner of the box the ellipse fits in',
     'X, Y střed · L celková délka · Š šířka · ∠ natočení': 'X, Y centre · L overall length · W width · ∠ angle',
     'X, Y střed · L celková délka · R rozteč středů zaoblení · Š šířka · ∠ natočení': 'X, Y centre · L overall length · R distance between arc centres · W width · ∠ angle',
-    'Od konce ke konci': 'End to end', 'Drážka: klepněte na jeden konec, pak na druhý konec drážky (celková délka), třetím klepnutím určíte šířku': 'Slot: tap one end, then the other end of the slot (overall length), a third tap sets the width',
+    'Od konce ke konci': 'End to end', 'Bod po bodu': 'Point by point', 'Od ruky': 'Freehand',
+    'Čára: klepejte na body nebo táhněte úseky; klepnutím na první bod obrys uzavřete, dvojím klepnutím nebo Enter ukončíte': 'Line: tap points or drag segments; tap the first point to close the outline, double-tap or Enter finishes',
+    'Křivka: klepejte nebo táhněte na body, kterými má křivka projít; klepnutím na první bod ji uzavřete, dvojím klepnutím nebo Enter ukončíte. Body pak jde přetáhnout.': 'Spline: tap or drag to the points the curve should pass through; tap the first point to close it, double-tap or Enter finishes. The points can be dragged afterwards.',
+    'Křivka od ruky: táhněte prstem nebo myší, po puštění se tah převede na hladkou křivku. Když skončíte u začátku, křivka se uzavře.': 'Freehand spline: drag with a finger or the mouse; on release the stroke becomes a smooth curve. Ending near the start closes it.', 'Drážka: klepněte na jeden konec, pak na druhý konec drážky (celková délka), třetím klepnutím určíte šířku': 'Slot: tap one end, then the other end of the slot (overall length), a third tap sets the width',
     // keys
     'Akce': 'Action', 'Del': 'Del'
   };
