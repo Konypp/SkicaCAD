@@ -41,7 +41,7 @@
     'Tělesa ': 'Bodies', 'Vyberte tělesa': 'Select bodies', 'Vyberte těleso': 'Select a body', 'Rychle': 'Quick', 'Celý model': 'Whole model', 'Plocha': 'Face',
     // sketch
     'PALETA SKICI': 'SKETCH PALETTE', 'Zrušit skicu': 'Cancel sketch', 'Zrušit změny': 'Discard changes', 'Smazat prvek': 'Delete element', 'Počet stran': 'Number of sides',
-    'Poloměr rohů': 'Corner radius', 'Uzavřená křivka': 'Closed curve', 'Tažením bodu měnit velikost rovnoměrně': 'Dragging a point resizes uniformly',
+    'Poloměr rohů': 'Corner radius', 'Zobrazit kóty': 'Show dimensions', 'Uzavřená křivka': 'Closed curve', 'Tažením bodu měnit velikost rovnoměrně': 'Dragging a point resizes uniformly',
     'uzavřený obrys': 'closed outline', 'otevřená čára (lze použít jako osu rotace)': 'open line (can be used as a revolve axis)', '(uzavírací)': '(closing)',
     'uzavřený profil': 'closed profile', 'uzavřené profily': 'closed profiles', 'uzavřených profilů': 'closed profiles',
     'Skica je prázdná. Nakreslete obdélník, kružnici nebo čáru.': 'The sketch is empty. Draw a rectangle, circle or line.',

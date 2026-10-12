@@ -533,6 +533,71 @@ function render() {
   renderer.render(scene, c);
   renderCube();
   if (sk) { updateDimLabel(); updateSegLabels(); } else if (segLabelsOn) updateSegLabels();
+  updateSketchDims();
+}
+/* ---------- sketch dimensions (kóty): drawn in screen space in an SVG overlay, recomputed every frame ---------- */
+let skDimsOn = false;
+const showSkDims = () => settings.skDims !== false;
+function updateSketchDims() {
+  const box = $('#skdims'); if (!box) return;
+  if (!sk || !showSkDims()) { if (skDimsOn) { box.innerHTML = ''; skDimsOn = false; } return; }
+  const P = sk.f.plane, W = dom.clientWidth, H = dom.clientHeight, out = [];
+  const px = (x, y) => toPx(P3(P, x, y));
+  const f1 = v => fmtc(v, 2);
+  const arrow = (t, d) => { const n = [-d[1], d[0]]; return `<path class="ah" d="M${t[0]},${t[1]}L${t[0] - d[0] * 8 + n[0] * 3},${t[1] - d[1] * 8 + n[1] * 3}L${t[0] - d[0] * 8 - n[0] * 3},${t[1] - d[1] * 8 - n[1] * 3}Z"/>`; };
+  const text = (x, y, s, ang = 0, anchor = 'middle') => `<text x="${x}" y="${y}" text-anchor="${anchor}"${ang ? ` transform="rotate(${ang} ${x} ${y})"` : ''}>${s}</text>`;
+  const ok = (...q) => q.every(v => v[2] < 1 && v[0] > -W && v[0] < 2 * W && v[1] > -H && v[1] < 2 * H);
+  /* aligned linear dimension between plane points a and b, pushed away from plane point c */
+  const lin = (a, b, c, label) => {
+    const A = px(a[0], a[1]), B = px(b[0], b[1]), C = px(c[0], c[1]); if (!ok(A, B)) return;
+    const dx = B[0] - A[0], dy = B[1] - A[1], L = Math.hypot(dx, dy); if (L < 18) return;
+    const u = [dx / L, dy / L]; let n = [-u[1], u[0]];
+    const side = (A[0] + B[0]) / 2 - C[0], sideY = (A[1] + B[1]) / 2 - C[1], dot = n[0] * side + n[1] * sideY;
+    if (Math.abs(dot) < 1e-3 ? n[1] > 0 : dot < 0) n = [-n[0], -n[1]];
+    const o = 22, a1 = [A[0] + n[0] * o, A[1] + n[1] * o], b1 = [B[0] + n[0] * o, B[1] + n[1] * o];
+    out.push(`<path d="M${A[0] + n[0] * 4},${A[1] + n[1] * 4}L${A[0] + n[0] * (o + 5)},${A[1] + n[1] * (o + 5)}M${B[0] + n[0] * 4},${B[1] + n[1] * 4}L${B[0] + n[0] * (o + 5)},${B[1] + n[1] * (o + 5)}M${a1[0]},${a1[1]}L${b1[0]},${b1[1]}"/>`);
+    out.push(arrow(a1, [-u[0], -u[1]]), arrow(b1, u));
+    let ang = Math.atan2(u[1], u[0]) / D2R; if (ang > 90) ang -= 180; if (ang <= -90) ang += 180;
+    out.push(text((a1[0] + b1[0]) / 2, (a1[1] + b1[1]) / 2, label || f1(Math.hypot(b[0] - a[0], b[1] - a[1])), Math.round(ang * 10) / 10));
+  };
+  /* line through or from a centre with arrows at the ends that touch the curve; the label sits past the end */
+  const across = (p1, p2, label, both) => {
+    const A = px(p1[0], p1[1]), B = px(p2[0], p2[1]); if (!ok(A, B)) return;
+    const dx = B[0] - A[0], dy = B[1] - A[1], L = Math.hypot(dx, dy); if (L < 10) return;
+    const u = [dx / L, dy / L], E = [B[0] + u[0] * 10, B[1] + u[1] * 10], hz = E[0] + (u[0] >= 0 ? 12 : -12);
+    out.push(`<path d="M${A[0]},${A[1]}L${E[0]},${E[1]}L${hz},${E[1]}"/>`, arrow(B, u));
+    if (both) out.push(arrow(A, [-u[0], -u[1]]));
+    out.push(text(hz + (u[0] >= 0 ? 3 : -3), E[1], label, 0, u[0] >= 0 ? 'start' : 'end'));
+  };
+  const rot = (cx, cy, a, x, y) => [cx + x * Math.cos(a) - y * Math.sin(a), cy + x * Math.sin(a) + y * Math.cos(a)];
+  const ents = sk.f.ents.map((e, i) => [e, i]).filter(([e, i]) => !(i === sk.selEnt && e.t === 'poly' && !sk.tool));
+  const d = draftEntity(); if (d) ents.push([d, -1]);
+  if (ents.length > 80) { box.innerHTML = ''; return; }
+  for (const [e] of ents) {
+    if (e.t === 'rect') {
+      const x0 = Math.min(e.x, e.x + e.w), x1 = Math.max(e.x, e.x + e.w), y0 = Math.min(e.y, e.y + e.h), y1 = Math.max(e.y, e.y + e.h), c = [(x0 + x1) / 2, (y0 + y1) / 2];
+      lin([x0, y0], [x1, y0], c); lin([x1, y0], [x1, y1], c);
+    } else if (e.t === 'circle') {
+      const a = Math.PI / 4; across([e.x - e.r * Math.cos(a), e.y - e.r * Math.sin(a)], [e.x + e.r * Math.cos(a), e.y + e.r * Math.sin(a)], 'Ø ' + f1(e.r * 2), true);
+    } else if (e.t === 'ngon') {
+      const a = (e.a || 0) * D2R; across([e.x, e.y], [e.x + e.r * Math.cos(a), e.y + e.r * Math.sin(a)], 'R ' + f1(e.r));
+      /* side length on the side opposite the radius line so the two labels don't collide */
+      const s1 = a + Math.floor(e.n / 2) * 2 * Math.PI / e.n, s2 = s1 + 2 * Math.PI / e.n; lin([e.x + e.r * Math.cos(s1), e.y + e.r * Math.sin(s1)], [e.x + e.r * Math.cos(s2), e.y + e.r * Math.sin(s2)], [e.x, e.y]);
+    } else if (e.t === 'ellipse') {
+      const a = (e.a || 0) * D2R, c = [e.x, e.y];
+      lin(rot(e.x, e.y, a, -e.rx, -e.ry), rot(e.x, e.y, a, e.rx, -e.ry), c, f1(e.rx * 2));
+      lin(rot(e.x, e.y, a, e.rx, -e.ry), rot(e.x, e.y, a, e.rx, e.ry), c, f1(e.ry * 2));
+    } else if (e.t === 'slot') {
+      const g = slotGeom(e), a = g.ang * D2R, h = e.w / 2, c = [g.cx, g.cy];
+      lin(rot(g.cx, g.cy, a, -g.len / 2, -h), rot(g.cx, g.cy, a, g.len / 2, -h), c, f1(g.len));
+      lin(rot(g.cx, g.cy, a, g.len / 2 - h, -h), rot(g.cx, g.cy, a, g.len / 2 - h, h), rot(g.cx, g.cy, a, 0, 0), f1(e.w));
+    } else if (e.t === 'poly') {
+      const n = e.pts.length, segs = e.closed ? n : n - 1; if (segs > 40 || n < 2) continue;
+      const c = e.pts.reduce((s, q) => [s[0] + q[0] / n, s[1] + q[1] / n], [0, 0]);
+      for (let k = 0; k < segs; k++) lin(e.pts[k], e.pts[(k + 1) % n], c);
+    }
+  }
+  box.innerHTML = out.join(''); skDimsOn = true;
 }
 let segLabelsOn = false;
 /* length and angle labels for the selected polyline */
@@ -928,6 +993,7 @@ $('#dialog').addEventListener('change', e => {
   const f = e.target.dataset && e.target.dataset.f; if (f && dlg && dlg.spec.onChange) dlg.spec.onChange(f);
   if (sk && e.target.dataset.ent) onPaletteChange(e.target);
   if (sk && e.target.id === 'pal-ngon') { const v = Math.round(parseNum(e.target.value)); if (v >= 3 && v <= 64) sk.ngonN = v; e.target.value = sk.ngonN; redrawSketch(); }
+  if (sk && e.target.id === 'pal-dims') { settings.skDims = e.target.checked; saveSettings(); requestRender(); }
   if (sk && e.target.id === 'pal-fr') { const v = parseNum(e.target.value); if (v > 0) sk.frR = v; e.target.value = fmtc(sk.frR, 3); }
 });
 $('#dialog').addEventListener('keydown', e => {
@@ -1382,7 +1448,7 @@ const ENT_LABEL = { spline: 'Křivka', rect: 'Obdélník', circle: 'Kružnice', 
 function openPalette() {
   const el = $('#dialog'); el.hidden = false; dlg = null;
   el.innerHTML = `<div class="phead"><span class="ico">${svg('sketch', 18)}</span><span class="t">PALETA SKICI</span><button class="ibtn" data-act="cancel" aria-label="Zrušit skicu" title="Zrušit změny">${svg('close', 14)}</button></div>
-    <div class="dbody palette"><div id="pal-tool" hidden></div><div class="note" id="pal-note"></div><div class="ents" id="pal-ents"></div></div>
+    <div class="dbody palette"><div id="pal-tool" hidden></div><div class="note" id="pal-note"></div><label class="chk"><input type="checkbox" id="pal-dims"${showSkDims() ? ' checked' : ''}><span>Zobrazit kóty</span></label><div class="ents" id="pal-ents"></div></div>
     <div class="dfoot"><button class="btn" data-act="cancel">Zrušit</button><button class="btn primary" data-act="ok">Dokončit skicu</button></div>`;
   renderPalette();
 }

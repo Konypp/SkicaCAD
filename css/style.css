@@ -201,6 +201,9 @@ button { cursor: pointer; }
 .info b { color: var(--ink); font-weight: 500; font-family: var(--font); }
 .toast { left: 50%; bottom: 60px; transform: translateX(-50%); padding: 7px 14px; border-radius: 16px; font-size: 12.5px; z-index: 8; pointer-events: none; max-width: calc(100% - 32px); }
 .dim { position: absolute; z-index: 6; pointer-events: none; padding: 2px 6px; border-radius: 3px; background: var(--field); border: 1px solid var(--sketch); color: var(--sketch); font: 11.5px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; transform: translate(14px, -28px); }
+.skdims { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; overflow: hidden; fill: none; stroke: var(--sketch); stroke-width: 1; }
+.skdims .ah { fill: var(--sketch); stroke: none; }
+.skdims text { fill: var(--sketch); stroke: var(--field); stroke-width: 4px; stroke-linejoin: round; paint-order: stroke; font: 11px var(--mono); font-variant-numeric: tabular-nums; dominant-baseline: central; }
 .seglabels { position: absolute; inset: 0; pointer-events: none; z-index: 5; overflow: hidden; }
 .seglabels span { position: absolute; transform: translate(-50%, -50%); padding: 1px 5px; border-radius: 3px; font: 11px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; background: var(--field); }
 .seglabels .seg { color: var(--sketch); border: 1px solid var(--sketch); }

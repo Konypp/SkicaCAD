@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.41 (pracovní verze)
+- Skica: kóty u všech prvků – obdélník (šířka a výška), kružnice (Ø), mnohoúhelník (R a délka strany), elipsa (obě osy), drážka (celková délka a šířka) a čáry (délka každého úseku). Kóty se ukazují i při kreslení. V paletě skici je lze vypnout volbou Zobrazit kóty.
+
 ## Beta 0.40
 - Kostka pohledů: osy X, Y a Z vycházejí z rohu kostky a vyčnívají ven za její stěny, písmena jsou na jejich koncích. Kostka je o kus větší, aby se osy vešly.
 
