@@ -136,8 +136,8 @@ button { cursor: pointer; }
 .node input.ren { flex: 1; min-width: 0; height: 22px; padding: 0 4px; border: 1px solid var(--accent); border-radius: 3px; background: var(--field); }
 .lv1 { padding-left: 4px; } .lv2 { padding-left: 22px; } .lv3 { padding-left: 40px; }
 
-.cubewrap { right: 12px; top: 10px; width: 112px; height: 112px; background: transparent; border: 0; box-shadow: none; z-index: 4; }
-#viewcube { width: 112px; height: 112px; display: block; cursor: pointer; touch-action: none; }
+.cubewrap { right: 12px; top: 10px; width: 132px; height: 132px; background: transparent; border: 0; box-shadow: none; z-index: 4; }
+#viewcube { width: 132px; height: 132px; display: block; cursor: pointer; touch-action: none; }
 .homebtn { position: absolute; left: -6px; top: 0; width: 26px; height: 26px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--muted); }
 .homebtn:hover { color: var(--ink); }
 
@@ -233,7 +233,7 @@ button { cursor: pointer; }
   .browser { width: min(236px, calc(100% - 140px)); }
   .browser:not(.open-m) .tree { display: none; }
   .browser:not(.open-m) .phead { border-bottom: 0; }
-  .cubewrap, #viewcube { width: 84px; height: 84px; }
+  .cubewrap, #viewcube { width: 100px; height: 100px; }
   .dialog { left: 8px; right: 8px; top: auto; bottom: 8px; width: auto; max-height: 52%; }
   .navbar { bottom: auto; top: 96px; left: auto; right: 12px; transform: none; flex-direction: column; border-radius: 18px; }
   .navbar .sep { width: 18px; height: 1px; margin: 3px 0; }

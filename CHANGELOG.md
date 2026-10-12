@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.40
+- Kostka pohledů: osy X, Y a Z vycházejí z rohu kostky a vyčnívají ven za její stěny, písmena jsou na jejich koncích. Kostka je o kus větší, aby se osy vešly.
+
 ## Beta 0.39
 - Pracovní plocha: osy X (červená) a Y (zelená) vedou přes celou mřížku od kraje ke kraji, svislá osa Z se nekreslí. Počátek je malá kružnice místo kuličky.
 - Kostka pohledů: osy jsou označené písmeny X, Y a Z v barvě osy.

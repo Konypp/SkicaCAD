@@ -454,13 +454,14 @@ try {
   cubeR = new THREE.WebGLRenderer({ canvas: cubeCanvas, antialias: true, alpha: true });
   cubeR.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   cubeScene = new THREE.Scene();
-  cubeCam = new THREE.OrthographicCamera(-1.55, 1.55, 1.55, -1.55, 0.1, 20);
+  cubeCam = new THREE.OrthographicCamera(-2.05, 2.05, 2.05, -2.05, 0.1, 20);
   cubeMesh = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 1.6), []);
   cubeMesh.rotation.x = Math.PI / 2;
   cubeScene.add(cubeMesh);
   const ce = noRay(new THREE.LineSegments(new THREE.EdgesGeometry(cubeMesh.geometry), new THREE.LineBasicMaterial({ color: 0x777777 })));
   cubeMesh.add(ce); cubeMesh.userData.edges = ce;
-  const axes = [[[1.15, 0, 0], 0xe5484d], [[0, 1.15, 0], 0x2f9e6a], [[0, 0, 1.15], 0x4f7ae0]];
+  /* axes run from the cube's corner out past the opposite faces; letters sit at the outer ends */
+  const AL = 2.15, axes = [[[AL, 0, 0], 0xe5484d], [[0, AL, 0], 0x2f9e6a], [[0, 0, AL], 0x4f7ae0]];
   axes.forEach(([to, c], k) => {
     cubeScene.add(noRay(new THREE.Line(lineGeo([-0.8, -0.8, -0.8, to[0] - 0.8, to[1] - 0.8, to[2] - 0.8]), new THREE.LineBasicMaterial({ color: c }))));
     /* axis letter at the end of each axis */
@@ -468,7 +469,7 @@ try {
     g.font = 'bold 44px IBM Plex Sans, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillStyle = '#' + new THREE.Color(c).getHexString(); g.fillText('XYZ'[k], 32, 34);
     const tex = new THREE.CanvasTexture(cv), sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: true, depthWrite: false, transparent: true }));
-    sp.scale.set(0.42, 0.42, 1); sp.position.set(to[0] * 1.16 - 0.8, to[1] * 1.16 - 0.8, to[2] * 1.16 - 0.8); sp.renderOrder = 5;
+    sp.scale.set(0.5, 0.5, 1); const lp = (AL + 0.22) / AL; sp.position.set(to[0] * lp - 0.8, to[1] * lp - 0.8, to[2] * lp - 0.8); sp.renderOrder = 5;
     cubeScene.add(noRay(sp));
   });
 } catch (e) { cubeR = null; $('#cubewrap').hidden = true; }
