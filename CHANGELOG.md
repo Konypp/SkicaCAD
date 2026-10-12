@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.38
+- Paleta skici, Drážka: nové pole R (rozteč středů zaoblení) vedle celkové délky L. Hodnoty jsou provázané (L = R + Š), změna jedné dopočítá druhou.
+
 ## Beta 0.37
 - Skica, Drážka (režim Od konce ke konci, dřív Ze středu): první dvě klepnutí určují krajní body drážky, tedy celkovou délku, ne středy zaoblení. Třetí klepnutí určí šířku, zaoblení se vejde dovnitř.
 

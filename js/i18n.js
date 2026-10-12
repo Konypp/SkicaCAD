@@ -217,6 +217,7 @@
     'Drážka z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se drážka vejde': 'Slot from corner: tap a corner, then the opposite corner of the box the slot fits in',
     'Elipsa z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se elipsa vepíše': 'Ellipse from corner: tap a corner, then the opposite corner of the box the ellipse fits in',
     'X, Y střed · L celková délka · Š šířka · ∠ natočení': 'X, Y centre · L overall length · W width · ∠ angle',
+    'X, Y střed · L celková délka · R rozteč středů zaoblení · Š šířka · ∠ natočení': 'X, Y centre · L overall length · R distance between arc centres · W width · ∠ angle',
     'Od konce ke konci': 'End to end', 'Drážka: klepněte na jeden konec, pak na druhý konec drážky (celková délka), třetím klepnutím určíte šířku': 'Slot: tap one end, then the other end of the slot (overall length), a third tap sets the width',
     // keys
     'Akce': 'Action', 'Del': 'Del'

@@ -1401,7 +1401,7 @@ function renderPalette() {
     else if (e.t === 'circle') body = `<div class="grid2">${num(i, 'x', 'X', e.x)}${num(i, 'y', 'Y', e.y)}${num(i, 'd', 'Ø', e.r * 2)}</div>`;
     else if (e.t === 'ngon') body = `<div class="grid2">${num(i, 'x', 'X', e.x)}${num(i, 'y', 'Y', e.y)}${num(i, 'r', 'R', e.r)}${num(i, 'n', 'n', e.n)}${num(i, 'a', '∠', e.a || 0)}${num(i, 'fr', 'Rz', e.fr || 0)}</div>`;
     else if (e.t === 'ellipse') body = `<div class="grid2">${num(i, 'x', 'X', e.x)}${num(i, 'y', 'Y', e.y)}${num(i, 'rx', 'a', e.rx)}${num(i, 'ry', 'b', e.ry)}${num(i, 'a', '∠', e.a || 0)}</div>`;
-    else if (e.t === 'slot') { const g = slotGeom(e); body = `<div class="grid2">${num(i, 'scx', 'X', g.cx)}${num(i, 'scy', 'Y', g.cy)}${num(i, 'slen', 'L', g.len)}${num(i, 'w', 'Š', e.w)}${num(i, 'sang', '∠', g.ang)}</div><div class="note">X, Y střed · L celková délka · Š šířka · ∠ natočení</div>`; }
+    else if (e.t === 'slot') { const g = slotGeom(e); body = `<div class="grid2">${num(i, 'scx', 'X', g.cx)}${num(i, 'scy', 'Y', g.cy)}${num(i, 'slen', 'L', g.len)}${num(i, 'sd', 'R', g.d)}${num(i, 'w', 'Š', e.w)}${num(i, 'sang', '∠', g.ang)}</div><div class="note">X, Y střed · L celková délka · R rozteč středů zaoblení · Š šířka · ∠ natočení</div>`; }
     else if (e.t === 'spline') body = `<div class="note">${e.pts.length} bodů · body přesunete tažením ve skice</div><label class="chk"><input type="checkbox" id="ent-${i}-closed" data-ent="${i}" data-k="closed"${e.closed ? ' checked' : ''}${e.pts.length < 3 ? ' disabled' : ''}><span>Uzavřená křivka</span></label>${uniChk(i)}`;
     else {
       const n = e.pts.length, segs = e.closed ? n : n - 1, rows = [];
@@ -1435,11 +1435,12 @@ function onPaletteChange(inp) {
   if (k === 'uni') { sk.uniform = inp.checked; renderPalette(); return; }
   if (e && k === 'closed') { e.closed = inp.checked && e.pts.length >= 3; renderPalette(); redrawSketch(); return; }
   const v = parseNum(inp.value);
-  if (e && e.t === 'slot' && ['scx', 'scy', 'slen', 'sang', 'w'].includes(k)) {
+  if (e && e.t === 'slot' && ['scx', 'scy', 'slen', 'sd', 'sang', 'w'].includes(k)) {
     if (!isFinite(v)) { renderPalette(); return; }
     const g = slotGeom(e);
     if (k === 'scx') g.cx = v; else if (k === 'scy') g.cy = v; else if (k === 'sang') g.ang = v;
     else if (k === 'slen') { if (v > 0) g.d = Math.max(0.01, v - e.w); }
+    else if (k === 'sd') { if (v >= 0) g.d = Math.max(0.01, v); }
     else if (k === 'w') { if (v > 0) { const L = g.len; e.w = v; g.d = Math.max(0.01, L - v); } }
     setSlotGeom(e, g); renderPalette(); redrawSketch(); return;
   }
