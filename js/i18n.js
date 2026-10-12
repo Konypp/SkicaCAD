@@ -212,6 +212,10 @@
     'Klepněte na další tvar, ze kterého se má vystřihovat': 'Tap another shape to cut from', 'Čára tvar neprotíná, nic se nerozdělilo.': 'The line does not cross the shape, nothing was split.',
     'Tvar je rozdělený. Klepněte do části, kterou chcete odstranit (Esc nechá obě části)': 'The shape is split. Tap inside the part to remove (Esc keeps both parts)',
     'Klepněte dovnitř jedné z částí.': 'Tap inside one of the parts.', 'Část odstraněna. Klepněte na další tvar, ze kterého se má vystřihovat.': 'Part removed. Tap another shape to cut from.',
+    'Kružnice z rohu: klepněte na roh čtverce, do kterého se kružnice vepíše, pak na protější roh': 'Circle from corner: tap a corner of the square the circle fits in, then the opposite corner',
+    'Mnohoúhelník z rohu: klepněte na roh čtverce, do kterého se vepíše, pak na protější roh. Počet stran nastavíte v paletě.': 'Polygon from corner: tap a corner of the square it fits in, then the opposite corner. Set the number of sides in the palette.',
+    'Drážka z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se drážka vejde': 'Slot from corner: tap a corner, then the opposite corner of the box the slot fits in',
+    'Elipsa z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se elipsa vepíše': 'Ellipse from corner: tap a corner, then the opposite corner of the box the ellipse fits in',
     // keys
     'Akce': 'Action', 'Del': 'Del'
   };

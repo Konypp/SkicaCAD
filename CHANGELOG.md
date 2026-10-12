@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.35
+- Skica: volba Kreslit z rohu / ze středu je u všech tvarů – obdélník, kružnice, elipsa, mnohoúhelník a drážka. Z rohu: tvar vyplní obdélník (u kružnice a mnohoúhelníku čtverec) mezi dvěma klepnutími. Ze středu: první klepnutí je střed. Volba se pamatuje pro každý nástroj zvlášť.
+
 ## Beta 0.34
 - Skica, Obdélník: v paletě volba Kreslit z rohu / ze středu (první klepnutí určí střed, druhé roh).
 - Skica, nový nástroj Vystřihnout (X): klepnete na uzavřený tvar a pak na

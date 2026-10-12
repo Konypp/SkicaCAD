@@ -1105,8 +1105,18 @@ function regionMesh(P, r, color, opacity, lift) {
 function draftEntity() {
   if (!sk || !sk.draft || !sk.cursor) return null;
   const c = sk.cursor, d = sk.draft;
-  if (sk.tool === 'rect') { const dx = c[0] - d.p[0], dy = c[1] - d.p[1]; return sk.rectCenter ? { t: 'rect', x: d.p[0] - dx, y: d.p[1] - dy, w: 2 * dx, h: 2 * dy } : { t: 'rect', x: d.p[0], y: d.p[1], w: dx, h: dy }; }
-  if (sk.tool === 'circle') return { t: 'circle', x: d.p[0], y: d.p[1], r: Math.hypot(c[0] - d.p[0], c[1] - d.p[1]) };
+  const dx = c[0] - d.p[0], dy = c[1] - d.p[1], corner = drawMode(sk.tool) === 'corner';
+  /* "from corner": the shape fills the box between the two clicks (circle and polygon use a square anchored at the first click) */
+  const sq = () => { const sd = Math.max(Math.abs(dx), Math.abs(dy)); return { cx: d.p[0] + Math.sign(dx || 1) * sd / 2, cy: d.p[1] + Math.sign(dy || 1) * sd / 2, r: sd / 2 }; };
+  if (sk.tool === 'rect') return corner ? { t: 'rect', x: d.p[0], y: d.p[1], w: dx, h: dy } : { t: 'rect', x: d.p[0] - dx, y: d.p[1] - dy, w: 2 * dx, h: 2 * dy };
+  if (sk.tool === 'circle') { if (corner) { const q = sq(); return { t: 'circle', x: q.cx, y: q.cy, r: q.r }; } return { t: 'circle', x: d.p[0], y: d.p[1], r: Math.hypot(dx, dy) }; }
+  if (corner && sk.tool === 'ngon') { const q = sq(); return { t: 'ngon', x: q.cx, y: q.cy, r: q.r, n: sk.ngonN, a: 90 }; }
+  if (corner && sk.tool === 'ellipse') return { t: 'ellipse', x: d.p[0] + dx / 2, y: d.p[1] + dy / 2, rx: Math.max(0.01, Math.abs(dx) / 2), ry: Math.max(0.01, Math.abs(dy) / 2), a: 0 };
+  if (corner && sk.tool === 'slot') {
+    const W = Math.abs(dx), H = Math.abs(dy), cx = d.p[0] + dx / 2, cy = d.p[1] + dy / 2;
+    if (W >= H) { const w = Math.max(0.01, H), hl = Math.max(0.005, (W - w) / 2); return { t: 'slot', x1: cx - hl, y1: cy, x2: cx + hl, y2: cy, w }; }
+    const w = Math.max(0.01, W), hl = Math.max(0.005, (H - w) / 2); return { t: 'slot', x1: cx, y1: cy - hl, x2: cx, y2: cy + hl, w };
+  }
   if (sk.tool === 'line') return { t: 'poly', pts: d.pts.concat([c]), closed: false };
   if (sk.tool === 'spline') return { t: 'spline', pts: d.pts.concat([c]), closed: false };
   if (sk.tool === 'ngon') return { t: 'ngon', x: d.p[0], y: d.p[1], r: Math.hypot(c[0] - d.p[0], c[1] - d.p[1]), n: sk.ngonN, a: Math.atan2(c[1] - d.p[1], c[0] - d.p[0]) / D2R };
@@ -1121,6 +1131,9 @@ function draftEntity() {
   }
   return null;
 }
+/* drawing mode of a shape tool: from the corner (box) or from the centre; remembered in the settings */
+const DRAW_DEFAULT = { rect: 'corner', circle: 'center', ellipse: 'center', ngon: 'center', slot: 'center' };
+const drawMode = t => ((settings.drawModes || {})[t] || DRAW_DEFAULT[t]);
 function slotHalfWidth(a, b, c) {
   const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy);
   if (L < 1e-9) return Math.hypot(c[0] - a[0], c[1] - a[1]);
@@ -1130,12 +1143,13 @@ function setSketchTool(t) {
   if (!sk) return;
   sk.tool = t; sk.draft = null; sk.cut = null;
   const PROMPTS = {
-    rect: sk.rectCenter ? 'Obdélník ze středu: klepněte na střed, pak na roh' : 'Obdélník: klepněte na první roh, pak na protější roh', circle: 'Kružnice: klepněte na střed, pak určete poloměr',
+    rect: drawMode('rect') === 'center' ? 'Obdélník ze středu: klepněte na střed, pak na roh' : 'Obdélník: klepněte na první roh, pak na protější roh',
+    circle: drawMode('circle') === 'corner' ? 'Kružnice z rohu: klepněte na roh čtverce, do kterého se kružnice vepíše, pak na protější roh' : 'Kružnice: klepněte na střed, pak určete poloměr',
     line: 'Čára: klepejte na body; klepnutím na první bod obrys uzavřete, Enter ukončí',
     spline: 'Křivka: klepejte na body, kterými má křivka projít; klepnutím na první bod ji uzavřete, Enter ukončí. Body pak jde přetáhnout.',
-    ngon: 'Mnohoúhelník: klepněte na střed, pak na vrchol. Počet stran nastavíte v paletě.',
-    slot: 'Drážka: klepněte na střed prvního oblouku, pak druhého, třetím klepnutím určíte šířku',
-    ellipse: 'Elipsa: klepněte na střed, pak na konec hlavní osy, třetím klepnutím určíte šířku',
+    ngon: drawMode('ngon') === 'corner' ? 'Mnohoúhelník z rohu: klepněte na roh čtverce, do kterého se vepíše, pak na protější roh. Počet stran nastavíte v paletě.' : 'Mnohoúhelník: klepněte na střed, pak na vrchol. Počet stran nastavíte v paletě.',
+    slot: drawMode('slot') === 'corner' ? 'Drážka z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se drážka vejde' : 'Drážka: klepněte na střed prvního oblouku, pak druhého, třetím klepnutím určíte šířku',
+    ellipse: drawMode('ellipse') === 'corner' ? 'Elipsa z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se elipsa vepíše' : 'Elipsa: klepněte na střed, pak na konec hlavní osy, třetím klepnutím určíte šířku',
     skfillet: 'Zaoblení rohů: nastavte poloměr v paletě a klepněte na obdélník, mnohoúhelník nebo uzavřený obrys',
     sktrim: 'Vystřihnout: klepněte na uzavřený tvar, ze kterého se má vystřihovat'
   };
@@ -1229,10 +1243,17 @@ function sketchClick(ev) {
     else { sk.cursor = p; const d = draftEntity(); if (d && Math.abs(d.w) > 1e-6 && Math.abs(d.h) > 1e-6) { f.ents.push(d); sk.selEnt = f.ents.length - 1; } sk.draft = null; renderPalette(); }
   } else if (sk.tool === 'circle') {
     if (!sk.draft) sk.draft = { p };
-    else { const r = Math.hypot(p[0] - sk.draft.p[0], p[1] - sk.draft.p[1]); if (r > 1e-6) { f.ents.push({ t: 'circle', x: sk.draft.p[0], y: sk.draft.p[1], r }); sk.selEnt = f.ents.length - 1; } sk.draft = null; renderPalette(); }
+    else { sk.cursor = p; const d = draftEntity(); if (d && d.r > 1e-6) { f.ents.push({ ...d, r: Math.round(d.r * 1000) / 1000 }); sk.selEnt = f.ents.length - 1; } sk.draft = null; renderPalette(); }
   } else if (sk.tool === 'ngon') {
     if (!sk.draft) sk.draft = { p };
-    else { const d = draftEntity(); if (d && d.r > 1e-6) { f.ents.push({ t: 'ngon', x: d.x, y: d.y, r: Math.round(d.r * 1000) / 1000, n: d.n, a: Math.round(d.a * 100) / 100 }); sk.selEnt = f.ents.length - 1; } sk.draft = null; renderPalette(); }
+    else { sk.cursor = p; const d = draftEntity(); if (d && d.r > 1e-6) { f.ents.push({ t: 'ngon', x: d.x, y: d.y, r: Math.round(d.r * 1000) / 1000, n: d.n, a: Math.round(d.a * 100) / 100 }); sk.selEnt = f.ents.length - 1; } sk.draft = null; renderPalette(); }
+  } else if ((sk.tool === 'ellipse' || sk.tool === 'slot') && drawMode(sk.tool) === 'corner') {
+    if (!sk.draft) sk.draft = { p };
+    else {
+      sk.cursor = p; const d = draftEntity(), r3 = v => Math.round(v * 1000) / 1000;
+      if (d && (d.t === 'slot' ? d.w > 1e-6 : d.rx > 1e-6 && d.ry > 1e-6)) { for (const k of ['x', 'y', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'w']) if (d[k] !== undefined) d[k] = r3(d[k]); f.ents.push(d); sk.selEnt = f.ents.length - 1; }
+      sk.draft = null; renderPalette();
+    }
   } else if (sk.tool === 'ellipse') {
     if (!sk.draft) sk.draft = { p };
     else if (!sk.draft.p2) { if (Math.hypot(p[0] - sk.draft.p[0], p[1] - sk.draft.p[1]) > 1e-6) sk.draft.p2 = p; }
@@ -1358,12 +1379,13 @@ function renderPalette() {
   const nr = Engine.regions(sk.f).length;
   const tb = $('#pal-tool');
   if (tb) {
-    const want = sk.tool === 'ngon' ? 'ngon' : sk.tool === 'skfillet' ? 'fr' : sk.tool === 'rect' ? 'rect' + (sk.rectCenter ? 'c' : '') : '';
+    const hasMode = !!DRAW_DEFAULT[sk.tool], want = (hasMode ? 'm-' + sk.tool + '-' + drawMode(sk.tool) : '') + (sk.tool === 'ngon' ? '+ngon' : '') + (sk.tool === 'skfillet' ? 'fr' : '');
     if (tb.dataset.kind !== want) {
       tb.dataset.kind = want;
-      tb.innerHTML = want === 'ngon' ? `<div class="frow"><label for="pal-ngon">Počet stran</label><span class="fnum"><input id="pal-ngon" value="${sk.ngonN}" inputmode="numeric" autocomplete="off"><span class="u">ks</span></span></div>`
+      const modeRow = hasMode ? `<div class="frow"><span class="fl">Kreslit</span><div class="seg"><button data-rmode="corner" aria-pressed="${drawMode(sk.tool) === 'corner'}">Z rohu</button><button data-rmode="center" aria-pressed="${drawMode(sk.tool) === 'center'}">Ze středu</button></div></div>` : '';
+      tb.innerHTML = modeRow + (sk.tool === 'ngon' ? `<div class="frow"><label for="pal-ngon">Počet stran</label><span class="fnum"><input id="pal-ngon" value="${sk.ngonN}" inputmode="numeric" autocomplete="off"><span class="u">ks</span></span></div>`
         : want === 'fr' ? `<div class="frow"><label for="pal-fr">Poloměr rohů</label><span class="fnum"><input id="pal-fr" value="${fmtc(sk.frR, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div>`
-        : want.startsWith('rect') ? `<div class="frow"><span class="fl">Kreslit</span><div class="seg"><button data-rmode="corner" aria-pressed="${!sk.rectCenter}">Z rohu</button><button data-rmode="center" aria-pressed="${!!sk.rectCenter}">Ze středu</button></div></div>` : '';
+        : '');
     }
     tb.hidden = !want;
   }
@@ -1391,7 +1413,7 @@ function renderPalette() {
 }
 $('#dialog').addEventListener('click', e => {
   if (!sk) return;
-  const rm = e.target.closest('[data-rmode]'); if (rm) { sk.rectCenter = rm.dataset.rmode === 'center'; sk.draft = null; setSketchTool('rect'); return; }
+  const rm = e.target.closest('[data-rmode]'); if (rm && DRAW_DEFAULT[sk.tool]) { settings.drawModes = { ...(settings.drawModes || {}), [sk.tool]: rm.dataset.rmode }; saveSettings(); sk.draft = null; setSketchTool(sk.tool); return; }
   const d = e.target.closest('[data-entdel]'); if (d) { sk.f.ents.splice(+d.dataset.entdel, 1); sk.selEnt = -1; renderPalette(); redrawSketch(); return; }
   const r = e.target.closest('[data-ent-row]'); if (r && !e.target.closest('input')) { sk.selEnt = +r.dataset.entRow; renderPalette(); redrawSketch(); }
 });
