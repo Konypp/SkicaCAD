@@ -204,6 +204,14 @@
     'Rovnou plochu lze zarovnat jen s rovnou plochou, válcovou jen s válcovou': 'A flat face can only be aligned with a flat face, a cylindrical one with a cylindrical one',
     'Klepněte na plochu tělesa, které se má přesunout (rovnou stěnu nebo válec)': 'Tap a face of the body that should move (a flat face or a cylinder)',
     'Klepněte na cílovou plochu (k rovné stěně rovnou, k válci válcovou)': 'Tap the target face (flat to flat, cylinder to cylinder)',
+    // sketch: rectangle from centre, trim
+    'Kreslit': 'Draw', 'Z rohu': 'From corner', 'Ze středu': 'From centre', 'Obdélník ze středu: klepněte na střed, pak na roh': 'Centre rectangle: tap the centre, then a corner',
+    'Vystřihnout': 'Trim', 'Vystřihnout: klepněte na uzavřený tvar, ze kterého se má vystřihovat': 'Trim: tap the closed shape to cut from',
+    'Teď klepněte na tvar, který se vystřihne, nebo na čáru, podél které se tvar rozdělí': 'Now tap the shape to cut out, or a line to split the shape along',
+    'Nejprve klepněte na uzavřený tvar, ze kterého se má vystřihovat.': 'First tap the closed shape to cut from.', 'Vystřiženo.': 'Cut out.', 'Tvar byl vystřižen celý.': 'The whole shape was cut away.',
+    'Klepněte na další tvar, ze kterého se má vystřihovat': 'Tap another shape to cut from', 'Čára tvar neprotíná, nic se nerozdělilo.': 'The line does not cross the shape, nothing was split.',
+    'Tvar je rozdělený. Klepněte do části, kterou chcete odstranit (Esc nechá obě části)': 'The shape is split. Tap inside the part to remove (Esc keeps both parts)',
+    'Klepněte dovnitř jedné z částí.': 'Tap inside one of the parts.', 'Část odstraněna. Klepněte na další tvar, ze kterého se má vystřihovat.': 'Part removed. Tap another shape to cut from.',
     // keys
     'Akce': 'Action', 'Del': 'Del'
   };
@@ -243,7 +251,7 @@
     [/^Krychle (\d+)$/, 'Cube $1'], [/^Válec (\d+)$/, 'Cylinder $1'], [/^Koule (\d+)$/, 'Sphere $1'], [/^Kužel (\d+)$/, 'Cone $1'], [/^Torus (\d+)$/, 'Torus $1'],
     [/^Vysunutí (\d+)$/, 'Extrude $1'], [/^Rotace (\d+)$/, 'Revolve $1'], [/^Zaoblení (\d+)$/, 'Fillet $1'], [/^Zkosení (\d+)$/, 'Chamfer $1'],
     [/^Kombinovat (\d+)$/, 'Combine $1'], [/^Přesunout (\d+)$/, 'Move $1'], [/^Otočit (\d+)$/, 'Rotate $1'], [/^Vycentrovat (\d+)$/, 'Center $1'],
-    [/^Upravit plochu (\d+)$/, 'Edit face $1'], [/^Zarovnat (\d+)$/, 'Align $1'], [/^Závit (\d+)$/, 'Thread $1'], [/^Měřítko (\d+)$/, 'Scale $1'], [/^Zrcadlit (\d+)$/, 'Mirror $1'],
+    [/^Upravit plochu (\d+)$/, 'Edit face $1'], [/^Vystřižení se nepodařilo: (.+)$/, (m, a) => `Trimming failed: ${tr(a)}`], [/^Zarovnat (\d+)$/, 'Align $1'], [/^Závit (\d+)$/, 'Thread $1'], [/^Měřítko (\d+)$/, 'Scale $1'], [/^Zrcadlit (\d+)$/, 'Mirror $1'],
     [/^Pole (\d+)$/, 'Pattern $1'], [/^Odstranit těleso (\d+)$/, 'Delete body $1'], [/^Čára (\d+)$/, 'Line $1'], [/^Křivka (\d+)$/, 'Spline $1'],
     [/^Obdélník (\d+)$/, 'Rectangle $1'], [/^Kružnice (\d+)$/, 'Circle $1'], [/^Elipsa (\d+)$/, 'Ellipse $1'], [/^Mnohoúhelník (\d+)$/, 'Polygon $1'], [/^Drážka (\d+)$/, 'Slot $1'],
     [/^(.+) \(vytvořen v (.+)\)$/, '$1 (made in $2)'],

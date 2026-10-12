@@ -50,6 +50,7 @@ const ICONS = {
   skdel: '<path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/>',
   finish: '<circle class="g" cx="12" cy="12" r="9" opacity=".2"/><circle cx="12" cy="12" r="9" style="stroke:var(--ok)"/><path d="m7.5 12.5 3 3 6-6.5" style="stroke:var(--ok);stroke-width:2.2"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  sktrim: '<circle cx="6.5" cy="17" r="2.6"/><circle cx="17.5" cy="17" r="2.6"/><path d="M8.4 15.2 16 4M15.6 15.2 8 4"/><path class="o" d="M3 10h18" stroke-dasharray="2 2" style="stroke:var(--orange)"/>',
   globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5s1.2-6.2 3.6-8.5z"/>',
   tfirst: '<path d="M6 5v14M18 5l-9 7 9 7z"/>',
   tprev: '<path d="M16 5l-9 7 9 7z"/>',
@@ -802,7 +803,7 @@ const RIBBON = {
   ],
   sketch: [
     ['Vytvořit', [['line', 'Čára', 'L'], ['spline', 'Křivka', 'K'], ['rect', 'Obdélník', 'R'], ['circle', 'Kružnice', 'C'], ['ellipse', 'Elipsa', 'E'], ['ngon', 'Mnohoúhelník', 'P'], ['slot', 'Drážka', 'D']]],
-    ['Upravit', [['skfillet', 'Zaoblit rohy'], ['skdel', 'Smazat', 'Del']]],
+    ['Upravit', [['skfillet', 'Zaoblit rohy'], ['sktrim', 'Vystřihnout', 'X'], ['skdel', 'Smazat', 'Del']]],
     ['Vložit', [['skimport', 'DXF / SVG']]],
     ['Dokončit', [['finish', 'Dokončit skicu', 'Enter']]]
   ]
@@ -817,7 +818,7 @@ function renderRibbon() {
     `<button class="tool${id === 'finish' ? ' finish' : ''}" data-cmd="${id}" title="${label}${key ? ' (' + key + ')' : ''}"${sk && SK_TOOLS.includes(id) ? ` aria-pressed="${sk.tool === id}"` : ''}${!sk && id === 'facemode' ? ` aria-pressed="${faceMode}"` : ''}><span class="ico">${svg(id, 26)}</span><span>${label}</span></button>`).join('')}</div><div class="rlabel">${g}</div></div>`).join('');
 }
 $('#rbody').addEventListener('click', e => { const b = e.target.closest('[data-cmd]'); if (b) runCommand(b.dataset.cmd); });
-const SK_TOOLS = ['line', 'spline', 'rect', 'circle', 'ellipse', 'ngon', 'slot', 'skfillet'];
+const SK_TOOLS = ['line', 'spline', 'rect', 'circle', 'ellipse', 'ngon', 'slot', 'skfillet', 'sktrim'];
 function runCommand(id) {
   $('#ctxmenu').hidden = true;
   if (sk) {
@@ -1104,7 +1105,7 @@ function regionMesh(P, r, color, opacity, lift) {
 function draftEntity() {
   if (!sk || !sk.draft || !sk.cursor) return null;
   const c = sk.cursor, d = sk.draft;
-  if (sk.tool === 'rect') return { t: 'rect', x: d.p[0], y: d.p[1], w: c[0] - d.p[0], h: c[1] - d.p[1] };
+  if (sk.tool === 'rect') { const dx = c[0] - d.p[0], dy = c[1] - d.p[1]; return sk.rectCenter ? { t: 'rect', x: d.p[0] - dx, y: d.p[1] - dy, w: 2 * dx, h: 2 * dy } : { t: 'rect', x: d.p[0], y: d.p[1], w: dx, h: dy }; }
   if (sk.tool === 'circle') return { t: 'circle', x: d.p[0], y: d.p[1], r: Math.hypot(c[0] - d.p[0], c[1] - d.p[1]) };
   if (sk.tool === 'line') return { t: 'poly', pts: d.pts.concat([c]), closed: false };
   if (sk.tool === 'spline') return { t: 'spline', pts: d.pts.concat([c]), closed: false };
@@ -1127,18 +1128,19 @@ function slotHalfWidth(a, b, c) {
 }
 function setSketchTool(t) {
   if (!sk) return;
-  sk.tool = t; sk.draft = null;
+  sk.tool = t; sk.draft = null; sk.cut = null;
   const PROMPTS = {
-    rect: 'Obdélník: klepněte na první roh, pak na protější roh', circle: 'Kružnice: klepněte na střed, pak určete poloměr',
+    rect: sk.rectCenter ? 'Obdélník ze středu: klepněte na střed, pak na roh' : 'Obdélník: klepněte na první roh, pak na protější roh', circle: 'Kružnice: klepněte na střed, pak určete poloměr',
     line: 'Čára: klepejte na body; klepnutím na první bod obrys uzavřete, Enter ukončí',
     spline: 'Křivka: klepejte na body, kterými má křivka projít; klepnutím na první bod ji uzavřete, Enter ukončí. Body pak jde přetáhnout.',
     ngon: 'Mnohoúhelník: klepněte na střed, pak na vrchol. Počet stran nastavíte v paletě.',
     slot: 'Drážka: klepněte na střed prvního oblouku, pak druhého, třetím klepnutím určíte šířku',
     ellipse: 'Elipsa: klepněte na střed, pak na konec hlavní osy, třetím klepnutím určíte šířku',
-    skfillet: 'Zaoblení rohů: nastavte poloměr v paletě a klepněte na obdélník, mnohoúhelník nebo uzavřený obrys'
+    skfillet: 'Zaoblení rohů: nastavte poloměr v paletě a klepněte na obdélník, mnohoúhelník nebo uzavřený obrys',
+    sktrim: 'Vystřihnout: klepněte na uzavřený tvar, ze kterého se má vystřihovat'
   };
   setPrompt(PROMPTS[t] || 'Klepnutím vyberte prvek skici. Nástroje kreslení jsou v pásu nahoře.');
-  dom.style.cursor = t && t !== 'skfillet' ? 'crosshair' : '';
+  dom.style.cursor = t && t !== 'skfillet' && t !== 'sktrim' ? 'crosshair' : '';
   renderRibbon(); redrawSketch(); renderPalette(); $('#dim').hidden = true;
 }
 function sketchPoint(ev) {
@@ -1187,7 +1189,7 @@ function sketchDrag(ev) {
 }
 function sketchMove(ev) {
   if (!sk.tool) { dom.style.cursor = sketchHandleAt(ev) ? 'move' : ''; }
-  if (!sk.tool || sk.tool === 'skfillet') { sk.snapPt = null; sk.cursor = null; redrawSketch(); return; }
+  if (!sk.tool || sk.tool === 'skfillet' || sk.tool === 'sktrim') { sk.snapPt = null; sk.cursor = null; redrawSketch(); return; }
   sk.cursor = sketchPoint(ev);
   redrawSketch();
   updateDimLabel(ev);
@@ -1210,6 +1212,7 @@ function updateDimLabel(ev) {
 }
 function sketchClick(ev) {
   if (!sk.tool) { pickSketchEntity(ev); return; }
+  if (sk.tool === 'sktrim') { trimClick(ev); return; }
   if (sk.tool === 'skfillet') {
     pickSketchEntity(ev);
     const e = sk.f.ents[sk.selEnt];
@@ -1223,7 +1226,7 @@ function sketchClick(ev) {
   const f = sk.f;
   if (sk.tool === 'rect') {
     if (!sk.draft) sk.draft = { p };
-    else { const w = p[0] - sk.draft.p[0], h = p[1] - sk.draft.p[1]; if (Math.abs(w) > 1e-6 && Math.abs(h) > 1e-6) { f.ents.push({ t: 'rect', x: sk.draft.p[0], y: sk.draft.p[1], w, h }); sk.selEnt = f.ents.length - 1; } sk.draft = null; renderPalette(); }
+    else { sk.cursor = p; const d = draftEntity(); if (d && Math.abs(d.w) > 1e-6 && Math.abs(d.h) > 1e-6) { f.ents.push(d); sk.selEnt = f.ents.length - 1; } sk.draft = null; renderPalette(); }
   } else if (sk.tool === 'circle') {
     if (!sk.draft) sk.draft = { p };
     else { const r = Math.hypot(p[0] - sk.draft.p[0], p[1] - sk.draft.p[1]); if (r > 1e-6) { f.ents.push({ t: 'circle', x: sk.draft.p[0], y: sk.draft.p[1], r }); sk.selEnt = f.ents.length - 1; } sk.draft = null; renderPalette(); }
@@ -1269,6 +1272,72 @@ function pickSketchEntity(ev) {
   sk.selEnt = best; renderPalette(); redrawSketch();
   if (best >= 0) { const row = $(`#dialog [data-ent-row="${best}"]`); if (row) row.scrollIntoView({ block: 'nearest' }); }
 }
+/* ---------- Vystřihnout (cut out part of a closed shape by another shape or by a line) ---------- */
+const XY_B = { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] };
+const isClosedEnt = e => e && (['rect', 'circle', 'ngon', 'slot', 'ellipse'].includes(e.t) || ((e.t === 'poly' || e.t === 'spline') && e.closed));
+/* 2D boolean of a closed sketch entity with a closed point loop, done with the solid kernel on thin prisms; returns outline loops */
+function clip2D(ent, cutPts, op) {
+  const A = K.extrudeProfiles([ent], XY_B, 0, 1), B = K.extrudeProfiles([{ t: 'poly', pts: cutPts, closed: true }], XY_B, -1, 2);
+  const R = K.boolean(A, B, op), idx = [];
+  R.forEach((p, i) => { if (p.n[2] > 0.999 && p.v.every(v => Math.abs(v[2] - 1) < 1e-6)) idx.push(i); });
+  const r4 = x => Math.round(x * 1e4) / 1e4;
+  return K.faceLoops(R, idx).map(loop => {
+    let pts = loop.map(v => [r4(v[0]), r4(v[1])]);
+    pts = pts.filter((p, i) => { const a = pts[(i - 1 + pts.length) % pts.length], b = pts[(i + 1) % pts.length]; return Math.abs((p[0] - a[0]) * (b[1] - a[1]) - (p[1] - a[1]) * (b[0] - a[0])) > 1e-7; });
+    return pts;
+  }).filter(pts => pts.length >= 3 && Math.abs(K.area2D(pts)) > 1e-6);
+}
+/* half-plane on the left of an open polyline, closed far away */
+function sidePolygon(pts) {
+  const L = 1e4, n = pts.length, u = (a, b) => { const d = [b[0] - a[0], b[1] - a[1]], l = Math.hypot(d[0], d[1]) || 1; return [d[0] / l, d[1] / l]; };
+  const d0 = u(pts[1], pts[0]), d1 = u(pts[n - 2], pts[n - 1]);
+  const s = [pts[0][0] + d0[0] * L, pts[0][1] + d0[1] * L], e = [pts[n - 1][0] + d1[0] * L, pts[n - 1][1] + d1[1] * L];
+  const ch = u(s, e), nl = [-ch[1], ch[0]];
+  return [s, ...pts, e, [e[0] + nl[0] * L, e[1] + nl[1] * L], [s[0] + nl[0] * L, s[1] + nl[1] * L]];
+}
+function sketchRawPoint(ev) {
+  const P = sk.f.plane; ray.setFromCamera(evNdc(ev), cam());
+  const hit = ray.ray.intersectPlane(new THREE.Plane().setFromNormalAndCoplanarPoint(v3(P.n), v3(P.o)), new V3());
+  return hit ? P2(P, hit) : null;
+}
+function trimClick(ev) {
+  const f = sk.f, c = sk.cut || (sk.cut = {});
+  if (c.parts) {
+    const p = sketchRawPoint(ev); if (!p) return;
+    const hitPart = [c.parts.a, c.parts.b].find(list => list.some(i => f.ents[i] && K.inPoly2D(p, K.profilePoints(f.ents[i]))));
+    if (!hitPart) { toast('Klepněte dovnitř jedné z částí.'); return; }
+    [...hitPart].sort((x, y) => y - x).forEach(i => f.ents.splice(i, 1));
+    sk.cut = null; sk.selEnt = -1; setPrompt('Část odstraněna. Klepněte na další tvar, ze kterého se má vystřihovat.'); renderPalette(); redrawSketch(); return;
+  }
+  pickSketchEntity(ev);
+  const i = sk.selEnt; if (i < 0) return;
+  if (c.target === undefined || c.target === null || !f.ents[c.target]) {
+    if (!isClosedEnt(f.ents[i])) { toast('Nejprve klepněte na uzavřený tvar, ze kterého se má vystřihovat.'); return; }
+    c.target = i; setPrompt('Teď klepněte na tvar, který se vystřihne, nebo na čáru, podél které se tvar rozdělí'); return;
+  }
+  if (i === c.target) return;
+  const tgt = f.ents[c.target], cut = f.ents[i];
+  try {
+    if (isClosedEnt(cut)) {
+      const loops = clip2D(tgt, K.profilePoints(cut), 'subtract');
+      const rm = [c.target, i].sort((x, y) => y - x); rm.forEach(k => f.ents.splice(k, 1));
+      loops.forEach(pts => f.ents.push({ t: 'poly', pts, closed: true }));
+      sk.cut = null; sk.selEnt = loops.length ? f.ents.length - 1 : -1;
+      toast(loops.length ? 'Vystřiženo.' : 'Tvar byl vystřižen celý.');
+      setPrompt('Klepněte na další tvar, ze kterého se má vystřihovat');
+    } else {
+      const line = entityPolylines([cut])[0].pts;
+      if (line.length < 2) return;
+      const side = sidePolygon(line), a = clip2D(tgt, side, 'intersect'), b = clip2D(tgt, side, 'subtract');
+      if (!a.length || !b.length) { toast('Čára tvar neprotíná, nic se nerozdělilo.'); sk.cut = null; return; }
+      const rm = [c.target, i].sort((x, y) => y - x); rm.forEach(k => f.ents.splice(k, 1));
+      const ia = a.map(pts => f.ents.push({ t: 'poly', pts, closed: true }) - 1), ib = b.map(pts => f.ents.push({ t: 'poly', pts, closed: true }) - 1);
+      sk.cut = { parts: { a: ia, b: ib } }; sk.selEnt = -1;
+      setPrompt('Tvar je rozdělený. Klepněte do části, kterou chcete odstranit (Esc nechá obě části)');
+    }
+  } catch (e) { toast('Vystřižení se nepodařilo: ' + e.message); sk.cut = null; }
+  renderPalette(); redrawSketch();
+}
 function deleteSketchEntity() {
   if (!sk) return;
   if (sk.selEnt < 0 || !sk.f.ents[sk.selEnt]) { toast('Nejprve vyberte prvek skici.'); return; }
@@ -1289,11 +1358,12 @@ function renderPalette() {
   const nr = Engine.regions(sk.f).length;
   const tb = $('#pal-tool');
   if (tb) {
-    const want = sk.tool === 'ngon' ? 'ngon' : sk.tool === 'skfillet' ? 'fr' : '';
+    const want = sk.tool === 'ngon' ? 'ngon' : sk.tool === 'skfillet' ? 'fr' : sk.tool === 'rect' ? 'rect' + (sk.rectCenter ? 'c' : '') : '';
     if (tb.dataset.kind !== want) {
       tb.dataset.kind = want;
       tb.innerHTML = want === 'ngon' ? `<div class="frow"><label for="pal-ngon">Počet stran</label><span class="fnum"><input id="pal-ngon" value="${sk.ngonN}" inputmode="numeric" autocomplete="off"><span class="u">ks</span></span></div>`
-        : want === 'fr' ? `<div class="frow"><label for="pal-fr">Poloměr rohů</label><span class="fnum"><input id="pal-fr" value="${fmtc(sk.frR, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div>` : '';
+        : want === 'fr' ? `<div class="frow"><label for="pal-fr">Poloměr rohů</label><span class="fnum"><input id="pal-fr" value="${fmtc(sk.frR, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div>`
+        : want.startsWith('rect') ? `<div class="frow"><span class="fl">Kreslit</span><div class="seg"><button data-rmode="corner" aria-pressed="${!sk.rectCenter}">Z rohu</button><button data-rmode="center" aria-pressed="${!!sk.rectCenter}">Ze středu</button></div></div>` : '';
     }
     tb.hidden = !want;
   }
@@ -1321,6 +1391,7 @@ function renderPalette() {
 }
 $('#dialog').addEventListener('click', e => {
   if (!sk) return;
+  const rm = e.target.closest('[data-rmode]'); if (rm) { sk.rectCenter = rm.dataset.rmode === 'center'; sk.draft = null; setSketchTool('rect'); return; }
   const d = e.target.closest('[data-entdel]'); if (d) { sk.f.ents.splice(+d.dataset.entdel, 1); sk.selEnt = -1; renderPalette(); redrawSketch(); return; }
   const r = e.target.closest('[data-ent-row]'); if (r && !e.target.closest('input')) { sk.selEnt = +r.dataset.entRow; renderPalette(); redrawSketch(); }
 });
@@ -3388,7 +3459,7 @@ document.addEventListener('keydown', e => {
   if (mod) return;
   if (k === 'Escape') {
     $('#ctxmenu').hidden = true;
-    if (sk) { if (sk.draft) { sk.draft = null; redrawSketch(); $('#dim').hidden = true; } else if (sk.tool) setSketchTool(null); return; }
+    if (sk) { if (sk.cut && (sk.cut.parts || sk.cut.target !== undefined)) { sk.cut = null; setSketchTool('sktrim'); return; } if (sk.draft) { sk.draft = null; redrawSketch(); $('#dim').hidden = true; } else if (sk.tool) setSketchTool(null); return; }
     if (cmd) { endCmd(false); return; }
     if (faceMode && selFace) { selFace = null; drawFaces(); updateInfo(); return; }
     if (faceMode) { setFaceMode(false); return; }
@@ -3408,7 +3479,7 @@ document.addEventListener('keydown', e => {
     else if (tlSel !== null) deleteFeature(tlSel);
     return;
   }
-  const map = sk ? { l: 'line', k: 'spline', r: 'rect', c: 'circle', e: 'ellipse', p: 'ngon', d: 'slot' } : cmd ? {} : { s: 'sketch', e: 'extrude', f: 'fillet', m: 'move', r: 'rotate', t: 'thread', i: 'measure', g: 'facemode' };
+  const map = sk ? { l: 'line', k: 'spline', r: 'rect', c: 'circle', e: 'ellipse', p: 'ngon', d: 'slot', x: 'sktrim' } : cmd ? {} : { s: 'sketch', e: 'extrude', f: 'fillet', m: 'move', r: 'rotate', t: 'thread', i: 'measure', g: 'facemode' };
   const id = map[k.toLowerCase()];
   if (id) { e.preventDefault(); runCommand(id); return; }
   if (k === 'F6') { e.preventDefault(); fitView(); }

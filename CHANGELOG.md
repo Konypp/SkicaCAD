@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta 0.34
+- Skica, Obdélník: v paletě volba Kreslit z rohu / ze středu (první klepnutí určí střed, druhé roh).
+- Skica, nový nástroj Vystřihnout (X): klepnete na uzavřený tvar a pak na
+  - jiný uzavřený tvar (kružnici, obdélník, obrys naklikaný po bodech): ten se z tvaru vystřihne,
+  - čáru (i lomenou přes více bodů): tvar se podél ní rozdělí a klepnutím zvolíte část, která se odstraní (Esc nechá obě).
+  Výsledkem je obrys, jehož úsečky lze dál upravit v paletě.
+
 ## Beta 0.33
 - Vycentrovat rozšířeno a přejmenováno na Zarovnat se třemi režimy:
   - Počátku: dosavadní vycentrování (X, Y, položení na podložku), beze změny.
