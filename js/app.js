@@ -1127,7 +1127,10 @@ function draftEntity() {
   }
   if (sk.tool === 'slot') {
     if (!d.p2) return { t: 'poly', pts: [d.p, c], closed: false };
-    return { t: 'slot', x1: d.p[0], y1: d.p[1], x2: d.p2[0], y2: d.p2[1], w: Math.max(0.01, 2 * slotHalfWidth(d.p, d.p2, c)) };
+    /* the two clicks are the outer ends of the slot (overall length); the arc centres sit half the width inside */
+    const w = Math.max(0.01, 2 * slotHalfWidth(d.p, d.p2, c)), ex = d.p2[0] - d.p[0], ey = d.p2[1] - d.p[1], L = Math.hypot(ex, ey) || 1e-9;
+    const ux = ex / L, uy = ey / L, mx = (d.p[0] + d.p2[0]) / 2, my = (d.p[1] + d.p2[1]) / 2, hl = Math.max(0.005, (L - w) / 2);
+    return { t: 'slot', x1: mx - ux * hl, y1: my - uy * hl, x2: mx + ux * hl, y2: my + uy * hl, w };
   }
   return null;
 }
@@ -1148,7 +1151,7 @@ function setSketchTool(t) {
     line: 'Čára: klepejte na body; klepnutím na první bod obrys uzavřete, Enter ukončí',
     spline: 'Křivka: klepejte na body, kterými má křivka projít; klepnutím na první bod ji uzavřete, Enter ukončí. Body pak jde přetáhnout.',
     ngon: drawMode('ngon') === 'corner' ? 'Mnohoúhelník z rohu: klepněte na roh čtverce, do kterého se vepíše, pak na protější roh. Počet stran nastavíte v paletě.' : 'Mnohoúhelník: klepněte na střed, pak na vrchol. Počet stran nastavíte v paletě.',
-    slot: drawMode('slot') === 'corner' ? 'Drážka z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se drážka vejde' : 'Drážka: klepněte na střed prvního oblouku, pak druhého, třetím klepnutím určíte šířku',
+    slot: drawMode('slot') === 'corner' ? 'Drážka z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se drážka vejde' : 'Drážka: klepněte na jeden konec, pak na druhý konec drážky (celková délka), třetím klepnutím určíte šířku',
     ellipse: drawMode('ellipse') === 'corner' ? 'Elipsa z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se elipsa vepíše' : 'Elipsa: klepněte na střed, pak na konec hlavní osy, třetím klepnutím určíte šířku',
     skfillet: 'Zaoblení rohů: nastavte poloměr v paletě a klepněte na obdélník, mnohoúhelník nebo uzavřený obrys',
     sktrim: 'Vystřihnout: klepněte na uzavřený tvar, ze kterého se má vystřihovat'
@@ -1261,7 +1264,7 @@ function sketchClick(ev) {
   } else if (sk.tool === 'slot') {
     if (!sk.draft) sk.draft = { p };
     else if (!sk.draft.p2) { if (Math.hypot(p[0] - sk.draft.p[0], p[1] - sk.draft.p[1]) > 1e-6) sk.draft.p2 = p; }
-    else { const d = draftEntity(); if (d && d.t === 'slot') { d.w = Math.round(d.w * 1000) / 1000; f.ents.push(d); sk.selEnt = f.ents.length - 1; } sk.draft = null; renderPalette(); }
+    else { const d = draftEntity(); if (d && d.t === 'slot') { for (const k of ['x1', 'y1', 'x2', 'y2', 'w']) d[k] = Math.round(d[k] * 1000) / 1000; f.ents.push(d); sk.selEnt = f.ents.length - 1; } sk.draft = null; renderPalette(); }
   } else if (isPolyTool(sk.tool)) {
     if (!sk.draft) sk.draft = { pts: [p] };
     else {
@@ -1382,7 +1385,7 @@ function renderPalette() {
     const hasMode = !!DRAW_DEFAULT[sk.tool], want = (hasMode ? 'm-' + sk.tool + '-' + drawMode(sk.tool) : '') + (sk.tool === 'ngon' ? '+ngon' : '') + (sk.tool === 'skfillet' ? 'fr' : '');
     if (tb.dataset.kind !== want) {
       tb.dataset.kind = want;
-      const modeRow = hasMode ? `<div class="frow"><span class="fl">Kreslit</span><div class="seg"><button data-rmode="corner" aria-pressed="${drawMode(sk.tool) === 'corner'}">Z rohu</button><button data-rmode="center" aria-pressed="${drawMode(sk.tool) === 'center'}">Ze středu</button></div></div>` : '';
+      const modeRow = hasMode ? `<div class="frow"><span class="fl">Kreslit</span><div class="seg"><button data-rmode="corner" aria-pressed="${drawMode(sk.tool) === 'corner'}">Z rohu</button><button data-rmode="center" aria-pressed="${drawMode(sk.tool) === 'center'}">${sk.tool === 'slot' ? 'Od konce ke konci' : 'Ze středu'}</button></div></div>` : '';
       tb.innerHTML = modeRow + (sk.tool === 'ngon' ? `<div class="frow"><label for="pal-ngon">Počet stran</label><span class="fnum"><input id="pal-ngon" value="${sk.ngonN}" inputmode="numeric" autocomplete="off"><span class="u">ks</span></span></div>`
         : want === 'fr' ? `<div class="frow"><label for="pal-fr">Poloměr rohů</label><span class="fnum"><input id="pal-fr" value="${fmtc(sk.frR, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div>`
         : '');
