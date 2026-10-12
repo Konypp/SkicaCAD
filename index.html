@@ -3,9 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>SkicaCAD Beta 0.42</title>
+<title>SkicaCAD Beta 0.43</title>
 <meta name="description" content="SkicaCAD – parametrické 3D CAD v prohlížeči (testovací verze).">
 <meta name="theme-color" content="#1B2430">
+<script>try { var t = (JSON.parse(localStorage.getItem('kota-cad-settings')) || {}).theme; if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}</script>
 <link rel="manifest" href="manifest.webmanifest" crossorigin="use-credentials">
 <meta name="application-name" content="SkicaCAD">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -80,12 +81,13 @@
   <header class="appbar">
     <div class="brand">
       <svg width="26" height="18" viewBox="0 0 30 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3v14M28 3v14M4.5 10h21M4.5 10l3-2.4M4.5 10l3 2.4M25.5 10l-3-2.4M25.5 10l-3 2.4"/></svg>
-      <span>SkicaCAD</span><span class="beta" id="ver-badge" title="Testovací verze">Beta 0.42</span>
+      <span>SkicaCAD</span><span class="beta" id="ver-badge" title="Testovací verze">Beta 0.43</span>
     </div>
     <button class="abtn" id="filebtn" aria-haspopup="true" aria-expanded="false" title="Soubor"><span class="ico" data-ic="menu" data-s="18"></span><span class="lbltxt">Soubor</span></button>
     <button class="abtn" id="undo" title="Zpět (Ctrl+Z)" aria-label="Zpět"><span class="ico" data-ic="undo" data-s="18"></span></button>
     <button class="abtn" id="redo" title="Znovu (Ctrl+Y)" aria-label="Znovu"><span class="ico" data-ic="redo" data-s="18"></span></button>
     <button class="abtn langbtn" id="langbtn" title="Jazyk / Language" aria-label="Jazyk / Language"><span class="ico" data-ic="globe" data-s="17"></span><span class="lc">CZ</span></button>
+    <button class="abtn" id="themebtn" title="Vzhled" aria-label="Vzhled"><span class="ico"></span></button>
     <input class="docname" id="docname" type="text" maxlength="60" aria-label="Název návrhu" value="Bez názvu">
     <span style="width:98px;flex:none" class="lbltxt"></span>
     <div class="menu" id="filemenu" hidden>

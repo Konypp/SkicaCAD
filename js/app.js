@@ -51,6 +51,9 @@ const ICONS = {
   finish: '<circle class="g" cx="12" cy="12" r="9" opacity=".2"/><circle cx="12" cy="12" r="9" style="stroke:var(--ok)"/><path d="m7.5 12.5 3 3 6-6.5" style="stroke:var(--ok);stroke-width:2.2"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   sktrim: '<circle cx="6.5" cy="17" r="2.6"/><circle cx="17.5" cy="17" r="2.6"/><path d="M8.4 15.2 16 4M15.6 15.2 8 4"/><path class="o" d="M3 10h18" stroke-dasharray="2 2" style="stroke:var(--orange)"/>',
+  thauto: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" style="fill:currentColor;stroke:none"/>',
+  thlight: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
+  thdark: '<path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/>',
   globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5s1.2-6.2 3.6-8.5z"/>',
   tfirst: '<path d="M6 5v14M18 5l-9 7 9 7z"/>',
   tprev: '<path d="M16 5l-9 7 9 7z"/>',
@@ -1182,6 +1185,8 @@ function regionMesh(P, r, color, opacity, lift) {
 function draftEntity() {
   if (!sk || !sk.draft || !sk.cursor) return null;
   const c = sk.cursor, d = sk.draft;
+  /* line and curve drafts keep a point list (pts) instead of a first point (p) */
+  if (!d.p) return sk.tool === 'line' ? { t: 'poly', pts: d.pts.concat([c]), closed: false } : sk.tool === 'spline' ? { t: 'spline', pts: d.pts.concat([c]), closed: false } : null;
   const dx = c[0] - d.p[0], dy = c[1] - d.p[1], corner = drawMode(sk.tool) === 'corner';
   /* "from corner": the shape fills the box between the two clicks (circle and polygon use a square anchored at the first click) */
   const sq = () => { const sd = Math.max(Math.abs(dx), Math.abs(dy)); return { cx: d.p[0] + Math.sign(dx || 1) * sd / 2, cy: d.p[1] + Math.sign(dy || 1) * sd / 2, r: sd / 2 }; };
@@ -3821,6 +3826,27 @@ $('#undo').addEventListener('click', undo);
 $('#redo').addEventListener('click', redo);
 
 /* ================= language ================= */
+/* appearance: automatic (follows the system), light or dark; stored in the settings */
+const THEMES = ['auto', 'light', 'dark'];
+function applyTheme() {
+  const t = settings.theme, r = document.documentElement;
+  if (t === 'light' || t === 'dark') r.dataset.theme = t; else delete r.dataset.theme;
+  const dark = t === 'dark' || (t !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const mc = document.querySelector('meta[name="theme-color"]'); if (mc) mc.content = dark ? '#1B2430' : '#F4F6F8';
+  syncThemeBtn();
+}
+function syncThemeBtn() {
+  const b = $('#themebtn'); if (!b) return; const t = THEMES.includes(settings.theme) ? settings.theme : 'auto', en = EN();
+  b.querySelector('.ico').innerHTML = svg('th' + t, 17);
+  b.title = en ? { auto: 'Appearance: automatic (follows the system)', light: 'Appearance: light', dark: 'Appearance: dark' }[t] : { auto: 'Vzhled: automaticky podle systému', light: 'Vzhled: světlý', dark: 'Vzhled: tmavý' }[t];
+  b.setAttribute('aria-label', b.title);
+}
+if ($('#themebtn')) $('#themebtn').addEventListener('click', () => {
+  const t = THEMES[(THEMES.indexOf(THEMES.includes(settings.theme) ? settings.theme : 'auto') + 1) % 3];
+  settings.theme = t; saveSettings(); applyTheme(); requestRender();
+  toast(EN() ? { auto: 'Appearance: automatic', light: 'Appearance: light', dark: 'Appearance: dark' }[t] : { auto: 'Vzhled: automaticky podle systému', light: 'Vzhled: světlý', dark: 'Vzhled: tmavý' }[t]);
+});
+applyTheme();
 function syncLangBtn() { const b = $('#langbtn'); if (!b) return; const en = EN(); b.querySelector('.lc').textContent = en ? 'EN' : 'CZ'; b.title = en ? 'Language: English (switch to Czech)' : 'Jazyk: čeština (přepnout do angličtiny)'; }
 if ($('#langbtn')) $('#langbtn').addEventListener('click', () => {
   const l = EN() ? 'cs' : 'en';
@@ -3830,7 +3856,7 @@ if ($('#langbtn')) $('#langbtn').addEventListener('click', () => {
   buildCubeMaterials(); renderRibbon(); renderBrowser(); renderTimeline(); updateInfo(); applyNav();
   if (sk) { renderPalette(); redrawSketch(); }
   if (!$('#startdlg').hidden) showStart(false);
-  syncLangBtn(); requestRender();
+  syncLangBtn(); syncThemeBtn(); requestRender();
   toast(l === 'en' ? 'Language: English' : 'Jazyk: čeština');
 });
 syncLangBtn();
@@ -3845,7 +3871,7 @@ function onTheme() {
   styleBodies();
 }
 new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-if (window.matchMedia) { const mq = window.matchMedia('(prefers-color-scheme: dark)'); if (mq.addEventListener) mq.addEventListener('change', onTheme); }
+if (window.matchMedia) { const mq = window.matchMedia('(prefers-color-scheme: dark)'); if (mq.addEventListener) mq.addEventListener('change', () => { onTheme(); applyTheme(); }); }
 
 /* ================= start ================= */
 gridMinor.color.copy(tok.grid); gridMajor.color.copy(tok['grid-major']);

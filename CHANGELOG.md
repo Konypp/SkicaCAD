@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 0.43
+- Horní lišta: nové tlačítko Vzhled přepíná automaticky (podle systému) → světlý → tmavý. Volba se pamatuje.
+- Oprava: při kreslení čáry a křivky se rozkreslený tvar nezobrazoval, dokud se obrys neuzavřel (chyba od verze 0.35, nejvíc patrná na mobilu).
+
 ## Beta 0.42
 - Skica: jemnější kóty – tenčí a průhlednější čáry, menší šipky a písmo, kóty blíž k tvaru.
 
