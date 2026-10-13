@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.62
+- Skica z plochy: původní obrys plochy zůstává ve skice jako šedý čárkovaný obrys. Když obrys přesunete, oranžová šipka ukazuje posun od původního místa i s hodnotou (např. Posun 9,43 mm (X 8 · Y 5)). Platí i při pozdější úpravě skici.
+
 ## Beta 0.61
 - Manipulátor posunu: když se osa otočí na zápornou stranu (osa míří od pozorovatele), šipka teď míří ven do záporného směru. Dřív byla obrácená a mířila zpět do středu.
 

@@ -615,7 +615,7 @@ let skDimsOn = false, dimMeta = [];
 const showSkDims = () => settings.skDims !== false;
 function updateSketchDims() {
   const box = $('#skdims'); if (!box) return;
-  if (!sk || !showSkDims()) { if (skDimsOn) { box.innerHTML = ''; skDimsOn = false; } return; }
+  if (!sk || (!showSkDims() && !sk.f.orig)) { if (skDimsOn) { box.innerHTML = ''; skDimsOn = false; } return; }
   const P = sk.f.plane, W = dom.clientWidth, H = dom.clientHeight, out = []; dimMeta = [];
   const px = (x, y) => toPx(P3(P, x, y));
   const f1 = v => fmtc(v, 2);
@@ -654,9 +654,23 @@ function updateSketchDims() {
     out.push(hit(ed, tx, E[1], label, 0, an), text(tx, E[1], label, 0, an));
   };
   const rot = (cx, cy, a, x, y) => [cx + x * Math.cos(a) - y * Math.sin(a), cy + x * Math.sin(a) + y * Math.cos(a)];
-  const ents = sk.f.ents.map((e, i) => [e, i]).filter(([e, i]) => !(i === sk.selEnt && e.t === 'poly' && !sk.tool));
-  const d = draftEntity(); if (d) ents.push([d, -1]);
-  if (ents.length > 80) { box.innerHTML = ''; return; }
+  /* sketch made from a face: how far each outline has moved from where it was on the face */
+  if (sk.f.orig) {
+    const cen = e => { const pl = entityPolylines([e])[0]; if (!pl || !pl.pts.length) return null; let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const q of pl.pts) { x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[0]); y1 = Math.max(y1, q[1]); } return [(x0 + x1) / 2, (y0 + y1) / 2]; };
+    sk.f.orig.forEach((o, i) => {
+      const e = sk.f.ents[i]; if (!e || e.t !== o.t) return;
+      const a = cen(o), b = cen(e); if (!a || !b) return;
+      const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy); if (L < 1e-4) return;
+      const A = px(a[0], a[1]), B = px(b[0], b[1]); if (!ok(A, B)) return;
+      const sl = Math.hypot(B[0] - A[0], B[1] - A[1]); if (sl < 4) return;
+      const u = [(B[0] - A[0]) / sl, (B[1] - A[1]) / sl];
+      out.push(`<g class="moved"><circle cx="${A[0]}" cy="${A[1]}" r="2.5"/><path d="M${A[0]},${A[1]}L${B[0]},${B[1]}"/>${arrow(B, u)}</g>`);
+      out.push(`<text class="moved" x="${A[0] - u[0] * 8}" y="${A[1] - u[1] * 8 + (u[1] > 0 ? -8 : 12)}" text-anchor="${u[0] > 0 ? 'end' : 'start'}">${EN() ? 'Moved' : 'Posun'} ${f1(L)} mm (X ${f1(dx)} · Y ${f1(dy)})</text>`);
+    });
+  }
+  const ents = showSkDims() ? sk.f.ents.map((e, i) => [e, i]).filter(([e, i]) => !(i === sk.selEnt && e.t === 'poly' && !sk.tool)) : [];
+  const d = showSkDims() ? draftEntity() : null; if (d) ents.push([d, -1]);
+  if (ents.length > 80) { box.innerHTML = out.join(''); skDimsOn = true; return; }
   for (const [e, i] of ents) {
     const ed = (k, v, map) => ({ i, k, v, map });
     if (e.t === 'rect') {
@@ -1280,6 +1294,7 @@ function redrawSketch() {
   const P = sk.f.plane, ents = sk.f.ents;
   /* profile fills */
   for (const r of Engine.regions(sk.f)) live.add(regionMesh(P, r, tok.orange, 0.2, 0.01));
+  if (sk.f.orig) { const g = sketchLines(P, sk.f.orig.map(e => ({ ...e, cons: true })), new THREE.Color(0x8a94a0), 0.02); live.add(g); }
   live.add(sketchLines(P, ents, tok.sketch, 0.04));
   if (sk.selEnt >= 0 && ents[sk.selEnt]) live.add(sketchLines(P, [ents[sk.selEnt]], tok.orange, 0.06));
   live.add(pointsObj(P, keyPoints(ents).slice(1), tok.sketch, 5));
@@ -2597,7 +2612,7 @@ function faceSketch(s) {
   }
   if (!ents.length) return null;
   const n = doc.features.filter(x => x.type === 'sketch').length + 1;
-  return { id: newId(), type: 'sketch', name: `Skica ${n} (z plochy)`, plane: { o: B.o.map(r4), u: B.u.map(r4), v: B.v.map(r4), n: B.n.map(r4) }, ents };
+  return { id: newId(), type: 'sketch', name: `Skica ${n} (z plochy)`, plane: { o: B.o.map(r4), u: B.u.map(r4), v: B.v.map(r4), n: B.n.map(r4) }, ents, orig: clone(ents) };
 }
 function faceToSketch() {
   const s = selFace;
