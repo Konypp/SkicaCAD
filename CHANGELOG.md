@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.65
+- Šroub: zápich pod hlavou je ve výchozím stavu vypnutý, zapíná se zaškrtnutím v dialogu.
+
 ## Beta 0.64
 - Šroub: volba Zápich pod hlavou (ve výchozím stavu zapnutá). Pod hlavou zůstane krátký hladký krček (2,5 × stoupání) o něco tenčí než dno závitu, takže matice dojede až k hlavě bez drhnutí v nejproblematičtějších vrstvách tisku. Závit pak končí nad zápichem.
 

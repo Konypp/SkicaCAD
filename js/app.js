@@ -2204,7 +2204,7 @@ function startFastener(type, editIndex, f) {
   const bolt = type === 'bolt', pivot = new THREE.Object3D(); scene.add(pivot);
   const c = {
     editIndex, tool: null, gizmoDrag: false, timer: null,
-    v: f ? { size: f.size, len: f.len, head: f.head || 'hex', thread: f.thread !== false, chamfer: f.chamfer !== false, undercut: !!f.undercut, tlen: f.tlen || 0, tol: f.tol != null ? f.tol : 0.2 } : { size: 6, len: 20, head: 'hex', thread: true, chamfer: true, undercut: true, tlen: 0, tol: 0.2 },
+    v: f ? { size: f.size, len: f.len, head: f.head || 'hex', thread: f.thread !== false, chamfer: f.chamfer !== false, undercut: !!f.undercut, tlen: f.tlen || 0, tol: f.tol != null ? f.tol : 0.2 } : { size: 6, len: 20, head: 'hex', thread: true, chamfer: true, undercut: false, tlen: 0, tol: 0.2 },
     pos: f ? f.pos.slice() : [0, 0, 0], op: f ? f.op : 'new', autoOp: false,
     init() {
       const sizes = FAST_SIZES.map(d => [String(d), 'M' + fmtc(d, 1)]);
