@@ -256,10 +256,23 @@ function toolForFastener(f) {
       const tl = Number(f.tlen) > 0 ? Math.min(L, Number(f.tlen)) : L;
       polys = KK.boolean(polys, threadTool({ pitch: P, size: de, r, len: L, start: 0, length: tl, fromEnd: true, ax: [0, 0, 1], c: [0, 0, hk] }), 'subtract');
     }
+    if (f.chamfer !== false) {
+      /* 45° lead-in at the tip, down to the thread root diameter */
+      const T = hk + L, c = Math.min(P, L / 3), rm = thread ? Math.max(0.3, de / 2 - 0.6134 * P) : Math.max(0.3, r - c), R = rm + c;
+      const keep = KK.translate(KK.primitive('cone', { r: R, h: R }), [0, 0, T - c + R / 2]);
+      const ring = KK.boolean(cylAlong([0, 0, T - c], [0, 0, 1], r + 1, c + 1), keep, 'subtract');
+      polys = KK.boolean(polys, ring, 'subtract');
+    }
   } else {
     const de = d + tol, rh = thread ? (de - 1.0825 * P) / 2 : de / 2;
     polys = KK.boolean(hexPrism(s, 0, m), cylAlong([0, 0, -0.5], [0, 0, 1], rh, m + 1), 'subtract');
     if (thread) polys = KK.boolean(polys, threadTool({ internal: true, pitch: P, size: de, r: rh, len: m, start: 0, full: true, ax: [0, 0, 1], c: [0, 0, 0] }), 'subtract');
+    if (f.chamfer !== false) {
+      /* 90° countersink on both faces so the bolt finds the thread easily */
+      const rc = de / 2 + 0.15, e = 0.01, cone = KK.primitive('cone', { r: rc, h: rc });
+      polys = KK.boolean(polys, KK.translate(cone, [0, 0, rc / 2 - e]), 'subtract');
+      polys = KK.boolean(polys, KK.translate(KK.mirror(cone, 'XY'), [0, 0, m - rc / 2 + e]), 'subtract');
+    }
   }
   const pos = f.pos || [0, 0, 0];
   return KK.translate(polys, pos);

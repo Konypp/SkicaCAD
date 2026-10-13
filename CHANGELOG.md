@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.58
+- Matice: zkosený náběh díry (zahloubení 90°) z obou stran, šroub snáz najde začátek závitu. Šroub: zkosená špička 45°. Obojí je ve výchozím stavu zapnuté a jde vypnout v dialogu.
+
 ## Beta 0.57
 - Soubor: export rozdělen – Exportovat STL (.stl), Exportovat OBJ (.obj), nebo Exportovat vše (.zip se STL, OBJ a návrhem jako dosud).
 
