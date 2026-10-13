@@ -588,6 +588,7 @@ function render() {
   sun.target.position.copy(controls.target);
   if (cmd && cmd.onFrame) cmd.onFrame();
   if (typeof syncFaceBar === 'function') syncFaceBar();
+  if (sk) { const fg = G.skwork.getObjectByName('fine'); if (fg) fg.visible = 10 / worldPerPx(controls.target) > 90; }
   renderer.render(scene, c);
   renderCube();
   if (sk) { updateDimLabel(); updateSegLabels(); } else if (segLabelsOn) updateSegLabels();
@@ -1239,12 +1240,24 @@ function buildSketchGrid() {
     const a = P3(P, i, -ext, -0.01), b = P3(P, i, ext, -0.01), c = P3(P, -ext, i, -0.01), d = P3(P, ext, i, -0.01);
     arr.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z, d.x, d.y, d.z);
   }
-  const g1 = noRay(new THREE.LineSegments(lineGeo(mi), new THREE.LineBasicMaterial({ color: tok.grid, transparent: true, opacity: 0.8, depthWrite: false })));
-  const g2 = noRay(new THREE.LineSegments(lineGeo(ma), new THREE.LineBasicMaterial({ color: tok['grid-major'], transparent: true, opacity: 0.9, depthWrite: false })));
+  /* the grid is drawn over everything (depthTest off): on a face of a body it would otherwise fight with the face and flicker or vanish when zooming */
+  const g1 = noRay(new THREE.LineSegments(lineGeo(mi), new THREE.LineBasicMaterial({ color: tok.grid, transparent: true, opacity: 0.8, depthWrite: false, depthTest: false })));
+  const g2 = noRay(new THREE.LineSegments(lineGeo(ma), new THREE.LineBasicMaterial({ color: tok['grid-major'], transparent: true, opacity: 0.9, depthWrite: false, depthTest: false })));
+  g1.renderOrder = g2.renderOrder = -2;
+  /* light dots where the grid lines cross */
+  const dots = [];
+  for (let i = -ext; i <= ext; i += step) for (let j = -ext; j <= ext; j += step) { const q = P3(P, i, j, 0); dots.push(q.x, q.y, q.z); }
+  const gd = noRay(new THREE.Points(lineGeo(dots), new THREE.PointsMaterial({ color: tok['grid-major'], size: 3, sizeAttenuation: false, transparent: true, opacity: 0.75, depthWrite: false, depthTest: false })));
+  gd.renderOrder = -1;
+  /* 1 mm lines, shown only when zoomed in far enough (see render) */
+  const fl = [];
+  for (let i = -ext; i <= ext; i += 1) { if (i % step === 0) continue; const a = P3(P, i, -ext, 0), b = P3(P, i, ext, 0), c = P3(P, -ext, i, 0), d = P3(P, ext, i, 0); fl.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z, d.x, d.y, d.z); }
+  const gf = noRay(new THREE.LineSegments(lineGeo(fl), new THREE.LineBasicMaterial({ color: tok.grid, transparent: true, opacity: 0.45, depthWrite: false, depthTest: false })));
+  gf.name = 'fine'; gf.renderOrder = -3; gf.visible = false;
   const ax1 = P3(P, -ext, 0, -0.005), ax2 = P3(P, ext, 0, -0.005), ay1 = P3(P, 0, -ext, -0.005), ay2 = P3(P, 0, ext, -0.005);
-  const axU = noRay(new THREE.Line(lineGeo([ax1.x, ax1.y, ax1.z, ax2.x, ax2.y, ax2.z]), new THREE.LineBasicMaterial({ color: 0xe5484d, transparent: true, opacity: 0.6 })));
-  const axV = noRay(new THREE.Line(lineGeo([ay1.x, ay1.y, ay1.z, ay2.x, ay2.y, ay2.z]), new THREE.LineBasicMaterial({ color: 0x2f9e6a, transparent: true, opacity: 0.6 })));
-  const work = new THREE.Group(); work.name = 'grid'; work.add(g1, g2, axU, axV);
+  const axU = noRay(new THREE.Line(lineGeo([ax1.x, ax1.y, ax1.z, ax2.x, ax2.y, ax2.z]), new THREE.LineBasicMaterial({ color: 0xe5484d, transparent: true, opacity: 0.6, depthTest: false })));
+  const axV = noRay(new THREE.Line(lineGeo([ay1.x, ay1.y, ay1.z, ay2.x, ay2.y, ay2.z]), new THREE.LineBasicMaterial({ color: 0x2f9e6a, transparent: true, opacity: 0.6, depthTest: false })));
+  const work = new THREE.Group(); work.name = 'grid'; work.add(gf, g1, g2, gd, axU, axV);
   G.skwork.add(work);
   const live = new THREE.Group(); live.name = 'live'; G.skwork.add(live);
 }
@@ -1518,7 +1531,7 @@ function hitSketchEntity(ev) {
     const n = pl.pts.length, m = pl.closed ? n : n - 1;
     for (let k = 0; k < m; k++) {
       const a = toPx(P3(P, pl.pts[k][0], pl.pts[k][1])), b = toPx(P3(P, pl.pts[(k + 1) % n][0], pl.pts[(k + 1) % n][1]));
-      const [d] = segDist(mx, my, a, b); if (d < bd) { bd = d; best = i; }
+      const [d] = segDist(mx, my, a, b); if (d < bd || (i === sk.selEnt && d <= bd + 0.5)) { bd = d; best = i; }
     }
   });
   return best;
@@ -2714,8 +2727,13 @@ function pasteClip() {
   if (sk) {
     if (!clip || clip.kind !== 'ents') { toast('Schránka neobsahuje prvek skici. Zkopírujte ho Ctrl+C.'); return; }
     clip.n++;
-    const d = 10 * clip.n;
-    for (const e of clip.ents) sk.f.ents.push(translateEnt(e, d, d));
+    /* the copy goes next to the original: along X in the top, front and back views, along Y in the side views
+       (in plane coordinates: the plane direction closest to that world axis), shifted by its own width + 5 mm */
+    const P = sk.f.plane, W = Math.abs(P.n[0]) > 0.9 ? [0, 1, 0] : [1, 0, 0];
+    let du = W[0] * P.u[0] + W[1] * P.u[1] + W[2] * P.u[2], dv = W[0] * P.v[0] + W[1] * P.v[1] + W[2] * P.v[2]; const dl = Math.hypot(du, dv) || 1; du /= dl; dv /= dl;
+    const proj = entityPolylines(clip.ents).flatMap(pl => pl.pts).map(q => q[0] * du + q[1] * dv);
+    const width = proj.length ? Math.max(...proj) - Math.min(...proj) : 0, stepD = Math.ceil((width + 5) / settings.snap) * settings.snap, d = stepD * clip.n;
+    for (const e of clip.ents) { const c = translateEnt(e, d * du, d * dv); if (c.pts) c.pts = c.pts.map(q => [Math.round(q[0] * 1e4) / 1e4, Math.round(q[1] * 1e4) / 1e4]); sk.f.ents.push(c); }
     sk.selEnt = sk.f.ents.length - 1; renderPalette(); redrawSketch(); toast('Vloženo'); return;
   }
   if (cmd) return;
@@ -2728,7 +2746,7 @@ function pasteClip() {
 function duplicateSel() {
   if (sk) {
     const e = sk.f.ents[sk.selEnt]; if (!e) { toast('Vyberte prvek skici, který chcete duplikovat.'); return; }
-    sk.f.ents.push(translateEnt(e, 10, 10)); sk.selEnt = sk.f.ents.length - 1; renderPalette(); redrawSketch(); toast('Duplikováno. Kopii přesunete tažením.'); return;
+    sk.f.ents.push(translateEnt(e, 0, 0)); sk.selEnt = sk.f.ents.length - 1; renderPalette(); redrawSketch(); toast('Duplikováno na stejné místo. Kopii přesunete tažením.'); return;
   }
   if (cmd) return;
   if (!sel.size) { toast('Vyberte těleso, které chcete duplikovat.'); return; }

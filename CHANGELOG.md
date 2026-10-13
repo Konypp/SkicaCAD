@@ -1,5 +1,11 @@
 # Changelog
 
+## Beta 0.50
+- Skica na ploše tělesa: mřížka se kreslí vždy nad plochou, při přibližování už neproblikává ani nemizí.
+- Mřížka skici: v místech, kde se čáry kříží, jsou lehce zvýrazněné body. Při větším přiblížení se doplní jemná mřížka po 1 mm.
+- Ctrl+D (a tlačítko Duplikovat v paletě) vytvoří kopii na stejném místě jako originál, kopii pak přesunete tažením.
+- Ctrl+C / Ctrl+V ve skice: kopie se vloží vedle originálu (o jeho šířku + 5 mm) – v ose X pro horní, přední a zadní pohled, v ose Y pro levý a pravý pohled. Další vložení pokračují stejným směrem.
+
 ## Beta 0.49
 - Skica: pomocné prvky (konstrukční čáry). Kreslí se čárkovaně, netvoří profil k vysunutí, ale dají se k nim přichytávat body a fungují jako osa rotace. Tlačítko Pomocná (Q) v sekci Upravit: s vybraným nástrojem zapne pomocné kreslení (nové prvky budou pomocné), bez nástroje přepne vybraný prvek. V paletě má každý prvek volbu Pomocný prvek.
 
