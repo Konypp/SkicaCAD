@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.61
+- Manipulátor posunu: když se osa otočí na zápornou stranu (osa míří od pozorovatele), šipka teď míří ven do záporného směru. Dřív byla obrácená a mířila zpět do středu.
+
 ## Beta 0.60
 - Vkládané objekty (krychle, válec, koule, kužel, torus, šroub, matice) se vždy vytvoří jako nové těleso, i když se překrývají s existujícím. Spojit / vyříznout / průnik jde dál zvolit v dialogu (Operace). Vysunutí a rotace skici volí operaci automaticky jako dosud.
 
