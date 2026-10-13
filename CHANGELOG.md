@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.56
+- Nové nástroje Šroub a Matice (sekce Vytvořit): metrické závity M2–M24 podle ISO. Šroub se šestihrannou hlavou (ISO 4017) nebo válcovou hlavou s imbusem (ISO 4762), volitelná délka dříku a délka závitu. Matice šestihranná (ISO 4032). Závit lze modelovat, nebo vynechat (hladký dřík / díra). Vůle pro 3D tisk (výchozí 0,2 mm) zmenší průměr šroubu, nebo zvětší díru matice. Klepnutím do pohledu se díl umístí, poloha jde měnit manipulátorem. Lze vytvořit jako nové těleso, připojit, nebo vyříznout (např. díra se závitem).
+
 ## Beta 0.55
 - Knihovna návrhů: Zálohovat knihovnu (Soubor i Moje návrhy) uloží všechny návrhy včetně importovaných modelů a náhledů do jednoho souboru .zip. Obnovit ze zálohy ho načte zpět – i na jiném zařízení. Chybějící návrhy se doplní, existující se přepíšou jen novější verzí ze zálohy.
 - Úložiště: v Moje návrhy je ukazatel zaplnění úložiště prohlížeče. Při 80 % a 95 % aplikace upozorní a doporučí zálohu.

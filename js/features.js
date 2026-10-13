@@ -8,7 +8,7 @@ const PLANES = {
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
 const FEATURE_LABEL = { sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
-  fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', thread: 'Závit', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
+  fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
 function blobPolys(id) {
@@ -232,6 +232,38 @@ function offsetFace(polys, f) {
   if (!out.length) throw new Error('Úprava plochy by odstranila celé těleso');
   return out;
 }
+/* ---------- ISO metric bolts and nuts ----------
+   size: [pitch, hex across flats (ISO 4017 / 4032), hex head height, nut height, socket head diameter (ISO 4762), hex key, socket depth] */
+const FASTENERS = {
+  2: [0.4, 4, 1.4, 1.6, 3.8, 1.5, 1], 2.5: [0.45, 5, 1.7, 2, 4.5, 2, 1.1], 3: [0.5, 5.5, 2, 2.4, 5.5, 2.5, 1.3], 4: [0.7, 7, 2.8, 3.2, 7, 3, 2],
+  5: [0.8, 8, 3.5, 4.7, 8.5, 4, 2.5], 6: [1, 10, 4, 5.2, 10, 5, 3], 8: [1.25, 13, 5.3, 6.8, 13, 6, 4], 10: [1.5, 16, 6.4, 8.4, 16, 8, 5],
+  12: [1.75, 18, 7.5, 10.8, 18, 10, 6], 16: [2, 24, 10, 14.8, 24, 14, 8], 20: [2.5, 30, 12.5, 18, 30, 17, 10], 24: [3, 36, 15, 21.5, 36, 19, 12]
+};
+const XYB = { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] };
+const hexPrism = (af, z0, z1) => KK.extrudeProfiles([{ t: 'ngon', x: 0, y: 0, r: af / Math.sqrt(3), n: 6, a: 30 }], XYB, z0, z1);
+/* a bolt stands on its head (head z 0..k, shank above it), a nut lies on z = 0; tol is the 3D-printing clearance */
+function toolForFastener(f) {
+  const d = Number(f.size), M = FASTENERS[d]; if (!M) throw new Error('Neznámá velikost závitu');
+  const [P, s, k, m, dk, key, tk] = M, tol = Math.max(0, Math.min(1, Number(f.tol) || 0)), thread = f.thread !== false;
+  let polys;
+  if (f.type === 'bolt') {
+    const L = Number(f.len); if (!(L >= 2 * P && L <= 500)) throw new Error('Délka šroubu musí být ' + (2 * P) + ' až 500 mm');
+    const de = d - tol, r = de / 2, socket = f.head === 'socket', hk = socket ? d : k;
+    const head = socket ? cylAlong([0, 0, 0], [0, 0, 1], dk / 2, hk) : hexPrism(s, 0, hk);
+    polys = KK.boolean(head, cylAlong([0, 0, hk - 0.02], [0, 0, 1], r, L + 0.02), 'union');
+    if (socket) polys = KK.boolean(polys, hexPrism(key + tol, -0.5, Math.min(tk, hk - 0.6)), 'subtract');
+    if (thread) {
+      const tl = Number(f.tlen) > 0 ? Math.min(L, Number(f.tlen)) : L;
+      polys = KK.boolean(polys, threadTool({ pitch: P, size: de, r, len: L, start: 0, length: tl, fromEnd: true, ax: [0, 0, 1], c: [0, 0, hk] }), 'subtract');
+    }
+  } else {
+    const de = d + tol, rh = thread ? (de - 1.0825 * P) / 2 : de / 2;
+    polys = KK.boolean(hexPrism(s, 0, m), cylAlong([0, 0, -0.5], [0, 0, 1], rh, m + 1), 'subtract');
+    if (thread) polys = KK.boolean(polys, threadTool({ internal: true, pitch: P, size: de, r: rh, len: m, start: 0, full: true, ax: [0, 0, 1], c: [0, 0, 0] }), 'subtract');
+  }
+  const pos = f.pos || [0, 0, 0];
+  return KK.translate(polys, pos);
+}
 function toolForPrimitive(f) {
   const p = {}; for (const k in f.p) p[k] = Math.max(0.01, Number(f.p[k]) || 0);
   if (f.type === 'torus' && p.t >= p.R) throw new Error('Trubice musí být menší než hlavní poloměr');
@@ -268,6 +300,8 @@ function step(state, f) {
       out = applyTool(bodies, f, toolForRevolve(f, sketches), newBody); break;
     case 'box': case 'cylinder': case 'sphere': case 'cone': case 'torus':
       out = applyTool(bodies, f, toolForPrimitive(f), newBody); break;
+    case 'bolt': case 'nut':
+      out = applyTool(bodies, f, toolForFastener(f), polys => ({ id: f.id, name: (f.type === 'bolt' ? 'Šroub M' + f.size + '×' + f.len : 'Matice M' + f.size).replace('.', ','), polys, from: f.id })); break;
     case 'import':
       out = applyTool(bodies, f, importPolys(f), polys => ({ id: f.id, name: f.name || ('Import ' + (++n)), polys, from: f.id })); break;
     case 'mirror': case 'pattern': {
@@ -445,7 +479,7 @@ function makeRebuilder() {
   };
 }
 
-return { offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { FASTENERS, toolForFastener, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

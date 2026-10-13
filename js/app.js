@@ -54,6 +54,8 @@ const ICONS = {
   skjoin: '<path d="M4 6c3-2 6 2 9 0"/><path d="M4 18c3 2 6-2 9 0"/><path d="M13 6 18 12 13 18M4 6v12" stroke-dasharray="2 2" style="stroke:var(--orange)"/>',
   skcons: '<path d="M3 20 21 4" stroke-dasharray="3 2.5"/><circle cx="3.5" cy="19.5" r="1.6"/><circle cx="20.5" cy="4.5" r="1.6"/>',
   skdup: '<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>',
+  bolt: '<path class="b" d="M7 3h10l2 3.5-2 3.5H7L5 6.5z"/><path d="M9.5 10v11h5V10"/><path d="M9.5 13l5 1.5M9.5 16l5 1.5M9.5 19l5 1.5"/>',
+  nut: '<path class="b" d="M7.5 4h9l4.5 8-4.5 8h-9L3 12z"/><circle cx="12" cy="12" r="3.6"/>',
   thauto: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" style="fill:currentColor;stroke:none"/>',
   thlight: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
   thdark: '<path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/>',
@@ -908,7 +910,7 @@ function featureTitle(i) {
   let n = 0; for (let j = 0; j <= i; j++) if (doc.features[j].type === f.type) n++;
   return Engine.FEATURE_LABEL[f.type] + ' ' + n;
 }
-const TL_ICON = { offsetface: 'pressface', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
+const TL_ICON = { offsetface: 'pressface', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
 function renderTimeline() {
   const tr = $('#tltrack'); tr.innerHTML = '';
   const m = viewMarker === null ? doc.marker : viewMarker;
@@ -980,7 +982,7 @@ document.addEventListener('pointerdown', e => { const m = $('#ctxmenu'); if (!m.
 /* ================= ribbon ================= */
 const RIBBON = {
   solid: [
-    ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'], ['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus']]],
+    ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'], ['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus'], ['bolt', 'Šroub'], ['nut', 'Matice']]],
     ['Upravit', [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení'], ['combine', 'Kombinovat'], ['move', 'Přesunout', 'M'], ['rotate', 'Otočit', 'R'], ['scale', 'Měřítko'], ['center', 'Zarovnat'], ['facemode', 'Plochy', 'G'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole'], ['del', 'Odstranit', 'Del']]],
     ['Výběr', [['selall', 'Vybrat vše', 'Ctrl+A']]],
     ['Kontrola', [['measure', 'Měřit', 'I']]],
@@ -1019,6 +1021,7 @@ function runCommand(id) {
     case 'sketch': startSketchCmd(); break;
     case 'extrude': startExtrude(); break;
     case 'box': case 'cylinder': case 'sphere': case 'cone': case 'torus': startPrimitive(id); break;
+    case 'bolt': case 'nut': startFastener(id); break;
     case 'fillet': case 'chamfer': startEdgeMod(id); break;
     case 'combine': startCombine(); break;
     case 'move': startMove(); break;
@@ -1149,6 +1152,7 @@ function editFeature(i) {
     case 'sketch': viewMarker = i; refresh(); enterSketch(ef, i); break;
     case 'extrude': startExtrude(i, ef); break;
     case 'box': case 'cylinder': case 'sphere': case 'cone': case 'torus': startPrimitive(f.type, i, ef); break;
+    case 'bolt': case 'nut': startFastener(f.type, i, ef); break;
     case 'fillet': case 'chamfer': startEdgeMod(f.type, i, ef); break;
     case 'combine': startCombine(i, ef); break;
     case 'move': startMove(i, ef); break;
@@ -2170,6 +2174,78 @@ function startPrimitive(type, editIndex, f) {
     dlg.set('pos', c.pos); c.update();
   };
   c.onDragChange = e => { controls.enabled = !e.value; c.gizmoDrag = e.value; if (!e.value) { pivot.position.set(c.pos[0], c.pos[1], c.pos[2]); requestRender(); } };
+  beginCmd(c); c.init();
+}
+
+/* ================= bolts and nuts (ISO metric) ================= */
+const FAST_SIZES = [2, 2.5, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24];
+function startFastener(type, editIndex, f) {
+  const bolt = type === 'bolt', pivot = new THREE.Object3D(); scene.add(pivot);
+  const c = {
+    editIndex, tool: null, gizmoDrag: false, timer: null,
+    v: f ? { size: f.size, len: f.len, head: f.head || 'hex', thread: f.thread !== false, tlen: f.tlen || 0, tol: f.tol != null ? f.tol : 0.2 } : { size: 6, len: 20, head: 'hex', thread: true, tlen: 0, tol: 0.2 },
+    pos: f ? f.pos.slice() : [0, 0, 0], op: f ? f.op : 'new', autoOp: !f,
+    init() {
+      const sizes = FAST_SIZES.map(d => [String(d), 'M' + fmtc(d, 1)]);
+      openDialog({
+        title: Engine.FEATURE_LABEL[type], icon: type,
+        fields: [{ k: 'opt', id: 'size', label: 'Velikost závitu', options: sizes, value: String(this.v.size) },
+          ...(bolt ? [{ k: 'num', id: 'len', label: 'Délka dříku', value: this.v.len },
+            { k: 'opt', id: 'head', label: 'Hlava', options: [['hex', 'Šestihranná (ISO 4017)'], ['socket', 'Válcová s imbusem (ISO 4762)']], value: this.v.head }] : []),
+          { k: 'chk', id: 'thread', label: 'Modelovat závit', value: this.v.thread },
+          ...(bolt ? [{ k: 'num', id: 'tlen', label: 'Délka závitu (0 = celý dřík)', value: this.v.tlen }] : []),
+          { k: 'num', id: 'tol', label: bolt ? 'Vůle pro 3D tisk (zmenší průměr)' : 'Vůle pro 3D tisk (zvětší díru)', value: this.v.tol },
+          { k: 'xyz', id: 'pos', label: 'Poloha', value: this.pos },
+          { k: 'opt', id: 'op', label: 'Operace', options: OPS, value: this.op }, { k: 'note', id: 'n' }],
+        onChange: id => {
+          if (id === 'pos') this.pos = dlg.get('pos');
+          else if (id === 'op') { this.op = dlg.get('op'); this.autoOp = false; }
+          else if (id === 'size') this.v.size = parseFloat(dlg.get('size'));
+          else if (id === 'head') this.v.head = dlg.get('head');
+          else if (id === 'thread') this.v.thread = dlg.get('thread');
+          else { const x = dlg.get(id); if (isFinite(x) && x >= 0) this.v[id] = x; }
+          this.schedule();
+        }
+      });
+      transform.setMode('translate'); transform.setSpace('world');
+      transform.addEventListener('objectChange', this.onGizmo);
+      transform.addEventListener('dragging-changed', this.onDragChange);
+      transform.attach(pivot);
+      setPrompt(bolt ? 'Šroub stojí na hlavě. Klepnutím do pohledu ho umístíte, manipulátorem posunete.' : 'Klepnutím do pohledu matici umístíte, manipulátorem posunete.');
+      this.update();
+    },
+    feature() { return { id: f ? f.id : 'tmp', type, size: this.v.size, ...(bolt ? { len: this.v.len, head: this.v.head, tlen: this.v.tlen } : {}), thread: this.v.thread, tol: this.v.tol, pos: this.pos.slice(), op: this.op }; },
+    schedule() { clearTimeout(this.timer); dlg.set('n', 'Počítám…'); this.timer = setTimeout(() => this.update(), 120); },
+    update() {
+      clearGroup(G.preview); this.tool = null;
+      if (!this.gizmoDrag) pivot.position.set(this.pos[0], this.pos[1], this.pos[2]);
+      try {
+        this.tool = Engine.toolForFastener(this.feature());
+        if (this.autoOp) { const o = anyOverlap(this.tool) ? 'join' : 'new'; if (o !== this.op) { this.op = o; dlg.set('op', o); } }
+        G.preview.add(previewMesh(this.tool, this.op));
+        const M = Engine.FASTENERS[this.v.size];
+        dlg.set('n', `M${fmtc(this.v.size, 1)} × ${fmtc(M[0], 2)} · ` + (bolt ? (this.v.head === 'socket' ? `hlava Ø ${fmtc(M[4], 1)} × ${fmtc(this.v.size, 1)} mm, imbus ${fmtc(M[5], 1)}` : `klíč ${fmtc(M[1], 1)}, hlava ${fmtc(M[2], 1)} mm`) : `klíč ${fmtc(M[1], 1)}, výška ${fmtc(M[3], 1)} mm`));
+        dlg.okEnabled(true);
+      } catch (e) { dlg.set('n', '!' + e.message); dlg.okEnabled(false); }
+      requestRender();
+    },
+    onClick(ev) {
+      const h = hitBodies(ev); let p;
+      if (h) p = h.point; else { ray.setFromCamera(evNdc(ev), cam()); p = ray.ray.intersectPlane(new THREE.Plane(new V3(0, 0, 1), 0), new V3()); }
+      if (!p) return;
+      this.pos = [snapV(p.x), snapV(p.y), Math.round(p.z * 1000) / 1000]; dlg.set('pos', this.pos); this.schedule();
+    },
+    onGizmo: null, onDragChange: null,
+    ok() { if (!this.tool) return null; const out = this.feature(); out.id = f ? f.id : newId(); return out; },
+    cleanup() {
+      clearTimeout(this.timer);
+      transform.removeEventListener('objectChange', this.onGizmo);
+      transform.removeEventListener('dragging-changed', this.onDragChange);
+      transform.detach(); transform.enabled = true; scene.remove(pivot); controls.enabled = true;
+    }
+  };
+  c.onGizmo = () => { const p = pivot.position; c.pos = [snapV(p.x), snapV(p.y), snapV(p.z)]; dlg.set('pos', c.pos); };
+  c.onDragChange = e => { controls.enabled = !e.value; c.gizmoDrag = e.value; if (!e.value) { pivot.position.set(c.pos[0], c.pos[1], c.pos[2]); c.schedule(); } };
   beginCmd(c); c.init();
 }
 
