@@ -252,9 +252,15 @@ function toolForFastener(f) {
     const head = socket ? cylAlong([0, 0, 0], [0, 0, 1], dk / 2, hk) : hexPrism(s, 0, hk);
     polys = KK.boolean(head, cylAlong([0, 0, hk - 0.02], [0, 0, 1], r, L + 0.02), 'union');
     if (socket) polys = KK.boolean(polys, hexPrism(key + tol, -0.5, Math.min(tk, hk - 0.6)), 'subtract');
+    /* thread undercut (DIN 76 style): a short plain neck below the head, slightly under the thread root diameter */
+    const g = thread && f.undercut ? Math.min(2.5 * P, L / 3) : 0;
     if (thread) {
-      const tl = Number(f.tlen) > 0 ? Math.min(L, Number(f.tlen)) : L;
-      polys = KK.boolean(polys, threadTool({ pitch: P, size: de, r, len: L, start: 0, length: tl, fromEnd: true, ax: [0, 0, 1], c: [0, 0, hk] }), 'subtract');
+      const tl = Math.min(L - g, Number(f.tlen) > 0 ? Number(f.tlen) : L);
+      if (tl >= P / 2) polys = KK.boolean(polys, threadTool({ pitch: P, size: de, r, len: L, start: 0, length: tl, fromEnd: true, ax: [0, 0, 1], c: [0, 0, hk] }), 'subtract');
+    }
+    if (g > 0) {
+      const rg = Math.max(0.3, de / 2 - 0.6134 * P - 0.1), ring = KK.boolean(cylAlong([0, 0, hk], [0, 0, 1], r + 1, g), cylAlong([0, 0, hk - 0.5], [0, 0, 1], rg, g + 1), 'subtract');
+      polys = KK.boolean(polys, ring, 'subtract');
     }
     if (f.chamfer !== false) {
       /* 45° lead-in at the tip, down to the thread root diameter */

@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.64
+- Šroub: volba Zápich pod hlavou (ve výchozím stavu zapnutá). Pod hlavou zůstane krátký hladký krček (2,5 × stoupání) o něco tenčí než dno závitu, takže matice dojede až k hlavě bez drhnutí v nejproblematičtějších vrstvách tisku. Závit pak končí nad zápichem.
+
 ## Beta 0.63
 - Skica z plochy: rovnoměrná změna velikosti (tažením bodu se mění celý obrys) je zapnutá automaticky, i při pozdější úpravě takové skici.
 - Rovnoměrná změna velikosti s přichytáváním: delší strana obrysu se mění po celých krocích mřížky (dřív např. 48,4 mm, teď 48 mm). U kurzoru se ukazuje i výsledný rozměr.

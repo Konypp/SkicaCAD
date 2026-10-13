@@ -2204,7 +2204,7 @@ function startFastener(type, editIndex, f) {
   const bolt = type === 'bolt', pivot = new THREE.Object3D(); scene.add(pivot);
   const c = {
     editIndex, tool: null, gizmoDrag: false, timer: null,
-    v: f ? { size: f.size, len: f.len, head: f.head || 'hex', thread: f.thread !== false, chamfer: f.chamfer !== false, tlen: f.tlen || 0, tol: f.tol != null ? f.tol : 0.2 } : { size: 6, len: 20, head: 'hex', thread: true, chamfer: true, tlen: 0, tol: 0.2 },
+    v: f ? { size: f.size, len: f.len, head: f.head || 'hex', thread: f.thread !== false, chamfer: f.chamfer !== false, undercut: !!f.undercut, tlen: f.tlen || 0, tol: f.tol != null ? f.tol : 0.2 } : { size: 6, len: 20, head: 'hex', thread: true, chamfer: true, undercut: true, tlen: 0, tol: 0.2 },
     pos: f ? f.pos.slice() : [0, 0, 0], op: f ? f.op : 'new', autoOp: false,
     init() {
       const sizes = FAST_SIZES.map(d => [String(d), 'M' + fmtc(d, 1)]);
@@ -2215,7 +2215,7 @@ function startFastener(type, editIndex, f) {
             { k: 'opt', id: 'head', label: 'Hlava', options: [['hex', 'Šestihranná (ISO 4017)'], ['socket', 'Válcová s imbusem (ISO 4762)']], value: this.v.head }] : []),
           { k: 'chk', id: 'thread', label: 'Modelovat závit', value: this.v.thread },
           { k: 'chk', id: 'chamfer', label: bolt ? 'Zkosená špička (snazší našroubování)' : 'Zkosený náběh díry z obou stran', value: this.v.chamfer },
-          ...(bolt ? [{ k: 'num', id: 'tlen', label: 'Délka závitu (0 = celý dřík)', value: this.v.tlen }] : []),
+          ...(bolt ? [{ k: 'chk', id: 'undercut', label: 'Zápich pod hlavou (hladký krček bez závitu)', value: this.v.undercut }, { k: 'num', id: 'tlen', label: 'Délka závitu (0 = celý dřík)', value: this.v.tlen }] : []),
           { k: 'num', id: 'tol', label: bolt ? 'Vůle pro 3D tisk (zmenší průměr)' : 'Vůle pro 3D tisk (zvětší díru)', value: this.v.tol },
           { k: 'xyz', id: 'pos', label: 'Poloha', value: this.pos },
           { k: 'opt', id: 'op', label: 'Operace', options: OPS, value: this.op }, { k: 'note', id: 'n' }],
@@ -2226,6 +2226,7 @@ function startFastener(type, editIndex, f) {
           else if (id === 'head') this.v.head = dlg.get('head');
           else if (id === 'thread') this.v.thread = dlg.get('thread');
           else if (id === 'chamfer') this.v.chamfer = dlg.get('chamfer');
+          else if (id === 'undercut') this.v.undercut = dlg.get('undercut');
           else { const x = dlg.get(id); if (isFinite(x) && x >= 0) this.v[id] = x; }
           this.schedule();
         }
@@ -2237,7 +2238,7 @@ function startFastener(type, editIndex, f) {
       setPrompt(bolt ? 'Šroub stojí na hlavě. Klepnutím do pohledu ho umístíte, manipulátorem posunete.' : 'Klepnutím do pohledu matici umístíte, manipulátorem posunete.');
       this.update();
     },
-    feature() { return { id: f ? f.id : 'tmp', type, size: this.v.size, ...(bolt ? { len: this.v.len, head: this.v.head, tlen: this.v.tlen } : {}), thread: this.v.thread, chamfer: this.v.chamfer, tol: this.v.tol, pos: this.pos.slice(), op: this.op }; },
+    feature() { return { id: f ? f.id : 'tmp', type, size: this.v.size, ...(bolt ? { len: this.v.len, head: this.v.head, tlen: this.v.tlen, undercut: this.v.undercut } : {}), thread: this.v.thread, chamfer: this.v.chamfer, tol: this.v.tol, pos: this.pos.slice(), op: this.op }; },
     schedule() { clearTimeout(this.timer); dlg.set('n', 'Počítám…'); this.timer = setTimeout(() => this.update(), 120); },
     update() {
       clearGroup(G.preview); this.tool = null;
