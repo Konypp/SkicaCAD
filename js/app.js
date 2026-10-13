@@ -1274,6 +1274,7 @@ function redrawSketch() {
   updateUndo();
   if (sk.snapPt) live.add(sk.snapMid ? midMarker(P, sk.snapPt, tok.accent) : pointsObj(P, [sk.snapPt], tok.accent, 10));
   if (sk.hoverMid && !sk.tool) live.add(midMarker(P, sk.hoverMid, tok.accent));
+  if (sk.gridHot && !sk.snapPt) live.add(crossMarker(P, sk.gridHot));
   /* the sketch grid is drawn without depth test in the transparent pass (so a body face cannot hide it);
      sketch lines and points must therefore come after it in that pass, or the grid would paint over them */
   live.traverse(o => { if (o.isLine || o.isPoints) { o.material.transparent = true; o.renderOrder = Math.max(o.renderOrder, 6); } });
@@ -1410,6 +1411,7 @@ function sketchHandleAt(ev) {
   return best;
 }
 function sketchDrag(ev) {
+  sk.gridHot = gridCrossNear(ev);
   if (sk.drag.move) {
     if (!down || !down.moved) return;
     const d = sk.drag, p = sketchRawPoint(ev); if (!p) return;
@@ -1437,8 +1439,9 @@ function sketchDrag(ev) {
 }
 function sketchMove(ev) {
   if (!sk.tool) { dom.style.cursor = sketchHandleAt(ev) ? 'move' : ''; }
-  if (!sk.tool || sk.tool === 'skfillet' || sk.tool === 'sktrim' || sk.tool === 'skjoin') { sk.snapPt = null; sk.cursor = null; sk.hoverMid = !sk.tool ? nearMidpoint(ev) : null; redrawSketch(); return; }
+  if (!sk.tool || sk.tool === 'skfillet' || sk.tool === 'sktrim' || sk.tool === 'skjoin') { sk.snapPt = null; sk.cursor = null; sk.gridHot = null; sk.hoverMid = !sk.tool ? nearMidpoint(ev) : null; redrawSketch(); return; }
   sk.cursor = sketchPoint(ev);
+  sk.gridHot = isFreehand() ? null : gridCrossNear(ev);
   redrawSketch();
   updateDimLabel(ev);
 }
@@ -1582,6 +1585,23 @@ function nearMidpoint(ev, maxPx) {
   const [mx, my] = evPx(ev), P = sk.f.plane; let best = null, bd = maxPx || (TOUCH ? 16 : 10);
   for (const q of midPoints()) { const s = toPx(P3(P, q[0], q[1])); const d = Math.hypot(s[0] - mx, s[1] - my); if (d < bd) { bd = d; best = q; } }
   return best;
+}
+/* grid crossing near the pointer (10 mm grid, or 1 mm when the fine grid is shown), only while drawing or dragging */
+function gridCrossNear(ev) {
+  const p = sketchRawPoint(ev); if (!p) return null;
+  const fg = G.skwork.getObjectByName('fine'), sp = fg && fg.visible ? 1 : 10;
+  const c = [Math.round(p[0] / sp) * sp, Math.round(p[1] / sp) * sp], P = sk.f.plane;
+  const s = toPx(P3(P, c[0], c[1])), [mx, my] = evPx(ev);
+  return Math.hypot(s[0] - mx, s[1] - my) < (TOUCH ? 14 : 9) ? c : null;
+}
+function crossMarker(P, q) {
+  const s = worldPerPx(P3(P, q[0], q[1])) * 5, arr = [];
+  for (let i = 0; i <= 24; i++) { const a = i / 24 * Math.PI * 2, v = P3(P, q[0] + Math.cos(a) * s, q[1] + Math.sin(a) * s, 0.02); arr.push(v.x, v.y, v.z); }
+  const g = noRay(new THREE.Group());
+  g.add(noRay(new THREE.Line(lineGeo(arr), new THREE.LineBasicMaterial({ color: tok['accent-hover'], transparent: true, opacity: 0.9, depthTest: false }))));
+  const d = P3(P, q[0], q[1], 0.02);
+  g.add(noRay(new THREE.Points(lineGeo([d.x, d.y, d.z]), new THREE.PointsMaterial({ color: tok['accent-hover'], size: 4, sizeAttenuation: false, transparent: true, opacity: 0.8, depthTest: false }))));
+  return g;
 }
 /* small triangle marking a midpoint (constant size on screen) */
 function midMarker(P, q, color) {
@@ -3774,18 +3794,18 @@ dom.addEventListener('pointermove', e => {
   lastMoveEv = e;
   if (!hoverQueued) { hoverQueued = true; requestAnimationFrame(() => { hoverQueued = false; handleHover(lastMoveEv); }); }
 });
-dom.addEventListener('pointerleave', () => { if (sk && sk.hoverMid) { sk.hoverMid = null; redrawSketch(); } if (cmd && cmd.onLeave) cmd.onLeave(); if (hoverBody) { hoverBody = null; styleBodies(); } $('#dim').hidden = true; });
+dom.addEventListener('pointerleave', () => { if (sk && (sk.hoverMid || sk.gridHot)) { sk.hoverMid = null; sk.gridHot = null; redrawSketch(); } if (cmd && cmd.onLeave) cmd.onLeave(); if (hoverBody) { hoverBody = null; styleBodies(); } $('#dim').hidden = true; });
 dom.addEventListener('pointercancel', e => { if (drawDrag && e.pointerId === drawDrag.id) cancelDrawDrag(); });
 dom.addEventListener('pointerup', e => {
   if (drawDrag && e.pointerId === drawDrag.id) {
-    const dd = drawDrag; drawDrag = null; controls.enabled = true;
+    const dd = drawDrag; drawDrag = null; controls.enabled = true; if (sk && e.pointerType === 'touch') sk.gridHot = null;
     if (dd.started) { down = null; lastTap = null; if (dd.free) finishFreehand(); else sketchClick(e); return; }
     if (isFreehand()) { down = null; return; }
   }
   if (!down) return;
   const d = down; down = null; clearTimeout(longPressT);
   if (d.longpress) return;
-  if (d.special) { if (sk && sk.drag) { sk.drag = null; controls.enabled = true; $('#dim').hidden = true; renderPalette(); redrawSketch(); return; } if (cmd && cmd.onUp) cmd.onUp(e); return; }
+  if (d.special) { if (sk && sk.drag) { sk.drag = null; sk.gridHot = null; controls.enabled = true; $('#dim').hidden = true; renderPalette(); redrawSketch(); return; } if (cmd && cmd.onUp) cmd.onUp(e); return; }
   const moved = Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5;
   if (d.gizmo || moved) { if (cmd && cmd.onLeave && moved) cmd.onLeave(); return; }
   if (d.btn === 2 && sk && isPolyTool(sk.tool) && sk.draft) { finishPolyline(false); return; }

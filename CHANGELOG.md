@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.53
+- Mřížka skici: průsečík mřížky se lehce modře zvýrazní (kroužek s tečkou) jen tehdy, když se k němu při kreslení nebo při posouvání bodu či prvku přiblížíte. Jinak se nic nezvýrazňuje. Při přiblížení s jemnou mřížkou platí pro průsečíky po 1 mm.
+
 ## Beta 0.52
 - Oprava: obrys skici splýval s mřížkou (mřížka se od verze 0.50 kreslila přes čáry skici). Čáry, body a značky skici jsou teď zase nad mřížkou.
 
