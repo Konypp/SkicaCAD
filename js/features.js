@@ -182,7 +182,8 @@ function threadTool(f) {
     sp = { rConst: inner - 0.05, rCrest: r + 0.02, rRoot: d / 2, crestF: 0.25, rootF: 0.125 };
     if (sp.rRoot < sp.rCrest + 0.02) throw new Error('Díra je pro zvolenou velikost závitu příliš velká');
   } else {
-    sp = { rConst: r + 0.05, rCrest: inner - 0.02, rRoot: d / 2 - 0.6134 * P, crestF: 0.125, rootF: 0.25 };
+    /* ISO 68-1 external profile: crest flat P/8, root at d3 = d - 1.2269 P; flanks kept at 60° all the way down, which leaves a root flat of P/6 (approximates the rounded root R = H/6) */
+    sp = { rConst: r + 0.05, rCrest: inner - 0.02, rRoot: d / 2 - 0.6134 * P, crestF: 0.125, rootF: 1 - 0.125 - 2 * 0.6134 * Math.tan(Math.PI / 6) };
     if (sp.rRoot > sp.rCrest - 0.02) throw new Error('Válec je pro zvolenou velikost závitu příliš tenký');
     if (sp.rRoot <= 0.05) throw new Error('Stoupání je pro tento průměr příliš velké');
   }
