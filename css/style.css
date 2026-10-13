@@ -244,7 +244,12 @@ button { cursor: pointer; }
   .navbar { bottom: auto; top: 96px; left: auto; right: 12px; transform: none; flex-direction: column; border-radius: 18px; }
   .navbar .sep { width: 18px; height: 1px; margin: 3px 0; }
   .navbar select { width: 32px; }
-  .prompt { top: 54px; max-width: calc(100% - 32px); }
+  /* phone: the hint is at most two lines wide across the screen; after touching the work area it shrinks to a small "?" (tap to read it again) */
+  .prompt { top: 54px; width: max-content; max-width: calc(100% - 32px); font-size: 12px; line-height: 1.3; padding: 5px 12px; border-radius: 12px; pointer-events: auto; cursor: pointer;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; padding-bottom: 0; border-bottom: 5px solid var(--panel); transition: opacity .15s; }
+  .prompt.full { -webkit-line-clamp: unset; }
+  .prompt.min { width: 28px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 50%; font-size: 0; display: block; opacity: .85; }
+  .prompt.min::before { content: '?'; display: block; font: 600 14px/28px var(--font); text-align: center; color: var(--muted); }
   .info { display: none; }
   .tlname { display: none; }
 }

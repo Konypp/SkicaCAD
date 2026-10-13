@@ -768,7 +768,10 @@ function faceOverlay(polys, keyStr, color, opacity) {
 function clearGroup(g) { while (g.children.length) { const c = g.children.pop(); disposeObj(c); } }
 
 /* ================= UI: prompt, toast, info ================= */
-function setPrompt(t) { const p = $('#prompt'); p.textContent = t || ''; p.hidden = !t; }
+const NARROW = () => window.matchMedia('(max-width: 760px)').matches;
+function setPrompt(t) { const p = $('#prompt'); if (p.textContent !== (t || '')) p.classList.remove('min', 'full'); p.textContent = t || ''; p.hidden = !t; }
+/* phone: the hint stays out of the way – touching the work area shrinks it to "?", tapping it shows the whole text */
+$('#prompt').addEventListener('click', () => { const p = $('#prompt'); if (!NARROW()) return; if (p.classList.contains('min')) { p.classList.remove('min'); p.classList.add('full'); } else p.classList.toggle('full'); });
 let toastT;
 function toast(t) { const el = $('#toast'); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 3200); }
 function updateInfo() {
@@ -3667,6 +3670,7 @@ let down = null, hoverQueued = false, lastMoveEv = null, longPressT = null, draw
 function cancelDrawDrag() { if (!drawDrag) return; const dd = drawDrag; drawDrag = null; controls.enabled = true; if (dd.started && (dd.created || dd.free)) { sk.draft = null; sk.cursor = null; } if (sk) { redrawSketch(); $('#dim').hidden = true; } }
 dom.addEventListener('pointerdown', e => {
   try { dom.focus({ preventScroll: true }); } catch (er) {}
+  if (NARROW()) { const pr = $('#prompt'); if (!pr.hidden) { pr.classList.remove('full'); pr.classList.add('min'); } }
   if (sk) sk.hoverMid = null;
   if (sk && sk.drag && sk.drag.move && sk.drag.pid !== e.pointerId) { sk.f.ents[sk.drag.ei] = sk.drag.orig; sk.drag = null; controls.enabled = true; $('#dim').hidden = true; redrawSketch(); }
   down = { x: e.clientX, y: e.clientY, btn: e.button, gizmo: !!(transform.object && transform.axis), special: false };

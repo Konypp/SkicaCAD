@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.48
+- Mobil: nápověda nahoře na ploše už nepřekrývá pracovní plochu. Je přes celou šířku a nejvýš na dva řádky. Po prvním dotyku plochy se zmenší na malé „?“, klepnutím na něj se zobrazí celá. Při změně nápovědy (další krok, jiný nástroj) se znovu ukáže.
+
 ## Beta 0.47
 - Skica: krok zpět a znovu během kreslení skici (tlačítka Zpět/Znovu v horní liště, Ctrl+Z / Ctrl+Y). Při rozkreslené čáře nebo křivce krok zpět odebere poslední bod, u rozkresleného tvaru ho zruší. Jinak vrací nakreslené prvky, přesuny, úpravy v paletě a v kótách, spojení, duplikace i mazání. Po dokončení skice se celá skica vrací jako jeden krok.
 
