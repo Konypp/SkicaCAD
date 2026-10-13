@@ -251,6 +251,7 @@
     [/^M([\d.,]+) × ([\d.,]+) · klíč ([\d.,]+), hlava ([\d.,]+) mm$/, 'M$1 × $2 · wrench $3, head $4 mm'],
     [/^M([\d.,]+) × ([\d.,]+) · klíč ([\d.,]+), výška ([\d.,]+) mm$/, 'M$1 × $2 · wrench $3, height $4 mm'],
     [/^Délka šroubu musí být ([\d.,]+) až 500 mm$/, 'Bolt length must be $1 to 500 mm'], [/^Šroub (\d+)$/, 'Bolt $1'], [/^Matice (\d+)$/, 'Nut $1'], [/^Šroub M([\d,]+)×([\d,]+)$/, 'Bolt M$1×$2'], [/^Matice M([\d,]+)$/, 'Nut M$1'],
+    [/^Tady nejde uložit soubor (\w+) přímo, je zabalený v ZIP\. Ve verzi na GitHub Pages se uloží přímo\.$/, 'The $1 file cannot be saved directly here, it is packed in a ZIP. The GitHub Pages version saves it directly.'],
     [/^Vítejte ve (.+)$/, 'Welcome to $1'], [/^Pokračovat: (.+)$/, 'Continue: $1'],
     [/^Otevřen návrh „(.+)“$/, 'Opened design “$1”'], [/^Smazat návrh (.+)$/, 'Delete design $1'],
     [/^(\d+) krok$/, '$1 step'], [/^(\d+) kroky$/, '$1 steps'], [/^(\d+) kroků$/, '$1 steps'], [/^otevřený$/, 'open'],

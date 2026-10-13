@@ -4024,7 +4024,18 @@ const dl = { async save({ filename, data }) {
 function updateMenu() { ['#m-save', '#m-export'].forEach(s => { $(s).disabled = !dl; $(s).title = dl ? '' : 'Ukládání souborů není v tomto zobrazení dostupné'; }); }
 async function saveFile(filename, data, okMsg) {
   if (!dl) { toast('Ukládání souborů není v tomto zobrazení dostupné.'); return; }
-  try { await dl.save({ filename, data }); toast(okMsg || 'Soubor uložen'); } catch (e) { if (!e || e.code !== 'declined') toast('Soubor se nepodařilo uložit.'); }
+  try { await dl.save({ filename, data }); toast(okMsg || 'Soubor uložen'); }
+  catch (e) {
+    /* the Claude preview only lets pages save some file types (not .stl / .obj): hand the file over packed in a .zip */
+    if (e && e.code === 'rejected_extension' && !/\.zip$/i.test(filename)) {
+      try {
+        await dl.save({ filename: filename + '.zip', data: makeZip([{ name: filename, data: typeof data === 'string' ? new TextEncoder().encode(data) : data }]) });
+        toast('Tady nejde uložit soubor ' + filename.split('.').pop().toUpperCase() + ' přímo, je zabalený v ZIP. Ve verzi na GitHub Pages se uloží přímo.');
+      } catch (e2) { if (!e2 || e2.code !== 'declined') toast('Soubor se nepodařilo uložit.'); }
+      return;
+    }
+    if (!e || e.code !== 'declined') toast('Soubor se nepodařilo uložit.');
+  }
 }
 const slug = () => (doc.name || 'model').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'model';
 /* file names carry the app name and version, e.g. drzak-s-nabojem_SkicaCAD-Beta-0.9 */
