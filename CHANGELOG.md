@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 0.70
+- Měřit: měří se skutečná kolmá vzdálenost mezi objekty, ne jen mezi dvěma body. Hrana–hrana (rovnoběžné hrany: jejich vzdálenost, jinak nejkratší vzdálenost a úhel), bod–hrana, bod–plocha, hrana–plocha a plocha–plocha (rovnoběžné plochy: tloušťka, jinak úhel mezi plochami).
+- Měřit: vybrané hrany a plochy zůstanou zvýrazněné, pomocné čárkované čáry ukazují, odkud se kolmice měří.
+
 ## Beta 0.69
 - Měřit: přesnější přichytávání. Bod se přichytí k vrcholu, ke středu hrany, ke středu kružnice či oblouku (i otvoru) nebo k nejbližšímu bodu hrany, a to i když kurzor není přímo na tělese. Zakryté hrany a vrcholy se ignorují. Na dotykové obrazovce je dosah přichycení větší.
 - Měřit: u kurzoru se ukazuje, k čemu se bod přichytí (Vrchol, Střed hrany, Hrana…), hrana pod kurzorem se zvýrazní a v okně se ukáže její délka nebo průměr kružnice.

@@ -3593,6 +3593,43 @@ function mpts(list, color, size) {
   const o = noRay(new THREE.Points(g, new THREE.PointsMaterial({ color, size, sizeAttenuation: false, depthTest: false, transparent: true })));
   o.renderOrder = 13; return o;
 }
+/* what was picked, as geometry: a point, a straight edge (line) or a flat face (plane) */
+function measureGeom(q) {
+  if (q.kind === 'e' && q.chain && q.chain.kind === 'line') { const a = v3(q.chain.line.p0), b = v3(q.chain.line.p1); return { t: 'line', a, b, d: b.clone().sub(a).normalize() }; }
+  if (q.kind === 'f' && q.flat) return { t: 'plane', o: q.p, n: q.n };
+  return { t: 'point', p: q.p };
+}
+/* distance between two picks: perpendicular when an edge or a face is involved, plus the angle for non-parallel edges or faces */
+function measureResult(qa, qb) {
+  const A = measureGeom(qa), B = measureGeom(qb), D2R_ = 180 / Math.PI;
+  const onLine = (p, L) => L.a.clone().add(L.d.clone().multiplyScalar(p.clone().sub(L.a).dot(L.d)));
+  const onPlane = (p, P) => p.clone().sub(P.n.clone().multiplyScalar(p.clone().sub(P.o).dot(P.n)));
+  const par = (u, v) => Math.abs(Math.abs(u.dot(v)) - 1) < 1e-4;
+  const ang = (u, v) => Math.acos(Math.min(1, Math.abs(u.dot(v)))) * D2R_;
+  const T = A.t + '-' + B.t;
+  let pa = qa.p.clone(), pb = qb.p.clone(), label = 'Vzdálenost', angle = null, angOnly = false;
+  if (T === 'point-point') { /* plain */ }
+  else if (T === 'point-line') { pb = onLine(pa, B); label = 'Kolmá vzdálenost od hrany'; }
+  else if (T === 'line-point') { pa = onLine(pb, A); label = 'Kolmá vzdálenost od hrany'; }
+  else if (T === 'point-plane') { pb = onPlane(pa, B); label = 'Kolmá vzdálenost od plochy'; }
+  else if (T === 'plane-point') { pa = onPlane(pb, A); label = 'Kolmá vzdálenost od plochy'; }
+  else if (T === 'line-line') {
+    if (par(A.d, B.d)) { pb = onLine(pa, B); label = 'Vzdálenost rovnoběžných hran'; }
+    else {
+      const w = A.a.clone().sub(B.a), b = A.d.dot(B.d), d = A.d.dot(w), e = B.d.dot(w), den = 1 - b * b;
+      pa = A.a.clone().add(A.d.clone().multiplyScalar((b * e - d) / den)); pb = B.a.clone().add(B.d.clone().multiplyScalar((e - b * d) / den));
+      label = 'Nejkratší vzdálenost přímek hran'; angle = ang(A.d, B.d);
+    }
+  } else if (T === 'plane-plane') {
+    if (par(A.n, B.n)) { pb = onPlane(pa, B); label = 'Vzdálenost rovnoběžných ploch'; }
+    else { angOnly = true; angle = 180 - Math.acos(Math.max(-1, Math.min(1, A.n.dot(B.n)))) * D2R_; }
+  } else if (T === 'line-plane' || T === 'plane-line') {
+    const L = A.t === 'line' ? A : B, P = A.t === 'line' ? B : A;
+    if (Math.abs(L.d.dot(P.n)) < 1e-4) { const pl = L === A ? pa : pb, pp = onPlane(pl, P); if (L === A) pb = pp; else pa = pp; label = 'Vzdálenost hrany od plochy'; }
+    else { angOnly = true; angle = 90 - Math.acos(Math.min(1, Math.abs(L.d.dot(P.n)))) * D2R_; }
+  }
+  return { pa, pb, d: pa.distanceTo(pb), label, angle, angOnly };
+}
 function startMeasure() {
   const R = TOUCH ? 24 : 14; /* snap radius in screen pixels */
   const c = {
@@ -3625,14 +3662,15 @@ function startMeasure() {
       edges.sort((a, b) => a.d - b.d);
       for (const q of edges.slice(0, 8)) if (!occluded(q.p)) return q;
       const h = hitBodies(ev);
-      return h ? { p: h.point.clone(), kind: 'f' } : null;
+      if (!h) return null;
+      const { poly } = polyOfHit(h), polys = h.object.userData.polys;
+      return { p: h.point.clone(), kind: 'f', n: v3(poly.n).normalize(), flat: !smoothFor(polys)[polys.indexOf(poly)], polys, key: planeKey(poly) };
     },
     update() {
       const f3 = q => `${MEASURE_KIND[q.kind]}: ${fmtc(q.p.x, 2)}; ${fmtc(q.p.y, 2)}; ${fmtc(q.p.z, 2)}`;
       dlg.set('p1', { text: this.pts[0] ? f3(this.pts[0]) : 'Klepněte na model', has: !!this.pts[0], active: this.pts.length === 0 || this.pts.length === 2 });
       dlg.set('p2', { text: this.pts[1] ? f3(this.pts[1]) : 'Klepněte na model', has: !!this.pts[1], active: this.pts.length === 1 });
       clearGroup(G.overlay);
-      const dist = (a, b) => `Vzdálenost ${fmtc(a.distanceTo(b), 3)} mm · ΔX ${fmtc(b.x - a.x, 3)} · ΔY ${fmtc(b.y - a.y, 3)} · ΔZ ${fmtc(b.z - a.z, 3)} mm`;
       const line = (a, b, dashed) => {
         const ln = noRay(new THREE.Line(lineGeo([a.x, a.y, a.z, b.x, b.y, b.z]), dashed
           ? new THREE.LineDashedMaterial({ color: tok.orange, depthTest: false, transparent: true, dashSize: worldPerPx(a) * 6, gapSize: worldPerPx(a) * 4 })
@@ -3641,7 +3679,9 @@ function startMeasure() {
         ln.renderOrder = 12; G.overlay.add(ln);
       };
       const hv = this.hover;
-      if (hv && hv.chain) G.overlay.add(segLine(hv.chain.pts, tok.accent));
+      const mark = (q, col, op) => { if (q.chain) G.overlay.add(segLine(q.chain.pts, col)); else if (q.kind === 'f' && q.flat) G.overlay.add(faceOverlay(q.polys, q.key, col, op)); };
+      this.pts.forEach(q => mark(q, tok.orange, 0.25));
+      if (hv && !this.pts.some(q => (q.chain && q.chain === hv.chain) || (q.kind === 'f' && hv.kind === 'f' && q.polys === hv.polys && q.key === hv.key))) mark(hv, tok.accent, 0.18);
       if (this.pts.length) G.overlay.add(mpts(this.pts.map(q => q.p), tok.orange, 10));
       if (hv) G.overlay.add(mpts([hv.p], hv.kind === 'f' ? tok.muted : tok.accent, hv.kind === 'f' ? 7 : 12));
       const tip = (cls, text, w, dy) => {
@@ -3651,11 +3691,17 @@ function startMeasure() {
         el.textContent = text; el._w = w.clone(); el._dy = dy; this.onFrame();
       };
       tip('kind', hv ? MEASURE_KIND[hv.kind] : '', hv && hv.p, -18);
-      const B = this.pts.length === 2 ? this.pts[1].p : this.pts.length === 1 && hv ? hv.p : null;
-      tip('len', B ? `${fmtc(this.pts[0].p.distanceTo(B), 3)} mm` : '', B && this.pts[0].p.clone().add(B).multiplyScalar(0.5), 0);
-      let note = 'Bod se přichytí k vrcholu, středu hrany, středu kružnice nebo k hraně.';
-      if (this.pts.length === 2) { line(this.pts[0].p, this.pts[1].p); note = dist(this.pts[0].p, this.pts[1].p); }
-      else if (this.pts.length === 1 && hv) { line(this.pts[0].p, hv.p, true); note = dist(this.pts[0].p, hv.p); }
+      const Q2 = this.pts.length === 2 ? this.pts[1] : this.pts.length === 1 && hv ? hv : null;
+      const r = Q2 ? measureResult(this.pts[0], Q2) : null;
+      const angTxt = r && r.angle !== null ? `Úhel ${fmtc(r.angle, 2)}°` : '';
+      tip('len', r ? (r.angOnly ? angTxt : `${fmtc(r.d, 3)} mm`) : '', r && r.pa.clone().add(r.pb).multiplyScalar(0.5), 0);
+      let note = 'Bod se přichytí k vrcholu, středu hrany, středu kružnice nebo k hraně. Klepnutím na hranu nebo rovnou plochu se měří kolmá vzdálenost.';
+      if (r) {
+        line(r.pa, r.pb, this.pts.length === 1);
+        if (r.pa.distanceTo(this.pts[0].p) > 1e-6) line(this.pts[0].p, r.pa, true);
+        if (r.pb.distanceTo(Q2.p) > 1e-6) line(Q2.p, r.pb, true);
+        note = r.angOnly ? `${angTxt} · vzdálenost bodů ${fmtc(r.d, 3)} mm` : `${r.label} ${fmtc(r.d, 3)} mm · ΔX ${fmtc(r.pb.x - r.pa.x, 3)} · ΔY ${fmtc(r.pb.y - r.pa.y, 3)} · ΔZ ${fmtc(r.pb.z - r.pa.z, 3)} mm` + (angTxt ? ' · ' + angTxt : '');
+      }
       else if (hv && hv.chain) note = chainInfo(hv.chain);
       else if (hv) note = f3(hv);
       dlg.set('n', note);
