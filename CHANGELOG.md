@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 0.69
+- Měřit: přesnější přichytávání. Bod se přichytí k vrcholu, ke středu hrany, ke středu kružnice či oblouku (i otvoru) nebo k nejbližšímu bodu hrany, a to i když kurzor není přímo na tělese. Zakryté hrany a vrcholy se ignorují. Na dotykové obrazovce je dosah přichycení větší.
+- Měřit: u kurzoru se ukazuje, k čemu se bod přichytí (Vrchol, Střed hrany, Hrana…), hrana pod kurzorem se zvýrazní a v okně se ukáže její délka nebo průměr kružnice.
+- Měřit: po prvním bodu se vzdálenost ukazuje živě čárkovanou čarou a popiskem uprostřed čáry.
+
 ## Beta 0.68
 - Šroub: další typy hlavy – šestihranná s drážkou a šestihranná s křížem (rozměr hlavy podle ISO 4017, jde utáhnout klíčem i šroubovákem).
 

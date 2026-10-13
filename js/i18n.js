@@ -160,6 +160,7 @@
     // measure
     'Bod 1': 'Point 1', 'Bod 2': 'Point 2', 'Klepněte na model': 'Tap the model', 'Klepněte na první bod': 'Tap the first point', 'Klepněte na druhý bod': 'Tap the second point',
     'Klepnutím blízko vrcholu se bod přichytí k vrcholu.': 'Tapping near a vertex snaps to the vertex.',
+    'Bod se přichytí k vrcholu, středu hrany, středu kružnice nebo k hraně.': 'The point snaps to a vertex, an edge midpoint, a circle centre or an edge.',
     // files, import
     'Otevřít návrh': 'Open design', 'Otevřít archiv ZIP': 'Open ZIP archive', 'Vyberte, jak archiv otevřít': 'Choose how to open the archive', 'Vložit jako těleso': 'Insert as body',
     'Otevřít návrh obnoví celou časovou osu a nahradí aktuální návrh (vrátíte ho Ctrl+Z). Vložit jako těleso přidá síť do aktuálního návrhu.': 'Open design restores the whole timeline and replaces the current design (undo with Ctrl+Z). Insert as body adds the mesh to the current design.',
@@ -274,6 +275,8 @@
     [/^délka plochy (.+) mm$/, 'face length $1 mm'], [/^normála (.+)$/, 'normal $1'], [/^Válcová plocha Ø(.+)$/, 'Cylindrical face Ø$1'],
     [/^Objem (.+) cm³$/, 'Volume $1 cm³'], [/^objem (.+) cm³$/, 'volume $1 cm³'], [/^povrch (.+) cm²$/, 'surface $1 cm²'],
     [/^Posun: X (.+)$/, 'Move: X $1'], [/^Původní rozměry (.+) mm$/, 'Original dimensions $1 mm'],
+    [/^(Vrchol|Střed hrany|Střed kružnice|Hrana|Plocha): (.+)$/, (m, k, v) => ({ 'Vrchol': 'Vertex', 'Střed hrany': 'Edge midpoint', 'Střed kružnice': 'Circle centre', 'Hrana': 'Edge', 'Plocha': 'Face' })[k] + ': ' + v],
+    [/^Kružnice · Ø (.+)$/, 'Circle · Ø $1'], [/^Oblouk · R (.+)$/, 'Arc · R $1'], [/^Hrana · délka (.+)$/, 'Edge · length $1'],
     [/^Vzdálenost (.+) mm$/, 'Distance $1 mm'], [/^Vzdálenost (.+)$/, 'Distance $1'],
     [/^Průměr plochy Ø(.+) neodpovídá velikosti (.+) \((díra pro ni má mít|čep má mít) Ø(.+)\)\.$/, (m, a, b, c, d) => `The face diameter Ø${a} does not match size ${b} (${c === 'čep má mít' ? 'the pin should be' : 'the hole should be'} Ø${d}).`],
     [/^Model má (.+) trojúhelníků, víc než zvládne prohlížeč \(6 milionů\)\. Zjednodušte ho prosím v jiném programu\.$/, 'The model has $1 triangles, more than the browser can handle (6 million). Please simplify it in another program.'],

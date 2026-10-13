@@ -3561,43 +3561,116 @@ function startPattern(editIndex, f) {
 }
 
 /* ================= measure ================= */
+/* snap targets of one body: corners, edge midpoints and circle/arc centres from the feature-edge chains (cached per mesh) */
+const measureCache = new WeakMap();
+function measureTargets(polys) {
+  let t = measureCache.get(polys);
+  if (t) return t;
+  const pts = [], seen = new Set();
+  const add = (p, kind, info) => { const k = kind + K.qk(p); if (seen.has(k)) return; seen.add(k); pts.push({ p: v3(p), kind, info }); };
+  const chains = chainsFor(polys);
+  for (const c of chains) {
+    if (c.kind === 'line') {
+      add(c.line.p0, 'v'); add(c.line.p1, 'v');
+      add([(c.line.p0[0] + c.line.p1[0]) / 2, (c.line.p0[1] + c.line.p1[1]) / 2, (c.line.p0[2] + c.line.p1[2]) / 2], 'm', c);
+    } else if (c.kind === 'arc') {
+      add(c.pts[0], 'v'); add(c.pts[c.pts.length - 1], 'v'); add(c.circle.c, 'c', c);
+    } else if (c.kind === 'circle') add(c.circle.c, 'c', c);
+  }
+  t = { pts, chains }; measureCache.set(polys, t); return t;
+}
+const MEASURE_KIND = { v: 'Vrchol', m: 'Střed hrany', c: 'Střed kružnice', e: 'Hrana', f: 'Plocha' };
+function chainInfo(c) {
+  if (!c) return '';
+  if (c.kind === 'circle') return `Kružnice · Ø ${fmtc(2 * c.circle.r, 3)} mm`;
+  if (c.kind === 'arc') return `Oblouk · R ${fmtc(c.circle.r, 3)} mm`;
+  let L = 0; for (let i = 1; i < c.pts.length; i++) L += Math.hypot(c.pts[i][0] - c.pts[i - 1][0], c.pts[i][1] - c.pts[i - 1][1], c.pts[i][2] - c.pts[i - 1][2]);
+  return `Hrana · délka ${fmtc(L, 3)} mm`;
+}
+function mpts(list, color, size) {
+  const arr = []; for (const p of list) arr.push(p.x, p.y, p.z);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
+  const o = noRay(new THREE.Points(g, new THREE.PointsMaterial({ color, size, sizeAttenuation: false, depthTest: false, transparent: true })));
+  o.renderOrder = 13; return o;
+}
 function startMeasure() {
+  const R = TOUCH ? 24 : 14; /* snap radius in screen pixels */
   const c = {
-    pts: [],
+    pts: [], hover: null,
     init() {
       openDialog({ title: 'Měřit', icon: 'measure', fields: [{ k: 'sel', id: 'p1', label: 'Bod 1' }, { k: 'sel', id: 'p2', label: 'Bod 2' }, { k: 'note', id: 'n' }] });
       dlg.okLabel('Zavřít');
       this.update();
     },
+    /* snapping order: corner / edge midpoint / circle centre within R px, then the nearest point of an edge, then the face under the cursor */
     pick(ev) {
-      const h = hitBodies(ev); if (!h) return null;
-      const { poly } = polyOfHit(h), [mx, my] = evPx(ev);
-      let best = h.point.clone(), bd = 12, snapped = false;
-      for (const q of poly.v) { const s = toPx(v3(q)); const dd = Math.hypot(s[0] - mx, s[1] - my); if (dd < bd) { bd = dd; best = v3(q); snapped = true; } }
-      return { p: best, snapped };
+      const [mx, my] = evPx(ev), pm = new Set(pickableMeshes());
+      const near = [], edges = [];
+      for (const [, e] of meshes) {
+        if (!pm.has(e.mesh)) continue;
+        const t = measureTargets(e.polys);
+        for (const q of t.pts) { const s = toPx(q.p); if (s[2] >= 1) continue; const d = Math.hypot(s[0] - mx, s[1] - my); if (d < R) near.push({ p: q.p, kind: q.kind, chain: q.info, d: d - (q.kind === 'v' ? 3 : 0) }); }
+        for (const ch of t.chains) {
+          let best = Infinity, bp = null, prev = null, prevP = null;
+          for (const p of ch.pts) {
+            const q = toPx(v3(p));
+            if (prev && prev[2] < 1 && q[2] < 1) { const [d, tt] = segDist(mx, my, prev, q); if (d < best) { best = d; bp = v3(prevP).lerp(v3(p), tt); } }
+            prev = q; prevP = p;
+          }
+          if (best < R * 0.75) edges.push({ p: bp, kind: 'e', chain: ch, d: best });
+        }
+      }
+      near.sort((a, b) => a.d - b.d);
+      for (const q of near.slice(0, 10)) if (!occluded(q.p)) return q;
+      edges.sort((a, b) => a.d - b.d);
+      for (const q of edges.slice(0, 8)) if (!occluded(q.p)) return q;
+      const h = hitBodies(ev);
+      return h ? { p: h.point.clone(), kind: 'f' } : null;
     },
     update() {
-      const f3 = p => `${fmtc(p.x, 2)}; ${fmtc(p.y, 2)}; ${fmtc(p.z, 2)}`;
-      dlg.set('p1', { text: this.pts[0] ? f3(this.pts[0].p) : 'Klepněte na model', has: !!this.pts[0], active: this.pts.length === 0 || this.pts.length === 2 });
-      dlg.set('p2', { text: this.pts[1] ? f3(this.pts[1].p) : 'Klepněte na model', has: !!this.pts[1], active: this.pts.length === 1 });
+      const f3 = q => `${MEASURE_KIND[q.kind]}: ${fmtc(q.p.x, 2)}; ${fmtc(q.p.y, 2)}; ${fmtc(q.p.z, 2)}`;
+      dlg.set('p1', { text: this.pts[0] ? f3(this.pts[0]) : 'Klepněte na model', has: !!this.pts[0], active: this.pts.length === 0 || this.pts.length === 2 });
+      dlg.set('p2', { text: this.pts[1] ? f3(this.pts[1]) : 'Klepněte na model', has: !!this.pts[1], active: this.pts.length === 1 });
       clearGroup(G.overlay);
-      if (this.pts.length) {
-        const arr = []; this.pts.forEach(q => arr.push(q.p.x, q.p.y, q.p.z));
-        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
-        const pt = noRay(new THREE.Points(g, new THREE.PointsMaterial({ color: tok.orange, size: 9, sizeAttenuation: false, depthTest: false })));
-        pt.renderOrder = 12; G.overlay.add(pt);
-      }
-      if (this.pts.length === 2) {
-        const [a, b] = this.pts.map(q => q.p), ln = noRay(new THREE.Line(lineGeo([a.x, a.y, a.z, b.x, b.y, b.z]), new THREE.LineBasicMaterial({ color: tok.orange, depthTest: false, transparent: true })));
+      const dist = (a, b) => `Vzdálenost ${fmtc(a.distanceTo(b), 3)} mm · ΔX ${fmtc(b.x - a.x, 3)} · ΔY ${fmtc(b.y - a.y, 3)} · ΔZ ${fmtc(b.z - a.z, 3)} mm`;
+      const line = (a, b, dashed) => {
+        const ln = noRay(new THREE.Line(lineGeo([a.x, a.y, a.z, b.x, b.y, b.z]), dashed
+          ? new THREE.LineDashedMaterial({ color: tok.orange, depthTest: false, transparent: true, dashSize: worldPerPx(a) * 6, gapSize: worldPerPx(a) * 4 })
+          : new THREE.LineBasicMaterial({ color: tok.orange, depthTest: false, transparent: true })));
+        if (dashed) ln.computeLineDistances();
         ln.renderOrder = 12; G.overlay.add(ln);
-        dlg.set('n', `Vzdálenost ${fmtc(a.distanceTo(b), 3)} mm · ΔX ${fmtc(b.x - a.x, 3)} · ΔY ${fmtc(b.y - a.y, 3)} · ΔZ ${fmtc(b.z - a.z, 3)} mm`);
-      } else dlg.set('n', 'Klepnutím blízko vrcholu se bod přichytí k vrcholu.');
+      };
+      const hv = this.hover;
+      if (hv && hv.chain) G.overlay.add(segLine(hv.chain.pts, tok.accent));
+      if (this.pts.length) G.overlay.add(mpts(this.pts.map(q => q.p), tok.orange, 10));
+      if (hv) G.overlay.add(mpts([hv.p], hv.kind === 'f' ? tok.muted : tok.accent, hv.kind === 'f' ? 7 : 12));
+      const tip = (cls, text, w, dy) => {
+        let el = document.querySelector('.mtip.' + cls);
+        if (!text) { if (el) el.remove(); return; }
+        if (!el) { el = document.createElement('div'); el.className = 'mtip ' + cls; $('#skdims').parentNode.appendChild(el); }
+        el.textContent = text; el._w = w.clone(); el._dy = dy; this.onFrame();
+      };
+      tip('kind', hv ? MEASURE_KIND[hv.kind] : '', hv && hv.p, -18);
+      const B = this.pts.length === 2 ? this.pts[1].p : this.pts.length === 1 && hv ? hv.p : null;
+      tip('len', B ? `${fmtc(this.pts[0].p.distanceTo(B), 3)} mm` : '', B && this.pts[0].p.clone().add(B).multiplyScalar(0.5), 0);
+      let note = 'Bod se přichytí k vrcholu, středu hrany, středu kružnice nebo k hraně.';
+      if (this.pts.length === 2) { line(this.pts[0].p, this.pts[1].p); note = dist(this.pts[0].p, this.pts[1].p); }
+      else if (this.pts.length === 1 && hv) { line(this.pts[0].p, hv.p, true); note = dist(this.pts[0].p, hv.p); }
+      else if (hv && hv.chain) note = chainInfo(hv.chain);
+      else if (hv) note = f3(hv);
+      dlg.set('n', note);
       setPrompt(this.pts.length === 1 ? 'Klepněte na druhý bod' : 'Klepněte na první bod');
       dlg.okEnabled(true); requestRender();
     },
-    onMove(ev) { dom.style.cursor = hitBodies(ev) ? 'crosshair' : ''; },
-    onClick(ev) { const q = this.pick(ev); if (!q) return; if (this.pts.length >= 2) this.pts = []; this.pts.push(q); this.update(); },
-    ok() { endCmd(false); return null; }
+    onMove(ev) {
+      const q = this.pick(ev); dom.style.cursor = q ? 'crosshair' : '';
+      const k = q ? q.kind + q.p.x.toFixed(4) + q.p.y.toFixed(4) + q.p.z.toFixed(4) : '', ok = this.hover ? this.hover.kind + this.hover.p.x.toFixed(4) + this.hover.p.y.toFixed(4) + this.hover.p.z.toFixed(4) : '';
+      if (k !== ok) { this.hover = q; this.update(); }
+    },
+    onClick(ev) { const q = this.pick(ev); if (!q) return; if (this.pts.length >= 2) this.pts = []; this.pts.push(q); this.hover = TOUCH ? null : q; this.update(); },
+    ok() { endCmd(false); return null; },
+    onFrame() { document.querySelectorAll('.mtip').forEach(el => { const q = toPx(el._w); el.style.left = q[0] + 'px'; el.style.top = (q[1] + el._dy) + 'px'; el.style.display = q[2] < 1 ? '' : 'none'; }); },
+    cleanup() { this.hover = null; document.querySelectorAll('.mtip').forEach(e => e.remove()); }
   };
   beginCmd(c); c.init();
 }
