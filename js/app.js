@@ -2224,7 +2224,7 @@ function startFastener(type, editIndex, f) {
         title: Engine.FEATURE_LABEL[type], icon: type,
         fields: [{ k: 'opt', id: 'size', label: 'Velikost závitu', options: sizes, value: String(this.v.size) },
           ...(bolt ? [{ k: 'num', id: 'len', label: 'Délka dříku', value: this.v.len },
-            { k: 'opt', id: 'head', label: 'Hlava', options: [['hex', 'Šestihranná (ISO 4017)'], ['socket', 'Válcová s imbusem (ISO 4762)'], ['slotted', 'Válcová s drážkou – plochý šroubovák (ISO 1207)'], ['phillips', 'Půlkulatá s křížem – křížový šroubovák (ISO 7045)']], value: this.v.head }] : []),
+            { k: 'opt', id: 'head', label: 'Hlava', options: [['hex', 'Šestihranná (ISO 4017)'], ['socket', 'Válcová s imbusem (ISO 4762)'], ['slotted', 'Válcová s drážkou – plochý šroubovák (ISO 1207)'], ['phillips', 'Půlkulatá s křížem – křížový šroubovák (ISO 7045)'], ['hexslot', 'Šestihranná s drážkou (klíč i plochý šroubovák)'], ['hexcross', 'Šestihranná s křížem (klíč i křížový šroubovák)']], value: this.v.head }] : []),
           { k: 'chk', id: 'thread', label: 'Modelovat závit', value: this.v.thread },
           { k: 'chk', id: 'chamfer', label: bolt ? 'Zkosená špička (snazší našroubování)' : 'Zkosený náběh díry z obou stran', value: this.v.chamfer },
           ...(bolt ? [{ k: 'chk', id: 'undercut', label: 'Zápich pod hlavou (hladký krček bez závitu)', value: this.v.undercut }, { k: 'num', id: 'tlen', label: 'Délka závitu (0 = celý dřík)', value: this.v.tlen }] : []),

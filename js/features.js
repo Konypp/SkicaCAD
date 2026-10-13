@@ -251,7 +251,7 @@ function toolForFastener(f) {
   let polys;
   if (f.type === 'bolt') {
     const L = Number(f.len); if (!(L >= 2 * P && L <= 500)) throw new Error('Délka šroubu musí být ' + (2 * P) + ' až 500 mm');
-    const de = d - tol, r = de / 2, socket = f.head === 'socket', slotted = f.head === 'slotted', phil = f.head === 'phillips';
+    const de = d - tol, r = de / 2, socket = f.head === 'socket', slotted = f.head === 'slotted', phil = f.head === 'phillips', hexSlot = f.head === 'hexslot', hexCross = f.head === 'hexcross';
     const SH = SLOT_HEADS[d], PH = PAN_HEADS[d];
     const hk = socket ? d : slotted ? SH[1] : phil ? PH[1] : k;
     const head = socket ? cylAlong([0, 0, 0], [0, 0, 1], dk / 2, hk) : slotted ? cylAlong([0, 0, 0], [0, 0, 1], SH[0] / 2, hk) : phil ? cylAlong([0, 0, 0], [0, 0, 1], PH[0] / 2, hk) : hexPrism(s, 0, hk);
@@ -262,6 +262,12 @@ function toolForFastener(f) {
     if (slotted) polys = KK.boolean(polys, slotBox(SH[2] + tol, SH[0] + 1, Math.min(SH[3], hk - 0.4), false), 'subtract');
     if (phil) {
       const w = Math.max(0.6, PH[0] * 0.13) + tol, l = PH[0] * 0.55, dep = Math.min(hk * 0.6, hk - 0.4);
+      polys = KK.boolean(polys, KK.boolean(slotBox(w, l, dep, false), slotBox(w, l, dep, true), 'union'), 'subtract');
+    }
+    /* hex head with a screwdriver slot or cross as well (slot through the whole head width) */
+    if (hexSlot) polys = KK.boolean(polys, slotBox(SH[2] + tol, s * 1.2 + 1, Math.min(SH[3], hk - 0.4), false), 'subtract');
+    if (hexCross) {
+      const w = Math.max(0.6, s * 0.13) + tol, l = s * 0.6, dep = Math.min(hk * 0.6, hk - 0.4);
       polys = KK.boolean(polys, KK.boolean(slotBox(w, l, dep, false), slotBox(w, l, dep, true), 'union'), 'subtract');
     }
     /* thread undercut (DIN 76 style): a short plain neck below the head, slightly under the thread root diameter */

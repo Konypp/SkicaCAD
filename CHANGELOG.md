@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.68
+- Šroub: další typy hlavy – šestihranná s drážkou a šestihranná s křížem (rozměr hlavy podle ISO 4017, jde utáhnout klíčem i šroubovákem).
+
 ## Beta 0.67
 - Skica: kružnice má táhlo poloměru (oranžový bod vpravo na obvodu). Tažením se mění průměr, s přichytáváním po celých krocích mřížky. Ve skice z plochy (např. z podstavy válce) je táhlo vidět vždy, jinak u vybrané kružnice.
 
