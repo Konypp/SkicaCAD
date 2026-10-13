@@ -4075,11 +4075,14 @@ function makeZip(files) {
   end.setUint32(12, central.reduce((s, p) => s + p.length, 0), true); end.setUint32(16, off, true);
   return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type: 'application/zip' });
 }
-function exportMesh() {
+/* kind: 'stl' | 'obj' | 'zip' (STL + OBJ + design) */
+function exportMesh(kind = 'zip') {
   const tris = exportTris();
   if (!tris.length) { toast('Není co exportovat, model neobsahuje viditelná tělesa.'); return; }
   const n = fileBase();
-  saveFile(n + '.zip', exportZip(tris, n), 'Uloženo. Archiv otevřete znovu ve SkicaCAD přetažením do okna nebo přes Soubor › Otevřít návrh.');
+  if (kind === 'stl') saveFile(n + '.stl', stlBytes(tris), 'STL uloženo');
+  else if (kind === 'obj') saveFile(n + '.obj', objText(), 'OBJ uloženo');
+  else saveFile(n + '.zip', exportZip(tris, n), 'Uloženo. Archiv otevřete znovu ve SkicaCAD přetažením do okna nebo přes Soubor › Otevřít návrh.');
 }
 function exportZip(tris, n) {
   return makeZip([{ name: n + '.stl', data: stlBytes(tris) }, { name: n + '.obj', data: new TextEncoder().encode(objText()) }, { name: n + '.skicacad.json', data: new TextEncoder().encode(projectJSON()) }]);
@@ -4228,7 +4231,9 @@ function restoreLibrary(entries) {
   toast(`Obnoveno ze zálohy: ${added} nových, ${updated} aktualizovaných, ${same} beze změny` + (failed ? `, ${failed} se nepodařilo načíst` : ''));
   showStart(false); checkStorage();
 }
-$('#m-export').addEventListener('click', () => { closeMenu(); exportMesh(); });
+$('#m-export').addEventListener('click', () => { closeMenu(); exportMesh('zip'); });
+$('#m-export-stl').addEventListener('click', () => { closeMenu(); exportMesh('stl'); });
+$('#m-export-obj').addEventListener('click', () => { closeMenu(); exportMesh('obj'); });
 $('#fileinput').addEventListener('change', e => {
   const file = e.target.files && e.target.files[0]; if (!file) return;
   e.target.value = '';

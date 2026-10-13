@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.57
+- Soubor: export rozdělen – Exportovat STL (.stl), Exportovat OBJ (.obj), nebo Exportovat vše (.zip se STL, OBJ a návrhem jako dosud).
+
 ## Beta 0.56
 - Nové nástroje Šroub a Matice (sekce Vytvořit): metrické závity M2–M24 podle ISO. Šroub se šestihrannou hlavou (ISO 4017) nebo válcovou hlavou s imbusem (ISO 4762), volitelná délka dříku a délka závitu. Matice šestihranná (ISO 4032). Závit lze modelovat, nebo vynechat (hladký dřík / díra). Vůle pro 3D tisk (výchozí 0,2 mm) zmenší průměr šroubu, nebo zvětší díru matice. Klepnutím do pohledu se díl umístí, poloha jde měnit manipulátorem. Lze vytvořit jako nové těleso, připojit, nebo vyříznout (např. díra se závitem).
 
