@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 0.54
+- Průsečíky mřížky: bod, který se při kreslení nebo posouvání přiblíží k průsečíku na pár pixelů, se na něj přesně přichytí (i bez přichytávání k mřížce). Zvýraznění se ukáže jen tehdy, když bod na průsečíku opravdu leží. Při přesunu celého prvku se přichytává jeho roh, střed nebo první bod.
+- Zvýraznění průsečíku je menší.
+
 ## Beta 0.53
 - Mřížka skici: průsečík mřížky se lehce modře zvýrazní (kroužek s tečkou) jen tehdy, když se k němu při kreslení nebo při posouvání bodu či prvku přiblížíte. Jinak se nic nezvýrazňuje. Při přiblížení s jemnou mřížkou platí pro průsečíky po 1 mm.
 

@@ -1396,8 +1396,10 @@ function sketchPoint(ev) {
   sk.snapMid = false;
   if (!best) { const m = nearMidpoint(ev, bd); if (m) { best = m; sk.snapMid = true; } }
   sk.snapPt = best;
-  if (best) return best.slice();
-  return [snapV(p[0]), snapV(p[1])];
+  if (best) { sk.gridHot = null; return best.slice(); }
+  const c = crossNear(p); if (c) { sk.gridHot = c; return c; }
+  const q = [snapV(p[0]), snapV(p[1])]; sk.gridHot = onCross(q) ? q : null;
+  return q;
 }
 /* draggable points: vertices of polylines and curves */
 function sketchHandleAt(ev) {
@@ -1411,11 +1413,13 @@ function sketchHandleAt(ev) {
   return best;
 }
 function sketchDrag(ev) {
-  sk.gridHot = gridCrossNear(ev);
   if (sk.drag.move) {
     if (!down || !down.moved) return;
     const d = sk.drag, p = sketchRawPoint(ev); if (!p) return;
-    const dx = snapV(p[0] - d.p0[0]), dy = snapV(p[1] - d.p0[1]);
+    let dx = snapV(p[0] - d.p0[0]), dy = snapV(p[1] - d.p0[1]);
+    /* the element's first key point (corner, centre or first point) is pulled onto a nearby grid crossing */
+    const k0 = keyPoints([d.orig])[1];
+    if (k0) { const kp = [k0[0] + dx, k0[1] + dy], c = crossNear(kp); if (c) { dx += c[0] - kp[0]; dy += c[1] - kp[1]; sk.gridHot = c; } else sk.gridHot = onCross(kp) ? kp : null; }
     sk.f.ents[d.ei] = translateEnt(d.orig, dx, dy);
     if (sk.f.ents[d.ei].pts) sk.f.ents[d.ei].pts = sk.f.ents[d.ei].pts.map(q => [Math.round(q[0] * 1e4) / 1e4, Math.round(q[1] * 1e4) / 1e4]);
     const el = $('#dim'), px = evPx(ev); el.textContent = `${EN() ? 'Move' : 'Posun'} X ${fmtc(dx, 2)} · Y ${fmtc(dy, 2)} mm`; el.hidden = false; el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px';
@@ -1434,14 +1438,14 @@ function sketchDrag(ev) {
     const fct = Math.max(0.01, Math.round(((p[0] - c[0]) * ov[0] + (p[1] - c[1]) * ov[1]) / l2 * 100) / 100), r4 = x => Math.round(x * 1e4) / 1e4;
     e.pts = d.orig.map(q => [r4(c[0] + (q[0] - c[0]) * fct), r4(c[1] + (q[1] - c[1]) * fct)]);
     const el = $('#dim'), px = evPx(ev); el.textContent = `Velikost ${fmtc(fct * 100, 0)} %`; el.hidden = false; el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px';
-  } else e.pts[sk.drag.pi] = [snapV(p[0]), snapV(p[1])];
+  } else { const c = crossNear(p), q = c || [snapV(p[0]), snapV(p[1])]; sk.gridHot = c || (onCross(q) ? q : null); e.pts[sk.drag.pi] = q; }
   redrawSketch();
 }
 function sketchMove(ev) {
   if (!sk.tool) { dom.style.cursor = sketchHandleAt(ev) ? 'move' : ''; }
   if (!sk.tool || sk.tool === 'skfillet' || sk.tool === 'sktrim' || sk.tool === 'skjoin') { sk.snapPt = null; sk.cursor = null; sk.gridHot = null; sk.hoverMid = !sk.tool ? nearMidpoint(ev) : null; redrawSketch(); return; }
   sk.cursor = sketchPoint(ev);
-  sk.gridHot = isFreehand() ? null : gridCrossNear(ev);
+  if (isFreehand()) sk.gridHot = null;
   redrawSketch();
   updateDimLabel(ev);
 }
@@ -1461,7 +1465,7 @@ function updateDimLabel(ev) {
   el.textContent = t; el.hidden = false;
   el.style.left = lastPointer[0] + 'px'; el.style.top = lastPointer[1] + 'px';
 }
-function sketchClick(ev) { const n0 = sk.f.ents.length; sketchClick0(ev); markCons(n0); }
+function sketchClick(ev) { const n0 = sk.f.ents.length; sketchClick0(ev); markCons(n0); if (sk && ev.pointerType === 'touch' && sk.gridHot) { sk.gridHot = null; redrawSketch(); } }
 function sketchClick0(ev) {
   if (!sk.tool) { pickSketchEntity(ev); return; }
   if (sk.tool === 'sktrim') { trimClick(ev); return; }
@@ -1587,20 +1591,23 @@ function nearMidpoint(ev, maxPx) {
   return best;
 }
 /* grid crossing near the pointer (10 mm grid, or 1 mm when the fine grid is shown), only while drawing or dragging */
-function gridCrossNear(ev) {
-  const p = sketchRawPoint(ev); if (!p) return null;
-  const fg = G.skwork.getObjectByName('fine'), sp = fg && fg.visible ? 1 : 10;
-  const c = [Math.round(p[0] / sp) * sp, Math.round(p[1] / sp) * sp], P = sk.f.plane;
-  const s = toPx(P3(P, c[0], c[1])), [mx, my] = evPx(ev);
-  return Math.hypot(s[0] - mx, s[1] - my) < (TOUCH ? 14 : 9) ? c : null;
+/* grid crossings: the visible grid (10 mm, or 1 mm while the fine grid is shown). A point that comes within a few
+   pixels of a crossing is pulled exactly onto it, and only then is the crossing highlighted */
+const gridSpacing = () => { const fg = G.skwork.getObjectByName('fine'); return fg && fg.visible ? 1 : 10; };
+function crossNear(q, maxPx) {
+  if (!q) return null;
+  const sp = gridSpacing(), c = [Math.round(q[0] / sp) * sp, Math.round(q[1] / sp) * sp], P = sk.f.plane;
+  const a = toPx(P3(P, c[0], c[1])), b = toPx(P3(P, q[0], q[1]));
+  return Math.hypot(a[0] - b[0], a[1] - b[1]) <= (maxPx == null ? (TOUCH ? 8 : 5) : maxPx) ? c : null;
 }
+const onCross = q => { const sp = gridSpacing(), e = 1e-6; return !!q && Math.abs(q[0] / sp - Math.round(q[0] / sp)) < e && Math.abs(q[1] / sp - Math.round(q[1] / sp)) < e; };
 function crossMarker(P, q) {
-  const s = worldPerPx(P3(P, q[0], q[1])) * 5, arr = [];
+  const s = worldPerPx(P3(P, q[0], q[1])) * 3.5, arr = [];
   for (let i = 0; i <= 24; i++) { const a = i / 24 * Math.PI * 2, v = P3(P, q[0] + Math.cos(a) * s, q[1] + Math.sin(a) * s, 0.02); arr.push(v.x, v.y, v.z); }
   const g = noRay(new THREE.Group());
   g.add(noRay(new THREE.Line(lineGeo(arr), new THREE.LineBasicMaterial({ color: tok['accent-hover'], transparent: true, opacity: 0.9, depthTest: false }))));
   const d = P3(P, q[0], q[1], 0.02);
-  g.add(noRay(new THREE.Points(lineGeo([d.x, d.y, d.z]), new THREE.PointsMaterial({ color: tok['accent-hover'], size: 4, sizeAttenuation: false, transparent: true, opacity: 0.8, depthTest: false }))));
+  g.add(noRay(new THREE.Points(lineGeo([d.x, d.y, d.z]), new THREE.PointsMaterial({ color: tok['accent-hover'], size: 3, sizeAttenuation: false, transparent: true, opacity: 0.8, depthTest: false }))));
   return g;
 }
 /* small triangle marking a midpoint (constant size on screen) */
