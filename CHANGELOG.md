@@ -1,5 +1,11 @@
 # Changelog
 
+## Beta 0.46
+- Skica: prvek (čáru, křivku i ostatní tvary) přesunete tažením – bez vybraného nástroje položte prst nebo myš na jeho obrys a táhněte. Posun se přichytává ke kroku mřížky. Druhý prst posun zruší.
+- Paleta skici: u každého prvku tlačítko Duplikovat (kopie se vloží o 10 mm vedle, stejně jako Ctrl+D).
+- Nový nástroj Spojit (J): klepněte na dvě otevřené čáry nebo křivky a jejich konce se propojí úsečkami do uzavřeného obrysu. Dvojí klepnutí na stejnou ji uzavře. Čáry zůstávají rovné a křivky zakřivené.
+- Středy úseček: při kreslení se bod přichytí i ke středu čáry nebo strany obdélníku a střed se označí trojúhelníčkem. Bez nástroje se střed ukáže, když na něj najedete.
+
 ## Beta 0.45
 - Skica: rozměr lze upravit přímo v kótě. Klepnutím na číslo kóty se otevře pole, Enter (nebo klepnutí jinam) změnu použije, Esc ji zruší. Funguje pro šířku a výšku obdélníku, průměr kružnice, poloměr i stranu mnohoúhelníku, osy elipsy, délku a šířku drážky a délky úseků čáry.
 - Přichytávání k mřížce: poloměr kružnice, mnohoúhelníku a osy elipsy kreslené ze středu se zaokrouhlují na krok mřížky (dřív např. 9,899 mm při šikmém tahu). Bod přichycený k existujícímu bodu má přednost.

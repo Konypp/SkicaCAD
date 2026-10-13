@@ -669,13 +669,15 @@ function roundCorners(pts, r) {
   return out;
 }
 /* centripetal Catmull-Rom curve through the given points */
-function splinePoints(P, closed, seg) {
+/* lin: indices of straight segments (from P[i] to P[i+1]); curved neighbours of a straight segment end there like an open curve */
+function splinePoints(P, closed, seg, lin) {
   const n = P.length; if (n < 2) return P.map(p => p.slice());
-  const S = seg || 16, out = [];
+  const S = seg || 16, out = [], L = lin && lin.length ? new Set(lin) : null;
   const get = i => (closed ? P[(i + n) % n] : P[Math.max(0, Math.min(n - 1, i))]);
-  const segs = closed ? n : n - 1;
+  const segs = closed ? n : n - 1, isL = i => !!L && L.has(closed ? (i + segs) % segs : i);
   for (let i = 0; i < segs; i++) {
-    const p0 = get(i - 1), p1 = get(i), p2 = get(i + 1), p3 = get(i + 2);
+    if (isL(i)) { out.push(get(i).slice()); continue; }
+    const p1 = get(i), p2 = get(i + 1), p0 = isL(i - 1) ? p1 : get(i - 1), p3 = isL(i + 1) ? p2 : get(i + 2);
     const tj = (a, b) => Math.max(Math.pow(Math.hypot(b[0] - a[0], b[1] - a[1]), 0.5), 1e-6);
     const t0 = 0, t1 = t0 + tj(p0, p1), t2 = t1 + tj(p1, p2), t3 = t2 + tj(p2, p3);
     const lerp = (a, b, ta, tb, t) => { const w = (tb - ta) || 1e-9; return [a[0] * (tb - t) / w + b[0] * (t - ta) / w, a[1] * (tb - t) / w + b[1] * (t - ta) / w]; };
@@ -697,7 +699,7 @@ function profilePoints(pr) {
   } else if (pr.t === 'circle') {
     const N = 64; pts = []; for (let i = 0; i < N; i++) { const a = 2 * Math.PI * i / N; pts.push([pr.x + pr.r * Math.cos(a), pr.y + pr.r * Math.sin(a)]); }
   } else if (pr.t === 'spline') {
-    pts = splinePoints(pr.pts, true, 16);
+    pts = splinePoints(pr.pts, true, 16, pr.lin);
   } else if (pr.t === 'ellipse') {
     const N = 72, a0 = (pr.a || 0) * Math.PI / 180, ca = Math.cos(a0), sa = Math.sin(a0); pts = [];
     for (let i = 0; i < N; i++) { const t = 2 * Math.PI * i / N, x = pr.rx * Math.cos(t), y = pr.ry * Math.sin(t); pts.push([pr.x + x * ca - y * sa, pr.y + x * sa + y * ca]); }
