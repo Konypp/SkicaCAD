@@ -2045,7 +2045,7 @@ function startPrimitive(type, editIndex, f) {
   const defs = PRIM_FIELDS[type], vals = f ? primVals(type, f.p) : Object.fromEntries(defs.map(d => [d[0], d[2]]));
   const pivot = new THREE.Object3D(); scene.add(pivot);
   const c = {
-    editIndex, vals, pos: f ? f.pos.slice() : [0, 0, 0], op: f ? f.op : 'new', autoOp: !f, tool: null,
+    editIndex, vals, pos: f ? f.pos.slice() : [0, 0, 0], op: f ? f.op : 'new', autoOp: false, /* inserted objects always start as a new body; the operation can still be changed in the dialog */ tool: null,
     hgrp: null, handles: [], drag: null, hover: null, gizmoDrag: false,
     /* a cube keeps its shape when dragged; any shape being edited keeps it if all its sides are equal */
     uniform: type === 'box' && (!f || (f.p.w === f.p.d && f.p.d === f.p.h)),
@@ -2184,7 +2184,7 @@ function startFastener(type, editIndex, f) {
   const c = {
     editIndex, tool: null, gizmoDrag: false, timer: null,
     v: f ? { size: f.size, len: f.len, head: f.head || 'hex', thread: f.thread !== false, chamfer: f.chamfer !== false, tlen: f.tlen || 0, tol: f.tol != null ? f.tol : 0.2 } : { size: 6, len: 20, head: 'hex', thread: true, chamfer: true, tlen: 0, tol: 0.2 },
-    pos: f ? f.pos.slice() : [0, 0, 0], op: f ? f.op : 'new', autoOp: !f,
+    pos: f ? f.pos.slice() : [0, 0, 0], op: f ? f.op : 'new', autoOp: false,
     init() {
       const sizes = FAST_SIZES.map(d => [String(d), 'M' + fmtc(d, 1)]);
       openDialog({

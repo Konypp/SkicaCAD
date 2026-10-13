@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.60
+- Vkládané objekty (krychle, válec, koule, kužel, torus, šroub, matice) se vždy vytvoří jako nové těleso, i když se překrývají s existujícím. Spojit / vyříznout / průnik jde dál zvolit v dialogu (Operace). Vysunutí a rotace skici volí operaci automaticky jako dosud.
+
 ## Beta 0.59
 - Oprava: v náhledu v Claude nešel uložit samostatný soubor STL ani OBJ (náhled povoluje jen některé typy souborů). Soubor se tam teď uloží zabalený v ZIP. Ve verzi na GitHub Pages se ukládá přímo .stl / .obj.
 
