@@ -279,6 +279,10 @@ button { cursor: pointer; }
 .sd-empty { margin: 0; color: var(--muted); }
 .sd-foot { display: flex; flex-wrap: wrap; gap: 6px; }
 .sd-foot .btn.sm { padding: 0 10px; }
+.sd-usage { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.sd-usage .bar { flex: 0 0 90px; height: 6px; border-radius: 3px; background: var(--panel-3); overflow: hidden; }
+.sd-usage .bar span { display: block; height: 100%; background: var(--accent); }
+.sd-usage.warn { color: var(--danger); } .sd-usage.warn .bar span { background: var(--danger); }
 .sd-note { margin: 0; font-size: 12px; color: var(--muted); }
 
 

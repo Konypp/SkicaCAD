@@ -35,7 +35,11 @@
     'Potlačit prvek': 'Suppress feature', 'Obnovit prvek': 'Unsuppress feature', 'Přesunout značku sem': 'Move marker here', 'Odstranit prvek': 'Delete feature',
     '(potlačeno)': '(suppressed)', 'Dvojklikem upravíte, pravým tlačítkem další volby': 'Double-click to edit, right-click for more options',
     // dialogs: common
-    'Zrušit': 'Cancel', 'OK': 'OK', 'Zavřít': 'Close', 'Operace': 'Operation', 'Nové těleso': 'New body', 'Spojit': 'Join', 'Duplikováno na stejné místo. Kopii přesunete tažením.': 'Duplicated in place. Drag the copy to move it.', 'Pomocná': 'Construction', 'Pomocný prvek': 'Construction element',
+    'Zrušit': 'Cancel', 'OK': 'OK', 'Zavřít': 'Close', 'Operace': 'Operation', 'Nové těleso': 'New body', 'Spojit': 'Join', 'Zálohovat knihovnu': 'Back up library', 'Obnovit ze zálohy…': 'Restore from backup…', 'Obnovit knihovnu ze zálohy…': 'Restore library from backup…',
+    'Úložiště návrhů v tomto prohlížeči': 'Design storage in this browser', 'Knihovna je prázdná, není co zálohovat.': 'The library is empty, nothing to back up.',
+    'Návrhy se ukládají automaticky jen v tomto prohlížeči. Záloha celé knihovny je jeden soubor .zip, který obnovíte i na jiném zařízení.': 'Designs are saved automatically, in this browser only. A backup of the whole library is a single .zip file you can restore on another device too.',
+    'Úložiště prohlížeče je plné. Zálohujte knihovnu (Soubor › Zálohovat knihovnu) a smažte staré návrhy (Soubor › Moje návrhy).': 'Browser storage is full. Back up the library (File › Back up library) and delete old designs (File › My designs).',
+    'Úložiště prohlížeče je plné, část zálohy se nevešla. Smažte staré návrhy a zkuste to znovu.': 'Browser storage is full, part of the backup did not fit. Delete old designs and try again.', 'Duplikováno na stejné místo. Kopii přesunete tažením.': 'Duplicated in place. Drag the copy to move it.', 'Pomocná': 'Construction', 'Pomocný prvek': 'Construction element',
     'Prvek je pomocný: kreslí se čárkovaně a netvoří profil.': 'The element is now construction geometry: drawn dashed, it never forms a profile.', 'Prvek už není pomocný.': 'The element is no longer construction geometry.',
     'Pomocné kreslení zapnuto: nové prvky budou pomocné (čárkovaně, netvoří profil).': 'Construction drawing on: new elements are construction geometry (dashed, no profile).', 'Pomocné kreslení vypnuto': 'Construction drawing off', 'Vyříznout': 'Cut', 'Průnik': 'Intersect',
     'Počítám náhled…': 'Computing preview…', 'Neplatná hodnota': 'Invalid value', 'Chyba': 'Error', 'Typ': 'Type', 'Směr': 'Direction', 'Osa': 'Axis', 'Rovina': 'Plane',
@@ -235,6 +239,10 @@
 
   /* patterns for texts that contain numbers or names: [regular expression, English template] */
   const PATTERNS = [
+    [/^Úložiště návrhů je zaplněné z (\d+) %\. Zálohujte knihovnu \(Soubor › Zálohovat knihovnu\) a smažte staré návrhy \(Soubor › Moje návrhy\)\.$/, 'Design storage is $1 % full. Back up the library (File › Back up library) and delete old designs (File › My designs).'],
+    [/^Úložiště: (<?\d+) % \((.+) z ~(.+)\)$/, 'Storage: $1 % ($2 of ~$3)'],
+    [/^Záloha knihovny uložena \((\d+) (návrh|návrhy|návrhů)\)$/, (m, n) => `Library backup saved (${n} design${n === '1' ? '' : 's'})`],
+    [/^Obnoveno ze zálohy: (\d+) nových, (\d+) aktualizovaných, (\d+) beze změny(?:, (\d+) se nepodařilo načíst)?$/, (m, a, b, c, d) => `Restored from backup: ${a} new, ${b} updated, ${c} unchanged` + (d ? `, ${d} could not be read` : '')],
     [/^Vítejte ve (.+)$/, 'Welcome to $1'], [/^Pokračovat: (.+)$/, 'Continue: $1'],
     [/^Otevřen návrh „(.+)“$/, 'Opened design “$1”'], [/^Smazat návrh (.+)$/, 'Delete design $1'],
     [/^(\d+) krok$/, '$1 step'], [/^(\d+) kroky$/, '$1 steps'], [/^(\d+) kroků$/, '$1 steps'], [/^otevřený$/, 'open'],

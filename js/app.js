@@ -240,8 +240,22 @@ const saveDoc = () => {
   if (!doc.uid) doc.uid = newUid();
   if (!doc.features.length) return;
   scheduleThumb();
-  try { libStore(doc); } catch (e) { if (!quotaWarned) { quotaWarned = true; toast('Úložiště prohlížeče je plné. Smažte staré návrhy (Soubor › Moje návrhy) nebo návrh uložte do souboru.'); } }
+  try { libStore(doc); checkStorage(); } catch (e) { if (!quotaWarned) { quotaWarned = true; toast('Úložiště prohlížeče je plné. Zálohujte knihovnu (Soubor › Zálohovat knihovnu) a smažte staré návrhy (Soubor › Moje návrhy).'); } }
 };
+/* how full the browser storage for designs is: localStorage holds about 5 million characters per site */
+const LS_QUOTA = 5e6;
+function storageUsed() {
+  let n = 0;
+  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^(skicacad|kota-cad)/.test(k)) n += k.length + (localStorage.getItem(k) || '').length; } } catch (e) { /* ignore */ }
+  return n;
+}
+let storageWarnLevel = 0;
+function checkStorage() {
+  const r = storageUsed() / LS_QUOTA, lvl = r >= 0.95 ? 2 : r >= 0.8 ? 1 : 0;
+  if (lvl > storageWarnLevel) toast(`Úložiště návrhů je zaplněné z ${Math.round(r * 100)} %. Zálohujte knihovnu (Soubor › Zálohovat knihovnu) a smažte staré návrhy (Soubor › Moje návrhy).`);
+  storageWarnLevel = Math.max(storageWarnLevel, lvl);
+}
+const fmtMB = n => (n < 1e5 ? fmtc(Math.max(1, n / 1e3), 0) + ' kB' : fmtc(n / 1e6, 1) + ' MB');
 function pushHist() {
   const s = JSON.stringify(doc);
   if (hist[hi] === s) return;
@@ -4066,8 +4080,9 @@ function showStart(first) {
       ${last ? `<button class="btn" data-open="${last.uid}">Pokračovat: ${esc(last.name)}</button>` : ''}
     </div>
     ${list.length ? `<div class="sd-label">Předchozí návrhy</div><ul class="sd-list">${rows}</ul>` : '<p class="sd-empty">Zatím tu nejsou žádné uložené návrhy. Jakmile začnete modelovat, návrh se sám uloží a příště ho najdete tady.</p>'}
-    <div class="sd-foot"><button class="btn sm" data-act="file">Otevřít ze souboru…</button><button class="btn sm" data-act="example">Ukázkový model</button></div>
-    <p class="sd-note">Návrhy se ukládají automaticky jen v tomto prohlížeči. Zálohu uděláte přes Soubor › Uložit návrh.</p></div>`;
+    <div class="sd-foot"><button class="btn sm" data-act="file">Otevřít ze souboru…</button><button class="btn sm" data-act="example">Ukázkový model</button><button class="btn sm" data-act="backup"${list.length ? '' : ' disabled'}>Zálohovat knihovnu</button><button class="btn sm" data-act="restore">Obnovit ze zálohy…</button></div>
+    ${(() => { const u = storageUsed(), r = Math.min(1, u / LS_QUOTA); return `<div class="sd-usage${r >= 0.8 ? ' warn' : ''}" title="Úložiště návrhů v tomto prohlížeči"><span class="bar"><span style="width:${Math.max(1, Math.round(r * 100))}%"></span></span><span>Úložiště: ${r > 0 && r < 0.01 ? '<1' : Math.round(r * 100)} % (${fmtMB(u)} z ~${fmtMB(LS_QUOTA)})</span></div>`; })()}
+    <p class="sd-note">Návrhy se ukládají automaticky jen v tomto prohlížeči. Záloha celé knihovny je jeden soubor .zip, který obnovíte i na jiném zařízení.</p></div>`;
   ov.hidden = false;
   const b = ov.querySelector('.btn.primary'); if (b) b.focus();
 }
@@ -4091,12 +4106,52 @@ $('#startdlg').addEventListener('click', e => {
   else if (a === 'new') { hideStart(); if (doc.features.length) loadDoc(emptyDoc(), 'Nový návrh'); }
   else if (a === 'file') { hideStart(); $('#fileinput').click(); }
   else if (a === 'example') { hideStart(); loadDoc(exampleDoc(), 'Ukázkový model načten'); }
+  else if (a === 'backup') backupLibrary();
+  else if (a === 'restore') $('#fileinput').click();
 });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#startdlg').hidden) { e.stopPropagation(); hideStart(); } }, true);
 $('#m-example').addEventListener('click', () => { closeMenu(); loadDoc(exampleDoc(), 'Ukázkový model načten'); });
 $('#m-open').addEventListener('click', () => { closeMenu(); $('#fileinput').click(); });
 $('#m-import').addEventListener('click', () => { closeMenu(); pickImportFile('.stl,.obj,.dxf,.svg,.zip'); });
 $('#m-save').addEventListener('click', () => { closeMenu(); saveFile(fileBase() + '.json', projectJSON()); });
+$('#m-backup').addEventListener('click', () => { closeMenu(); backupLibrary(); });
+$('#m-restore').addEventListener('click', () => { closeMenu(); $('#fileinput').click(); });
+/* ---------- library backup: every stored design (with its imported meshes and thumbnail) in one .zip ---------- */
+function backupLibrary() {
+  if (doc.features.length) saveDoc();
+  const list = libList(); if (!list.length) { toast('Knihovna je prázdná, není co zálohovat.'); return; }
+  const files = [], used = new Set(), enc = new TextEncoder();
+  list.forEach((x, i) => {
+    const d = libGet(x.uid); if (!d) return;
+    const bl = {}; for (const f of d.features) if (f.type === 'import' && blobs[f.blob]) bl[f.blob] = blobs[f.blob];
+    const safe = String(d.name).replace(/[^\p{L}\p{N} _-]+/gu, '').trim().slice(0, 40) || 'navrh';
+    let fn = `${String(i + 1).padStart(2, '0')} ${safe}.skicacad.json`; while (used.has(fn)) fn = fn.replace('.skicacad.json', '_.skicacad.json'); used.add(fn);
+    files.push({ name: fn, data: enc.encode(JSON.stringify({ app: 'skicacad', generator: SKICA.full, appVersion: SKICA.version, version: 3, units: 'mm', saved: x.t, thumb: libThumb(x.uid) || undefined, doc: d, blobs: bl })) });
+  });
+  files.push({ name: 'library.json', data: enc.encode(JSON.stringify({ app: 'skicacad', kind: 'library', generator: SKICA.full, appVersion: SKICA.version, created: Date.now(), count: files.length })) });
+  const day = new Date().toISOString().slice(0, 10);
+  saveFile(`skicacad-knihovna-${day}.zip`, makeZip(files), `Záloha knihovny uložena (${plural(files.length - 1, 'návrh', 'návrhy', 'návrhů')})`);
+}
+/* restoring merges: a design missing here is added, one that exists here is replaced only by a newer copy */
+function restoreLibrary(entries) {
+  const dec = new TextDecoder(), list = libList(); let added = 0, updated = 0, same = 0, failed = 0;
+  for (const en of entries) {
+    if (!/\.json$/i.test(en.name) || /library\.json$/i.test(en.name)) continue;
+    let j; try { j = JSON.parse(dec.decode(en.data)); } catch (e) { failed++; continue; }
+    const d = validDoc(j && (j.doc || j)); if (!d || !d.features.length) { failed++; continue; }
+    const t = Number(j.saved) || Date.now(), have = list.find(x => x.uid === d.uid);
+    if (have && have.t >= t) { same++; continue; }
+    try {
+      localStorage.setItem(DKEY(d.uid), JSON.stringify(d));
+      if (typeof j.thumb === 'string' && j.thumb.startsWith('data:image/')) localStorage.setItem(TKEY(d.uid), j.thumb);
+    } catch (e) { toast('Úložiště prohlížeče je plné, část zálohy se nevešla. Smažte staré návrhy a zkuste to znovu.'); break; }
+    if (j.blobs && typeof j.blobs === 'object') Object.assign(blobs, j.blobs);
+    if (have) { have.t = t; have.name = d.name; have.n = d.features.length; updated++; } else { list.push({ uid: d.uid, name: d.name, t, n: d.features.length }); added++; }
+  }
+  list.sort((a, b) => b.t - a.t); libWrite(list.slice(0, LIB_MAX)); saveBlobs();
+  toast(`Obnoveno ze zálohy: ${added} nových, ${updated} aktualizovaných, ${same} beze změny` + (failed ? `, ${failed} se nepodařilo načíst` : ''));
+  showStart(false); checkStorage();
+}
 $('#m-export').addEventListener('click', () => { closeMenu(); exportMesh(); });
 $('#fileinput').addEventListener('change', e => {
   const file = e.target.files && e.target.files[0]; if (!file) return;
@@ -4105,6 +4160,7 @@ $('#fileinput').addEventListener('change', e => {
     try {
       if (/\.zip$/i.test(file.name)) {
         const entries = await Importers.readZip(await file.arrayBuffer());
+        if (entries.some(x => /(^|\/)library\.json$/i.test(x.name))) { restoreLibrary(entries); return; }
         const proj = entries.find(x => /\.skicacad\.json$/i.test(x.name)) || entries.find(x => /\.json$/i.test(x.name));
         if (!proj) throw new Error('Archiv neobsahuje návrh SkicaCAD. Síť z něj vložíte přes Importovat.');
         openProject(JSON.parse(new TextDecoder().decode(proj.data)));

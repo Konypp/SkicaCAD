@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 0.55
+- Knihovna návrhů: Zálohovat knihovnu (Soubor i Moje návrhy) uloží všechny návrhy včetně importovaných modelů a náhledů do jednoho souboru .zip. Obnovit ze zálohy ho načte zpět – i na jiném zařízení. Chybějící návrhy se doplní, existující se přepíšou jen novější verzí ze zálohy.
+- Úložiště: v Moje návrhy je ukazatel zaplnění úložiště prohlížeče. Při 80 % a 95 % aplikace upozorní a doporučí zálohu.
+
 ## Beta 0.54
 - Průsečíky mřížky: bod, který se při kreslení nebo posouvání přiblíží k průsečíku na pár pixelů, se na něj přesně přichytí (i bez přichytávání k mřížce). Zvýraznění se ukáže jen tehdy, když bod na průsečíku opravdu leží. Při přesunu celého prvku se přichytává jeho roh, střed nebo první bod.
 - Zvýraznění průsečíku je menší.
