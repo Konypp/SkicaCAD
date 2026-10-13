@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.47
+- Skica: krok zpět a znovu během kreslení skici (tlačítka Zpět/Znovu v horní liště, Ctrl+Z / Ctrl+Y). Při rozkreslené čáře nebo křivce krok zpět odebere poslední bod, u rozkresleného tvaru ho zruší. Jinak vrací nakreslené prvky, přesuny, úpravy v paletě a v kótách, spojení, duplikace i mazání. Po dokončení skice se celá skica vrací jako jeden krok.
+
 ## Beta 0.46
 - Skica: prvek (čáru, křivku i ostatní tvary) přesunete tažením – bez vybraného nástroje položte prst nebo myš na jeho obrys a táhněte. Posun se přichytává ke kroku mřížky. Druhý prst posun zruší.
 - Paleta skici: u každého prvku tlačítko Duplikovat (kopie se vloží o 10 mm vedle, stejně jako Ctrl+D).

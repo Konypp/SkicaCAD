@@ -247,10 +247,31 @@ function pushHist() {
   hist = hist.slice(0, hi + 1); hist.push(s); if (hist.length > 120) hist.shift(); hi = hist.length - 1;
   updateUndo();
 }
-function updateUndo() { $('#undo').disabled = hi <= 0 || !!cmd || !!sk; $('#redo').disabled = hi >= hist.length - 1 || !!cmd || !!sk; }
+function updateUndo() {
+  if (sk) { $('#undo').disabled = !(sk.hist && sk.hist.length) && !sk.draft; $('#redo').disabled = !(sk.fut && sk.fut.length); return; }
+  $('#undo').disabled = hi <= 0 || !!cmd; $('#redo').disabled = hi >= hist.length - 1 || !!cmd;
+}
 function commit() { pushHist(); saveDoc(); refreshBusy(); }
-function undo() { if (hi > 0 && !cmd && !sk) { hi--; doc = JSON.parse(hist[hi]); afterDocSwap(); } }
-function redo() { if (hi < hist.length - 1 && !cmd && !sk) { hi++; doc = JSON.parse(hist[hi]); afterDocSwap(); } }
+function undo() { if (sk) { skUndo(); return; } if (hi > 0 && !cmd) { hi--; doc = JSON.parse(hist[hi]); afterDocSwap(); } }
+function redo() { if (sk) { skRedo(); return; } if (hi < hist.length - 1 && !cmd) { hi++; doc = JSON.parse(hist[hi]); afterDocSwap(); } }
+/* sketch history: its own undo stack while the sketch is open (whole sketch closes as one step in the model history).
+   A snapshot is taken whenever the palette refreshes after a change; undo first takes back the point or shape being drawn. */
+function skCheckpoint() {
+  if (!sk || !sk.hist) return;
+  const j = JSON.stringify(sk.f.ents);
+  if (j !== sk.lastJSON) { sk.hist.push(sk.lastJSON); if (sk.hist.length > 200) sk.hist.shift(); sk.fut = []; sk.lastJSON = j; }
+  updateUndo();
+}
+function skSwap(j) { sk.f.ents = JSON.parse(j); sk.lastJSON = j; sk.selEnt = -1; sk.joinA = null; sk.drag = null; $('#dim').hidden = true; renderPalette(); redrawSketch(); updateUndo(); }
+function skUndo() {
+  if (sk.draft) {
+    if (sk.draft.pts && sk.draft.pts.length > 1 && isPolyTool(sk.tool) && !isFreehand()) sk.draft.pts.pop(); else sk.draft = null;
+    redrawSketch(); updateDimLabel(); updateUndo(); return;
+  }
+  if (!sk.hist.length) return;
+  sk.fut.push(sk.lastJSON); skSwap(sk.hist.pop());
+}
+function skRedo() { if (!sk.fut.length) return; sk.hist.push(sk.lastJSON); skSwap(sk.fut.pop()); }
 function afterDocSwap() { $('#docname').value = doc.name; tlSel = null; saveDoc(); updateUndo(); refreshBusy(); }
 const newId = () => 'f' + (++doc.seq);
 
@@ -1157,6 +1178,7 @@ const skGridMat = { minor: null, major: null };
 function enterSketch(f, editIndex) {
   sk = { f, editIndex, tool: null, draft: null, selEnt: -1, cursor: null, snapPt: null, ngonN: 6, frR: 2 };
   if (!f.ents) f.ents = [];
+  sk.hist = []; sk.fut = []; sk.lastJSON = JSON.stringify(f.ents);
   sel = new Set(); styleBodies();
   G.grid.visible = false;
   buildSketchGrid();
@@ -1205,6 +1227,7 @@ function redrawSketch() {
   const se = ents[sk.selEnt];
   if (se && (se.t === 'spline' || se.t === 'poly') && !sk.tool) live.add(pointsObj(P, se.pts, tok.orange, 9));
   for (const e of ents) if (e.t === 'spline' && e !== se) live.add(pointsObj(P, e.pts, tok.sketch, 7));
+  updateUndo();
   if (sk.snapPt) live.add(sk.snapMid ? midMarker(P, sk.snapPt, tok.accent) : pointsObj(P, [sk.snapPt], tok.accent, 10));
   if (sk.hoverMid && !sk.tool) live.add(midMarker(P, sk.hoverMid, tok.accent));
   requestRender();
@@ -1598,6 +1621,7 @@ function openPalette() {
 }
 function renderPalette() {
   if (!sk) return;
+  skCheckpoint();
   const box = $('#pal-ents'); if (!box) return;
   const ents = sk.f.ents;
   const nr = Engine.regions(sk.f).length;
