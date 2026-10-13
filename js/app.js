@@ -1248,6 +1248,8 @@ function enterSketch(f, editIndex) {
   sk = { f, editIndex, tool: null, draft: null, selEnt: -1, cursor: null, snapPt: null, ngonN: 6, frR: 2 };
   if (!f.ents) f.ents = [];
   sk.hist = []; sk.fut = []; sk.lastJSON = JSON.stringify(f.ents);
+  /* a sketch taken from a face is resized uniformly by default (its outline keeps its shape) */
+  if (f.orig) sk.uniform = true;
   sel = new Set(); styleBodies();
   G.grid.visible = false;
   buildSketchGrid();
@@ -1468,9 +1470,13 @@ function sketchDrag(ev) {
     if (!d.orig) { d.orig = e.pts.map(q => q.slice()); d.c = [0, 1].map(k => d.orig.reduce((t, q) => t + q[k], 0) / d.orig.length); }
     const c = d.c, o = d.orig[d.pi], ov = [o[0] - c[0], o[1] - c[1]], l2 = ov[0] * ov[0] + ov[1] * ov[1];
     if (l2 < 1e-12) return;
-    const fct = Math.max(0.01, Math.round(((p[0] - c[0]) * ov[0] + (p[1] - c[1]) * ov[1]) / l2 * 100) / 100), r4 = x => Math.round(x * 1e4) / 1e4;
+    let fct = Math.max(0.01, Math.round(((p[0] - c[0]) * ov[0] + (p[1] - c[1]) * ov[1]) / l2 * 100) / 100);
+    const r4 = x => Math.round(x * 1e4) / 1e4, bw = q => { const xs = q.map(t => t[0]), ys = q.map(t => t[1]); return [Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)]; };
+    /* with grid snapping the larger side of the outline grows in whole steps */
+    const [w0, h0] = bw(d.orig), big = Math.max(w0, h0);
+    if (settings.gridSnap && big > 1e-6) { const st = settings.snap; fct = Math.max(st, Math.round(big * fct / st) * st) / big; }
     e.pts = d.orig.map(q => [r4(c[0] + (q[0] - c[0]) * fct), r4(c[1] + (q[1] - c[1]) * fct)]);
-    const el = $('#dim'), px = evPx(ev); el.textContent = `Velikost ${fmtc(fct * 100, 0)} %`; el.hidden = false; el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px';
+    const el = $('#dim'), px = evPx(ev); el.textContent = `Velikost ${fmtc(fct * 100, 0)} % · ${fmtc(w0 * fct, 2)} × ${fmtc(h0 * fct, 2)} mm`; el.hidden = false; el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px';
   } else { const c = crossNear(p), q = c || [snapV(p[0]), snapV(p[1])]; sk.gridHot = c || (onCross(q) ? q : null); e.pts[sk.drag.pi] = q; }
   redrawSketch();
 }

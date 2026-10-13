@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 0.63
+- Skica z plochy: rovnoměrná změna velikosti (tažením bodu se mění celý obrys) je zapnutá automaticky, i při pozdější úpravě takové skici.
+- Rovnoměrná změna velikosti s přichytáváním: delší strana obrysu se mění po celých krocích mřížky (dřív např. 48,4 mm, teď 48 mm). U kurzoru se ukazuje i výsledný rozměr.
+- Ověřeno přichytávání ve skice z plochy (horní i boční stěna, těleso mimo mřížku): k rohům obrysu, ke středům úseček, k mřížce i posun obrysu po celých krocích fungují.
+
 ## Beta 0.62
 - Skica z plochy: původní obrys plochy zůstává ve skice jako šedý čárkovaný obrys. Když obrys přesunete, oranžová šipka ukazuje posun od původního místa i s hodnotou (např. Posun 9,43 mm (X 8 · Y 5)). Platí i při pozdější úpravě skici.
 
