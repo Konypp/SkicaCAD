@@ -52,6 +52,7 @@ const ICONS = {
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   sktrim: '<circle cx="6.5" cy="17" r="2.6"/><circle cx="17.5" cy="17" r="2.6"/><path d="M8.4 15.2 16 4M15.6 15.2 8 4"/><path class="o" d="M3 10h18" stroke-dasharray="2 2" style="stroke:var(--orange)"/>',
   skjoin: '<path d="M4 6c3-2 6 2 9 0"/><path d="M4 18c3 2 6-2 9 0"/><path d="M13 6 18 12 13 18M4 6v12" stroke-dasharray="2 2" style="stroke:var(--orange)"/>',
+  skcons: '<path d="M3 20 21 4" stroke-dasharray="3 2.5"/><circle cx="3.5" cy="19.5" r="1.6"/><circle cx="20.5" cy="4.5" r="1.6"/>',
   skdup: '<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>',
   thauto: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" style="fill:currentColor;stroke:none"/>',
   thlight: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
@@ -256,6 +257,24 @@ function undo() { if (sk) { skUndo(); return; } if (hi > 0 && !cmd) { hi--; doc 
 function redo() { if (sk) { skRedo(); return; } if (hi < hist.length - 1 && !cmd) { hi++; doc = JSON.parse(hist[hi]); afterDocSwap(); } }
 /* sketch history: its own undo stack while the sketch is open (whole sketch closes as one step in the model history).
    A snapshot is taken whenever the palette refreshes after a change; undo first takes back the point or shape being drawn. */
+/* elements drawn while helper drawing is on become construction elements (same undo step as the drawing) */
+function markCons(n0) {
+  if (!sk || !sk.consMode || sk.f.ents.length <= n0) return;
+  for (let i = n0; i < sk.f.ents.length; i++) sk.f.ents[i].cons = true;
+  sk.lastJSON = JSON.stringify(sk.f.ents); renderPalette(); redrawSketch();
+}
+function toggleCons() {
+  if (!sk) return;
+  const e = sk.f.ents[sk.selEnt];
+  if (!sk.tool && e) {
+    if (e.cons) delete e.cons; else e.cons = true;
+    toast(e.cons ? 'Prvek je pomocný: kreslí se čárkovaně a netvoří profil.' : 'Prvek už není pomocný.');
+    renderPalette(); redrawSketch(); return;
+  }
+  sk.consMode = !sk.consMode;
+  toast(sk.consMode ? 'Pomocné kreslení zapnuto: nové prvky budou pomocné (čárkovaně, netvoří profil).' : 'Pomocné kreslení vypnuto');
+  renderRibbon(); redrawSketch();
+}
 function skCheckpoint() {
   if (!sk || !sk.hist) return;
   const j = JSON.stringify(sk.f.ents);
@@ -381,13 +400,26 @@ function entityPolylines(ents) {
   }
   return out;
 }
+/* construction (helper) elements – e.cons – are drawn dashed and never form a profile */
 function sketchLines(P, ents, color, lift = 0.03) {
-  const arr = [];
-  for (const pl of entityPolylines(ents)) {
-    const n = pl.pts.length, m = pl.closed ? n : n - 1;
-    for (let i = 0; i < m; i++) { const a = pl.pts[i], b = pl.pts[(i + 1) % n]; const A = P3(P, a[0], a[1], lift), B = P3(P, b[0], b[1], lift); arr.push(A.x, A.y, A.z, B.x, B.y, B.z); }
+  const seg = list => {
+    const arr = [];
+    for (const pl of entityPolylines(list)) {
+      const n = pl.pts.length, m = pl.closed ? n : n - 1;
+      for (let i = 0; i < m; i++) { const a = pl.pts[i], b = pl.pts[(i + 1) % n]; const A = P3(P, a[0], a[1], lift), B = P3(P, b[0], b[1], lift); arr.push(A.x, A.y, A.z, B.x, B.y, B.z); }
+    }
+    return arr;
+  };
+  const norm = ents.filter(e => !e.cons), cons = ents.filter(e => e.cons);
+  const solid = noRay(new THREE.LineSegments(lineGeo(seg(norm)), new THREE.LineBasicMaterial({ color })));
+  if (!cons.length) return solid;
+  const g = noRay(new THREE.Group()); g.add(solid);
+  /* one dash pattern per element outline, measured along the outline (computeLineDistances on segment pairs would restart every segment) */
+  for (const pl of entityPolylines(cons)) {
+    const arr = [], n = pl.pts.length; for (let i = 0; i < (pl.closed ? n + 1 : n); i++) { const q = pl.pts[i % n], v = P3(P, q[0], q[1], lift); arr.push(v.x, v.y, v.z); }
+    const l = new THREE.Line(lineGeo(arr), new THREE.LineDashedMaterial({ color, dashSize: 1.6, gapSize: 1.2 })); l.computeLineDistances(); g.add(noRay(l));
   }
-  return noRay(new THREE.LineSegments(lineGeo(arr), new THREE.LineBasicMaterial({ color })));
+  return g;
 }
 function keyPoints(ents) {
   const pts = [[0, 0]];
@@ -941,7 +973,7 @@ const RIBBON = {
   ],
   sketch: [
     ['Vytvořit', [['line', 'Čára', 'L'], ['spline', 'Křivka', 'K'], ['rect', 'Obdélník', 'R'], ['circle', 'Kružnice', 'C'], ['ellipse', 'Elipsa', 'E'], ['ngon', 'Mnohoúhelník', 'P'], ['slot', 'Drážka', 'D']]],
-    ['Upravit', [['skfillet', 'Zaoblit rohy'], ['sktrim', 'Vystřihnout', 'X'], ['skjoin', 'Spojit', 'J'], ['skdel', 'Smazat', 'Del']]],
+    ['Upravit', [['skfillet', 'Zaoblit rohy'], ['sktrim', 'Vystřihnout', 'X'], ['skjoin', 'Spojit', 'J'], ['skcons', 'Pomocná', 'Q'], ['skdel', 'Smazat', 'Del']]],
     ['Vložit', [['skimport', 'DXF / SVG']]],
     ['Dokončit', [['finish', 'Dokončit skicu', 'Enter']]]
   ]
@@ -953,7 +985,7 @@ function renderRibbon() {
   $('#tab-sketch').setAttribute('aria-selected', String(!!sk));
   $('#tab-solid').disabled = !!sk;
   body.innerHTML = RIBBON[mode].map(([g, items]) => `<div class="rgroup"><div class="rtools">${items.map(([id, label, key]) =>
-    `<button class="tool${id === 'finish' ? ' finish' : ''}" data-cmd="${id}" title="${label}${key ? ' (' + key + ')' : ''}"${sk && SK_TOOLS.includes(id) ? ` aria-pressed="${sk.tool === id}"` : ''}${!sk && id === 'facemode' ? ` aria-pressed="${faceMode}"` : ''}><span class="ico">${svg(id, 26)}</span><span>${label}</span></button>`).join('')}</div><div class="rlabel">${g}</div></div>`).join('');
+    `<button class="tool${id === 'finish' ? ' finish' : ''}" data-cmd="${id}" title="${label}${key ? ' (' + key + ')' : ''}"${sk && SK_TOOLS.includes(id) ? ` aria-pressed="${sk.tool === id}"` : ''}${sk && id === 'skcons' ? ` aria-pressed="${!!sk.consMode}"` : ''}${!sk && id === 'facemode' ? ` aria-pressed="${faceMode}"` : ''}><span class="ico">${svg(id, 26)}</span><span>${label}</span></button>`).join('')}</div><div class="rlabel">${g}</div></div>`).join('');
 }
 $('#rbody').addEventListener('click', e => { const b = e.target.closest('[data-cmd]'); if (b) runCommand(b.dataset.cmd); });
 const SK_TOOLS = ['line', 'spline', 'rect', 'circle', 'ellipse', 'ngon', 'slot', 'skfillet', 'sktrim', 'skjoin'];
@@ -962,6 +994,7 @@ function runCommand(id) {
   if (sk) {
     if (id === 'finish') finishSketch(true);
     else if (id === 'skdel') deleteSketchEntity();
+    else if (id === 'skcons') toggleCons();
     else if (SK_TOOLS.includes(id)) setSketchTool(sk.tool === id ? null : id);
     else if (id === 'skimport') pickImportFile('.dxf,.svg');
     return;
@@ -1225,7 +1258,7 @@ function redrawSketch() {
   if (sk.selEnt >= 0 && ents[sk.selEnt]) live.add(sketchLines(P, [ents[sk.selEnt]], tok.orange, 0.06));
   live.add(pointsObj(P, keyPoints(ents).slice(1), tok.sketch, 5));
   const d = draftEntity();
-  if (d) live.add(sketchLines(P, [d], tok.orange, 0.07));
+  if (d) { if (sk.consMode) d.cons = true; live.add(sketchLines(P, [d], tok.orange, 0.07)); }
   if (sk.draft && isPolyTool(sk.tool)) live.add(pointsObj(P, sk.draft.pts, tok.orange, 6));
   const se = ents[sk.selEnt];
   if (se && (se.t === 'spline' || se.t === 'poly') && !sk.tool) live.add(pointsObj(P, se.pts, tok.orange, 9));
@@ -1310,7 +1343,8 @@ function setSketchTool(t) {
   renderRibbon(); redrawSketch(); renderPalette(); $('#dim').hidden = true;
 }
 /* freehand curve: the sampled stroke is thinned (Douglas–Peucker) to a few through-points of a smooth spline */
-function finishFreehand() {
+function finishFreehand() { const n0 = sk ? sk.f.ents.length : 0; finishFreehand0(); markCons(n0); }
+function finishFreehand0() {
   if (!sk || !sk.draft) return;
   const raw = sk.draft.pts; sk.draft = null; sk.cursor = null;
   if (raw.length >= 2) {
@@ -1413,7 +1447,8 @@ function updateDimLabel(ev) {
   el.textContent = t; el.hidden = false;
   el.style.left = lastPointer[0] + 'px'; el.style.top = lastPointer[1] + 'px';
 }
-function sketchClick(ev) {
+function sketchClick(ev) { const n0 = sk.f.ents.length; sketchClick0(ev); markCons(n0); }
+function sketchClick0(ev) {
   if (!sk.tool) { pickSketchEntity(ev); return; }
   if (sk.tool === 'sktrim') { trimClick(ev); return; }
   if (sk.tool === 'skjoin') { joinClick(ev); return; }
@@ -1464,7 +1499,8 @@ function sketchClick(ev) {
 }
 const isPolyTool = t => t === 'line' || t === 'spline';
 const dirAngle = (a, b) => { let d = Math.atan2(b[1] - a[1], b[0] - a[0]) / D2R; if (d < 0) d += 360; return Math.round(d * 100) / 100 % 360; };
-function finishPolyline(closed) {
+function finishPolyline(closed) { const n0 = sk ? sk.f.ents.length : 0; finishPolyline0(closed); markCons(n0); }
+function finishPolyline0(closed) {
   if (!sk || !isPolyTool(sk.tool) || !sk.draft) return;
   const pts = sk.draft.pts;
   if (pts.length >= 2) { sk.f.ents.push({ t: sk.tool === 'spline' ? 'spline' : 'poly', pts: pts.map(p => p.slice()), closed: !!closed && pts.length >= 3 }); sk.selEnt = sk.f.ents.length - 1; }
@@ -1660,7 +1696,8 @@ function renderPalette() {
       }
       body = `<div class="note">${n} bodů · ${e.closed ? 'uzavřený obrys' : 'otevřená čára (lze použít jako osu rotace)'}</div>${rows.join('')}${e.closed ? `<div class="grid2">${num(i, 'fr', 'R', e.fr || 0)}</div>${uniChk(i)}` : ''}`;
     }
-    return `<div class="ent${sk.selEnt === i ? ' sel' : ''}" data-ent-row="${i}"><div class="eh"><span class="ico">${svg(e.t === 'poly' ? 'line' : e.t, 16)}</span>${ENT_LABEL[e.t]} ${i + 1}<button class="ibtn" data-entdup="${i}" aria-label="Duplikovat prvek" title="Duplikovat (Ctrl+D)">${svg('skdup', 14)}</button><button class="ibtn" data-entdel="${i}" aria-label="Smazat prvek" title="Smazat">${svg('skdel', 14)}</button></div>${body}</div>`;
+    body += `<label class="chk"><input type="checkbox" id="ent-${i}-cons" data-ent="${i}" data-k="cons"${e.cons ? ' checked' : ''}><span>Pomocný prvek</span></label>`;
+    return `<div class="ent${sk.selEnt === i ? ' sel' : ''}${e.cons ? ' cons' : ''}" data-ent-row="${i}"><div class="eh"><span class="ico">${svg(e.t === 'poly' ? 'line' : e.t, 16)}</span>${ENT_LABEL[e.t]} ${i + 1}<button class="ibtn" data-entdup="${i}" aria-label="Duplikovat prvek" title="Duplikovat (Ctrl+D)">${svg('skdup', 14)}</button><button class="ibtn" data-entdel="${i}" aria-label="Smazat prvek" title="Smazat">${svg('skdel', 14)}</button></div>${body}</div>`;
   }).join('');
 }
 $('#dialog').addEventListener('click', e => {
@@ -1683,6 +1720,7 @@ function setSlotGeom(e, g) {
 function onPaletteChange(inp) {
   const i = +inp.dataset.ent, k = inp.dataset.k, e = sk.f.ents[i];
   if (k === 'uni') { sk.uniform = inp.checked; renderPalette(); return; }
+  if (e && k === 'cons') { if (inp.checked) e.cons = true; else delete e.cons; renderPalette(); redrawSketch(); return; }
   if (e && k === 'closed') { e.closed = inp.checked && e.pts.length >= 3; renderPalette(); redrawSketch(); return; }
   const v = parseNum(inp.value);
   if (e && e.t === 'slot' && ['scx', 'scy', 'slen', 'sd', 'sang', 'w'].includes(k)) {
@@ -3816,7 +3854,7 @@ document.addEventListener('keydown', e => {
     else if (tlSel !== null) deleteFeature(tlSel);
     return;
   }
-  const map = sk ? { l: 'line', k: 'spline', r: 'rect', c: 'circle', e: 'ellipse', p: 'ngon', d: 'slot', x: 'sktrim', j: 'skjoin' } : cmd ? {} : { s: 'sketch', e: 'extrude', f: 'fillet', m: 'move', r: 'rotate', t: 'thread', i: 'measure', g: 'facemode' };
+  const map = sk ? { l: 'line', k: 'spline', r: 'rect', c: 'circle', e: 'ellipse', p: 'ngon', d: 'slot', x: 'sktrim', j: 'skjoin', q: 'skcons' } : cmd ? {} : { s: 'sketch', e: 'extrude', f: 'fillet', m: 'move', r: 'rotate', t: 'thread', i: 'measure', g: 'facemode' };
   const id = map[k.toLowerCase()];
   if (id) { e.preventDefault(); runCommand(id); return; }
   if (k === 'F6') { e.preventDefault(); fitView(); }

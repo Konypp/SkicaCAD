@@ -24,6 +24,7 @@ const PRIM = {
 function closedLoops(sk) {
   const out = [];
   (sk.ents || []).forEach((e, i) => {
+    if (e.cons) return; /* construction (helper) elements never form a profile */
     if (e.t === 'rect' && Math.abs(e.w) > 1e-6 && Math.abs(e.h) > 1e-6) out.push({ ei: i, pts: KK.profilePoints(e) });
     else if ((e.t === 'circle' || e.t === 'ngon') && e.r > 1e-6) out.push({ ei: i, pts: KK.profilePoints(e) });
     else if (e.t === 'slot' && Math.abs(e.w) > 1e-6) out.push({ ei: i, pts: KK.profilePoints(e) });

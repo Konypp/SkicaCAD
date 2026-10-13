@@ -35,7 +35,9 @@
     'Potlačit prvek': 'Suppress feature', 'Obnovit prvek': 'Unsuppress feature', 'Přesunout značku sem': 'Move marker here', 'Odstranit prvek': 'Delete feature',
     '(potlačeno)': '(suppressed)', 'Dvojklikem upravíte, pravým tlačítkem další volby': 'Double-click to edit, right-click for more options',
     // dialogs: common
-    'Zrušit': 'Cancel', 'OK': 'OK', 'Zavřít': 'Close', 'Operace': 'Operation', 'Nové těleso': 'New body', 'Spojit': 'Join', 'Vyříznout': 'Cut', 'Průnik': 'Intersect',
+    'Zrušit': 'Cancel', 'OK': 'OK', 'Zavřít': 'Close', 'Operace': 'Operation', 'Nové těleso': 'New body', 'Spojit': 'Join', 'Pomocná': 'Construction', 'Pomocný prvek': 'Construction element',
+    'Prvek je pomocný: kreslí se čárkovaně a netvoří profil.': 'The element is now construction geometry: drawn dashed, it never forms a profile.', 'Prvek už není pomocný.': 'The element is no longer construction geometry.',
+    'Pomocné kreslení zapnuto: nové prvky budou pomocné (čárkovaně, netvoří profil).': 'Construction drawing on: new elements are construction geometry (dashed, no profile).', 'Pomocné kreslení vypnuto': 'Construction drawing off', 'Vyříznout': 'Cut', 'Průnik': 'Intersect',
     'Počítám náhled…': 'Computing preview…', 'Neplatná hodnota': 'Invalid value', 'Chyba': 'Error', 'Typ': 'Type', 'Směr': 'Direction', 'Osa': 'Axis', 'Rovina': 'Plane',
     'Profil': 'Profile', 'Vyberte profil': 'Select a profile', 'Jedna strana': 'One side', 'Symetricky': 'Symmetric', 'Vzdálenost': 'Distance', 'Úhel': 'Angle', 'Úhel (°)': 'Angle (°)',
     'Tělesa ': 'Bodies', 'Vyberte tělesa': 'Select bodies', 'Vyberte těleso': 'Select a body', 'Rychle': 'Quick', 'Celý model': 'Whole model', 'Plocha': 'Face',
