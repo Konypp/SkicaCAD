@@ -1274,6 +1274,9 @@ function redrawSketch() {
   updateUndo();
   if (sk.snapPt) live.add(sk.snapMid ? midMarker(P, sk.snapPt, tok.accent) : pointsObj(P, [sk.snapPt], tok.accent, 10));
   if (sk.hoverMid && !sk.tool) live.add(midMarker(P, sk.hoverMid, tok.accent));
+  /* the sketch grid is drawn without depth test in the transparent pass (so a body face cannot hide it);
+     sketch lines and points must therefore come after it in that pass, or the grid would paint over them */
+  live.traverse(o => { if (o.isLine || o.isPoints) { o.material.transparent = true; o.renderOrder = Math.max(o.renderOrder, 6); } });
   requestRender();
 }
 function regionMesh(P, r, color, opacity, lift) {

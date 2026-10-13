@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.52
+- Oprava: obrys skici splýval s mřížkou (mřížka se od verze 0.50 kreslila přes čáry skici). Čáry, body a značky skici jsou teď zase nad mřížkou.
+
 ## Beta 0.51
 - Mřížka skici: zrušeno zvýraznění průsečíků mřížky (z verze 0.50). Mřížka nad plochou tělesa a jemná mřížka po 1 mm při přiblížení zůstávají.
 
