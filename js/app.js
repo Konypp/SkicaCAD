@@ -1244,11 +1244,6 @@ function buildSketchGrid() {
   const g1 = noRay(new THREE.LineSegments(lineGeo(mi), new THREE.LineBasicMaterial({ color: tok.grid, transparent: true, opacity: 0.8, depthWrite: false, depthTest: false })));
   const g2 = noRay(new THREE.LineSegments(lineGeo(ma), new THREE.LineBasicMaterial({ color: tok['grid-major'], transparent: true, opacity: 0.9, depthWrite: false, depthTest: false })));
   g1.renderOrder = g2.renderOrder = -2;
-  /* light dots where the grid lines cross */
-  const dots = [];
-  for (let i = -ext; i <= ext; i += step) for (let j = -ext; j <= ext; j += step) { const q = P3(P, i, j, 0); dots.push(q.x, q.y, q.z); }
-  const gd = noRay(new THREE.Points(lineGeo(dots), new THREE.PointsMaterial({ color: tok['grid-major'], size: 3, sizeAttenuation: false, transparent: true, opacity: 0.75, depthWrite: false, depthTest: false })));
-  gd.renderOrder = -1;
   /* 1 mm lines, shown only when zoomed in far enough (see render) */
   const fl = [];
   for (let i = -ext; i <= ext; i += 1) { if (i % step === 0) continue; const a = P3(P, i, -ext, 0), b = P3(P, i, ext, 0), c = P3(P, -ext, i, 0), d = P3(P, ext, i, 0); fl.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z, d.x, d.y, d.z); }
@@ -1257,7 +1252,7 @@ function buildSketchGrid() {
   const ax1 = P3(P, -ext, 0, -0.005), ax2 = P3(P, ext, 0, -0.005), ay1 = P3(P, 0, -ext, -0.005), ay2 = P3(P, 0, ext, -0.005);
   const axU = noRay(new THREE.Line(lineGeo([ax1.x, ax1.y, ax1.z, ax2.x, ax2.y, ax2.z]), new THREE.LineBasicMaterial({ color: 0xe5484d, transparent: true, opacity: 0.6, depthTest: false })));
   const axV = noRay(new THREE.Line(lineGeo([ay1.x, ay1.y, ay1.z, ay2.x, ay2.y, ay2.z]), new THREE.LineBasicMaterial({ color: 0x2f9e6a, transparent: true, opacity: 0.6, depthTest: false })));
-  const work = new THREE.Group(); work.name = 'grid'; work.add(gf, g1, g2, gd, axU, axV);
+  const work = new THREE.Group(); work.name = 'grid'; work.add(gf, g1, g2, axU, axV);
   G.skwork.add(work);
   const live = new THREE.Group(); live.name = 'live'; G.skwork.add(live);
 }
