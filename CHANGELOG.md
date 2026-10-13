@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.66
+- Šroub: nové typy hlavy – válcová s drážkou pro plochý šroubovák (rozměry podle ISO 1207) a půlkulatá s křížem pro křížový šroubovák (rozměry hlavy podle ISO 7045, křížová drážka zjednodušená na rovný kříž). Vůle pro 3D tisk rozšíří i drážku.
+
 ## Beta 0.65
 - Šroub: zápich pod hlavou je ve výchozím stavu vypnutý, zapíná se zaškrtnutím v dialogu.
 

@@ -2212,7 +2212,7 @@ function startFastener(type, editIndex, f) {
         title: Engine.FEATURE_LABEL[type], icon: type,
         fields: [{ k: 'opt', id: 'size', label: 'Velikost závitu', options: sizes, value: String(this.v.size) },
           ...(bolt ? [{ k: 'num', id: 'len', label: 'Délka dříku', value: this.v.len },
-            { k: 'opt', id: 'head', label: 'Hlava', options: [['hex', 'Šestihranná (ISO 4017)'], ['socket', 'Válcová s imbusem (ISO 4762)']], value: this.v.head }] : []),
+            { k: 'opt', id: 'head', label: 'Hlava', options: [['hex', 'Šestihranná (ISO 4017)'], ['socket', 'Válcová s imbusem (ISO 4762)'], ['slotted', 'Válcová s drážkou – plochý šroubovák (ISO 1207)'], ['phillips', 'Půlkulatá s křížem – křížový šroubovák (ISO 7045)']], value: this.v.head }] : []),
           { k: 'chk', id: 'thread', label: 'Modelovat závit', value: this.v.thread },
           { k: 'chk', id: 'chamfer', label: bolt ? 'Zkosená špička (snazší našroubování)' : 'Zkosený náběh díry z obou stran', value: this.v.chamfer },
           ...(bolt ? [{ k: 'chk', id: 'undercut', label: 'Zápich pod hlavou (hladký krček bez závitu)', value: this.v.undercut }, { k: 'num', id: 'tlen', label: 'Délka závitu (0 = celý dřík)', value: this.v.tlen }] : []),
@@ -2248,7 +2248,7 @@ function startFastener(type, editIndex, f) {
         if (this.autoOp) { const o = anyOverlap(this.tool) ? 'join' : 'new'; if (o !== this.op) { this.op = o; dlg.set('op', o); } }
         G.preview.add(previewMesh(this.tool, this.op));
         const M = Engine.FASTENERS[this.v.size];
-        dlg.set('n', `M${fmtc(this.v.size, 1)} × ${fmtc(M[0], 2)} · ` + (bolt ? (this.v.head === 'socket' ? `hlava Ø ${fmtc(M[4], 1)} × ${fmtc(this.v.size, 1)} mm, imbus ${fmtc(M[5], 1)}` : `klíč ${fmtc(M[1], 1)}, hlava ${fmtc(M[2], 1)} mm`) : `klíč ${fmtc(M[1], 1)}, výška ${fmtc(M[3], 1)} mm`));
+        dlg.set('n', `M${fmtc(this.v.size, 1)} × ${fmtc(M[0], 2)} · ` + (bolt ? (this.v.head === 'socket' ? `hlava Ø ${fmtc(M[4], 1)} × ${fmtc(this.v.size, 1)} mm, imbus ${fmtc(M[5], 1)}` : this.v.head === 'slotted' || this.v.head === 'phillips' ? (h => `hlava Ø ${fmtc(h[0], 1)} × ${fmtc(h[1], 1)} mm`)(Engine.SCREW_HEADS[this.v.head][this.v.size]) : `klíč ${fmtc(M[1], 1)}, hlava ${fmtc(M[2], 1)} mm`) : `klíč ${fmtc(M[1], 1)}, výška ${fmtc(M[3], 1)} mm`));
         dlg.okEnabled(true);
       } catch (e) { dlg.set('n', '!' + e.message); dlg.okEnabled(false); }
       requestRender();
