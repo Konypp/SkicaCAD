@@ -177,13 +177,18 @@ function threadTool(f) {
   if (len < P / 2) throw new Error('Závit je příliš krátký');
   const z0 = f.fromEnd ? L - start - len : start;
   const ax = KK.vnorm(f.ax), o = KK.vadd(f.c, KK.vmul(ax, z0)), inner = r * Math.cos(Math.PI / 40);
+  const tol = Math.max(0, Math.min(1, Number(f.tol) || 0)); /* 3D-print clearance on the diameter (Thread command only; bolts and nuts pass an adjusted size) */
   let sp;
   if (f.internal) {
-    sp = { rConst: inner - 0.05, rCrest: r + 0.02, rRoot: d / 2, crestF: 0.25, rootF: 0.125 };
+    /* clearance enlarges the whole profile (the minor diameter too, even when the hole was drawn at the nominal D1) */
+    const D = d + tol;
+    sp = { rConst: inner - 0.05, rCrest: Math.max(r, (D - 1.0825 * P) / 2) + 0.02, rRoot: D / 2, crestF: 0.25, rootF: 0.125 };
     if (sp.rRoot < sp.rCrest + 0.02) throw new Error('Díra je pro zvolenou velikost závitu příliš velká');
   } else {
     /* ISO 68-1 external profile: crest flat P/8, root at d3 = d - 1.2269 P; flanks kept at 60° all the way down, which leaves a root flat of P/6 (approximates the rounded root R = H/6) */
-    sp = { rConst: r + 0.05, rCrest: inner - 0.02, rRoot: d / 2 - 0.6134 * P, crestF: 0.125, rootF: 1 - 0.125 - 2 * 0.6134 * Math.tan(Math.PI / 6) };
+    /* clearance shrinks the whole profile (the crests too, even on a pin drawn at the nominal d) */
+    const de = d - tol;
+    sp = { rConst: r + 0.05, rCrest: Math.min(inner, de / 2) - 0.02, rRoot: de / 2 - 0.6134 * P, crestF: 0.125, rootF: 1 - 0.125 - 2 * 0.6134 * Math.tan(Math.PI / 6) };
     if (sp.rRoot > sp.rCrest - 0.02) throw new Error('Válec je pro zvolenou velikost závitu příliš tenký');
     if (sp.rRoot <= 0.05) throw new Error('Stoupání je pro tento průměr příliš velké');
   }

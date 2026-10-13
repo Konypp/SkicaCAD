@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.72
+- Závit: nové pole Vůle pro 3D tisk (výchozí 0,2 mm, stejně jako u šroubu a matice). U čepu zmenší celý profil závitu, u díry ho zvětší, takže závit na čepu odpovídá šroubu a závit v díře matici se stejnou vůlí. Čep i díru stačí kreslit v jmenovitém rozměru (čep Ø = M, díra Ø = malý průměr matice, ten se nabídne sám). Dřívější závity si ponechají vůli 0.
+
 ## Beta 0.71
 - Závity: kontrola rozměrů podle ISO 68-1 / 261 / 965 u nástroje Závit (čep i díra, M1,6–M30), u šroubů a matic (M2–M24). Stoupání, pravý směr, průměry a rozměry hlav a matic (ISO 4017, 4032, 4762, 1207, 7045) odpovídají.
 - Oprava: vnější závit (šroub, závit na čepu) měl boky sklonu asi 56° místo 60°, takže střední průměr vycházel u větších velikostí pod tolerancí 6g (např. M10: 8,86 mm místo min. 8,86–8,99 mm, M24: 21,72 místo min. 21,80). Teď má profil 60° a střední průměr leží v toleranci 6g. Závit šroubu je proto nepatrně plnější (M6 o 0,08 mm na středním průměru), vůli dál určuje nastavení Vůle.

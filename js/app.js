@@ -2963,7 +2963,7 @@ const threadLabel = (d, p) => `M${fmtc(d, 1)} × ${fmtc(p, 2)}`;
 function startThread(editIndex, f) {
   const c = {
     editIndex, body: f ? f.body : null, face: f ? { c: f.c, ax: f.ax, r: f.r, len: f.len, internal: f.internal } : null,
-    size: f ? f.size : 10, pitch: f ? f.pitch : 1.5, left: f ? !!f.left : false, full: f ? f.full !== false : true,
+    size: f ? f.size : 10, pitch: f ? f.pitch : 1.5, left: f ? !!f.left : false, full: f ? f.full !== false : true, tol: f ? (Number(f.tol) || 0) : 0.2,
     length: f ? (f.length || 10) : 10, start: f ? (f.start || 0) : 0, fromEnd: f ? !!f.fromEnd : false,
     hover: null, timer: null, tool: null, handles: [], hgrp: null, drag: null, hoverH: null,
     init() {
@@ -2974,6 +2974,7 @@ function startThread(editIndex, f) {
           { k: 'opt', id: 'size', label: 'Velikost', options: Engine.THREADS.map(([d, p]) => [String(d), threadLabel(d, p)]), value: String(this.size) },
           { k: 'num', id: 'pitch', label: 'Stoupání', value: this.pitch },
           { k: 'seg', id: 'hand', label: 'Směr', options: [['r', 'Pravý'], ['l', 'Levý']], value: this.left ? 'l' : 'r' },
+          { k: 'num', id: 'tol', label: 'Vůle pro 3D tisk', value: this.tol },
           { k: 'chk', id: 'full', label: 'Po celé délce plochy', value: this.full },
           { k: 'seg', id: 'from', label: 'Měřit od', options: [['a', 'Spodní konec'], ['b', 'Horní konec']], value: this.fromEnd ? 'b' : 'a' },
           { k: 'num', id: 'start', label: 'Odsazení', value: this.start }, { k: 'num', id: 'length', label: 'Délka závitu', value: this.length },
@@ -2982,6 +2983,7 @@ function startThread(editIndex, f) {
           if (id === 'size') { this.size = parseFloat(dlg.get('size')); const t = Engine.THREADS.find(x => x[0] === this.size); if (t) { this.pitch = t[1]; dlg.set('pitch', t[1]); } }
           else if (id === 'pitch') { const v = dlg.get('pitch'); if (v > 0) this.pitch = v; }
           else if (id === 'hand') this.left = dlg.get('hand') === 'l';
+          else if (id === 'tol') { const v = dlg.get('tol'); if (v >= 0 && v <= 1) this.tol = v; }
           else if (id === 'full') this.full = dlg.get('full');
           else if (id === 'from') this.fromEnd = dlg.get('from') === 'b';
           else if (id === 'length') { const v = dlg.get('length'); if (v > 0) { this.length = v; this.full = false; dlg.set('full', false); } }
@@ -3018,13 +3020,13 @@ function startThread(editIndex, f) {
       dlg.set('length', this.length); dlg.set('start', this.start);
     },
     feature() {
-      return { id: f ? f.id : 'tmp', type: 'thread', body: this.body, ...this.face, size: this.size, pitch: this.pitch, left: this.left, full: this.full,
+      return { id: f ? f.id : 'tmp', type: 'thread', body: this.body, ...this.face, size: this.size, pitch: this.pitch, left: this.left, tol: this.tol, full: this.full,
         length: this.length, start: this.start, fromEnd: this.fromEnd };
     },
     update() {
       const fc = this.face;
       dlg.set('face', { text: fc ? `Válcová plocha Ø${fmtc(fc.r * 2, 2)}` : 'Klepněte na válcovou plochu', has: !!fc, active: true });
-      dlg.set('kind', fc ? `${fc.internal ? 'Vnitřní závit (díra)' : 'Vnější závit (čep)'} · délka plochy ${fmtc(fc.len, 2)} mm` : 'Vyberte vnější plochu čepu nebo vnitřní plochu díry.');
+      dlg.set('kind', fc ? `${fc.internal ? 'Vnitřní závit (díra)' : 'Vnější závit (čep)'} · délka plochy ${fmtc(fc.len, 2)} mm` + (this.tol > 0 ? ` · vůle ${fc.internal ? 'zvětší' : 'zmenší'} závit o ${fmtc(this.tol, 2)} mm` : '') : 'Vyberte vnější plochu čepu nebo vnitřní plochu díry.');
       dlg.show('length', !this.full);
       if (fc) {
         const vert = Math.abs(fc.ax[2]) > 0.7, lb = vert ? ['Spodní konec', 'Horní konec'] : ['Začátek plochy', 'Konec plochy'];
