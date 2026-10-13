@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.67
+- Skica: kružnice má táhlo poloměru (oranžový bod vpravo na obvodu). Tažením se mění průměr, s přichytáváním po celých krocích mřížky. Ve skice z plochy (např. z podstavy válce) je táhlo vidět vždy, jinak u vybrané kružnice.
+
 ## Beta 0.66
 - Šroub: nové typy hlavy – válcová s drážkou pro plochý šroubovák (rozměry podle ISO 1207) a půlkulatá s křížem pro křížový šroubovák (rozměry hlavy podle ISO 7045, křížová drážka zjednodušená na rovný kříž). Vůle pro 3D tisk rozšíří i drážku.
 

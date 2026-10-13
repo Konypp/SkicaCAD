@@ -1305,6 +1305,7 @@ function redrawSketch() {
   if (sk.draft && isPolyTool(sk.tool)) live.add(pointsObj(P, sk.draft.pts, tok.orange, 6));
   const se = ents[sk.selEnt];
   if (se && (se.t === 'spline' || se.t === 'poly') && !sk.tool) live.add(pointsObj(P, se.pts, tok.orange, 9));
+  if (!sk.tool) ents.forEach((e, i) => { if (e.t === 'circle' && (i === sk.selEnt || sk.f.orig)) live.add(pointsObj(P, [[e.x + e.r, e.y]], tok.orange, 9)); });
   for (const e of ents) if (e.t === 'spline' && e !== se) live.add(pointsObj(P, e.pts, tok.sketch, 7));
   updateUndo();
   if (sk.snapPt) live.add(sk.snapMid ? midMarker(P, sk.snapPt, tok.accent) : pointsObj(P, [sk.snapPt], tok.accent, 10));
@@ -1441,6 +1442,8 @@ function sketchHandleAt(ev) {
   const [mx, my] = evPx(ev), P = sk.f.plane;
   let best = null, bd = 10;
   sk.f.ents.forEach((e, ei) => {
+    /* a circle has a radius handle on its right-hand side (in a face sketch always, otherwise when selected) */
+    if (e.t === 'circle' && (ei === sk.selEnt || sk.f.orig)) { const s = toPx(P3(P, e.x + e.r, e.y)); const d = Math.hypot(s[0] - mx, s[1] - my); if (d < bd) { bd = d; best = { ei, rad: true }; } return; }
     if (e.t !== 'spline' && e.t !== 'poly') return;
     if (e.t === 'poly' && ei !== sk.selEnt) return;
     e.pts.forEach((q, pi) => { const s = toPx(P3(P, q[0], q[1])); const d = Math.hypot(s[0] - mx, s[1] - my); if (d < bd) { bd = d; best = { ei, pi }; } });
@@ -1461,6 +1464,15 @@ function sketchDrag(ev) {
     redrawSketch(); return;
   }
   const P = sk.f.plane, e = sk.f.ents[sk.drag.ei]; if (!e) return;
+  if (sk.drag.rad) {
+    const p = sketchRawPoint(ev); if (!p) return;
+    let r = Math.hypot(p[0] - e.x, p[1] - e.y);
+    /* with grid snapping the diameter changes in whole steps */
+    r = settings.gridSnap ? Math.max(settings.snap, Math.round(2 * r / settings.snap) * settings.snap) / 2 : Math.max(0.05, Math.round(r * 1000) / 1000);
+    e.r = r;
+    const el = $('#dim'), px = evPx(ev); el.textContent = `Ø ${fmtc(2 * r, 2)} mm`; el.hidden = false; el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px';
+    redrawSketch(); return;
+  }
   ray.setFromCamera(evNdc(ev), cam());
   const hit = ray.ray.intersectPlane(new THREE.Plane().setFromNormalAndCoplanarPoint(v3(P.n), v3(P.o)), new V3());
   if (!hit) return;
