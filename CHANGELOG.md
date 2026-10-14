@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.89
+- Otočit: volba Položit na podložku (Z = 0) je ve výchozím stavu znovu zapnutá. Otočit celý model zůstává vypnuté.
+
 ## Beta 0.88
 - Otočit: u kruhů manipulátoru je stupnice úhlů v barvě osy – čárka po 5°, delší čárka po 15°. Po najetí na čárku se ukáže osa a úhel (např. „Z: −45°“), klepnutím se těleso kolem té osy natočí přesně na daný úhel. Barevná tečka na stupnici ukazuje aktuální úhel. Kde se stupnice dvou os kříží, vybere se ta, která je víc natočená k pohledu.
 

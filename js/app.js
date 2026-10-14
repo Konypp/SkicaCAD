@@ -3955,7 +3955,7 @@ function startRotate(editIndex, f) {
   const pivot = new THREE.Object3D(); scene.add(pivot);
   const c = {
     editIndex, all: f ? !!f.all : false, bodies: new Set(f ? (f.bodies || []) : [...sel]), r: f ? f.r.slice() : [0, 0, 0],
-    pivotMode: f ? (f.pivot || 'center') : 'center', ground: f ? !!f.ground : false, dragging: false, faceMode: false, center: new V3(), highlight: new Set(),
+    pivotMode: f ? (f.pivot || 'center') : 'center', ground: f ? !!f.ground : true, dragging: false, faceMode: false, center: new V3(), highlight: new Set(),
     ids() { return this.all ? cur.bodies.map(b => b.id) : [...this.bodies].filter(id => meshes.has(id)); },
     init() {
       if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
