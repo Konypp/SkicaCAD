@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 0.77
+- Ohnout plochu: místo hrany se volí směr ohybu. Tlačítka nesou názvy os (+X, +Y, −X, −Y, u svislých ploch +Z/−Z) a posuvník Natočení směru (0–360°) dovolí ohnout libovolným směrem. Osa ohybu leží na okraji plochy v tomto směru, takže se u válce ohyb už nenatáčí kolem osy Z podle náhodné plošky kružnice. Klepnutí na hranu plochy nastaví směr kolmo k ní.
+- Ohnout plochu: úhel (1–180°) a poloměr ohybu (0–20 mm) mají posuvník, výchozí poloměr je 2 mm. U zaoblených ploch okno upozorní, když je poloměr menší než 1 mm (ohyb se pak na vnitřní straně zúží do bodu).
+- Okna příkazů umí u číselného pole zobrazit posuvník.
+
 ## Beta 0.76
 - Ohnout plochu: u zaoblených ploch (podstava válce, kruhová plocha) se poloměr ohybu nastaví sám na polovinu šířky plochy, takže vznikne plynulé koleno jako u ohnuté tyče. S poloměrem 0 se ohyb kruhové plochy na vnitřní straně geometricky zužuje do jediného bodu (vypadá jako spoj); okno na to upozorní a doporučí poloměr. Zadaný poloměr se nepřepisuje.
 - Ohnout plochu: oprava chyby „Profil protíná osu rotace“, když osa ležela na zaokrouhlené hraně kruhové plochy.

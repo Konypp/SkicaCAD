@@ -316,3 +316,6 @@ button { cursor: pointer; }
 /* measure: snap kind next to the cursor and the live distance at the middle of the line */
 .mtip { position: absolute; z-index: 6; pointer-events: none; transform: translate(-50%, -50%); padding: 1px 6px; border-radius: 4px; font: 11px var(--mono); white-space: nowrap; background: var(--field); color: var(--accent); border: 1px solid var(--accent); opacity: .92; }
 .mtip.len { color: var(--orange); border-color: var(--orange); font-size: 12px; font-variant-numeric: tabular-nums; }
+/* slider under a number field (e.g. bend angle) */
+.frange-row { display: block; padding-left: 108px; margin-top: -4px; }
+.frange { width: 100%; accent-color: var(--accent); margin: 2px 0 4px; }

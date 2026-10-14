@@ -1082,7 +1082,8 @@ function openDialog(spec) {
     const id = 'dlg-' + f.id;
     switch (f.k) {
       case 'sel': return `<div class="frow" data-row="${f.id}"><span class="fl">${f.label}</span><button class="selbtn" id="${id}" data-sel="${f.id}"><span class="dot"></span><span class="tx"></span></button></div>`;
-      case 'num': return `<div class="frow" data-row="${f.id}"><label for="${id}">${f.label}</label><span class="fnum"><input id="${id}" data-f="${f.id}" inputmode="decimal" autocomplete="off"><span class="u">${f.unit || 'mm'}</span></span></div>`;
+      case 'num': return `<div class="frow" data-row="${f.id}"><label for="${id}">${f.label}</label><span class="fnum"><input id="${id}" data-f="${f.id}" inputmode="decimal" autocomplete="off"><span class="u">${f.unit || 'mm'}</span></span></div>`
+        + (f.range ? `<div class="frow frange-row" data-row="${f.id}-r"><input type="range" class="frange" id="${id}-r" data-f="${f.id}" data-range="1" min="${f.range[0]}" max="${f.range[1]}" step="${f.range[2] || 1}" aria-label="${f.label}"></div>` : '');
       case 'xyz': return `<div class="frow" data-row="${f.id}"><span class="fl">${f.label}</span><div class="xyz">${['x', 'y', 'z'].map((a, j) => `<span class="fnum"><span class="ax ax-${a}">${a.toUpperCase()}</span><input id="${id}-${j}" data-f="${f.id}" data-j="${j}" inputmode="decimal" autocomplete="off" aria-label="${f.label} ${a.toUpperCase()}"></span>`).join('')}</div></div>`;
       case 'opt': return `<div class="frow" data-row="${f.id}"><label for="${id}">${f.label}</label><select class="fsel" id="${id}" data-f="${f.id}">${f.options.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></div>`;
       case 'seg': return `<div class="frow" data-row="${f.id}"><span class="fl">${f.label}</span><div class="seg" id="${id}" data-seg="${f.id}">${f.options.map(([v, l]) => `<button data-v="${v}" aria-pressed="false">${l}</button>`).join('')}</div></div>`;
@@ -1109,7 +1110,7 @@ function openDialog(spec) {
     },
     set(id, v) {
       const f = spec.fields.find(x => x.id === id); if (!f) return;
-      if (f.k === 'num') { const el2 = $('#dlg-' + id); if (document.activeElement !== el2) el2.value = fmtc(v, 3); }
+      if (f.k === 'num') { const el2 = $('#dlg-' + id); if (document.activeElement !== el2) el2.value = fmtc(v, 3); const r = $('#dlg-' + id + '-r'); if (r && document.activeElement !== r && isFinite(v)) r.value = String(v); }
       else if (f.k === 'xyz') v.forEach((x, j) => { const el2 = $(`#dlg-${id}-${j}`); if (document.activeElement !== el2) el2.value = fmtc(x, 3); });
       else if (f.k === 'opt') $('#dlg-' + id).value = v;
       else if (f.k === 'chk') $('#dlg-' + id).checked = !!v;
@@ -1119,7 +1120,7 @@ function openDialog(spec) {
     },
     okEnabled(on) { $('[data-act="ok"]', el).disabled = !on; },
     setOptions(id, options, value) { const sel = $('#dlg-' + id); sel.innerHTML = options.map(([v, l]) => `<option value="${v}">${l}</option>`).join(''); if (value !== undefined) sel.value = String(value); },
-    show(id, on) { const r = $(`#dialog [data-row="${id}"]`); if (r) r.hidden = !on; },
+    show(id, on) { const r = $(`#dialog [data-row="${id}"]`); if (r) r.hidden = !on; const r2 = $(`#dialog [data-row="${id}-r"]`); if (r2) r2.hidden = !on; },
     okLabel(t) { $('[data-act="ok"]', el).textContent = t; }
   };
   spec.fields.forEach(f => { if (f.value !== undefined) dlg.set(f.id, f.value); });
@@ -1134,8 +1135,11 @@ $('#dialog').addEventListener('click', e => {
   const sg = e.target.closest('[data-seg] button');
   if (sg && dlg) { const id = sg.parentElement.dataset.seg; dlg.set(id, sg.dataset.v); dlg.spec.onChange && dlg.spec.onChange(id); }
 });
-$('#dialog').addEventListener('input', e => { const f = e.target.dataset && e.target.dataset.f; if (f && dlg && dlg.spec.onChange && e.target.type !== 'checkbox' && e.target.tagName !== 'SELECT') dlg.spec.onChange(f, true); });
+/* a slider under a number field writes its value into the field (the field stays the source of the value) */
+const syncRange = t => { if (t && t.dataset && t.dataset.range) { const n = $('#dlg-' + t.dataset.f); if (n) n.value = fmtc(parseFloat(t.value), 3); } };
+$('#dialog').addEventListener('input', e => { syncRange(e.target); const f = e.target.dataset && e.target.dataset.f; if (f && dlg && dlg.spec.onChange && e.target.type !== 'checkbox' && e.target.tagName !== 'SELECT') dlg.spec.onChange(f, true); });
 $('#dialog').addEventListener('change', e => {
+  syncRange(e.target);
   const f = e.target.dataset && e.target.dataset.f; if (f && dlg && dlg.spec.onChange) dlg.spec.onChange(f);
   if (sk && e.target.dataset.ent) onPaletteChange(e.target);
   if (sk && e.target.id === 'pal-ngon') { const v = Math.round(parseNum(e.target.value)); if (v >= 3 && v <= 64) sk.ngonN = v; e.target.value = sk.ngonN; redrawSketch(); }
@@ -2750,21 +2754,26 @@ function startBendFace(editIndex, f, face) {
   const R = TOUCH ? 24 : 14, r6 = x => Math.round(x * 1e6) / 1e6, r4 = x => Math.round(x * 1e4) / 1e4;
   const c = {
     editIndex, body: f ? f.body : null, desc: f ? { n: f.n, w: f.w, p: f.p, ...(f.clip ? { clip: f.clip } : {}) } : null,
-    axis: f ? { a: f.axis.a.slice(), b: f.axis.b.slice() } : null, angle: f ? f.angle : 90, radius: f ? (f.radius || 0) : 0,
-    edges: [], hoverEdge: -1, timer: null, tool: null, hideBody: null, radiusSet: !!f,
+    axis: f ? { a: f.axis.a.slice(), b: f.axis.b.slice() } : null, angle: f ? f.angle : 90, radius: f ? (f.radius || 0) : 2,
+    phi: f && isFinite(f.phi) ? f.phi : null, outline: [], edges: [], hoverEdge: -1, timer: null, tool: null,
     init() {
       if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
       openDialog({
         title: 'Ohnout plochu', icon: 'bendface',
-        fields: [{ k: 'sel', id: 'face', label: 'Plocha' }, { k: 'sel', id: 'axis', label: 'Osa ohybu' },
-          { k: 'num', id: 'angle', label: 'Úhel', unit: '°', value: this.angle }, { k: 'num', id: 'radius', label: 'Poloměr ohybu', value: this.radius }, { k: 'note', id: 'n' }],
+        fields: [{ k: 'sel', id: 'face', label: 'Plocha' },
+          { k: 'seg', id: 'dir', label: 'Směr ohybu', options: [['0', '+X'], ['90', '+Y'], ['180', '−X'], ['270', '−Y']] },
+          { k: 'num', id: 'phi', label: 'Natočení směru', unit: '°', value: 0, range: [0, 360, 1] },
+          { k: 'num', id: 'angle', label: 'Úhel', unit: '°', value: this.angle, range: [1, 180, 1] },
+          { k: 'num', id: 'radius', label: 'Poloměr ohybu', value: this.radius, range: [0, 20, 0.5] }, { k: 'note', id: 'n' }],
         onChange: id => {
-          if (id === 'angle') { const v = dlg.get('angle'); if (isFinite(v)) this.angle = v; }
-          if (id === 'radius') { const v = dlg.get('radius'); if (v >= 0) { this.radius = v; this.radiusSet = true; } }
+          if (id === 'angle') { const v = dlg.get('angle'); if (isFinite(v) && v > 0) this.angle = Math.min(180, v); }
+          if (id === 'radius') { const v = dlg.get('radius'); if (v >= 0) this.radius = v; }
+          if (id === 'phi') { const v = dlg.get('phi'); if (isFinite(v)) { this.phi = ((v % 360) + 360) % 360; this.makeAxis(); } }
+          if (id === 'dir') { this.phi = parseFloat(dlg.get('dir')); dlg.set('phi', this.phi); this.makeAxis(); }
           this.update();
         }
       });
-      if (!f && face && face.kind === 'plane') this.useFace(face, true); else this.loadEdges(); 
+      if (!f && face && face.kind === 'plane') this.useFace(face); else { this.loadOutline(); if (this.desc) { if (this.phi === null) this.phi = this.phiOfAxis(); this.labels(); } }
       this.update();
     },
     regionPolys() {
@@ -2772,51 +2781,69 @@ function startBendFace(editIndex, f, face) {
       const g = K.planarFace(b.polys, this.desc.n, this.desc.w, this.desc.p); if (!g) return null;
       return this.desc.clip ? Engine.clipRegion(b.polys, g, this.desc.clip) : g.map(i => b.polys[i]);
     },
-    loadEdges() { const rp = this.regionPolys(); this.edges = rp ? faceEdgesOf(rp) : []; },
-    useFace(fc, first) {
+    loadOutline() { const rp = this.regionPolys(); this.edges = rp ? faceEdgesOf(rp) : []; this.outline = rp ? K.faceLoops(rp, rp.map((_, i) => i)).flat() : []; },
+    /* in-plane directions aligned with the world axes: U follows X (or Y on faces facing X), V = n x U */
+    frame() {
+      const n = this.desc.n, pick = Math.abs(n[0]) > 0.9 ? [0, 1, 0] : [1, 0, 0];
+      const U = K.vnorm(K.vsub(pick, K.vmul(n, K.vdot(pick, n)))), V = K.cross(n, U);
+      return { U, V };
+    },
+    dirOf(phi) { const { U, V } = this.frame(), a = phi * D2R; return K.vadd(K.vmul(U, Math.cos(a)), K.vmul(V, Math.sin(a))); },
+    axisName(v) { const k = [0, 1, 2].reduce((m, i) => (Math.abs(v[i]) > Math.abs(v[m]) ? i : m), 0); return (v[k] >= 0 ? '+' : '−') + 'XYZ'[k]; },
+    /* the four quick directions get the names of the world axes they point along */
+    labels() { if (!this.desc) return; $$('#dlg-dir button').forEach(btn => { btn.textContent = this.axisName(this.dirOf(parseFloat(btn.dataset.v))); }); dlg.set('dir', String(this.phi)); dlg.set('phi', this.phi); },
+    phiOfAxis() {
+      if (!this.axis || !this.outline.length) return 0;
+      const { U, V } = this.frame(), cen = this.outline.reduce((s2, q) => K.vadd(s2, K.vmul(q, 1 / this.outline.length)), [0, 0, 0]);
+      const mid = K.vmul(K.vadd(this.axis.a, this.axis.b), 0.5), t = K.vnorm(K.vsub(this.axis.b, this.axis.a));
+      let d = K.vsub(mid, cen); d = K.vsub(d, K.vmul(t, K.vdot(d, t)));
+      return Math.round(((Math.atan2(K.vdot(d, V), K.vdot(d, U)) / D2R) % 360 + 360) % 360 * 100) / 100;
+    },
+    /* bend axis = the line across the face at its outermost point in the bend direction (a straight edge when there is one) */
+    makeAxis() {
+      if (!this.desc || !this.outline.length) { this.axis = null; return; }
+      const dir = this.dirOf(this.phi), t = K.cross(this.desc.n, dir);
+      let sMax = -Infinity; for (const q of this.outline) sMax = Math.max(sMax, K.vdot(q, dir));
+      const on = this.outline.filter(q => K.vdot(q, dir) > sMax - 1e-4);
+      let tMin = Infinity, tMax = -Infinity; for (const q of this.outline) { const v = K.vdot(q, t); tMin = Math.min(tMin, v); tMax = Math.max(tMax, v); }
+      const P = on[0], tp = K.vdot(P, t);
+      const A = K.vadd(P, K.vmul(t, tMin - tp)), B = K.vadd(P, K.vmul(t, tMax - tp));
+      this.axis = K.vdot(K.vsub(B, A), K.vsub(B, A)) > 1e-8 ? { a: A.map(r4), b: B.map(r4) } : null;
+    },
+    useFace(fc) {
       this.body = fc.bodyId; this.desc = { n: fc.n.map(r6), w: r6(fc.w), p: fc.p.map(r4), ...(fc.clip ? { clip: fc.clip } : {}) };
-      this.loadEdges();
-      /* default axis: the lowest edge (a bend downwards), the longer one when two are equally low */
-      let best = null, bk = Infinity;
-      for (const [a, b] of this.edges) { const z = (a[2] + b[2]) / 2, L = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), key = Math.round(z * 1e3) * 1e6 - L; if (key < bk) { bk = key; best = [a, b]; } }
-      this.axis = best ? { a: best[0].map(r4), b: best[1].map(r4) } : null;
-      this.autoRadius();
-      if (!first) this.update();
+      this.loadOutline();
+      /* default: bend downwards on upright faces, towards +X (or +Y) on flat ones */
+      const { U, V } = this.frame(), down = K.vsub([0, 0, -1], K.vmul(this.desc.n, -this.desc.n[2]));
+      this.phi = K.vdot(down, down) > 0.01 ? Math.round(((Math.atan2(K.vdot(down, V), K.vdot(down, U)) / D2R) % 360 + 360) % 360) : 0;
+      this.makeAxis(); this.labels();
     },
-    /* the axis lies on a rounded outline (one short facet of a circle) instead of a real straight edge */
+    feature() { return { id: f ? f.id : 'tmp', type: 'bendface', body: this.body, ...this.desc, axis: this.axis, phi: this.phi, angle: this.angle, radius: this.radius }; },
     curved() {
-      if (!this.axis || !this.edges.length) return false;
+      if (!this.axis) return false;
       const L = Math.hypot(...[0, 1, 2].map(k => this.axis.b[k] - this.axis.a[k]));
-      let ext = 0; for (const [a] of this.edges) ext = Math.max(ext, Math.hypot(...[0, 1, 2].map(k => a[k] - this.axis.a[k])));
-      return L < 0.25 * ext;
+      const on = this.edges.some(([a, b2]) => { const l = Math.hypot(...[0, 1, 2].map(k => b2[k] - a[k])); return l > 0.6 * L && [a, b2].every(q => { const d = K.vsub(q, this.axis.a), t = K.vnorm(K.vsub(this.axis.b, this.axis.a)), pp = K.vsub(d, K.vmul(t, K.vdot(d, t))); return K.vdot(pp, pp) < 1e-6; }); });
+      return !on;
     },
-    /* a rounded face bent with radius 0 pinches to a single point on the inner side (the swept circles all touch the axis):
-       give it a bend radius right away; an explicit radius the user typed is kept */
-    halfWidth() { let ext = 0; if (this.axis) for (const [a] of this.edges) ext = Math.max(ext, Math.hypot(...[0, 1, 2].map(k => a[k] - this.axis.a[k]))); return ext / 2; },
-    autoRadius() {
-      if (this.radiusSet || !(this.radius <= 0) || !this.curved()) return;
-      this.radius = Math.max(1, Math.round(this.halfWidth() * 2) / 2); /* inner radius = half the face width: a smooth elbow like a bent rod or pipe */
-      if (dlg) dlg.set('radius', this.radius);
-    },
-    feature() { return { id: f ? f.id : 'tmp', type: 'bendface', body: this.body, ...this.desc, axis: this.axis, angle: this.angle, radius: this.radius }; },
     update() {
       clearGroup(G.overlay);
-      const has = !!this.desc, L = this.axis ? Math.hypot(...[0, 1, 2].map(k => this.axis.b[k] - this.axis.a[k])) : 0;
+      const has = !!this.desc;
       dlg.set('face', { text: has ? 'Rovinná plocha' : 'Klepněte na rovinnou plochu', has, active: !has });
-      dlg.set('axis', { text: this.axis ? `Hrana ${fmtc(L, 2)} mm` : 'Klepněte na hranu plochy', has: !!this.axis, active: has });
-      setPrompt(!has ? 'Klepněte na rovinnou plochu, kterou chcete ohnout' : 'Klepnutím na jinou hranu plochy změníte osu ohybu');
+      ['dir', 'phi'].forEach(id => dlg.show(id, has));
+      setPrompt(!has ? 'Klepněte na rovinnou plochu, kterou chcete ohnout' : 'Směr ohybu zvolte tlačítky, posuvníkem nebo klepnutím na hranu plochy');
       if (has) {
-        const rp = this.regionPolys(); if (rp) G.overlay.add(faceOverlay(rp, planeKey(rp[0]), tok.accent, 0.2));
-        const seg = [];
-        this.edges.forEach(([a, b], i) => { if (i === this.hoverEdge) seg.push(...a, ...b); });
-        if (seg.length) { const l = noRay(new THREE.LineSegments(lineGeo(seg), new THREE.LineBasicMaterial({ color: tok.accent, depthTest: false, transparent: true }))); l.renderOrder = 12; G.overlay.add(l); }
-        if (this.axis) { const l = noRay(new THREE.LineSegments(lineGeo([...this.axis.a, ...this.axis.b]), new THREE.LineBasicMaterial({ color: tok.orange, depthTest: false, transparent: true }))); l.renderOrder = 13; G.overlay.add(l); G.overlay.add(mpts([v3(this.axis.a), v3(this.axis.b)], tok.orange, 8)); }
+        const rp = this.regionPolys(); if (rp && rp.length) G.overlay.add(faceOverlay(rp, planeKey(rp[0]), tok.accent, 0.2));
+        if (this.hoverEdge >= 0 && this.edges[this.hoverEdge]) { const [a, b2] = this.edges[this.hoverEdge]; const l = noRay(new THREE.LineSegments(lineGeo([...a, ...b2]), new THREE.LineBasicMaterial({ color: tok.accent, depthTest: false, transparent: true }))); l.renderOrder = 12; G.overlay.add(l); }
+        if (this.axis) {
+          const l = noRay(new THREE.LineSegments(lineGeo([...this.axis.a, ...this.axis.b]), new THREE.LineBasicMaterial({ color: tok.orange, depthTest: false, transparent: true }))); l.renderOrder = 13; G.overlay.add(l);
+          G.overlay.add(mpts([v3(this.axis.a), v3(this.axis.b)], tok.orange, 8));
+        }
       }
       this.schedule();
     },
     schedule() {
       clearTimeout(this.timer); clearGroup(G.preview); this.tool = null;
-      if (!this.desc || !this.axis) { dlg.set('n', this.desc ? 'Klepněte na hranu plochy, kolem které se má plocha ohnout.' : 'Vyberte rovinnou stěnu tělesa, třeba čelo hranolu.'); dlg.okEnabled(false); requestRender(); return; }
+      if (!this.desc || !this.axis) { dlg.set('n', this.desc ? 'Směr ohybu se nepodařilo určit.' : 'Vyberte rovinnou stěnu tělesa, třeba čelo hranolu nebo podstavu válce.'); dlg.okEnabled(false); requestRender(); return; }
       dlg.set('n', 'Počítám náhled…'); dlg.okEnabled(false);
       this.timer = setTimeout(() => {
         if (cmd !== this) return;
@@ -2824,14 +2851,14 @@ function startBendFace(editIndex, f, face) {
           const b = cur.bodies.find(x => x.id === this.body);
           this.tool = Engine.bendFaceTool(b.polys, this.feature());
           G.preview.add(previewMesh(this.tool, 'join'));
-          const half = this.halfWidth(); dlg.set('n', this.curved() && this.radius < half * 0.5 ? `Zaoblená plocha s malým poloměrem ohybu: na vnitřní straně se ohyb zužuje až do jednoho bodu (vypadá jako spoj). Plynulý ohyb dá poloměr kolem ${fmtc(half, 1)} mm (polovina šířky plochy).` : 'Plocha se otočí kolem oranžové hrany do prostoru před sebou. Koncovou plochu pak vysunete pod úhlem (režim Plochy › Vysunout).'); dlg.okEnabled(true);
+          dlg.set('n', this.curved() && this.radius < 1 ? 'Malý poloměr ohybu: u zaoblené plochy se ohyb na vnitřní straně zúží až do jednoho bodu (vypadá jako spoj). Pro plynulý ohyb zadejte alespoň 1 až 2 mm.' : 'Plocha se ohne kolem oranžové osy směrem, který jste zvolili. Koncovou plochu pak vysunete pod úhlem (režim Plochy › Vysunout).'); dlg.okEnabled(true);
         } catch (e) { dlg.set('n', '!' + e.message); }
         requestRender();
-      }, 150);
+      }, this.dragging ? 60 : 150);
     },
     edgeAt(ev) {
       const [mx, my] = evPx(ev); let best = -1, bd = R;
-      this.edges.forEach(([a, b], i) => { const pa = toPx(v3(a)), pb = toPx(v3(b)); if (pa[2] >= 1 || pb[2] >= 1) return; const [d] = segDist(mx, my, pa, pb); if (d < bd) { bd = d; best = i; } });
+      this.edges.forEach(([a, b2], i) => { const pa = toPx(v3(a)), pb = toPx(v3(b2)); if (pa[2] >= 1 || pb[2] >= 1) return; const [d] = segDist(mx, my, pa, pb); if (d < bd) { bd = d; best = i; } });
       return best;
     },
     onMove(ev) {
@@ -2840,11 +2867,22 @@ function startBendFace(editIndex, f, face) {
       if (i !== this.hoverEdge) { this.hoverEdge = i; this.update(); }
     },
     onClick(ev) {
-      if (this.desc) { const i = this.edgeAt(ev); if (i >= 0) { const [a, b] = this.edges[i]; this.axis = { a: a.map(r4), b: b.map(r4) }; this.autoRadius(); this.update(); return; } }
+      if (this.desc) {
+        const i = this.edgeAt(ev);
+        if (i >= 0) {
+          /* a tapped edge sets the direction perpendicular to it, away from the face */
+          const [a, b2] = this.edges[i], t = K.vnorm(K.vsub(b2, a)), { U, V } = this.frame();
+          let d = K.cross(t, this.desc.n);
+          const cen = this.outline.reduce((s2, q) => K.vadd(s2, K.vmul(q, 1 / this.outline.length)), [0, 0, 0]);
+          if (K.vdot(d, K.vsub(K.vmul(K.vadd(a, b2), 0.5), cen)) < 0) d = K.vmul(d, -1);
+          this.phi = Math.round(((Math.atan2(K.vdot(d, V), K.vdot(d, U)) / D2R) % 360 + 360) % 360 * 100) / 100;
+          dlg.set('phi', this.phi); dlg.set('dir', String(this.phi)); this.makeAxis(); this.update(); return;
+        }
+      }
       const h = hitBodies(ev), fc = h ? faceAtHit(h) : null;
       if (!fc) return;
       if (fc.kind !== 'plane') { toast('Ohnout lze jen rovinnou plochu.'); return; }
-      this.useFace(fc);
+      this.useFace(fc); this.update();
     },
     ok() {
       /* Enter in a field confirms before the delayed preview has run: check the bend right away */
