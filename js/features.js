@@ -599,19 +599,70 @@ function hingeParts(f) {
     const hole = cylAlong([-1, 0, zc], [1, 0, 0], pr + c, L + 2);
     A = KK.boolean(A, hole, 'subtract'); B = KK.boolean(B, hole, 'subtract');
   } else {
-    /* the pin belongs to leaf B; its cone tips sit in blind cone sockets in A's end knuckles, which keeps the two leaves together */
-    const w = HINGE_WALL, xa = w + D + ch, xb = L - w - D - ch;
-    let pin = cylAlong([xa, 0, zc], [1, 0, 0], pr, xb - xa);
-    pin = KK.boolean(pin, coneX([xa, 0, zc], [-1, 0, 0], pr, rt, ch), 'union');
-    pin = KK.boolean(pin, coneX([xb, 0, zc], [1, 0, 0], pr, rt, ch), 'union');
-    const hs = pr + c - rt, sa = w + hs, sb = L - w - hs;
-    let sock = cylAlong([sa - 0.01, 0, zc], [1, 0, 0], pr + c, sb - sa + 0.02);
-    sock = KK.boolean(sock, coneX([sa, 0, zc], [-1, 0, 0], pr + c, rt, hs), 'union');
-    sock = KK.boolean(sock, coneX([sb, 0, zc], [1, 0, 0], pr + c, rt, hs), 'union');
-    A = KK.boolean(A, sock, 'subtract');
-    B = KK.boolean(B, pin, 'union');
+    ({ A, B } = hingePin(H, A, B, zc));
   }
   return { A, B, H };
+}
+/* the pin belongs to leaf B; its cone tips sit in blind cone sockets in A's end knuckles, which keeps the two leaves together (axis along x at height az) */
+function hingePin(H, A, B, az) {
+  const { L, pr, c, rt, ch, D } = H, w = HINGE_WALL, xa = w + D + ch, xb = L - w - D - ch;
+  let pin = cylAlong([xa, 0, az], [1, 0, 0], pr, xb - xa);
+  pin = KK.boolean(pin, coneX([xa, 0, az], [-1, 0, 0], pr, rt, ch), 'union');
+  pin = KK.boolean(pin, coneX([xb, 0, az], [1, 0, 0], pr, rt, ch), 'union');
+  const hs = pr + c - rt, sa = w + hs, sb = L - w - hs;
+  let sock = cylAlong([sa - 0.01, 0, az], [1, 0, 0], pr + c, sb - sa + 0.02);
+  sock = KK.boolean(sock, coneX([sa, 0, az], [-1, 0, 0], pr + c, rt, hs), 'union');
+  sock = KK.boolean(sock, coneX([sb, 0, az], [1, 0, 0], pr + c, rt, hs), 'union');
+  return { A: KK.boolean(A, sock, 'subtract'), B: KK.boolean(B, pin, 'union') };
+}
+/* ---------- box hinge: box and lid stand side by side with their rims at the same height; the axis lies on the rim
+   in the middle of the gap, each leaf hangs down the facing wall on a 45° web so the whole thing prints in one piece.
+   Local frame: axis along x (0..L), the box on -y with its wall face at y = -G/2, the lid on +y, rim at z = 0. */
+const BOXH_GRIP = 0.8; /* how far the leaf reaches into the wall */
+function boxHingeSection(H, G, side) {
+  const { R } = H, M = 36, gw = G / 2, pts = [];
+  const zj = -R * Math.SQRT2 - gw; /* where the 45° web (tangent to the knuckle at -45°) meets the wall */
+  pts.push([-gw - BOXH_GRIP, zj - 1], [-gw, zj - 1], [-gw, zj]);
+  for (let i = 0; i <= M; i++) { const a = -Math.PI / 4 + (Math.PI + Math.PI / 4) * i / M; pts.push([R * Math.cos(a), R * Math.sin(a)]); }
+  pts.push([-gw - BOXH_GRIP, 0]);
+  return side < 0 ? pts : pts.map(([y, z]) => [-y, z]).reverse();
+}
+function boxHingeLocal(f, G) {
+  const H = hingeDims({ ...f, w: 1e3, t: 1, kind: 'print' }), { L, N, k, c, R } = H;
+  if (G < 2 * (R + c) - 1e-6) throw new Error('Mezera mezi krabičkou a víkem musí být alespoň ' + (Math.ceil(2 * (R + c) * 10) / 10).toString().replace('.', ',') + ' mm (teď ' + (Math.round(G * 10) / 10).toString().replace('.', ',') + ' mm)');
+  if (G > 30) throw new Error('Krabička a víko jsou od sebe příliš daleko (nejvýš 30 mm)');
+  let A = null, B = null;
+  for (let i = 0; i < N; i++) {
+    const side = i % 2 ? 1 : -1, x0 = i * (k + c), pr = prismX(boxHingeSection(H, G, side), x0, x0 + k);
+    if (side < 0) A = A ? KK.boolean(A, pr, 'union') : pr; else B = B ? KK.boolean(B, pr, 'union') : pr;
+  }
+  return { H, ...hingePin(H, A, B, 0) };
+}
+/* place the box hinge(s) from the two bodies: returns world-space tools for the box and for the lid */
+function boxHingeTools(f, boxPolys, lidPolys) {
+  const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys);
+  if (Math.abs(a.max[2] - b.max[2]) > 0.05) throw new Error('Krabička a víko musí mít horní hranu ve stejné výšce');
+  let ax = -1, G = -1, dir = 0;
+  for (const k of [0, 1]) {
+    const g1 = b.min[k] - a.max[k], g2 = a.min[k] - b.max[k];
+    if (g1 > G) { G = g1; ax = k; dir = 1; }
+    if (g2 > G) { G = g2; ax = k; dir = -1; }
+  }
+  if (G <= 0) throw new Error('Krabička a víko se překrývají, postavte je vedle sebe s mezerou');
+  const o = 1 - ax, s0 = Math.max(a.min[o], b.min[o]), s1 = Math.min(a.max[o], b.max[o]), span = s1 - s0, L = Number(f.len), cnt = Math.max(1, Math.min(4, Math.round(Number(f.count) || 1)));
+  if (span < L * cnt + 2 * (cnt - 1)) throw new Error('Panty se nevejdou podél hrany (' + (Math.round(span * 10) / 10).toString().replace('.', ',') + ' mm)');
+  const { A, B, H } = boxHingeLocal(f, G);
+  /* local y points from the box to the lid, local x along the edge, z up; keep it right-handed */
+  const ey = [0, 0, 0]; ey[ax] = dir; const ex = [ey[1], -ey[0], 0], zA = a.max[2];
+  const mid = (dir > 0 ? a.max[ax] + b.min[ax] : b.max[ax] + a.min[ax]) / 2;
+  let TA = null, TB = null;
+  for (let j = 0; j < cnt; j++) {
+    const cAlong = s0 + span * (j + 0.5) / cnt, org = [0, 0, zA]; org[ax] = mid; org[o] = cAlong - ex[o] * L / 2;
+    const m = [ex[0], ex[1], ex[2], 0, ey[0], ey[1], ey[2], 0, 0, 0, 1, 0, org[0], org[1], org[2], 1];
+    const ta = KK.transform(A, m), tb = KK.transform(B, m);
+    TA = TA ? TA.concat(ta) : ta; TB = TB ? TB.concat(tb) : tb;
+  }
+  return { A: TA, B: TB, H, G };
 }
 function toolForHinge(f) {
   const { A, B } = hingeParts(f), part = f.part || 'both';
@@ -652,7 +703,14 @@ function step(state, f) {
       out = applyTool(bodies, f, toolForPrimitive(f), newBody); break;
     case 'bolt': case 'nut':
       out = applyTool(bodies, f, toolForFastener(f), polys => ({ id: f.id, name: (f.type === 'bolt' ? 'Šroub M' + f.size + '×' + f.len : 'Matice M' + f.size + (f.low ? ' nízká' : '')).replace('.', ','), polys, from: f.id })); break;
-    case 'hinge': {
+    case 'hinge': if (f.kind === 'box') {
+      const bx = bodies.find(b => b.id === f.box), ld = bodies.find(b => b.id === f.lid);
+      if (!bx || !ld) throw new Error('Krabička nebo víko chybí');
+      if (bx === ld) throw new Error('Krabička a víko musí být dvě různá tělesa');
+      const T = boxHingeTools(f, bx.polys, ld.polys);
+      out = bodies.map(b => (b === bx ? { ...b, polys: KK.boolean(b.polys, T.A, 'union') } : b === ld ? { ...b, polys: KK.boolean(b.polys, T.B, 'union') } : b));
+      break;
+    } else {
       /* the two leaves interlock, so a bounding-box test would also catch the body on the other leaf: join only bodies the hinge really touches */
       const tool = toolForHinge(f);
       let ff = f;
@@ -889,7 +947,7 @@ function makeRebuilder() {
   };
 }
 
-return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, hingeDims, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, hingeDims, boxHingeTools, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

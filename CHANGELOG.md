@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 1.01
+- Pant, nový typ **Krabička s víkem**: krabička a víko stojí na podložce vedle sebe otevřené nahoru (horní hrany ve stejné výšce, mezera mezi nimi alespoň 2 × (poloměr kloubu + vůle), pro čep Ø 3 mm asi 6,8 mm). Klepnete na krabičku a na víko a panty se samy umístí doprostřed mezery na horní hranu a připojí ke stěnám obou těles.
+  - Klouby drží na stěně šikmou podpěrou 45°, takže se vše vytiskne vcelku bez podpěr; víko se po tisku překlopí o 180° a dosedne na krabičku.
+  - Volíte délku pantu, počet pantů (1–3), počet kloubů, průměr čepu a vůli.
+
 ## Beta 1.00
 - Nový příkaz **Pant** (skupina Vytvořit): generátor pantu pro 3D tisk.
   - Typ **Tištěný vcelku**: tiskne se jako jeden kus bez podpěr. Čep patří ke křídlu B a kuželovými konci drží v jamkách krajních kloubů křídla A; mezi díly je všude vůle (výchozí 0,35 mm). Křídlo se otočí asi o 170°.
