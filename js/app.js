@@ -124,6 +124,7 @@ controls.update();
 
 const transform = new THREE.TransformControls(persp, dom);
 transform.setSize(0.9);
+transform.freeXY = true; /* the centre handle moves bodies in X and Y only (patched TransformControls) */
 scene.add(transform);
 
 const G = {

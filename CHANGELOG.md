@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 0.96
+- Gizmo posunu: tažením za středový bod se tělesa posouvají jen v rovině X a Y, výška (Z) se nemění. Pro Z je dál modrá šipka.
+- Rozříznout a Ohnout ponechávají volný pohyb středového bodu.
+
 ## Beta 0.95
 - Skica: elipsa se kreslí na dvě klepnutí. Ze středu: střed, pak roh obdélníku, do kterého se vepíše. Z rohu: dva protější rohy. Natočení se nastavuje v paletě. Když je obdélník plochý, druhá osa dostane polovinu první, takže nevznikne „čára“.
 - Šipky na klávesnici posouvají o krok mřížky, se Shiftem o 10 kroků:

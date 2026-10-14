@@ -102,7 +102,8 @@
 			defineProperty( 'dragging', false );
 			defineProperty( 'showX', true );
 			defineProperty( 'showY', true );
-			defineProperty( 'showZ', true ); // Reusable utility variables
+			defineProperty( 'showZ', true );
+			defineProperty( 'freeXY', false ); // SkicaCAD patch // Reusable utility variables
 
 			const worldPosition = new THREE.Vector3();
 			const worldPositionStart = new THREE.Vector3();
@@ -298,6 +299,7 @@
 				if ( axis.indexOf( 'X' ) === - 1 ) this._offset.x = 0;
 				if ( axis.indexOf( 'Y' ) === - 1 ) this._offset.y = 0;
 				if ( axis.indexOf( 'Z' ) === - 1 ) this._offset.z = 0;
+				if ( axis === 'XYZ' && this.freeXY && this.space !== 'local' ) this._offset.z = 0; // SkicaCAD patch: centre handle moves in X and Y only
 
 				if ( space === 'local' && axis !== 'XYZ' ) {
 
@@ -1429,6 +1431,15 @@
 							break;
 
 						case 'XYZ':
+							// SkicaCAD patch: with freeXY the centre handle slides on the world XY plane (unless that plane is seen edge-on)
+							if ( this.freeXY && this.mode === 'translate' && space !== 'local' && Math.abs( this.eye.z ) > 0.12 ) {
+
+								_alignVector.copy( _unitY );
+								_dirVector.copy( _unitZ );
+								break;
+
+							}
+
 						case 'E':
 							_dirVector.set( 0, 0, 0 );
 
