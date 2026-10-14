@@ -314,7 +314,7 @@
     [/^Úhel (.+) · vzdálenost bodů (.+)$/, 'Angle $1 · point distance $2'], [/^Úhel (.+)$/, 'Angle $1'],
     [/^Plocha se rozdělí na části (.+) mm² a (.+) mm²\. Každou pak vyberete a upravíte samostatně\.$/, 'The face splits into parts of $1 mm² and $2 mm². You can then select and edit each one separately.'],
     [/^Rozřízne se (\d+) (těleso|tělesa|těles), z každého vzniknou dvě \(modře a oranžově\)\.( Zmenšená plocha odřízne jen část před sebou \(ve směru šipky\)\.)?$/, (m, k, w, x) => `${k} ${k === '1' ? 'body is' : 'bodies are'} split, each into two (blue and orange).` + (x ? ' A smaller face cuts off only the part in front of it (in the arrow direction).' : '')],
-    [/^Posun roviny (.+) mm$/, 'Plane offset $1 mm'], [/^Natočení (-?[\d,.−]+)°$/, 'Rotation $1°'], [/^Velikost (.+) mm$/, 'Size $1 mm'], [/^Posun plochy (.+) mm$/, 'Face shift $1 mm'],
+    [/^Posun roviny (.+) mm$/, 'Plane offset $1 mm'], [/^Natočení (-?[\d,.−]+)°$/, 'Rotation $1°'], [/^Natočení (.+)° · (.+)°$/, 'Rotation $1° · $2°'], [/^Velikost (.+) mm$/, 'Size $1 mm'], [/^Posun plochy (.+) mm$/, 'Face shift $1 mm'],
     [/^Úhel ([\d,.]+)°$/, 'Angle $1°'], [/^Směr (.+) · (.+)°$/, 'Direction $1 · $2°'], [/^Poloměr ohybu (.+) mm$/, 'Bend radius $1 mm'],
     [/^Natočení kolem ([XYZ])$/, 'Rotation about $1'], [/^Posun plochy ([XYZ])$/, 'Face shift along $1'],
     [/^Hrana ([\d,.]+) mm$/, 'Edge $1 mm'], [/^Ohnout plochu (\d+)$/, 'Bend face $1'], [/^Rozříznout (\d+)$/, 'Split body $1'],

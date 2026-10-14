@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 0.86
+- Rozříznout a Ohnout plochu používají přímo stejný manipulátor jako Přesunout, Otočit a Měřítko (šipky, kruhy a kostičky v barvách os, stejné ovládání i přichytávání).
+  - Rozříznout: Posun = šipka ve směru normály (u zmenšené plochy i šipky v rovině), Natočení = dva kruhy kolem os v rovině, Velikost = kostičky měřítka v rovině plochy.
+  - Ohnout: Natočení = kruh kolem osy ohybu (úhel) a kruh kolem normály plochy (směr ohybu), Poloměr = šipka od plochy.
+
 ## Beta 0.85
 - Táhla u Rozříznout a Ohnout plochu mají tvar a barvy jako manipulátor Přesunout / Otočit / Měřítko: šipka posouvá, oblouk otáčí, kostička mění velikost; barva odpovídá ose (X červená, Y zelená, Z modrá, šikmo oranžová), táhlo pod kurzorem nebo při tažení zežloutne.
 - V obou oknech přepínač Táhla ukáže jen táhla jednoho druhu (Rozříznout: Posun / Natočení / Velikost, Ohnout: Natočení / Poloměr), aby se nepletla.

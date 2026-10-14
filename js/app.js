@@ -2766,58 +2766,6 @@ function startPressFace(editIndex, f) {
   beginCmd(c); c.init();
 }
 
-/* ================= drag handles in the 3D view (shared by Ohnout and Rozříznout) ================= */
-/* same language as the move / rotate / scale manipulator: an arrow moves, an arc turns, a little cube resizes;
-   colour of the axis it works along (or turns about), yellow while hovered or dragged; keeps its size on screen */
-const HANDLE_AXIS_COL = [0xff0000, 0x00ff00, 0x0000ff];
-function handleColor(v) {
-  if (!v) return new THREE.Color(0xff9900);
-  const a = [Math.abs(v.x), Math.abs(v.y), Math.abs(v.z)], k = a.indexOf(Math.max(...a));
-  return new THREE.Color(a[k] > 0.9 ? HANDLE_AXIS_COL[k] : 0xff9900);
-}
-function makeHandleSet(n) {
-  const grp = new THREE.Group(), hs = [];
-  const mk = g => { const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: tok.orange, depthTest: false, transparent: true })); m.renderOrder = 14; return m; };
-  for (let i = 0; i < n; i++) {
-    const cone = mk(new THREE.ConeGeometry(1, 2.6, 18)), ball = mk(new THREE.SphereGeometry(0.7, 14, 10)), cube = mk(new THREE.BoxGeometry(1.7, 1.7, 1.7));
-    const arc = mk(new THREE.TorusGeometry(3.2, 0.32, 8, 32, Math.PI * 0.6));
-    const shaft = noRay(new THREE.Line(lineGeo([0, 0, 0, 0, 0, 0]), new THREE.LineBasicMaterial({ color: tok.orange, depthTest: false, transparent: true })));
-    shaft.frustumCulled = false; shaft.renderOrder = 14;
-    grp.add(cone, ball, cube, arc, shaft); hs.push({ cone, ball, cube, arc, shaft });
-  }
-  grp.visible = false; scene.add(grp);
-  return { grp, hs, dispose() { scene.remove(grp); disposeObj(grp); } };
-}
-/* kind 'move' (arrow along dir), 'scale' (cube along dir) or 'rot' (arc about axis, its middle facing dir) */
-function placeHandle(h, tip, dir, hot, kind = 'move', axis = null) {
-  const s = arrowSize(tip), col = hot ? new THREE.Color(0xffd000) : handleColor(kind === 'rot' ? axis : dir);
-  for (const o of [h.cone, h.cube, h.arc, h.shaft]) o.visible = false;
-  h.ball.visible = true; h.ball.scale.setScalar(s); h.ball.position.copy(tip);
-  if (kind === 'rot' && axis) {
-    const ax = axis.clone().normalize(), q = new THREE.Quaternion().setFromUnitVectors(new V3(0, 0, 1), ax);
-    /* the torus arc starts on local +X: turn it about the axis so that the arc is centred on dir */
-    const x0 = new V3(1, 0, 0).applyQuaternion(q), d = dir ? dir.clone().sub(ax.clone().multiplyScalar(dir.dot(ax))) : x0.clone();
-    if (d.lengthSq() > 1e-9) { d.normalize(); const ang = Math.atan2(x0.clone().cross(d).dot(ax), x0.dot(d)) - Math.PI * 0.3; q.premultiply(new THREE.Quaternion().setFromAxisAngle(ax, ang)); }
-    h.arc.visible = true; h.arc.scale.setScalar(s); h.arc.quaternion.copy(q);
-    /* the arc passes through the tip: its centre lies 3.2 units back along dir */
-    h.arc.position.copy(tip).addScaledVector(d.lengthSq() > 0 ? d : x0, -3.2 * s);
-  } else if (dir) {
-    const head = kind === 'scale' ? h.cube : h.cone;
-    head.visible = true; head.scale.setScalar(s); head.quaternion.setFromUnitVectors(new V3(0, 1, 0), dir); head.position.copy(tip).addScaledVector(dir, s * (kind === 'scale' ? 2.4 : 2.2));
-    h.shaft.visible = true;
-    const b = tip.clone().addScaledVector(dir, s * 1.6), pa = h.shaft.geometry.attributes.position;
-    pa.setXYZ(0, tip.x, tip.y, tip.z); pa.setXYZ(1, b.x, b.y, b.z); pa.needsUpdate = true;
-  }
-  for (const o of [h.cone, h.ball, h.cube, h.arc, h.shaft]) o.material.color.copy(col);
-}
-function hideHandle(h) { h.cone.visible = h.ball.visible = h.shaft.visible = h.cube.visible = h.arc.visible = false; }
-function handleHit(ev, set) {
-  if (!set.grp.visible) return -1;
-  ray.setFromCamera(evNdc(ev), cam());
-  for (let i = 0; i < set.hs.length; i++) for (const o of [set.hs[i].cone, set.hs[i].ball, set.hs[i].cube, set.hs[i].arc]) { if (!o.visible) continue; o.updateMatrixWorld(true); if (ray.intersectObject(o, false).length) return i; }
-  return -1;
-}
-function dimLabel(ev, text) { const el = $('#dim'), px = evPx(ev); el.textContent = text; el.hidden = false; el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px'; }
 
 /* ================= bend a face about one of its edges ================= */
 /* straight pieces of the outline of a (part of a) planar face, as [a, b] world points */
@@ -2836,7 +2784,7 @@ function startBendFace(editIndex, f, face) {
   const c = {
     editIndex, body: f ? f.body : null, desc: f ? { n: f.n, w: f.w, p: f.p, ...(f.clip ? { clip: f.clip } : {}) } : null,
     axis: f ? { a: f.axis.a.slice(), b: f.axis.b.slice() } : null, angle: f ? f.angle : 90, radius: f ? (f.radius || 0) : 2,
-    phi: f && isFinite(f.phi) ? f.phi : null, outline: [], edges: [], hoverEdge: -1, timer: null, tool: null, hset: null, hHot: -1, hdrag: null, hmode: 'rot',
+    phi: f && isFinite(f.phi) ? f.phi : null, outline: [], edges: [], hoverEdge: -1, timer: null, tool: null, piv: null, gdrag: null, hmode: 'rot', onGizmo: null, onDragChange: null, onPtr: null, lastEv: null,
     init() {
       if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
       openDialog({
@@ -2847,7 +2795,7 @@ function startBendFace(editIndex, f, face) {
           { k: 'num', id: 'angle', label: 'Úhel', unit: '°', value: this.angle, range: [1, 180, 1] },
           { k: 'num', id: 'radius', label: 'Poloměr ohybu', value: this.radius, range: [0, 20, 0.5] }, { k: 'note', id: 'n' }],
         onChange: id => {
-          if (id === 'hmode') { this.hmode = dlg.get('hmode'); requestRender(); return; }
+          if (id === 'hmode') { this.hmode = dlg.get('hmode'); this.syncPiv(); return; }
           if (id === 'angle') { const v = dlg.get('angle'); if (isFinite(v) && v > 0) this.angle = Math.min(180, v); }
           if (id === 'radius') { const v = dlg.get('radius'); if (v >= 0) this.radius = v; }
           if (id === 'phi') { const v = dlg.get('phi'); if (isFinite(v)) { this.phi = ((v % 360) + 360) % 360; this.makeAxis(); } }
@@ -2855,7 +2803,11 @@ function startBendFace(editIndex, f, face) {
           this.update();
         }
       });
-      this.hset = makeHandleSet(3);
+      /* the same manipulator as Otočit / Přesunout, sitting on the bend axis: local X = bend axis, local Z = face normal */
+      this.piv = new THREE.Object3D(); scene.add(this.piv);
+      transform.addEventListener('objectChange', this.onGizmo);
+      transform.addEventListener('dragging-changed', this.onDragChange);
+      this.onPtr = ev => { this.lastEv = ev; }; dom.addEventListener('pointermove', this.onPtr);
       if (!f && face && face.kind === 'plane') this.useFace(face); else { this.loadOutline(); if (this.desc) { if (this.phi === null) this.phi = this.phiOfAxis(); this.labels(); } }
       this.update();
     },
@@ -2911,56 +2863,46 @@ function startBendFace(editIndex, f, face) {
       const rho = Math.max(1, cen.clone().sub(O).dot(r0));
       return { dir, r0, n, k, mid, O, rho };
     },
-    onFrame() {
-      const g = this.geo(), hs = this.hset; if (!hs) return;
-      hs.grp.visible = !!g; if (!g) return;
-      const th = this.angle * D2R, tipA = g.O.clone().addScaledVector(g.r0, g.rho * Math.cos(th)).addScaledVector(g.n, g.rho * Math.sin(th));
-      const tan = g.r0.clone().multiplyScalar(-Math.sin(th)).addScaledVector(g.n, Math.cos(th)).normalize();
-      hs.hs.forEach(hideHandle);
-      if (this.hmode === 'rot') {
-        placeHandle(hs.hs[0], tipA, tan, this.hHot === 0, 'rot', g.k);
-        /* direction of the bend: an arc about the face normal on the face edge in the bend direction */
-        const cen = this.faceCen(), dirTip = cen.clone().addScaledVector(g.dir, this.reach(g.dir) * 0.6);
-        placeHandle(hs.hs[2], dirTip, g.dir, this.hHot === 2, 'rot', g.n);
-      } else placeHandle(hs.hs[1], g.O.clone(), g.dir, this.hHot === 1, 'move');
-    },
     faceCen() { return this.outline.reduce((s2, q) => s2.add(v3(q)), new V3()).multiplyScalar(1 / Math.max(1, this.outline.length)); },
-    /* distance from the face centre to its outline in direction d */
-    reach(d) { const c0 = this.faceCen(); let m = 0; for (const q of this.outline) m = Math.max(m, v3(q).sub(c0).dot(d)); return Math.max(1, m); },
-    onDown(ev) {
-      const i = handleHit(ev, this.hset); if (i < 0) return false;
-      this.hdrag = { i }; controls.enabled = false; return true;
+    /* Natočení: ring about the bend axis = angle, ring about the face normal = direction; Poloměr: arrow away from the face */
+    syncPiv() {
+      const g = this.geo();
+      if (!g) { transform.detach(); requestRender(); return; }
+      if (this.gdrag) return;
+      /* right-handed frame with local Y = the direction in which the radius grows (so the arrow points the right way) */
+      const X = g.dir.clone().cross(g.n).normalize();
+      this.piv.position.copy(g.O);
+      this.piv.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, g.dir.clone(), g.n));
+      this.piv.scale.set(1, 1, 1);
+      transform.setMode(this.hmode === 'rot' ? 'rotate' : 'translate'); transform.setSpace('local');
+      if (this.hmode === 'rot') { transform.showX = true; transform.showY = false; transform.showZ = true; }
+      else { transform.showX = false; transform.showY = true; transform.showZ = false; }
+      if (transform.object !== this.piv) transform.attach(this.piv);
+      requestRender();
     },
-    onDrag(ev) {
-      const d = this.hdrag, g = this.geo(); if (!d || !g) return;
-      if (d.i === 0) {
-        /* angle: pointer on the plane perpendicular to the bend axis, measured from the face towards its normal */
-        ray.setFromCamera(evNdc(ev), cam());
-        const pl = new THREE.Plane().setFromNormalAndCoplanarPoint(g.k, g.O), x = new V3();
-        if (!ray.ray.intersectPlane(pl, x)) return;
-        const q = x.sub(g.O); let a = Math.atan2(q.dot(g.n), q.dot(g.r0)) / D2R;
-        if (a < 0) a = a < -90 ? 180 : 1;
-        a = Math.max(1, Math.min(180, Math.round(a / (settings.gridSnap ? 5 : 1)) * (settings.gridSnap ? 5 : 1)));
-        if (a !== this.angle) { this.angle = a; dlg.set('angle', a); this.update(); }
-        dimLabel(ev, `Úhel ${fmtc(this.angle, 0)}°`);
-      } else if (d.i === 2) {
-        /* direction: pointer on the face plane, angle around the face centre in the face's own X/Y frame */
-        ray.setFromCamera(evNdc(ev), cam());
-        const pl = new THREE.Plane().setFromNormalAndCoplanarPoint(g.n, this.faceCen()), x = new V3();
-        if (!ray.ray.intersectPlane(pl, x)) return;
-        const { U, V } = this.frame(), q = x.sub(this.faceCen()), st = settings.gridSnap ? 5 : 1;
-        let p = Math.atan2(q.dot(v3(V)), q.dot(v3(U))) / D2R; p = ((Math.round(p / st) * st) % 360 + 360) % 360;
-        if (p !== this.phi) { this.phi = p; dlg.set('phi', p); dlg.set('dir', String(p)); this.makeAxis(); this.update(); }
-        dimLabel(ev, `Směr ${this.axisName(this.dirOf(this.phi))} · ${fmtc(this.phi, 0)}°`);
+    fromGizmo() {
+      const d = this.gdrag; if (!d) return;
+      if (d.mode === 'rot') {
+        /* rotation since the drag started, in the manipulator's own axes */
+        const q = d.q0.clone().invert().multiply(this.piv.quaternion), w = Math.max(-1, Math.min(1, q.w)), th = 2 * Math.acos(w), sn = Math.sqrt(1 - w * w);
+        const ax = sn > 1e-6 ? new V3(q.x / sn, q.y / sn, q.z / sn) : new V3(), deg = th / D2R;
+        if (Math.abs(ax.x) >= Math.abs(ax.z)) {
+          const a = Math.max(1, Math.min(180, Math.round(d.angle + deg * Math.sign(ax.x) * d.sx)));
+          if (a !== this.angle) { this.angle = a; dlg.set('angle', a); }
+          showDimAt(this.lastEv, `Úhel ${fmtc(this.angle, 0)}°`);
+        } else {
+          const p = ((Math.round(d.phi + deg * Math.sign(ax.z)) % 360) + 360) % 360;
+          if (p !== this.phi) { this.phi = p; dlg.set('phi', p); dlg.set('dir', String(p)); this.makeAxis(); }
+          showDimAt(this.lastEv, `Směr ${this.axisName(this.dirOf(this.phi))} · ${fmtc(this.phi, 0)}°`);
+        }
       } else {
-        /* radius: distance of the bend axis from the face edge */
-        const t = lineParam(ev, g.mid, g.dir); if (t === null) return;
-        const st = settings.gridSnap ? 0.5 : 0.1, r = Math.max(0, Math.round(t / st) * st);
-        if (Math.abs(r - this.radius) > 1e-9) { this.radius = Math.round(r * 1000) / 1000; dlg.set('radius', this.radius); this.update(); }
-        dimLabel(ev, `Poloměr ohybu ${fmtc(this.radius, 2)} mm`);
+        const g = this.geo(); if (!g) return;
+        const st = settings.gridSnap ? 0.5 : 0.1, r = Math.max(0, Math.round(this.piv.position.clone().sub(g.mid).dot(g.dir) / st) * st);
+        if (Math.abs(r - this.radius) > 1e-9) { this.radius = Math.round(r * 1000) / 1000; dlg.set('radius', this.radius); }
+        showDimAt(this.lastEv, `Poloměr ohybu ${fmtc(this.radius, 2)} mm`);
       }
+      this.update();
     },
-    onUp() { this.hdrag = null; controls.enabled = true; $('#dim').hidden = true; this.update(); },
     feature() { return { id: f ? f.id : 'tmp', type: 'bendface', body: this.body, ...this.desc, axis: this.axis, phi: this.phi, angle: this.angle, radius: this.radius }; },
     curved() {
       if (!this.axis) return false;
@@ -2983,6 +2925,7 @@ function startBendFace(editIndex, f, face) {
         }
       }
       this.schedule();
+      this.syncPiv();
     },
     schedule() {
       clearTimeout(this.timer); clearGroup(G.preview); this.tool = null;
@@ -3005,15 +2948,13 @@ function startBendFace(editIndex, f, face) {
       return best;
     },
     onMove(ev) {
-      const hh = handleHit(ev, this.hset);
-      if (hh !== this.hHot) { this.hHot = hh; requestRender(); }
-      if (hh >= 0) { dom.style.cursor = 'grab'; return; }
+      if (transform.axis) { dom.style.cursor = 'grab'; return; }
       if (!this.desc) { dom.style.cursor = hitBodies(ev) ? 'pointer' : ''; return; }
       const i = this.edgeAt(ev); dom.style.cursor = i >= 0 || hitBodies(ev) ? 'pointer' : '';
       if (i !== this.hoverEdge) { this.hoverEdge = i; this.update(); }
     },
     onClick(ev) {
-      if (handleHit(ev, this.hset) >= 0) return;
+      if (transform.axis) return;
       if (this.desc) {
         const i = this.edgeAt(ev);
         if (i >= 0) {
@@ -3037,7 +2978,21 @@ function startBendFace(editIndex, f, face) {
       if (!this.tool) return null; const o = this.feature(); o.id = f ? f.id : newId(); return o;
     },
     after() { selFace = null; hoverFace = null; setTimeout(() => toast('Ohyb je hotový. Koncovou plochu vysunete v režimu Plochy: klepněte na ni a zvolte Vysunout.'), 700); },
-    cleanup() { clearTimeout(this.timer); if (this.hset) this.hset.dispose(); controls.enabled = true; $('#dim').hidden = true; }
+    cleanup() {
+      clearTimeout(this.timer);
+      transform.removeEventListener('objectChange', this.onGizmo); transform.removeEventListener('dragging-changed', this.onDragChange); dom.removeEventListener('pointermove', this.onPtr);
+      transform.detach(); scene.remove(this.piv); transform.setMode('translate'); transform.setSpace('world'); transform.showX = transform.showY = transform.showZ = true;
+      controls.enabled = true; $('#dim').hidden = true;
+    }
+  };
+  c.onGizmo = () => { if (c.gdrag) c.fromGizmo(); };
+  c.onDragChange = e => {
+    controls.enabled = !e.value;
+    if (e.value) {
+      const g = c.geo(), Y = g ? g.dir.clone() : new V3();
+      /* +rotation about local X turns local Y towards Z: that opens the bend when Y points from the axis to the face */
+      c.gdrag = { mode: c.hmode, q0: c.piv.quaternion.clone(), angle: c.angle, phi: c.phi, sx: g && Y.dot(g.r0) >= 0 ? 1 : -1 };
+    } else { c.gdrag = null; $('#dim').hidden = true; c.syncPiv(); c.update(); }
   };
   beginCmd(c); c.init();
 }
@@ -3050,7 +3005,7 @@ function startSplitBody(editIndex, f) {
     editIndex, bodies: new Set(f ? (f.bodies || []) : [...sel]), mode: f ? (f.mode || 'XY') : 'XY', off: f ? (Number(f.offset) || 0) : null,
     faceN: f && f.mode === 'face' ? (f.fn || f.n).slice() : null, faceW: f && f.mode === 'face' ? (f.fw !== undefined ? Number(f.fw) : Number(f.w) - (Number(f.offset) || 0)) : 0,
     tilt: f && f.tilt ? f.tilt.slice() : [0, 0], shift: f && f.shift ? f.shift.slice() : [0, 0], size: f && f.size ? Number(f.size) : null,
-    keep: f ? (f.keep || 'both') : 'both', pick: 'bodies', timer: null, ok_: false, hideBodies: new Set(), highlight: new Set(), hset: null, hHot: -1, hdrag: null, hmode: 'move',
+    keep: f ? (f.keep || 'both') : 'both', pick: 'bodies', timer: null, ok_: false, hideBodies: new Set(), highlight: new Set(), piv: null, gdrag: null, hmode: 'move',
     ids() { return [...this.bodies].filter(id => meshes.has(id)); },
     /* bounding box of the selection, cached (the handles ask for it every frame) */
     bb() {
@@ -3066,7 +3021,12 @@ function startSplitBody(editIndex, f) {
       if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
       if (this.off === null) this.off = this.centerOff();
       if (this.size === null) this.size = this.fullSize();
-      this.hset = makeHandleSet(6);
+      /* the same manipulator as Přesunout / Otočit / Měřítko, attached to the cutting face (its local Z = the face normal) */
+      this.piv = new THREE.Object3D(); scene.add(this.piv);
+      transform.setSpace('local');
+      transform.addEventListener('objectChange', this.onGizmo);
+      transform.addEventListener('dragging-changed', this.onDragChange);
+      this.onPtr = ev => { this.lastEv = ev; }; dom.addEventListener('pointermove', this.onPtr);
       openDialog({
         title: 'Rozříznout', icon: 'splitbody',
         fields: [{ k: 'sel', id: 'bodies', label: 'Tělesa' },
@@ -3092,7 +3052,7 @@ function startSplitBody(editIndex, f) {
           if (id === 'su') num('su', v => { this.shift[0] = v; });
           if (id === 'sv') num('sv', v => { this.shift[1] = v; });
           if (id === 'keep') this.keep = dlg.get('keep');
-          if (id === 'hmode') { this.hmode = dlg.get('hmode'); requestRender(); return; }
+          if (id === 'hmode') { this.hmode = dlg.get('hmode'); this.syncPiv(); return; }
           this.update();
         }
       });
@@ -3155,13 +3115,14 @@ function startSplitBody(editIndex, f) {
         const m = noRay(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: tok.orange, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false })));
         m.renderOrder = 4; G.overlay.add(m);
         G.overlay.add(noRay(new THREE.LineLoop(lineGeo([...q[0], ...q[1], ...q[2], ...q[3]]), new THREE.LineBasicMaterial({ color: tok.orange }))));
-        /* arrow of the normal: "above the plane" is where it points */
-        const tip = K.vadd(pl.P, K.vmul(pl.n, Math.max(3, H * 0.25)));
+        /* the normal: "above the plane" is where it points */
+        const tip = K.vadd(pl.P, K.vmul(pl.n, Math.max(3, H * 0.35)));
         G.overlay.add(noRay(new THREE.Line(lineGeo([...pl.P, ...tip]), new THREE.LineBasicMaterial({ color: tok.orange }))));
         G.overlay.add(mpts([v3(tip)], tok.orange, 8));
       }
       this.schedule();
       styleBodies();
+      this.syncPiv();
     },
     schedule() {
       clearTimeout(this.timer); this.ok_ = false;
@@ -3190,50 +3151,47 @@ function startSplitBody(editIndex, f) {
       dlg.okEnabled(this.ok_); requestRender();
       return this.ok_;
     },
-    /* handles: 0 plane offset (along the base normal), 1/2 tilt about the two in-plane axes, 3 size (corner), 4/5 shift in the plane */
-    onFrame() {
-      const hs = this.hset; if (!hs) return;
-      const pl = this.ids().length ? this.plane() : null; hs.grp.visible = !!pl; if (!pl) return;
-      const H = this.visH(), P = v3(pl.P), n = v3(pl.n), U = v3(pl.U), V = v3(pl.V), b0 = this.base(), B = Engine.basisFromPlane(b0.n, b0.w);
+    /* manipulator on the cutting face: Posun = arrows (normal; in the plane only for a smaller face), Natočení = rings about the two
+       in-plane axes, Velikost = the in-plane scale handles */
+    syncPiv() {
+      const pl = this.ids().length ? this.plane() : null;
+      if (!pl || this.pick === 'plane') { transform.detach(); requestRender(); return; }
+      if (this.gdrag) return;
+      this.piv.position.copy(v3(pl.P));
+      this.piv.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(v3(pl.U), v3(pl.V), v3(pl.n)));
+      this.piv.scale.set(1, 1, 1);
       const m = this.hmode;
-      hs.hs.forEach(hideHandle);
-      if (m === 'move') {
-        placeHandle(hs.hs[0], P.clone(), v3(b0.n).normalize(), this.hHot === 0, 'move');
-        if (pl.rect) { placeHandle(hs.hs[4], P.clone().addScaledVector(U, -H * 0.5), v3(B.u).negate(), this.hHot === 4, 'move'); placeHandle(hs.hs[5], P.clone().addScaledVector(V, -H * 0.5), v3(B.v).negate(), this.hHot === 5, 'move'); }
-      } else if (m === 'rot') {
-        placeHandle(hs.hs[1], P.clone().addScaledVector(V, H), V.clone(), this.hHot === 1, 'rot', U.clone());
-        placeHandle(hs.hs[2], P.clone().addScaledVector(U, H), U.clone(), this.hHot === 2, 'rot', V.clone());
-      } else placeHandle(hs.hs[3], P.clone().addScaledVector(U, H).addScaledVector(V, H), U.clone().add(V).normalize(), this.hHot === 3, 'scale');
+      transform.setMode(m === 'move' ? 'translate' : m === 'rot' ? 'rotate' : 'scale'); transform.setSpace('local');
+      transform.showX = transform.showY = m !== 'move' || !!pl.rect; transform.showZ = m === 'move';
+      if (transform.object !== this.piv) transform.attach(this.piv);
+      requestRender();
     },
-    onDown(ev) {
-      const i = handleHit(ev, this.hset); if (i < 0) return false;
-      const pl = this.plane(), b0 = this.base(), B = Engine.basisFromPlane(b0.n, b0.w), H = this.visH();
-      const P = v3(pl.P), n = v3(pl.n), U = v3(pl.U), V = v3(pl.V);
-      const spec = [[P, v3(b0.n).normalize()], [P.clone().addScaledVector(V, H), n], [P.clone().addScaledVector(U, H), n], [P.clone().addScaledVector(U, H).addScaledVector(V, H), U.clone().add(V).normalize()],
-        [P.clone(), v3(B.u)], [P.clone(), v3(B.v)]][i];
-      const t0 = lineParam(ev, spec[0], spec[1]);
-      this.hdrag = { i, a: spec[0], dir: spec[1], t0: t0 === null ? 0 : t0, H, off: this.off, tilt: this.tilt.slice(), size: 2 * H, shift: this.shift.slice() };
-      controls.enabled = false; return true;
-    },
-    onDrag(ev) {
-      const d = this.hdrag; if (!d) return;
-      const t = lineParam(ev, d.a, d.dir); if (t === null) return;
-      const dt = t - d.t0, st = settings.gridSnap ? settings.snap : 0.01, snapL = v => Math.round(v / st) * st, deg = v => Math.max(-90, Math.min(90, Math.round(v)));
-      if (d.i === 0) { this.off = Math.round(snapL(d.off + dt) * 1000) / 1000; dlg.set('off', this.off); dimLabel(ev, `Posun roviny ${fmtc(this.off, 2)} mm`); }
-      else if (d.i === 1) { this.tilt[0] = deg(d.tilt[0] + Math.atan2(dt, d.H) / D2R); dlg.set('ta', this.tilt[0]); dimLabel(ev, `Natočení ${fmtc(this.tilt[0], 0)}°`); }
-      else if (d.i === 2) { this.tilt[1] = deg(d.tilt[1] - Math.atan2(dt, d.H) / D2R); dlg.set('tb', this.tilt[1]); dimLabel(ev, `Natočení ${fmtc(this.tilt[1], 0)}°`); }
-      else if (d.i === 3) { const F = this.fullSize(); this.size = Math.max(st, Math.min(F, Math.round(snapL(d.size + dt * Math.SQRT2) * 1000) / 1000)); dlg.set('size', this.size); dimLabel(ev, `Velikost ${fmtc(this.size, 2)} mm`); }
-      else { const k = d.i - 4; this.shift[k] = Math.round(snapL(d.shift[k] + dt) * 1000) / 1000; dlg.set(k ? 'sv' : 'su', this.shift[k]); dimLabel(ev, `Posun plochy ${fmtc(this.shift[k], 2)} mm`); }
+    /* read the manipulator back into the face parameters */
+    fromGizmo() {
+      const g = this.gdrag; if (!g) return;
+      const b0 = this.base(), B = Engine.basisFromPlane(b0.n, b0.w), n0 = v3(b0.n), st = settings.gridSnap ? settings.snap : 0.01, snapL = v => Math.round(Math.round(v / st) * st * 1000) / 1000;
+      if (g.mode === 'move') {
+        const P = this.piv.position.clone(), bb = this.bb(), cc = bb ? v3([0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2)) : new V3();
+        const wb = P.dot(n0), Pc = cc.clone().addScaledVector(n0, wb - cc.dot(n0)), d = P.clone().sub(Pc);
+        this.off = snapL(wb - (this.mode === 'face' ? this.faceW : 0)); dlg.set('off', this.off);
+        if (this.plane().rect) { this.shift = [snapL(d.dot(v3(B.u))), snapL(d.dot(v3(B.v)))]; dlg.set('su', this.shift[0]); dlg.set('sv', this.shift[1]); }
+        showDimAt(this.lastEv, `Posun roviny ${fmtc(this.off, 2)} mm`);
+      } else if (g.mode === 'rot') {
+        const n = new V3(0, 0, 1).applyQuaternion(this.piv.quaternion), u = n.dot(v3(B.u)), v = n.dot(v3(B.v)), w = n.dot(n0);
+        this.tilt = [Math.max(-90, Math.min(90, Math.round(Math.atan2(-v, w) / D2R))), Math.max(-90, Math.min(90, Math.round(Math.asin(Math.max(-1, Math.min(1, u))) / D2R)))];
+        dlg.set('ta', this.tilt[0]); dlg.set('tb', this.tilt[1]);
+        showDimAt(this.lastEv, `Natočení ${fmtc(this.tilt[0], 0)}° · ${fmtc(this.tilt[1], 0)}°`);
+      } else {
+        const k = Math.max(Math.abs(this.piv.scale.x), Math.abs(this.piv.scale.y), 1e-3);
+        this.size = Math.max(st, Math.min(this.fullSize(), snapL(g.size * k))); dlg.set('size', this.size);
+        showDimAt(this.lastEv, `Velikost ${fmtc(this.size, 2)} mm`);
+      }
       this.update();
     },
-    onUp() { this.hdrag = null; controls.enabled = true; $('#dim').hidden = true; this.update(); },
-    onMove(ev) {
-      const hh = handleHit(ev, this.hset);
-      if (hh !== this.hHot) { this.hHot = hh; requestRender(); }
-      dom.style.cursor = hh >= 0 ? 'grab' : hitBodies(ev) ? 'pointer' : '';
-    },
+    onGizmo: null, onDragChange: null, onPtr: null, lastEv: null,
+    onMove(ev) { this.lastEv = ev; dom.style.cursor = transform.axis ? 'grab' : hitBodies(ev) ? 'pointer' : ''; },
     onClick(ev) {
-      if (handleHit(ev, this.hset) >= 0) return;
+      if (transform.axis) return;
       const h = hitBodies(ev); if (!h) return;
       if (this.mode === 'face' && this.pick === 'plane') {
         const fc = faceAtHit(h);
@@ -3257,7 +3215,18 @@ function startSplitBody(editIndex, f) {
       return { id: f ? f.id : newId(), type: 'splitbody', bodies: this.ids(), mode: this.mode, offset: this.off, n: pl.n.map(r6), w: r6(pl.w), keep: this.keep,
         tilt: this.tilt.slice(), shift: this.shift.slice(), size: this.size, ...(pl.rect ? { rect: pl.rect } : {}), ...(this.mode === 'face' ? { fn: this.faceN, fw: this.faceW } : {}) };
     },
-    cleanup() { clearTimeout(this.timer); this.hideBodies = new Set(); this.highlight = null; if (this.hset) this.hset.dispose(); controls.enabled = true; $('#dim').hidden = true; }
+    cleanup() {
+      clearTimeout(this.timer); this.hideBodies = new Set(); this.highlight = null;
+      transform.removeEventListener('objectChange', this.onGizmo); transform.removeEventListener('dragging-changed', this.onDragChange); dom.removeEventListener('pointermove', this.onPtr);
+      transform.detach(); scene.remove(this.piv); transform.setMode('translate'); transform.setSpace('world'); transform.showX = transform.showY = transform.showZ = true;
+      controls.enabled = true; $('#dim').hidden = true;
+    }
+  };
+  c.onGizmo = () => { if (c.gdrag) c.fromGizmo(); };
+  c.onDragChange = e => {
+    controls.enabled = !e.value;
+    if (e.value) c.gdrag = { mode: c.hmode, size: Math.min(c.size, c.fullSize()) };
+    else { c.gdrag = null; $('#dim').hidden = true; c.syncPiv(); c.update(); }
   };
   beginCmd(c); c.init();
 }
@@ -3838,7 +3807,7 @@ function startThread(editIndex, f) {
 
 /* ================= scale finished bodies ================= */
 /* dimension label next to the pointer while dragging */
-function showDimAt(ev, text) { const el = $('#dim'), px = evPx(ev); el.textContent = text; el.hidden = false; el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px'; }
+function showDimAt(ev, text) { if (!ev) return; const el = $('#dim'), px = evPx(ev); el.textContent = text; el.hidden = false; el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px'; }
 
 function startScale(editIndex, f) {
   const c = {
@@ -5181,7 +5150,7 @@ pushHist();
 loadStoredBlobs();
 refreshBusy(() => fitView(VIEW_ISO, true));
 showStart(true);
-if (window.__KOTA_TEST__) window.__kota = { get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart, makeThumb, libThumb, transform, persp, toPx, startMove, alignDesc,
+if (window.__KOTA_TEST__) window.__kota = { get cmd() { return cmd; }, transform, get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart, makeThumb, libThumb, transform, persp, toPx, startMove, alignDesc,
   get doc() { return doc; }, get cur() { return cur; }, get cmd() { return cmd; }, get sk() { return sk; }, get dlg() { return dlg; }, get sel() { return sel; }, meshes, chainsFor };
 })();
 
