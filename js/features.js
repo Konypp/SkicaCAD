@@ -317,6 +317,15 @@ function bendFaceTool(polys, f) {
   const ro = [o3[0] - (Rm[0] * o3[0] + Rm[3] * o3[1] + Rm[6] * o3[2]), o3[1] - (Rm[1] * o3[0] + Rm[4] * o3[1] + Rm[7] * o3[2]), o3[2] - (Rm[2] * o3[0] + Rm[5] * o3[1] + Rm[8] * o3[2])];
   return KK.transform(tool, [Rm[0], Rm[1], Rm[2], 0, Rm[3], Rm[4], Rm[5], 0, Rm[6], Rm[7], Rm[8], 0, ro[0], ro[1], ro[2], 1]);
 }
+/* cutting tool of Rozříznout: the whole half-space, or (a smaller cutting face) a square prism standing on the face,
+   which cuts out only the part of the body in front of that square */
+function cutTool(f, n, w, bb) {
+  if (!f.rect) return halfSpace(n, w, bb);
+  const r = f.rect, S = Number(r.size) / 2, D = Math.hypot(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]) * 2 + 10;
+  if (!(S > 0)) throw new Error('Velikost řezné plochy musí být větší než 0');
+  const B = { o: r.c.map(Number), u: KK.vnorm(r.u.map(Number)), v: KK.vnorm(r.v.map(Number)), n };
+  return KK.extrudeProfiles([{ t: 'poly', pts: [[-S, -S], [S, -S], [S, S], [-S, S]] }], B, 0, D);
+}
 /* half-space solid on the +n side of the plane n·x = w, large enough to contain the given bounding box */
 function halfSpace(n, w, bb) {
   const c = [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2), D = Math.hypot(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]) * 2 + 10;
@@ -622,7 +631,7 @@ function step(state, f) {
       const nn = KK.vnorm(f.n.map(Number)), w = Number(f.w), keep = f.keep || 'both', added = [], repl = new Map();
       let k = 0, cut = 0;
       for (const x of sel) {
-        const hs = halfSpace(nn, w, KK.bbox(x.polys));
+        const hs = cutTool(f, nn, w, KK.bbox(x.polys));
         const pos = KK.boolean(x.polys, hs, 'intersect'), neg = KK.boolean(x.polys, hs, 'subtract');
         const vp = pos.length ? Math.abs(KK.signedVolume(pos)) : 0, vn = neg.length ? Math.abs(KK.signedVolume(neg)) : 0;
         if (vp < 1e-6 || vn < 1e-6) continue;
@@ -682,7 +691,7 @@ function makeRebuilder() {
   };
 }
 
-return { bendFaceTool, halfSpace, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

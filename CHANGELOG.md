@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.83
+- Rozříznout: řeznou rovinu lze posuvníky posunout (Posun roviny), natočit kolem obou os ležících v rovině (−90° až 90°) a zmenšit (Velikost řezné plochy). Zmenšená plocha odřízne jen část tělesa před sebou ve směru šipky a dá se posouvat v rovině. Šipka v náhledu ukazuje stranu „nad rovinou“. Rozsahy posuvníků se řídí velikostí vybraných těles a popisky ukazují skutečné osy.
+
 ## Beta 0.82
 - Kužel: nové pole Horní průměr (výchozí 0 = špička). S nenulovou hodnotou vznikne komolý kužel, horní průměr může být i větší než spodní (obrácený kužel). Horní průměr má v náhledu vlastní táhlo a lze ho dodatečně upravit.
 

@@ -2926,41 +2926,88 @@ function startBendFace(editIndex, f, face) {
 /* ================= split bodies with a plane ================= */
 const SPLIT_PLANES = { XY: [0, 0, 1], XZ: [0, 1, 0], YZ: [1, 0, 0] };
 function startSplitBody(editIndex, f) {
+  const r3 = x => Math.round(x * 1000) / 1000, r6 = x => Math.round(x * 1e6) / 1e6;
   const c = {
     editIndex, bodies: new Set(f ? (f.bodies || []) : [...sel]), mode: f ? (f.mode || 'XY') : 'XY', off: f ? (Number(f.offset) || 0) : null,
-    faceN: f && f.mode === 'face' ? f.n.slice() : null, faceW: f && f.mode === 'face' ? Number(f.w) - (Number(f.offset) || 0) : 0,
+    faceN: f && f.mode === 'face' ? (f.fn || f.n).slice() : null, faceW: f && f.mode === 'face' ? (f.fw !== undefined ? Number(f.fw) : Number(f.w) - (Number(f.offset) || 0)) : 0,
+    tilt: f && f.tilt ? f.tilt.slice() : [0, 0], shift: f && f.shift ? f.shift.slice() : [0, 0], size: f && f.size ? Number(f.size) : null,
     keep: f ? (f.keep || 'both') : 'both', pick: 'bodies', timer: null, ok_: false, hideBodies: new Set(), highlight: new Set(),
     ids() { return [...this.bodies].filter(id => meshes.has(id)); },
+    bb() { const ids = this.ids(); return ids.length ? K.bbox(cur.bodies.filter(b => ids.includes(b.id)).flatMap(b => b.polys)) : null; },
+    /* size of a cutting face that covers the whole selection (and more); a bigger value cuts straight through everything */
+    fullSize() { const bb = this.bb(); return bb ? Math.ceil(Math.hypot(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]) * 1.3 + 4) : 100; },
     init() {
       if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
       if (this.off === null) this.off = this.centerOff();
+      if (this.size === null) this.size = this.fullSize();
       openDialog({
         title: 'Rozříznout', icon: 'splitbody',
         fields: [{ k: 'sel', id: 'bodies', label: 'Tělesa' },
           { k: 'opt', id: 'mode', label: 'Řezná rovina', options: [['XY', 'Rovina XY (vodorovně)'], ['XZ', 'Rovina XZ (zepředu)'], ['YZ', 'Rovina YZ (zboku)'], ['face', 'Rovina plochy tělesa']], value: this.mode },
           { k: 'sel', id: 'plane', label: 'Plocha' },
-          { k: 'num', id: 'off', label: 'Odsazení', value: this.off },
+          { k: 'num', id: 'off', label: 'Posun roviny', value: this.off, range: [-100, 100, 0.5] },
+          { k: 'num', id: 'ta', label: 'Natočení kolem X', unit: '°', value: this.tilt[0], range: [-90, 90, 1] },
+          { k: 'num', id: 'tb', label: 'Natočení kolem Y', unit: '°', value: this.tilt[1], range: [-90, 90, 1] },
+          { k: 'num', id: 'size', label: 'Velikost řezné plochy', value: this.size, range: [1, 100, 1] },
+          { k: 'num', id: 'su', label: 'Posun plochy X', value: this.shift[0], range: [-50, 50, 0.5] },
+          { k: 'num', id: 'sv', label: 'Posun plochy Y', value: this.shift[1], range: [-50, 50, 0.5] },
           { k: 'seg', id: 'keep', label: 'Ponechat', options: [['both', 'Obě části'], ['pos', 'Nad rovinou'], ['neg', 'Pod rovinou']], value: this.keep },
           { k: 'note', id: 'n' }],
         onSel: id => { this.pick = id; this.update(); },
         onChange: id => {
-          if (id === 'mode') { this.mode = dlg.get('mode'); if (this.mode === 'face') { if (!this.faceN) this.pick = 'plane'; this.off = 0; } else { this.off = this.centerOff(); } dlg.set('off', this.off); }
-          if (id === 'off') { const v = dlg.get('off'); if (isFinite(v)) this.off = v; }
+          const num = (k, fn) => { const v = dlg.get(k); if (isFinite(v)) fn(v); };
+          if (id === 'mode') { this.mode = dlg.get('mode'); if (this.mode === 'face') { if (!this.faceN) this.pick = 'plane'; this.off = 0; } else this.off = this.centerOff(); dlg.set('off', this.off); this.ranges(); }
+          if (id === 'off') num('off', v => { this.off = v; });
+          if (id === 'ta') num('ta', v => { this.tilt[0] = Math.max(-90, Math.min(90, v)); });
+          if (id === 'tb') num('tb', v => { this.tilt[1] = Math.max(-90, Math.min(90, v)); });
+          if (id === 'size') num('size', v => { if (v > 0) this.size = v; });
+          if (id === 'su') num('su', v => { this.shift[0] = v; });
+          if (id === 'sv') num('sv', v => { this.shift[1] = v; });
           if (id === 'keep') this.keep = dlg.get('keep');
           this.update();
         }
       });
+      this.ranges();
       this.update();
     },
-    /* principal planes start in the middle of the selection (cuts it in half) */
-    centerOff() {
-      const n = SPLIT_PLANES[this.mode] || [0, 0, 1], ids = this.ids(); if (!ids.length) return 0;
-      const bb = K.bbox(cur.bodies.filter(b => ids.includes(b.id)).flatMap(b => b.polys)), k = n.indexOf(1);
-      return Math.round((bb.min[k] + bb.max[k]) / 2 * 1000) / 1000;
-    },
-    plane() {
+    /* the base plane before tilting: principal plane, or the plane of the picked face */
+    base() {
       if (this.mode === 'face') return this.faceN ? { n: this.faceN, w: this.faceW + this.off } : null;
       return { n: SPLIT_PLANES[this.mode], w: this.off };
+    },
+    axisName(v) { const k = [0, 1, 2].reduce((m, i) => (Math.abs(v[i]) > Math.abs(v[m]) ? i : m), 0); return 'XYZ'[k]; },
+    /* slider ranges and labels follow the selection and the plane */
+    ranges() {
+      const bb = this.bb(), b0 = this.base(), set = (id, lo, hi) => { const r = $('#dlg-' + id + '-r'); if (r) { r.min = String(lo); r.max = String(hi); } };
+      const lbl = (id, t) => { const l = $(`#dialog label[for="dlg-${id}"]`); if (l) l.textContent = t; };
+      if (bb && b0) {
+        let lo = Infinity, hi = -Infinity;
+        for (const x of [bb.min[0], bb.max[0]]) for (const y of [bb.min[1], bb.max[1]]) for (const z of [bb.min[2], bb.max[2]]) { const t = K.vdot(b0.n, [x, y, z]) - (this.mode === 'face' ? this.faceW : 0); lo = Math.min(lo, t); hi = Math.max(hi, t); }
+        set('off', Math.floor(lo - 1), Math.ceil(hi + 1));
+        const F = this.fullSize(); set('size', 1, F); set('su', -Math.ceil(F / 2), Math.ceil(F / 2)); set('sv', -Math.ceil(F / 2), Math.ceil(F / 2));
+        const B = Engine.basisFromPlane(b0.n, b0.w);
+        lbl('ta', 'Natočení kolem ' + this.axisName(B.u)); lbl('tb', 'Natočení kolem ' + this.axisName(B.v));
+        lbl('su', 'Posun plochy ' + this.axisName(B.u)); lbl('sv', 'Posun plochy ' + this.axisName(B.v));
+      }
+    },
+    centerOff() {
+      const n = SPLIT_PLANES[this.mode] || [0, 0, 1], bb = this.bb(); if (!bb) return 0;
+      const k = n.indexOf(1);
+      return r3((bb.min[k] + bb.max[k]) / 2);
+    },
+    /* final cutting plane: base plane through the selection centre (+ shift in the plane), tilted about its two in-plane axes */
+    plane() {
+      const b0 = this.base(), bb = this.bb(); if (!b0) return null;
+      const B = Engine.basisFromPlane(b0.n, b0.w), cc = bb ? [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2) : B.o;
+      let P = K.vsub(cc, K.vmul(b0.n, K.vdot(b0.n, cc) - b0.w));
+      P = K.vadd(P, K.vadd(K.vmul(B.u, this.shift[0]), K.vmul(B.v, this.shift[1])));
+      const rot = (v, ax, a) => { const c2 = Math.cos(a), s2 = Math.sin(a); return K.vadd(K.vadd(K.vmul(v, c2), K.vmul(K.cross(ax, v), s2)), K.vmul(ax, K.vdot(ax, v) * (1 - c2))); };
+      const ta = this.tilt[0] * D2R, tb = this.tilt[1] * D2R;
+      let n = rot(b0.n, B.u, ta), U = B.u, V = rot(B.v, B.u, ta);
+      n = rot(n, V, tb); U = rot(U, V, tb);
+      n = K.vnorm(n); U = K.vnorm(U); V = K.vnorm(K.cross(n, U));
+      const full = this.size >= this.fullSize() - 1e-6;
+      return { n, w: K.vdot(n, P), P, U, V, rect: full ? null : { c: P.map(r6), u: U.map(r6), v: V.map(r6), size: this.size } };
     },
     update() {
       const ids = this.ids(), pl = this.plane();
@@ -2968,46 +3015,51 @@ function startSplitBody(editIndex, f) {
       dlg.set('bodies', { ...bodySelText(new Set(ids)), active: this.pick === 'bodies' });
       dlg.show('plane', this.mode === 'face');
       dlg.set('plane', { text: this.faceN ? 'Rovinná plocha' : 'Klepněte na rovinnou plochu', has: !!this.faceN, active: this.pick === 'plane' });
+      const limited = pl && !!pl.rect; dlg.show('su', limited); dlg.show('sv', limited);
       setPrompt(this.pick === 'plane' ? 'Klepněte na rovinnou plochu, jejíž rovina těleso rozřízne' : 'Klepnutím na tělesa vyberte, co rozříznout');
       clearGroup(G.overlay);
       if (pl && ids.length) {
-        /* the cutting plane as a translucent square around the selection */
-        const bb = K.bbox(cur.bodies.filter(b => ids.includes(b.id)).flatMap(b => b.polys)), D = Math.hypot(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]) * 0.65 + 2;
-        const B = Engine.basisFromPlane(pl.n, pl.w), cc = [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2), d = K.vsub(cc, B.o), cu = K.vdot(d, B.u), cv = K.vdot(d, B.v);
-        const P = (x, y) => K.vadd(B.o, K.vadd(K.vmul(B.u, x), K.vmul(B.v, y)));
-        const q = [P(cu - D, cv - D), P(cu + D, cv - D), P(cu + D, cv + D), P(cu - D, cv + D)];
+        /* the cutting face as a translucent square (its real size when it is limited) */
+        const H = Math.min(this.size, this.fullSize()) / 2, P = (x, y) => K.vadd(pl.P, K.vadd(K.vmul(pl.U, x), K.vmul(pl.V, y)));
+        const q = [P(-H, -H), P(H, -H), P(H, H), P(-H, H)];
         const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([...q[0], ...q[1], ...q[2], ...q[0], ...q[2], ...q[3]], 3));
         const m = noRay(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: tok.orange, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false })));
         m.renderOrder = 4; G.overlay.add(m);
         G.overlay.add(noRay(new THREE.LineLoop(lineGeo([...q[0], ...q[1], ...q[2], ...q[3]]), new THREE.LineBasicMaterial({ color: tok.orange }))));
+        /* arrow of the normal: "above the plane" is where it points */
+        const tip = K.vadd(pl.P, K.vmul(pl.n, Math.max(3, H * 0.25)));
+        G.overlay.add(noRay(new THREE.Line(lineGeo([...pl.P, ...tip]), new THREE.LineBasicMaterial({ color: tok.orange }))));
+        G.overlay.add(mpts([v3(tip)], tok.orange, 8));
       }
       this.schedule();
       styleBodies();
     },
     schedule() {
-      clearTimeout(this.timer); clearGroup(G.preview); this.ok_ = false; this.hideBodies = new Set();
+      clearTimeout(this.timer); this.ok_ = false;
       const ids = this.ids(), pl = this.plane();
-      if (!ids.length || !pl) { dlg.set('n', !ids.length ? 'Vyberte tělesa, která chcete rozříznout.' : 'Vyberte plochu, podle které se má řezat.'); dlg.okEnabled(false); requestRender(); return; }
+      if (!ids.length || !pl) { clearGroup(G.preview); this.hideBodies = new Set(); dlg.set('n', !ids.length ? 'Vyberte tělesa, která chcete rozříznout.' : 'Vyberte plochu, podle které se má řezat.'); dlg.okEnabled(false); styleBodies(); requestRender(); return; }
       dlg.set('n', 'Počítám náhled…'); dlg.okEnabled(false);
-      this.timer = setTimeout(() => { if (cmd === this) this.compute(); }, 150);
+      this.timer = setTimeout(() => { if (cmd === this) this.compute(); }, 120);
     },
     compute() {
-        clearTimeout(this.timer); clearGroup(G.preview); this.hideBodies = new Set();
-        const ids = this.ids(), pl = this.plane(); if (!ids.length || !pl) return false;
-        let cut = 0;
+      clearTimeout(this.timer); clearGroup(G.preview); this.hideBodies = new Set();
+      const ids = this.ids(), pl = this.plane(); if (!ids.length || !pl) return false;
+      let cut = 0;
+      try {
         for (const b of cur.bodies.filter(x => ids.includes(x.id))) {
-          const hs = Engine.halfSpace(pl.n, pl.w, K.bbox(b.polys)), pos = K.boolean(b.polys, hs, 'intersect'), neg = K.boolean(b.polys, hs, 'subtract');
+          const hs = Engine.cutTool({ rect: pl.rect }, pl.n, pl.w, K.bbox(b.polys)), pos = K.boolean(b.polys, hs, 'intersect'), neg = K.boolean(b.polys, hs, 'subtract');
           if (!pos.length || !neg.length || Math.abs(K.signedVolume(pos)) < 1e-6 || Math.abs(K.signedVolume(neg)) < 1e-6) continue;
           cut++; this.hideBodies.add(b.id);
           /* the part that stays is shown like the body, the part that goes away in red */
           G.preview.add(previewMesh(pos, this.keep === 'neg' ? 'cut' : 'join'));
           G.preview.add(previewMesh(neg, this.keep === 'pos' ? 'cut' : 'intersect'));
         }
-        styleBodies();
-        if (!cut) { dlg.set('n', '!Rovina řezu žádné vybrané těleso neprotíná.'); }
-        else { this.ok_ = true; dlg.set('n', this.keep === 'both' ? `Rozřízne se ${plural(cut, 'těleso', 'tělesa', 'těles')}, z každého vzniknou dvě (modře a oranžově).` : 'Červeně je část, která se odstraní.'); }
-        dlg.okEnabled(this.ok_); requestRender();
-        return this.ok_;
+      } catch (e) { dlg.set('n', '!' + e.message); dlg.okEnabled(false); styleBodies(); requestRender(); return false; }
+      styleBodies();
+      if (!cut) dlg.set('n', '!Řezná plocha žádné vybrané těleso neprotíná.');
+      else { this.ok_ = true; dlg.set('n', (this.keep === 'both' ? `Rozřízne se ${plural(cut, 'těleso', 'tělesa', 'těles')}, z každého vzniknou dvě (modře a oranžově).` : 'Červeně je část, která se odstraní.') + (pl.rect ? ' Zmenšená plocha odřízne jen část před sebou (ve směru šipky).' : '')); }
+      dlg.okEnabled(this.ok_); requestRender();
+      return this.ok_;
     },
     onMove(ev) { dom.style.cursor = hitBodies(ev) ? 'pointer' : ''; },
     onClick(ev) {
@@ -3015,20 +3067,24 @@ function startSplitBody(editIndex, f) {
       if (this.mode === 'face' && this.pick === 'plane') {
         const fc = faceAtHit(h);
         if (!fc || fc.kind !== 'plane') { toast('Vyberte rovinnou plochu.'); return; }
-        this.faceN = fc.n.map(v => Math.round(v * 1e6) / 1e6); this.faceW = Math.round(fc.w * 1e5) / 1e5;
+        this.faceN = fc.n.map(r6); this.faceW = Math.round(fc.w * 1e5) / 1e5;
         if (!this.ids().length) this.bodies.add(fc.bodyId);
-        this.pick = 'bodies'; this.update(); return;
+        this.pick = 'bodies'; this.ranges(); this.update(); return;
       }
-      const id = h.object.userData.bodyId;
+      const id = h.object.userData.bodyId, first = !this.ids().length;
       if (this.bodies.has(id)) this.bodies.delete(id); else this.bodies.add(id);
-      if (this.mode !== 'face' && this.bodies.size === 1 && this.off === 0) { this.off = this.centerOff(); dlg.set('off', this.off); }
+      if (first && this.ids().length) {
+        if (this.mode !== 'face') { this.off = this.centerOff(); dlg.set('off', this.off); }
+        this.size = this.fullSize(); dlg.set('size', this.size);
+      }
       if (this.mode === 'face' && !this.faceN) this.pick = 'plane';
-      this.update();
+      this.ranges(); this.update();
     },
     ok() {
       if (!this.ok_ && !this.compute()) return null;
-      const pl = this.plane(), r6 = x => Math.round(x * 1e6) / 1e6;
-      return { id: f ? f.id : newId(), type: 'splitbody', bodies: this.ids(), mode: this.mode, offset: this.off, n: pl.n.map(r6), w: r6(pl.w), keep: this.keep };
+      const pl = this.plane();
+      return { id: f ? f.id : newId(), type: 'splitbody', bodies: this.ids(), mode: this.mode, offset: this.off, n: pl.n.map(r6), w: r6(pl.w), keep: this.keep,
+        tilt: this.tilt.slice(), shift: this.shift.slice(), size: this.size, ...(pl.rect ? { rect: pl.rect } : {}), ...(this.mode === 'face' ? { fn: this.faceN, fw: this.faceW } : {}) };
     },
     cleanup() { clearTimeout(this.timer); this.hideBodies = new Set(); this.highlight = null; }
   };
