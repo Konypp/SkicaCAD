@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.88
+- Otočit: u kruhů manipulátoru je stupnice úhlů v barvě osy – čárka po 5°, delší čárka po 15°. Po najetí na čárku se ukáže osa a úhel (např. „Z: −45°“), klepnutím se těleso kolem té osy natočí přesně na daný úhel. Barevná tečka na stupnici ukazuje aktuální úhel. Kde se stupnice dvou os kříží, vybere se ta, která je víc natočená k pohledu.
+
 ## Beta 0.87
 - Jednotný název volby: „Šipkami měnit rovnoměrně všechny rozměry“ (základní tělesa) a „Tažením bodu měnit velikost rovnoměrně“ (paleta skici) se nově jmenují stejně jako u Měřítka: Zachovat poměr stran.
 

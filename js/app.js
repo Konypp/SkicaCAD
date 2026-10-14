@@ -2767,6 +2767,8 @@ function startPressFace(editIndex, f) {
 }
 
 
+/* axis colours of the move / rotate / scale manipulator */
+const HANDLE_AXIS_COL = [0xff0000, 0x00ff00, 0x0000ff];
 /* ================= bend a face about one of its edges ================= */
 /* straight pieces of the outline of a (part of a) planar face, as [a, b] world points */
 function faceEdgesOf(regionPolys) {
@@ -4024,8 +4026,74 @@ function startRotate(editIndex, f) {
       styleBodies();
     },
     onBody(id) { if (this.all) return; if (this.bodies.has(id)) this.bodies.delete(id); else this.bodies.add(id); this.recenter(); },
-    onMove(ev) { dom.style.cursor = hitBodies(ev) ? 'pointer' : ''; },
+    /* ---- angle scale just inside the rotation rings (between the ring and the free-rotation ball, so it does not catch the
+       manipulator): a tick every 5°, a longer one every 15°; tapping a tick turns to that angle ---- */
+    ticks: null, tickList: [], hoverTick: null,
+    /* direction of angle a (radians) on the ring about axis k; 0° at +Y for X, +Z for Y, +X for Z, growing anticlockwise about the axis */
+    ringDir(k, a) { const c2 = Math.cos(a), s2 = Math.sin(a); return k === 0 ? new V3(0, c2, s2) : k === 1 ? new V3(s2, 0, c2) : new V3(c2, s2, 0); },
+    gizmoRadius() {
+      const c3 = cam(), p = pivot.position;
+      const factor = c3.isOrthographicCamera ? (c3.top - c3.bottom) / c3.zoom : p.distanceTo(c3.position) * Math.min(1.9 * Math.tan(Math.PI * c3.fov / 360) / c3.zoom, 7);
+      return factor * transform.size / 7;
+    },
+    onFrame() {
+      if (!this.ticks) {
+        this.ticks = new THREE.Group(); scene.add(this.ticks);
+        for (let k = 0; k < 3; k++) {
+          const l = noRay(new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: HANDLE_AXIS_COL[k], depthTest: false, transparent: true, opacity: 0.85 })));
+          l.renderOrder = 15; l.frustumCulled = false; this.ticks.add(l);
+        }
+        const hl = noRay(new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xffd000, depthTest: false, transparent: true })));
+        hl.renderOrder = 16; hl.frustumCulled = false; this.ticks.add(hl);
+        const cur3 = noRay(new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({ size: 7, sizeAttenuation: false, depthTest: false, transparent: true, vertexColors: true })));
+        cur3.renderOrder = 16; cur3.frustumCulled = false; this.ticks.add(cur3);
+      }
+      const on = transform.object === pivot && !this.faceMode;
+      this.ticks.visible = on; if (!on) { this.tickList = []; return; }
+      const C = pivot.position, R = this.gizmoRadius(), toCam = cam().position.clone().sub(C).normalize();
+      this.tickList = [];
+      for (let k = 0; k < 3; k++) {
+        const arr = [];
+        for (let d = 0; d < 360; d += 5) {
+          const u = this.ringDir(k, d * D2R);
+          if (u.dot(toCam) < -0.05) continue; /* only the half of the ring facing the viewer, like the ring itself */
+          const big = d % 15 === 0, a2 = C.clone().addScaledVector(u, R * 0.88), b2 = C.clone().addScaledVector(u, R * (big ? 0.74 : 0.8));
+          arr.push(a2.x, a2.y, a2.z, b2.x, b2.y, b2.z);
+          this.tickList.push({ k, d: d > 180 ? d - 360 : d, a: a2, b: b2 });
+        }
+        this.ticks.children[k].geometry.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
+      }
+      const h = this.hoverTick, hl = [];
+      if (h) { const u = this.ringDir(h.k, h.d * D2R), a2 = C.clone().addScaledVector(u, R * 0.89), b2 = C.clone().addScaledVector(u, R * 0.71); hl.push(a2.x, a2.y, a2.z, b2.x, b2.y, b2.z); }
+      this.ticks.children[3].geometry.setAttribute('position', new THREE.Float32BufferAttribute(hl, 3));
+      /* current angle of each axis as a dot on its scale */
+      const pts = [], cols = [];
+      for (let k = 0; k < 3; k++) { const u = this.ringDir(k, this.r[k] * D2R); if (u.dot(toCam) < -0.05) continue; const q = C.clone().addScaledVector(u, R * 0.84); pts.push(q.x, q.y, q.z); const cc = new THREE.Color(HANDLE_AXIS_COL[k]); cols.push(cc.r, cc.g, cc.b); }
+      const g2 = this.ticks.children[4].geometry; g2.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); g2.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+    },
+    tickAt(ev) {
+      if (!this.tickList.length || this.dragging) return null;
+      const [mx, my] = evPx(ev), lim = TOUCH ? 11 : 7, toCam = cam().position.clone().sub(pivot.position).normalize();
+      /* where two scales cross (on the axes) prefer the ring that faces the viewer more */
+      let best = null, bs = Infinity;
+      for (const t of this.tickList) {
+        const pa = toPx(t.a), pb = toPx(t.b); if (pa[2] >= 1) continue; const [dd] = segDist(mx, my, pa, pb); if (dd > lim) continue;
+        const sc = dd - 3 * Math.abs(toCam.getComponent(t.k)); if (sc < bs) { bs = sc; best = t; }
+      }
+      return best;
+    },
+    onMove(ev) {
+      const t = this.tickAt(ev);
+      if ((t && t.k + ':' + t.d) !== (this.hoverTick && this.hoverTick.k + ':' + this.hoverTick.d)) { this.hoverTick = t; requestRender(); }
+      /* over a tick the scale wins: the manipulator ignores the pointer, so a tap selects the angle instead of grabbing a ring */
+      transform.enabled = !t; if (t) transform.axis = null;
+      if (t) { dom.style.cursor = 'pointer'; showDimAt(ev, `${'XYZ'[t.k]}: ${fmtc(t.d, 0)}°`); return; }
+      $('#dim').hidden = true;
+      dom.style.cursor = hitBodies(ev) ? 'pointer' : '';
+    },
     onClick(ev) {
+      const t = this.tickAt(ev);
+      if (t) { this.r[t.k] = t.d; dlg.set('r', this.r); this.apply(true); $('#dim').hidden = true; return; }
       const h = hitBodies(ev); if (!h) return;
       if (this.faceMode) {
         const { poly } = polyOfHit(h);
@@ -4046,6 +4114,9 @@ function startRotate(editIndex, f) {
       transform.detach(); scene.remove(pivot); transform.setMode('translate');
       resetBodyMatrices(applied);
       this.highlight = null;
+      if (this.ticks) { scene.remove(this.ticks); disposeObj(this.ticks); this.ticks = null; }
+      transform.enabled = true;
+      $('#dim').hidden = true;
     }
   };
   c.onGizmo = () => { c.r = [roundDeg(pivot.rotation.x), roundDeg(pivot.rotation.y), roundDeg(pivot.rotation.z)]; dlg.set('r', c.r); c.apply(false); };
