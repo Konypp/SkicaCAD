@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 0.98
+- Matice: nová volba Výška – Normální (ISO 4032) nebo Nízká (ISO 4035, pojistná matice). Nízká má přibližně poloviční výšku, např. M3 1,8 mm, M6 3,2 mm, M10 5 mm, M12 6 mm. Šířka klíče zůstává stejná.
+- Těleso se jmenuje „Matice M6 nízká“.
+
 ## Beta 0.97
 - Moje návrhy: dva návrhy už nemohou mít stejný název. Když zadáte název, který už existuje, aplikace k němu přidá pořadí, např. „Držák (2)“, a oznámí to.
 - Totéž platí pro nový návrh „Bez názvu“ a pro otevřený soubor se stejným názvem. Během psaní názvu se nic nepřejmenovává, kontrola proběhne až po potvrzení.

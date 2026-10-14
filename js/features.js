@@ -372,6 +372,8 @@ const FASTENERS = {
   5: [0.8, 8, 3.5, 4.7, 8.5, 4, 2.5], 6: [1, 10, 4, 5.2, 10, 5, 3], 8: [1.25, 13, 5.3, 6.8, 13, 6, 4], 10: [1.5, 16, 6.4, 8.4, 16, 8, 5],
   12: [1.75, 18, 7.5, 10.8, 18, 10, 6], 16: [2, 24, 10, 14.8, 24, 14, 8], 20: [2.5, 30, 12.5, 18, 30, 17, 10], 24: [3, 36, 15, 21.5, 36, 19, 12]
 };
+/* thin (jam) nuts ISO 4035: height m max; across flats as ISO 4032 */
+const THIN_NUT = { 2: 1.2, 2.5: 1.6, 3: 1.8, 4: 2.2, 5: 2.7, 6: 3.2, 8: 4, 10: 5, 12: 6, 16: 8, 20: 10, 24: 12 };
 /* screwdriver heads: slotted cheese head (ISO 1207): [dk, k, slot width, slot depth]; Phillips pan head (ISO 7045): [dk, k] (recess approximated) */
 const SLOT_HEADS = { 2: [3.8, 1.3, 0.5, 0.6], 2.5: [4.5, 1.6, 0.6, 0.7], 3: [5.5, 2, 0.8, 0.85], 4: [7, 2.6, 1.2, 1.1], 5: [8.5, 3.3, 1.2, 1.3], 6: [10, 3.9, 1.6, 1.6], 8: [13, 5, 2, 2], 10: [16, 6, 2.5, 2.4], 12: [18, 7, 3, 2.8], 16: [24, 9, 4, 3.6], 20: [30, 11, 5, 4.4], 24: [36, 13, 6, 5.2] };
 const PAN_HEADS = { 2: [4, 1.6], 2.5: [5, 1.75], 3: [5.6, 2.4], 4: [8, 3.1], 5: [9.5, 3.7], 6: [12, 4.6], 8: [16, 6], 10: [20, 7.5], 12: [24, 9], 16: [32, 12], 20: [40, 15], 24: [48, 18] };
@@ -380,7 +382,7 @@ const hexPrism = (af, z0, z1) => KK.extrudeProfiles([{ t: 'ngon', x: 0, y: 0, r:
 /* a bolt stands on its head (head z 0..k, shank above it), a nut lies on z = 0; tol is the 3D-printing clearance */
 function toolForFastener(f) {
   const d = Number(f.size), M = FASTENERS[d]; if (!M) throw new Error('Neznámá velikost závitu');
-  const [P, s, k, m, dk, key, tk] = M, tol = Math.max(0, Math.min(1, Number(f.tol) || 0)), thread = f.thread !== false;
+  const [P, s, k, m0, dk, key, tk] = M, tol = Math.max(0, Math.min(1, Number(f.tol) || 0)), thread = f.thread !== false;
   let polys;
   if (f.type === 'bolt') {
     const L = Number(f.len); if (!(L >= 2 * P && L <= 500)) throw new Error('Délka šroubu musí být ' + (2 * P) + ' až 500 mm');
@@ -422,7 +424,7 @@ function toolForFastener(f) {
       polys = KK.boolean(polys, ring, 'subtract');
     }
   } else {
-    const de = d + tol, rh = thread ? (de - 1.0825 * P) / 2 : de / 2;
+    const de = d + tol, rh = thread ? (de - 1.0825 * P) / 2 : de / 2, m = f.low ? (THIN_NUT[d] || m0 * 0.6) : m0; /* f.low: thin nut ISO 4035 */
     polys = KK.boolean(hexPrism(s, 0, m), cylAlong([0, 0, -0.5], [0, 0, 1], rh, m + 1), 'subtract');
     if (thread) polys = KK.boolean(polys, threadTool({ internal: true, pitch: P, size: de, r: rh, len: m, start: 0, full: true, ax: [0, 0, 1], c: [0, 0, 0] }), 'subtract');
     if (f.chamfer !== false) {
@@ -472,7 +474,7 @@ function step(state, f) {
     case 'box': case 'cylinder': case 'sphere': case 'cone': case 'torus':
       out = applyTool(bodies, f, toolForPrimitive(f), newBody); break;
     case 'bolt': case 'nut':
-      out = applyTool(bodies, f, toolForFastener(f), polys => ({ id: f.id, name: (f.type === 'bolt' ? 'Šroub M' + f.size + '×' + f.len : 'Matice M' + f.size).replace('.', ','), polys, from: f.id })); break;
+      out = applyTool(bodies, f, toolForFastener(f), polys => ({ id: f.id, name: (f.type === 'bolt' ? 'Šroub M' + f.size + '×' + f.len : 'Matice M' + f.size + (f.low ? ' nízká' : '')).replace('.', ','), polys, from: f.id })); break;
     case 'import':
       out = applyTool(bodies, f, importPolys(f), polys => ({ id: f.id, name: f.name || ('Import ' + (++n)), polys, from: f.id })); break;
     case 'mirror': case 'pattern': {
@@ -691,7 +693,7 @@ function makeRebuilder() {
   };
 }
 
-return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 
