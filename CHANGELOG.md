@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.87
+- Jednotný název volby: „Šipkami měnit rovnoměrně všechny rozměry“ (základní tělesa) a „Tažením bodu měnit velikost rovnoměrně“ (paleta skici) se nově jmenují stejně jako u Měřítka: Zachovat poměr stran.
+
 ## Beta 0.86
 - Rozříznout a Ohnout plochu používají přímo stejný manipulátor jako Přesunout, Otočit a Měřítko (šipky, kruhy a kostičky v barvách os, stejné ovládání i přichytávání).
   - Rozříznout: Posun = šipka ve směru normály (u zmenšené plochy i šipky v rovině), Natočení = dva kruhy kolem os v rovině, Velikost = kostičky měřítka v rovině plochy.

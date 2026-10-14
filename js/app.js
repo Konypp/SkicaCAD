@@ -1817,7 +1817,7 @@ function renderPalette() {
   }
   $('#pal-note').textContent = ents.length ? `${sk.f.name} · ${nr} ${nr === 1 ? 'uzavřený profil' : nr >= 2 && nr <= 4 ? 'uzavřené profily' : 'uzavřených profilů'}` : 'Skica je prázdná. Nakreslete obdélník, kružnici nebo čáru.';
   const num = (i, k, label, val) => `<label class="fnum" title="${label}"><span class="ax">${label}</span><input id="ent-${i}-${k}" data-ent="${i}" data-k="${k}" value="${fmtc(val, 3)}" inputmode="decimal" autocomplete="off" aria-label="${label}"></label>`;
-  const uniChk = i => `<label class="chk"><input type="checkbox" id="ent-${i}-uni" data-ent="${i}" data-k="uni"${sk.uniform ? ' checked' : ''}><span>Tažením bodu měnit velikost rovnoměrně</span></label>`;
+  const uniChk = i => `<label class="chk"><input type="checkbox" id="ent-${i}-uni" data-ent="${i}" data-k="uni"${sk.uniform ? ' checked' : ''}><span>Zachovat poměr stran</span></label>`;
   box.innerHTML = ents.map((e, i) => {
     let body = '';
     if (e.t === 'rect') body = `<div class="grid2">${num(i, 'x', 'X', e.x)}${num(i, 'y', 'Y', e.y)}${num(i, 'w', 'Š', e.w)}${num(i, 'h', 'V', e.h)}${num(i, 'fr', 'R', e.fr || 0)}</div>`;
@@ -2141,7 +2141,7 @@ function startPrimitive(type, editIndex, f) {
       openDialog({
         title: Engine.FEATURE_LABEL[type], icon: type,
         fields: [...defs.map(([k, l]) => ({ k: 'num', id: k, label: l, value: this.vals[k] })), { k: 'xyz', id: 'pos', label: 'Poloha základny', value: this.pos },
-          { k: 'chk', id: 'uni', label: 'Šipkami měnit rovnoměrně všechny rozměry', value: this.uniform },
+          { k: 'chk', id: 'uni', label: 'Zachovat poměr stran', value: this.uniform },
           { k: 'opt', id: 'op', label: 'Operace', options: OPS, value: this.op }, { k: 'note', id: 'n' }],
         onChange: id => {
           if (id === 'uni') { this.uniform = dlg.get('uni'); return; }

@@ -51,7 +51,7 @@
     'Tělesa ': 'Bodies', 'Vyberte tělesa': 'Select bodies', 'Vyberte těleso': 'Select a body', 'Rychle': 'Quick', 'Celý model': 'Whole model', 'Plocha': 'Face',
     // sketch
     'PALETA SKICI': 'SKETCH PALETTE', 'Zrušit skicu': 'Cancel sketch', 'Zrušit změny': 'Discard changes', 'Smazat prvek': 'Delete element', 'Počet stran': 'Number of sides',
-    'Poloměr rohů': 'Corner radius', 'Zobrazit kóty': 'Show dimensions', 'Uzavřená křivka': 'Closed curve', 'Tažením bodu měnit velikost rovnoměrně': 'Dragging a point resizes uniformly',
+    'Poloměr rohů': 'Corner radius', 'Zobrazit kóty': 'Show dimensions', 'Uzavřená křivka': 'Closed curve',
     'uzavřený obrys': 'closed outline', 'otevřená čára (lze použít jako osu rotace)': 'open line (can be used as a revolve axis)', '(uzavírací)': '(closing)',
     'uzavřený profil': 'closed profile', 'uzavřené profily': 'closed profiles', 'uzavřených profilů': 'closed profiles',
     'Skica je prázdná. Nakreslete obdélník, kružnici nebo čáru.': 'The sketch is empty. Draw a rectangle, circle or line.',
@@ -85,7 +85,7 @@
     'Nástroj nezasahuje do žádného tělesa': 'The tool does not touch any body',
     // primitives
     'Šířka (X)': 'Width (X)', 'Hloubka (Y)': 'Depth (Y)', 'Výška (Z)': 'Height (Z)', 'Šířka': 'Width', 'Hloubka': 'Depth', 'Výška': 'Height', 'Průměr': 'Diameter',
-    'Poloměr': 'Radius', 'Poloměr trubice': 'Tube radius', 'Poloha základny': 'Base position', 'Šipkami měnit rovnoměrně všechny rozměry': 'Arrows change all dimensions uniformly',
+    'Poloměr': 'Radius', 'Poloměr trubice': 'Tube radius', 'Poloha základny': 'Base position',
     'Táhněte oranžovými šipkami pro změnu rozměrů, manipulátorem pro posun, nebo klepněte do pohledu': 'Drag the orange arrows to resize, the manipulator to move, or tap in the view',
     'Klepnutím do pohledu umístíte těleso, rozměry zadejte v dialogu': 'Tap in the view to place the body, enter the dimensions in the dialog',
     'Trubice musí být menší než hlavní poloměr': 'The tube must be smaller than the main radius',
