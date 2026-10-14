@@ -53,6 +53,7 @@ const ICONS = {
   finish: '<circle class="g" cx="12" cy="12" r="9" opacity=".2"/><circle cx="12" cy="12" r="9" style="stroke:var(--ok)"/><path d="m7.5 12.5 3 3 6-6.5" style="stroke:var(--ok);stroke-width:2.2"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   sktrim: '<circle cx="6.5" cy="17" r="2.6"/><circle cx="17.5" cy="17" r="2.6"/><path d="M8.4 15.2 16 4M15.6 15.2 8 4"/><path class="o" d="M3 10h18" stroke-dasharray="2 2" style="stroke:var(--orange)"/>',
+  sksegtrim: '<circle cx="10" cy="13" r="6"/><path d="M12 4h9v9h-5"/><path class="o" d="M13.5 7.5 16 10" stroke-dasharray="2 2" style="stroke:var(--orange)"/><path d="M3 21 8 16M8 21 3 16" style="stroke:var(--orange)"/>',
   skjoin: '<path d="M4 6c3-2 6 2 9 0"/><path d="M4 18c3 2 6-2 9 0"/><path d="M13 6 18 12 13 18M4 6v12" stroke-dasharray="2 2" style="stroke:var(--orange)"/>',
   skcons: '<path d="M3 20 21 4" stroke-dasharray="3 2.5"/><circle cx="3.5" cy="19.5" r="1.6"/><circle cx="20.5" cy="4.5" r="1.6"/>',
   skdup: '<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>',
@@ -482,7 +483,7 @@ function keyPoints(ents) {
   for (const e of ents) {
     if (e.t === 'rect') pts.push([e.x, e.y], [e.x + e.w, e.y], [e.x + e.w, e.y + e.h], [e.x, e.y + e.h], [e.x + e.w / 2, e.y + e.h / 2]);
     else if (e.t === 'circle') pts.push([e.x, e.y]);
-    else if (e.t === 'poly' || e.t === 'spline') pts.push(...e.pts);
+    else if (e.t === 'poly' || e.t === 'spline') pts.push(...e.pts.filter((q, j) => !isSmoothPt(e, j)));
     else if (e.t === 'ngon') { pts.push([e.x, e.y]); for (let i = 0; i < e.n; i++) { const a = (e.a || 0) * D2R + 2 * Math.PI * i / e.n; pts.push([e.x + e.r * Math.cos(a), e.y + e.r * Math.sin(a)]); } }
     else if (e.t === 'slot') pts.push([e.x1, e.y1], [e.x2, e.y2]);
     else if (e.t === 'ellipse') { const a = (e.a || 0) * D2R, c = Math.cos(a), s = Math.sin(a); pts.push([e.x, e.y], [e.x + e.rx * c, e.y + e.rx * s], [e.x - e.rx * c, e.y - e.rx * s], [e.x - e.ry * s, e.y + e.ry * c], [e.x + e.ry * s, e.y - e.ry * c]); }
@@ -653,18 +654,30 @@ function render() {
 /* ---------- sketch dimensions (kóty): drawn in screen space in an SVG overlay, recomputed every frame ---------- */
 let skDimsOn = false, dimMeta = [];
 const showSkDims = () => settings.skDims !== false;
+/* turning angle of a polyline at point j (180 at open ends); a trimmed outline (tr) keeps arcs as short chords with small turns */
+function polyTurn(e, j) {
+  const n = e.pts.length; if (!e.closed && (j <= 0 || j >= n - 1)) return 180;
+  const p0 = e.pts[(j - 1 + n) % n], p1 = e.pts[j % n], p2 = e.pts[(j + 1) % n];
+  let d = Math.abs(Math.atan2(p2[1] - p1[1], p2[0] - p1[0]) - Math.atan2(p1[1] - p0[1], p1[0] - p0[0])) / D2R; return d > 180 ? 360 - d : d;
+}
+const isChord = (e, k) => !!e.tr && (polyTurn(e, k) < 12 || polyTurn(e, k + 1) < 12);
+const isSmoothPt = (e, j) => !!e.tr && polyTurn(e, j) < 12;
 function updateSketchDims() {
   const box = $('#skdims'); if (!box) return;
   if (!sk || (!showSkDims() && !sk.f.orig)) { if (skDimsOn) { box.innerHTML = ''; skDimsOn = false; } return; }
   const P = sk.f.plane, W = dom.clientWidth, H = dom.clientHeight, out = []; dimMeta = [];
   const px = (x, y) => toPx(P3(P, x, y));
   const f1 = v => fmtc(v, 2);
+  const hse = !sk.tool ? sk.f.ents[sk.selEnt] : null, hpx = hse && hse.t !== 'poly' && hse.t !== 'spline' ? shapeHandles(hse).map(h => px(h.p[0], h.p[1])) : [];
   const arrow = (t, d) => { const n = [-d[1], d[0]]; return `<path class="ah" d="M${t[0]},${t[1]}L${t[0] - d[0] * 6 + n[0] * 1.8},${t[1] - d[1] * 6 + n[1] * 1.8}L${t[0] - d[0] * 6 - n[0] * 1.8},${t[1] - d[1] * 6 - n[1] * 1.8}Z"/>`; };
   const text = (x, y, s, ang = 0, anchor = 'middle') => `<text x="${x}" y="${y}" text-anchor="${anchor}"${ang ? ` transform="rotate(${ang} ${x} ${y})"` : ''}>${s}</text>`;
   /* an editable label gets an invisible, finger-sized hit area; tapping it opens a number field (openDimEdit) */
   const hit = (ed, x, y, label, ang = 0, anchor = 'middle') => {
     if (!ed || ed.i < 0) return '';
     const w = Math.max(40, label.length * 6.5 + 16), x0 = anchor === 'start' ? x - 6 : anchor === 'end' ? x - w + 6 : x - w / 2;
+    /* a label lying over a size handle gets no hit area, so the handle stays draggable */
+    const ca = Math.cos(-ang * D2R), sa = Math.sin(-ang * D2R);
+    if (hpx.some(q => { const qx = x + (q[0] - x) * ca - (q[1] - y) * sa, qy = y + (q[0] - x) * sa + (q[1] - y) * ca; return qx > x0 - 8 && qx < x0 + w + 8 && qy > y - 20 && qy < y + 20; })) return '';
     const di = dimMeta.push({ ...ed, x: anchor === 'middle' ? x : anchor === 'start' ? x + w / 2 - 6 : x - w / 2 + 6, y }) - 1;
     return `<rect class="dhit" data-di="${di}" x="${x0}" y="${y - 12}" width="${w}" height="24" rx="4"${ang ? ` transform="rotate(${ang} ${x} ${y})"` : ''}/>`;
   };
@@ -746,9 +759,10 @@ function updateSketchDims() {
       lin(rot(g.cx, g.cy, a, -g.len / 2, -h), rot(g.cx, g.cy, a, g.len / 2, -h), c, f1(g.len), ed('slen', g.len));
       lin(rot(g.cx, g.cy, a, g.len / 2 - h, -h), rot(g.cx, g.cy, a, g.len / 2 - h, h), rot(g.cx, g.cy, a, 0, 0), f1(e.w), ed('w', e.w));
     } else if (e.t === 'poly') {
-      const n = e.pts.length, segs = e.closed ? n : n - 1; if (segs > 40 || n < 2) continue;
+      const n = e.pts.length, segs = e.closed ? n : n - 1; if ((segs > 40 && !e.tr) || n < 2) continue;
       const c = e.pts.reduce((s, q) => [s[0] + q[0] / n, s[1] + q[1] / n], [0, 0]);
-      for (let k = 0; k < segs; k++) { const a = e.pts[k], b = e.pts[(k + 1) % n]; lin(a, b, c, null, ed('L' + k, Math.hypot(b[0] - a[0], b[1] - a[1]))); }
+      /* a trimmed outline keeps arcs as short chords: those get no length, only the straight sides do */
+      for (let k = 0; k < segs; k++) { if (isChord(e, k)) continue; const a = e.pts[k], b = e.pts[(k + 1) % n]; lin(a, b, c, null, ed('L' + k, Math.hypot(b[0] - a[0], b[1] - a[1]))); }
       if (i < 0 && n >= 2) angleDim(e.pts[n - 2], e.pts[n - 1]); /* the segment being drawn: its angle too */
     } else if (e.t === 'spline' && i < 0 && e.pts.length >= 2) {
       const a = e.pts[e.pts.length - 2], b = e.pts[e.pts.length - 1];
@@ -787,14 +801,15 @@ function updateSegLabels() {
   const e = sk && sk.f.ents[sk.selEnt];
   if (!e || e.t !== 'poly' || sk.tool) { if (segLabelsOn) { box.innerHTML = ''; segLabelsOn = false; } return; }
   const P = sk.f.plane, n = e.pts.length, segs = e.closed ? n : n - 1, html = [];
-  if (segs > 40) { box.innerHTML = ''; return; }
+  if (segs > 40 && !e.tr) { box.innerHTML = ''; return; }
   const scr = e.pts.map(q => toPx(P3(P, q[0], q[1])));
   for (let k = 0; k < segs; k++) {
+    if (isChord(e, k)) continue;
     const a = e.pts[k], b = e.pts[(k + 1) % n], sa = scr[k], sb = scr[(k + 1) % n];
     html.push(`<span class="seg" style="left:${(sa[0] + sb[0]) / 2}px;top:${(sa[1] + sb[1]) / 2}px">${fmtc(Math.hypot(b[0] - a[0], b[1] - a[1]), 2)} mm · ${fmtc(dirAngle(a, b), 1)}°</span>`);
   }
   for (let k = 0; k < n; k++) {
-    if (!e.closed && (k === 0 || k === n - 1)) continue;
+    if ((!e.closed && (k === 0 || k === n - 1)) || isSmoothPt(e, k)) continue;
     const p = e.pts[k], a = e.pts[(k - 1 + n) % n], b = e.pts[(k + 1) % n];
     const v1 = [a[0] - p[0], a[1] - p[1]], v2 = [b[0] - p[0], b[1] - p[1]], l1 = Math.hypot(...v1), l2 = Math.hypot(...v2);
     if (l1 < 1e-9 || l2 < 1e-9) continue;
@@ -1063,7 +1078,7 @@ const RIBBON = {
   ],
   sketch: [
     ['Vytvořit', [['line', 'Čára', 'L'], ['spline', 'Křivka', 'K'], ['rect', 'Obdélník', 'R'], ['circle', 'Kružnice', 'C'], ['ellipse', 'Elipsa', 'E'], ['ngon', 'Mnohoúhelník', 'P'], ['slot', 'Drážka', 'D']]],
-    ['Upravit', [['skfillet', 'Zaoblit rohy'], ['sktrim', 'Vystřihnout', 'X'], ['skjoin', 'Spojit', 'J'], ['skcons', 'Pomocná', 'Q'], ['skdel', 'Smazat', 'Del']]],
+    ['Upravit', [['skfillet', 'Zaoblit rohy'], ['sktrim', 'Vystřihnout', 'X'], ['sksegtrim', 'Oříznout', 'T'], ['skjoin', 'Spojit', 'J'], ['skcons', 'Pomocná', 'Q'], ['skdel', 'Smazat', 'Del']]],
     ['Vložit', [['skimport', 'DXF / SVG']]],
     ['Dokončit', [['finish', 'Dokončit skicu', 'Enter']]]
   ]
@@ -1078,7 +1093,7 @@ function renderRibbon() {
     `<button class="tool${id === 'finish' ? ' finish' : ''}" data-cmd="${id}" title="${label}${key ? ' (' + key + ')' : ''}"${sk && SK_TOOLS.includes(id) ? ` aria-pressed="${sk.tool === id}"` : ''}${sk && id === 'skcons' ? ` aria-pressed="${!!sk.consMode}"` : ''}${!sk && id === 'facemode' ? ` aria-pressed="${faceMode}"` : ''}><span class="ico">${svg(id, 26)}</span><span>${label}</span></button>`).join('')}</div><div class="rlabel">${g}</div></div>`).join('');
 }
 $('#rbody').addEventListener('click', e => { const b = e.target.closest('[data-cmd]'); if (b) runCommand(b.dataset.cmd); });
-const SK_TOOLS = ['line', 'spline', 'rect', 'circle', 'ellipse', 'ngon', 'slot', 'skfillet', 'sktrim', 'skjoin'];
+const SK_TOOLS = ['line', 'spline', 'rect', 'circle', 'ellipse', 'ngon', 'slot', 'skfillet', 'sktrim', 'sksegtrim', 'skjoin'];
 function runCommand(id) {
   $('#ctxmenu').hidden = true;
   if (sk) {
@@ -1370,10 +1385,11 @@ function redrawSketch() {
   live.add(pointsObj(P, keyPoints(ents).slice(1), tok.sketch, 5));
   const d = draftEntity();
   if (d) { if (sk.consMode) d.cons = true; live.add(sketchLines(P, [d], tok.orange, 0.07)); }
+  if (sk.segHover && sk.tool === 'sksegtrim') { const g = sketchLines(P, [{ t: 'poly', pts: sk.segHover, closed: false, cons: true }], tok.danger, 0.08); live.add(g); }
   if (sk.draft && isPolyTool(sk.tool)) live.add(pointsObj(P, sk.draft.pts, tok.orange, 6));
   const se = ents[sk.selEnt];
-  if (se && (se.t === 'spline' || se.t === 'poly') && !sk.tool) live.add(pointsObj(P, se.pts, tok.orange, 9));
-  if (!sk.tool) ents.forEach((e, i) => { if (e.t === 'circle' && (i === sk.selEnt || sk.f.orig)) live.add(pointsObj(P, [[e.x + e.r, e.y]], tok.orange, 9)); });
+  if (se && (se.t === 'spline' || se.t === 'poly') && !sk.tool) live.add(pointsObj(P, se.pts.filter((q, j) => !isSmoothPt(se, j)), tok.orange, 9));
+  if (!sk.tool) ents.forEach((e, i) => { if (e.t !== 'poly' && e.t !== 'spline' && (i === sk.selEnt || (e.t === 'circle' && sk.f.orig))) live.add(pointsObj(P, shapeHandles(e).map(h => h.p), tok.orange, 9)); });
   for (const e of ents) if (e.t === 'spline' && e !== se) live.add(pointsObj(P, e.pts, tok.sketch, 7));
   updateUndo();
   if (sk.snapPt) live.add(sk.snapMid ? midMarker(P, sk.snapPt, tok.accent) : pointsObj(P, [sk.snapPt], tok.accent, 10));
@@ -1441,7 +1457,7 @@ function slotHalfWidth(a, b, c) {
 }
 function setSketchTool(t) {
   if (!sk) return;
-  sk.tool = t; sk.draft = null; sk.cut = null; sk.joinA = null;
+  sk.tool = t; sk.draft = null; sk.cut = null; sk.joinA = null; sk.segHover = null;
   const PROMPTS = {
     rect: drawMode('rect') === 'center' ? 'Obdélník ze středu: klepněte na střed, pak na roh' : 'Obdélník: klepněte na první roh, pak na protější roh',
     circle: drawMode('circle') === 'corner' ? 'Kružnice z rohu: klepněte na roh čtverce, do kterého se kružnice vepíše, pak na protější roh' : 'Kružnice: klepněte na střed, pak určete poloměr',
@@ -1452,10 +1468,11 @@ function setSketchTool(t) {
     ellipse: drawMode('ellipse') === 'corner' ? 'Elipsa z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se elipsa vepíše' : 'Elipsa: klepněte na střed, pak na konec hlavní osy, třetím klepnutím určíte šířku',
     skfillet: 'Zaoblení rohů: nastavte poloměr v paletě a klepněte na obdélník, mnohoúhelník nebo uzavřený obrys',
     sktrim: 'Vystřihnout: klepněte na uzavřený tvar, ze kterého se má vystřihovat',
-    skjoin: JOIN_PROMPT1
+    skjoin: JOIN_PROMPT1,
+    sksegtrim: 'Oříznout: klepněte na úsek čáry mezi průsečíky, úsek se odstraní a navazující čáry se spojí do jednoho obrysu'
   };
   setPrompt(PROMPTS[t] || 'Klepnutím vyberte prvek skici, tažením ho přesunete. Nástroje kreslení jsou v pásu nahoře.');
-  dom.style.cursor = t && t !== 'skfillet' && t !== 'sktrim' && t !== 'skjoin' ? 'crosshair' : '';
+  dom.style.cursor = t && t !== 'skfillet' && t !== 'sktrim' && t !== 'sksegtrim' && t !== 'skjoin' ? 'crosshair' : '';
   renderRibbon(); redrawSketch(); renderPalette(); $('#dim').hidden = true;
 }
 /* freehand curve: the sampled stroke is thinned (Douglas–Peucker) to a few through-points of a smooth spline */
@@ -1505,16 +1522,76 @@ function sketchPoint(ev) {
   const q = [snapV(p[0]), snapV(p[1])]; sk.gridHot = onCross(q) ? q : null;
   return q;
 }
-/* draggable points: vertices of polylines and curves */
+/* size handles of the closed shapes (shown on the selected shape): key k → point in the sketch */
+function shapeHandles(e) {
+  const H = [];
+  if (e.t === 'circle') H.push({ k: 'r', p: [e.x + e.r, e.y] });
+  else if (e.t === 'rect') {
+    const x0 = e.x, y0 = e.y, x1 = e.x + e.w, y1 = e.y + e.h, xm = e.x + e.w / 2, ym = e.y + e.h / 2;
+    H.push({ k: 'c00', p: [x0, y0] }, { k: 'c10', p: [x1, y0] }, { k: 'c11', p: [x1, y1] }, { k: 'c01', p: [x0, y1] },
+      { k: 'e0', p: [xm, y0] }, { k: 'e1', p: [x1, ym] }, { k: 'e2', p: [xm, y1] }, { k: 'e3', p: [x0, ym] });
+  }
+  else if (e.t === 'ngon') { const a = (e.a || 0) * D2R; H.push({ k: 'r', p: [e.x + e.r * Math.cos(a), e.y + e.r * Math.sin(a)] }); }
+  else if (e.t === 'ellipse') { const a = (e.a || 0) * D2R, c = Math.cos(a), s = Math.sin(a); H.push({ k: 'rx', p: [e.x + e.rx * c, e.y + e.rx * s] }, { k: 'ry', p: [e.x - e.ry * s, e.y + e.ry * c] }); }
+  else if (e.t === 'slot') {
+    const dx = e.x2 - e.x1, dy = e.y2 - e.y1, L = Math.hypot(dx, dy) || 1e-9, ux = dx / L, uy = dy / L, h = e.w / 2;
+    H.push({ k: 's1', p: [e.x1 - ux * h, e.y1 - uy * h] }, { k: 's2', p: [e.x2 + ux * h, e.y2 + uy * h] }, { k: 'w', p: [(e.x1 + e.x2) / 2 - uy * h, (e.y1 + e.y2) / 2 + ux * h] });
+  }
+  return H;
+}
+/* drag of a size handle: o = the shape before the drag, p = pointer in the sketch; returns the new shape and a label */
+function applyShapeHandle(o, k, p) {
+  const r4 = v => Math.round(v * 1e4) / 1e4;
+  /* lengths measured from a centre: whole grid steps (diameters / widths in steps), otherwise 0.001 mm */
+  const len = (v, two) => settings.gridSnap ? Math.max(settings.snap, Math.round((two ? 2 : 1) * v / settings.snap) * settings.snap) / (two ? 2 : 1) : Math.max(0.01, Math.round(v * 1000) / 1000);
+  const e = clone(o);
+  if (o.t === 'circle') { e.r = len(Math.hypot(p[0] - o.x, p[1] - o.y), true); return [e, `Ø ${fmtc(2 * e.r, 2)} mm`]; }
+  if (o.t === 'ngon') { const a = (o.a || 0) * D2R, d = (p[0] - o.x) * Math.cos(a) + (p[1] - o.y) * Math.sin(a); e.r = len(Math.max(0.01, d)); return [e, `R ${fmtc(e.r, 2)} mm · ${EN() ? 'across flats' : 'otvor klíče'} ${fmtc(2 * e.r * Math.cos(Math.PI / o.n), 2)} mm`]; }
+  if (o.t === 'ellipse') {
+    const a = (o.a || 0) * D2R, c = Math.cos(a), s = Math.sin(a), qx = p[0] - o.x, qy = p[1] - o.y;
+    if (k === 'rx') e.rx = len(Math.abs(qx * c + qy * s), true); else e.ry = len(Math.abs(-qx * s + qy * c), true);
+    return [e, `${fmtc(2 * e.rx, 2)} × ${fmtc(2 * e.ry, 2)} mm`];
+  }
+  if (o.t === 'rect') {
+    const q = crossNear(p) || [snapV(p[0]), snapV(p[1])];
+    let x0 = o.x, y0 = o.y, x1 = o.x + o.w, y1 = o.y + o.h;
+    if (k[0] === 'c') { if (k[1] === '0') x0 = q[0]; else x1 = q[0]; if (k[2] === '0') y0 = q[1]; else y1 = q[1]; }
+    else if (k === 'e0') y0 = q[1]; else if (k === 'e2') y1 = q[1]; else if (k === 'e1') x1 = q[0]; else if (k === 'e3') x0 = q[0];
+    if (Math.abs(x1 - x0) < 0.01) x1 = x0 + (x1 >= x0 ? 0.01 : -0.01);
+    if (Math.abs(y1 - y0) < 0.01) y1 = y0 + (y1 >= y0 ? 0.01 : -0.01);
+    Object.assign(e, { x: r4(x0), y: r4(y0), w: r4(x1 - x0), h: r4(y1 - y0) });
+    return [e, `${fmtc(Math.abs(e.w), 2)} × ${fmtc(Math.abs(e.h), 2)} mm`];
+  }
+  if (o.t === 'slot') {
+    const dx = o.x2 - o.x1, dy = o.y2 - o.y1, L = Math.hypot(dx, dy) || 1e-9, ux = dx / L, uy = dy / L, h = o.w / 2;
+    if (k === 'w') {
+      const mx = (o.x1 + o.x2) / 2, my = (o.y1 + o.y2) / 2;
+      e.w = len(2 * Math.abs(-(p[0] - mx) * uy + (p[1] - my) * ux));
+    } else {
+      /* one outer end follows the pointer along the slot axis, the other end stays */
+      const fx = k === 's1' ? o.x2 + ux * h : o.x1 - ux * h, fy = k === 's1' ? o.y2 + uy * h : o.y1 - uy * h, sg = k === 's1' ? -1 : 1;
+      const Lt = Math.max(o.w + 0.01, len(sg * ((p[0] - fx) * ux + (p[1] - fy) * uy)));
+      const ex = fx + sg * ux * Lt, ey = fy + sg * uy * Lt, a1 = [ex - sg * ux * h, ey - sg * uy * h], a2 = [fx + sg * ux * h, fy + sg * uy * h];
+      if (k === 's1') { e.x1 = r4(a1[0]); e.y1 = r4(a1[1]); e.x2 = r4(a2[0]); e.y2 = r4(a2[1]); } else { e.x2 = r4(a1[0]); e.y2 = r4(a1[1]); e.x1 = r4(a2[0]); e.y1 = r4(a2[1]); }
+    }
+    const Lo = Math.hypot(e.x2 - e.x1, e.y2 - e.y1) + e.w;
+    return [e, `${fmtc(Lo, 2)} × ${fmtc(e.w, 2)} mm`];
+  }
+  return [e, ''];
+}
+/* draggable points: vertices of polylines and curves, size handles of the selected shape */
 function sketchHandleAt(ev) {
   const [mx, my] = evPx(ev), P = sk.f.plane;
   let best = null, bd = 10;
   sk.f.ents.forEach((e, ei) => {
     /* a circle has a radius handle on its right-hand side (in a face sketch always, otherwise when selected) */
-    if (e.t === 'circle' && (ei === sk.selEnt || sk.f.orig)) { const s = toPx(P3(P, e.x + e.r, e.y)); const d = Math.hypot(s[0] - mx, s[1] - my); if (d < bd) { bd = d; best = { ei, rad: true }; } return; }
-    if (e.t !== 'spline' && e.t !== 'poly') return;
+    if (e.t !== 'spline' && e.t !== 'poly') {
+      if (ei !== sk.selEnt && !(e.t === 'circle' && sk.f.orig)) return;
+      shapeHandles(e).forEach(h => { const s = toPx(P3(P, h.p[0], h.p[1])); const d = Math.hypot(s[0] - mx, s[1] - my); if (d < bd) { bd = d; best = { ei, shape: h.k }; } });
+      return;
+    }
     if (e.t === 'poly' && ei !== sk.selEnt) return;
-    e.pts.forEach((q, pi) => { const s = toPx(P3(P, q[0], q[1])); const d = Math.hypot(s[0] - mx, s[1] - my); if (d < bd) { bd = d; best = { ei, pi }; } });
+    e.pts.forEach((q, pi) => { if (isSmoothPt(e, pi)) return; const s = toPx(P3(P, q[0], q[1])); const d = Math.hypot(s[0] - mx, s[1] - my); if (d < bd) { bd = d; best = { ei, pi }; } });
   });
   return best;
 }
@@ -1532,13 +1609,13 @@ function sketchDrag(ev) {
     redrawSketch(); return;
   }
   const P = sk.f.plane, e = sk.f.ents[sk.drag.ei]; if (!e) return;
-  if (sk.drag.rad) {
+  if (sk.drag.shape) {
     const p = sketchRawPoint(ev); if (!p) return;
-    let r = Math.hypot(p[0] - e.x, p[1] - e.y);
-    /* with grid snapping the diameter changes in whole steps */
-    r = settings.gridSnap ? Math.max(settings.snap, Math.round(2 * r / settings.snap) * settings.snap) / 2 : Math.max(0.05, Math.round(r * 1000) / 1000);
-    e.r = r;
-    const el = $('#dim'), px = evPx(ev); el.textContent = `Ø ${fmtc(2 * r, 2)} mm`; el.hidden = false; el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px';
+    if (!sk.drag.orig) sk.drag.orig = clone(e);
+    const [ne, label] = applyShapeHandle(sk.drag.orig, sk.drag.shape, p);
+    sk.f.ents[sk.drag.ei] = ne;
+    if (ne.t !== 'rect') sk.gridHot = null;
+    const el = $('#dim'), px = evPx(ev); el.textContent = label; el.hidden = !label; el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px';
     redrawSketch(); return;
   }
   ray.setFromCamera(evNdc(ev), cam());
@@ -1562,6 +1639,7 @@ function sketchDrag(ev) {
 }
 function sketchMove(ev) {
   if (!sk.tool) { dom.style.cursor = sketchHandleAt(ev) ? 'move' : ''; }
+  if (sk.tool === 'sksegtrim') { const r = segTrimAt(ev); sk.segHover = r ? r.cut : null; sk.snapPt = null; sk.cursor = null; sk.gridHot = null; redrawSketch(); return; }
   if (!sk.tool || sk.tool === 'skfillet' || sk.tool === 'sktrim' || sk.tool === 'skjoin') { sk.snapPt = null; sk.cursor = null; sk.gridHot = null; sk.hoverMid = !sk.tool ? nearMidpoint(ev) : null; redrawSketch(); return; }
   sk.cursor = sketchPoint(ev);
   if (isFreehand()) sk.gridHot = null;
@@ -1591,6 +1669,7 @@ function sketchClick0(ev) {
   if (!sk.tool) { pickSketchEntity(ev); return; }
   if (sk.tool === 'sktrim') { trimClick(ev); return; }
   if (sk.tool === 'skjoin') { joinClick(ev); return; }
+  if (sk.tool === 'sksegtrim') { segTrimClick(ev); return; }
   if (sk.tool === 'skfillet') {
     pickSketchEntity(ev);
     const e = sk.f.ents[sk.selEnt];
@@ -1804,6 +1883,88 @@ function trimClick(ev) {
   } catch (e) { toast('Vystřižení se nepodařilo: ' + e.message); sk.cut = null; }
   renderPalette(); redrawSketch();
 }
+/* ---------- trimming a segment: the part of an element between its two nearest intersections with other elements ---------- */
+function segTrimAt(ev) {
+  const ents = sk.f.ents, ei = hitSketchEntity(ev); if (ei < 0) return null;
+  const p = sketchRawPoint(ev); if (!p) return null;
+  const pls = entityPolylines(ents), A = pls[ei]; if (!A || A.pts.length < 2) return null;
+  const pts = A.pts, n = pts.length, closed = A.closed, m = closed ? n : n - 1, cum = [0];
+  for (let k = 0; k < m; k++) cum.push(cum[k] + Math.hypot(pts[(k + 1) % n][0] - pts[k][0], pts[(k + 1) % n][1] - pts[k][1]));
+  const L = cum[m]; if (L < 1e-9) return null;
+  /* where the pointer lies along the outline */
+  let tp = 0, bd = Infinity;
+  for (let k = 0; k < m; k++) {
+    const a = pts[k], b = pts[(k + 1) % n], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+    const u = l2 > 0 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2)) : 0, d = Math.hypot(a[0] + dx * u - p[0], a[1] + dy * u - p[1]);
+    if (d < bd) { bd = d; tp = cum[k] + u * (cum[k + 1] - cum[k]); }
+  }
+  /* intersections with all other elements, as distances along this outline */
+  const ts = [], eps = L * 1e-7 + 1e-9;
+  pls.forEach((B, j) => {
+    if (j === ei || !B) return;
+    const q = B.pts, nb = q.length, mb = B.closed ? nb : nb - 1;
+    for (let k = 0; k < m; k++) {
+      const a = pts[k], b = pts[(k + 1) % n], rx = b[0] - a[0], ry = b[1] - a[1];
+      const x0 = Math.min(a[0], b[0]), x1 = Math.max(a[0], b[0]), y0 = Math.min(a[1], b[1]), y1 = Math.max(a[1], b[1]);
+      for (let h = 0; h < mb; h++) {
+        const c = q[h], d = q[(h + 1) % nb];
+        if (Math.max(c[0], d[0]) < x0 - 1e-9 || Math.min(c[0], d[0]) > x1 + 1e-9 || Math.max(c[1], d[1]) < y0 - 1e-9 || Math.min(c[1], d[1]) > y1 + 1e-9) continue;
+        const sx = d[0] - c[0], sy = d[1] - c[1], den = rx * sy - ry * sx; if (Math.abs(den) < 1e-14) continue;
+        const wx = c[0] - a[0], wy = c[1] - a[1], u = (wx * sy - wy * sx) / den, v = (wx * ry - wy * rx) / den;
+        if (u < -1e-9 || u > 1 + 1e-9 || v < -1e-9 || v > 1 + 1e-9) continue;
+        ts.push(cum[k] + Math.max(0, Math.min(1, u)) * (cum[k + 1] - cum[k]));
+      }
+    }
+  });
+  ts.sort((x, y) => x - y);
+  const cuts = []; for (const t of ts) if (!cuts.length || t - cuts[cuts.length - 1] > eps * 10) cuts.push(t);
+  if (closed && cuts.length > 1 && cuts[0] + L - cuts[cuts.length - 1] <= eps * 10) cuts.pop();
+  const inner = closed ? cuts : cuts.filter(t => t > eps * 10 && t < L - eps * 10);
+  /* the outline from distance a to b (b may run past the end of a closed outline) */
+  const at = t => { t = closed ? ((t % L) + L) % L : Math.max(0, Math.min(L, t)); let k = 0; while (k < m - 1 && cum[k + 1] < t) k++; const a = pts[k], b = pts[(k + 1) % n], l = cum[k + 1] - cum[k], u = l > 0 ? (t - cum[k]) / l : 0; return [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u]; };
+  const sub = (a, b) => {
+    const out = [at(a)];
+    for (let lap = 0; lap < 2; lap++) for (let k = 1; k <= m; k++) { const t = cum[k] + lap * L; if (t > a + eps && t < b - eps) out.push(pts[k % n].slice()); }
+    out.push(at(b)); return out;
+  };
+  if (!inner.length || (closed && inner.length < 2)) return { ei, keep: [], cut: closed ? pts.concat([pts[0]]) : pts.slice(), all: true };
+  let lo, hi;
+  if (closed) { lo = inner.filter(t => t < tp).pop(); hi = inner.find(t => t > tp); if (lo === undefined) lo = inner[inner.length - 1] - L; if (hi === undefined) hi = inner[0] + L; }
+  else { lo = inner.filter(t => t < tp).pop(); hi = inner.find(t => t > tp); if (lo === undefined) lo = 0; if (hi === undefined) hi = L; }
+  const cut = sub(lo, hi), keep = [];
+  if (closed) keep.push(sub(hi, lo + L));
+  else { if (lo > eps * 10) keep.push(sub(0, lo)); if (hi < L - eps * 10) keep.push(sub(hi, L)); }
+  return { ei, keep, cut };
+}
+function segTrimClick(ev) {
+  const r = segTrimAt(ev); if (!r) { toast('Klepněte na čáru, kterou chcete oříznout.'); return; }
+  const f = sk.f, o = f.ents[r.ei], r4 = q => [Math.round(q[0] * 1e4) / 1e4, Math.round(q[1] * 1e4) / 1e4];
+  f.ents.splice(r.ei, 1);
+  r.keep.forEach(pts => { const e = { t: 'poly', pts: pts.map(r4), closed: false, tr: true }; if (o.cons) e.cons = true; f.ents.push(e); });
+  /* trimmed pieces whose ends meet are joined into one line, closed when the chain comes back to its start */
+  const same = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]) < 1e-3, isT = e => e && e.t === 'poly' && e.tr && !e.closed;
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (let i = 0; i < f.ents.length && !changed; i++) {
+      const A = f.ents[i]; if (!isT(A)) continue;
+      if (A.pts.length > 2 && same(A.pts[0], A.pts[A.pts.length - 1])) { A.pts.pop(); A.closed = true; changed = true; break; }
+      for (let j = 0; j < f.ents.length; j++) {
+        const B = f.ents[j]; if (j === i || !isT(B) || !!A.cons !== !!B.cons) continue;
+        const a0 = A.pts[0], a1 = A.pts[A.pts.length - 1], b0 = B.pts[0], b1 = B.pts[B.pts.length - 1];
+        let pts = null;
+        if (same(a1, b0)) pts = A.pts.concat(B.pts.slice(1));
+        else if (same(a1, b1)) pts = A.pts.concat(B.pts.slice(0, -1).reverse());
+        else if (same(a0, b1)) pts = B.pts.concat(A.pts.slice(1));
+        else if (same(a0, b0)) pts = B.pts.slice().reverse().concat(A.pts.slice(1));
+        if (pts) { A.pts = pts; f.ents.splice(j, 1); changed = true; break; }
+      }
+    }
+  }
+  sk.segHover = null; sk.selEnt = -1;
+  toast(r.all ? 'Prvek nemá průsečík, odstraněn celý.' : 'Úsek odstraněn.');
+  renderPalette(); redrawSketch();
+}
 function deleteSketchEntity() {
   if (!sk) return;
   if (sk.selEnt < 0 || !sk.f.ents[sk.selEnt]) { toast('Nejprve vyberte prvek skici.'); return; }
@@ -1849,7 +2010,8 @@ function renderPalette() {
     else if (e.t === 'spline') body = `<div class="note">${e.pts.length} bodů · body přesunete tažením ve skice</div><label class="chk"><input type="checkbox" id="ent-${i}-closed" data-ent="${i}" data-k="closed"${e.closed ? ' checked' : ''}${e.pts.length < 3 ? ' disabled' : ''}><span>Uzavřená křivka</span></label>${uniChk(i)}`;
     else {
       const n = e.pts.length, segs = e.closed ? n : n - 1, rows = [];
-      for (let k = 0; k < Math.min(segs, 40); k++) {
+      for (let k = 0, shown = 0; k < segs && shown < 40; k++) {
+        if (isChord(e, k)) continue; shown++;
         const a = e.pts[k], b = e.pts[(k + 1) % n], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
         rows.push(`<div class="seglbl">Úsečka ${k + 1}${e.closed && k === n - 1 ? ' (uzavírací)' : ''}</div><div class="grid2">${num(i, 'L' + k, 'L', L)}${num(i, 'A' + k, '∠', dirAngle(a, b))}</div>`);
       }
@@ -4907,7 +5069,7 @@ document.addEventListener('keydown', e => {
     else if (tlSel !== null) deleteFeature(tlSel);
     return;
   }
-  const map = sk ? { l: 'line', k: 'spline', r: 'rect', c: 'circle', e: 'ellipse', p: 'ngon', d: 'slot', x: 'sktrim', j: 'skjoin', q: 'skcons' } : cmd ? {} : { s: 'sketch', e: 'extrude', f: 'fillet', m: 'move', r: 'rotate', t: 'thread', i: 'measure', g: 'facemode' };
+  const map = sk ? { l: 'line', k: 'spline', r: 'rect', c: 'circle', e: 'ellipse', p: 'ngon', d: 'slot', x: 'sktrim', t: 'sksegtrim', j: 'skjoin', q: 'skcons' } : cmd ? {} : { s: 'sketch', e: 'extrude', f: 'fillet', m: 'move', r: 'rotate', t: 'thread', i: 'measure', g: 'facemode' };
   const id = map[k.toLowerCase()];
   if (id) { e.preventDefault(); runCommand(id); return; }
   if (k === 'F6') { e.preventDefault(); fitView(); }

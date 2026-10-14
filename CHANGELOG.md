@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 0.91
+- Skica: vybraný tvar má táhla pro změnu rozměrů jako kružnice. Obdélník: rohy a středy stran. Mnohoúhelník: vrchol (poloměr). Elipsa: konce obou os. Drážka: oba konce (délka) a bok (šířka). Popisky kót táhla nezakrývají.
+- Skica: nový nástroj Oříznout (T). Klepnutím na úsek čáry mezi průsečíky se úsek odstraní a navazující čáry se spojí do jednoho obrysu (např. kružnice + obdélník → jeden tvar). Úsek, který se odstraní, se při najetí zvýrazní. Prvek bez průsečíku se odstraní celý.
+
 ## Beta 0.90
 - Skica: při kreslení čáry a křivky se u kurzoru už nezobrazuje rámeček s délkou a úhlem. Délka i úhel (oblouk od osy X) jsou přímo v kótách. Když jsou kóty vypnuté, rámeček se ukazuje dál.
 

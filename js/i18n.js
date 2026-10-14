@@ -251,7 +251,7 @@
     'Klepněte na cílovou plochu (k rovné stěně rovnou, k válci válcovou)': 'Tap the target face (flat to flat, cylinder to cylinder)',
     // sketch: rectangle from centre, trim
     'Kreslit': 'Draw', 'Z rohu': 'From corner', 'Ze středu': 'From centre', 'Obdélník ze středu: klepněte na střed, pak na roh': 'Centre rectangle: tap the centre, then a corner',
-    'Vystřihnout': 'Trim', 'Vystřihnout: klepněte na uzavřený tvar, ze kterého se má vystřihovat': 'Trim: tap the closed shape to cut from',
+    'Vystřihnout': 'Trim', 'Oříznout': 'Trim segment', 'Oříznout: klepněte na úsek čáry mezi průsečíky, úsek se odstraní a navazující čáry se spojí do jednoho obrysu': 'Trim segment: tap a piece of a line between intersections; it is removed and the remaining lines join into one outline', 'Klepněte na čáru, kterou chcete oříznout.': 'Tap the line you want to trim.', 'Prvek nemá průsečík, odstraněn celý.': 'The element has no intersection, removed entirely.', 'Úsek odstraněn.': 'Segment removed.', 'Vystřihnout: klepněte na uzavřený tvar, ze kterého se má vystřihovat': 'Trim: tap the closed shape to cut from',
     'Teď klepněte na tvar, který se vystřihne, nebo na čáru, podél které se tvar rozdělí': 'Now tap the shape to cut out, or a line to split the shape along',
     'Nejprve klepněte na uzavřený tvar, ze kterého se má vystřihovat.': 'First tap the closed shape to cut from.', 'Vystřiženo.': 'Cut out.', 'Tvar byl vystřižen celý.': 'The whole shape was cut away.',
     'Klepněte na další tvar, ze kterého se má vystřihovat': 'Tap another shape to cut from', 'Čára tvar neprotíná, nic se nerozdělilo.': 'The line does not cross the shape, nothing was split.',
