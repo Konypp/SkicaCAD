@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 0.74
+- Nový příkaz Rozříznout (Upravit): rozřízne vybraná tělesa rovinou XY, XZ, YZ nebo rovinou vybrané plochy, s odsazením (u hlavních rovin začíná uprostřed výběru). Ponechá obě části jako samostatná tělesa, nebo jen část nad či pod rovinou. Náhled ukazuje obě části barevně a řeznou rovinu.
+- Plochy: nová akce Ohnout (i v kontextové nabídce). Rovinná plocha (i část rozdělené plochy) se otočí kolem zvolené hrany o zadaný úhel, volitelně s poloměrem ohybu. Vznikne zaoblený přechod a koncová plocha pod úhlem, kterou lze dál vysunout (Plochy › Vysunout). Výchozí osa je spodní hrana plochy, klepnutím na jinou hranu se změní.
+- Potvrzení klávesou Enter přímo v poli funguje i u příkazů, jejichž náhled se počítá se zpožděním (Ohnout, Rozříznout).
+
 ## Beta 0.73
 - Plochy: nová akce Rozdělit plochu (v liště vybrané rovinné plochy i v kontextové nabídce). Dvěma body (přichytí se k rohům, středům hran, hranám po krocích mřížky, jinak k mřížce) nebo jedním bodem a tlačítkem Vodorovně / Svisle se vede dělicí čára. Části plochy se pak vybírají samostatně a dají se posunout, vysunout nebo převést na skicu. Rozdělení je krok v časové ose (lze upravit), dělicí čára se zobrazuje jako hrana a přenáší se při přesunu, otočení, měřítku, zarovnání, zrcadlení i poli. Tvar tělesa a export se nemění.
 - Otočit: oprava chyby, kvůli které se náhled otočení (rychlá tlačítka, zadané úhly, manipulátor) překresloval až s další událostí. Po OK tělesa zůstanou na novém místě, neodskakují na chvíli zpět. Úhly a pokládání už zbytečně nepřepočítávají výběr.

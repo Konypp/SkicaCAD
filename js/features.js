@@ -8,7 +8,7 @@ const PLANES = {
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
 const FEATURE_LABEL = { sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
-  fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
+  fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
 function blobPolys(id) {
@@ -274,6 +274,43 @@ function seamSegments(polys, seams) {
     }
   }
   return arr;
+}
+/* outline loops (2D, in basis B) of a planar face or of its part cut out by half-planes */
+function faceLoops2D(polys, f, B) {
+  const g = KK.planarFace(polys, f.n, f.w, f.p);
+  if (!g) throw new Error('Plocha nebyla nalezena');
+  const cp = f.clip && f.clip.length ? clipRegion(polys, g, f.clip) : null;
+  if (cp && !cp.length) throw new Error('Část plochy nebyla nalezena');
+  return (cp ? KK.faceLoops(cp, cp.map((_, i) => i)) : KK.faceLoops(polys, g)).map(l => l.map(q => { const dq = KK.vsub(q, B.o); return [KK.vdot(dq, B.u), KK.vdot(dq, B.v)]; }));
+}
+/* bend a planar face: the face is revolved about a line in its plane (one of its edges, moved outwards by the bend radius)
+   into the space in front of it, so the body continues around a bend and ends in a tilted face that can be extruded further */
+function bendFaceTool(polys, f) {
+  const ang = Number(f.angle) || 0;
+  if (!(Math.abs(ang) >= 0.5 && Math.abs(ang) <= 180)) throw new Error('Úhel ohybu musí být 0,5° až 180°');
+  const B = basisFromPlane(f.n, f.w), loops = faceLoops2D(polys, f, B);
+  if (!loops.length) throw new Error('Obrys plochy se nepodařilo určit');
+  const to2 = q => { const dq = KK.vsub(q, B.o); return [KK.vdot(dq, B.u), KK.vdot(dq, B.v)]; };
+  const A = to2(f.axis.a), Bp = to2(f.axis.b);
+  let d = [Bp[0] - A[0], Bp[1] - A[1]]; const dl = Math.hypot(d[0], d[1]);
+  if (dl < 1e-6) throw new Error('Osa ohybu není určená');
+  d = [d[0] / dl, d[1] / dl];
+  /* the face must lie on the left of the axis (+per side) so that a positive angle sweeps in front of the face */
+  const all = loops.flat(); let side = 0;
+  for (const q of all) side += (q[0] - A[0]) * -d[1] + (q[1] - A[1]) * d[0];
+  if (side < 0) d = [-d[0], -d[1]];
+  const r = Math.max(0, Number(f.radius) || 0), per = [-d[1], d[0]], P0 = [A[0] - per[0] * r, A[1] - per[1] * r];
+  for (const q of all) if ((q[0] - P0[0]) * per[0] + (q[1] - P0[1]) * per[1] < -1e-4) throw new Error('Osa ohybu musí ležet na okraji plochy, ne uvnitř');
+  const tool = KK.revolveProfiles(loops.map(l => ({ t: 'poly', pts: l })), B, { p: P0, d }, ang * Math.PI / 180);
+  if (!tool.length) throw new Error('Ohyb se nepodařilo vytvořit');
+  /* sink the tool 0.01 mm into the body so that the union does not meet a coplanar face */
+  return KK.translate(tool, KK.vmul(f.n, -0.01));
+}
+/* half-space solid on the +n side of the plane n·x = w, large enough to contain the given bounding box */
+function halfSpace(n, w, bb) {
+  const c = [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2), D = Math.hypot(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]) * 2 + 10;
+  const B = basisFromPlane(n, w), off = KK.vdot(KK.vsub(c, B.o), B.u), offv = KK.vdot(KK.vsub(c, B.o), B.v);
+  return KK.extrudeProfiles([{ t: 'poly', pts: [[off - D, offv - D], [off + D, offv - D], [off + D, offv + D], [off - D, offv + D]] }], B, 0, D);
 }
 /* direct face edit: new diameter for a cylindrical face, or push / pull a planar face */
 function offsetFaceTool(polys, f) {
@@ -559,6 +596,33 @@ function step(state, f) {
       else out = bodies.map(x => (sel.includes(x) ? xfBody(x, m) : x));
       break;
     }
+    case 'bendface': {
+      const b = bodies.find(x => x.id === f.body);
+      if (!b) throw new Error('Těleso neexistuje');
+      const res = KK.boolean(b.polys, bendFaceTool(b.polys, f), 'union');
+      if (!res.length) throw new Error('Ohyb se nepodařilo vytvořit');
+      out = bodies.map(x => (x === b ? { ...x, polys: res } : x));
+      break;
+    }
+    case 'splitbody': {
+      const sel = bodies.filter(x => (f.bodies || []).includes(x.id));
+      if (!sel.length) throw new Error('Vyberte tělesa');
+      const nn = KK.vnorm(f.n.map(Number)), w = Number(f.w), keep = f.keep || 'both', added = [], repl = new Map();
+      let k = 0, cut = 0;
+      for (const x of sel) {
+        const hs = halfSpace(nn, w, KK.bbox(x.polys));
+        const pos = KK.boolean(x.polys, hs, 'intersect'), neg = KK.boolean(x.polys, hs, 'subtract');
+        const vp = pos.length ? Math.abs(KK.signedVolume(pos)) : 0, vn = neg.length ? Math.abs(KK.signedVolume(neg)) : 0;
+        if (vp < 1e-6 || vn < 1e-6) continue;
+        cut++;
+        if (keep === 'pos') repl.set(x.id, pos);
+        else if (keep === 'neg') repl.set(x.id, neg);
+        else { repl.set(x.id, neg); added.push({ id: f.id + (k ? '_' + k : ''), name: 'Těleso ' + (++n), polys: pos, from: f.id, ...(x.seams ? { seams: x.seams } : {}) }); k++; }
+      }
+      if (!cut) throw new Error('Rovina řezu žádné vybrané těleso neprotíná');
+      out = bodies.map(x => (repl.has(x.id) ? { ...x, polys: repl.get(x.id) } : x)).concat(added);
+      break;
+    }
     case 'splitface': {
       const b = bodies.find(x => x.id === f.body);
       if (!b) throw new Error('Těleso neexistuje');
@@ -606,7 +670,7 @@ function makeRebuilder() {
   };
 }
 
-return { faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { bendFaceTool, halfSpace, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

@@ -41,6 +41,8 @@ const ICONS = {
   torus: '<ellipse class="b" cx="12" cy="12" rx="9.5" ry="6"/><ellipse cx="12" cy="12" rx="9.5" ry="6"/><path class="b2" d="M7.5 11.8c1.2-1.2 2.8-1.8 4.5-1.8s3.3.6 4.5 1.8c-1.2 1-2.8 1.5-4.5 1.5s-3.3-.5-4.5-1.5z" style="fill:var(--panel)"/><path d="M7.5 11.8c1.2-1.2 2.8-1.8 4.5-1.8s3.3.6 4.5 1.8c-1.2 1-2.8 1.5-4.5 1.5s-3.3-.5-4.5-1.5z"/>',
   fillet: '<path class="b" d="M4 20V9h6a5 5 0 0 0 5 5h5v6z"/><path d="M4 20V9h6a5 5 0 0 0 5 5h5v6z"/><path class="o" d="M10 9a5 5 0 0 0 5 5" style="fill:none;stroke:var(--orange);stroke-width:2.4"/><path d="M10 9V4h10v10" stroke-dasharray="2 2" opacity=".6"/>',
   chamfer: '<path class="b" d="M4 20V9h6l5 5h5v6z"/><path d="M4 20V9h6l5 5h5v6z"/><path d="M10 9l5 5" style="stroke:var(--orange);stroke-width:2.4"/><path d="M10 9V4h10v10" stroke-dasharray="2 2" opacity=".6"/>',
+  splitbody: '<path class="b" d="M4 8 12 4l8 4v8l-8 4-8-4z" opacity=".55"/><path d="M4 8 12 4l8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"/><path d="M2 13.5 12 9l10 4.5" stroke-dasharray="2.2 1.6"/>',
+  bendface: '<path class="b" d="M3 5h9a8 8 0 0 1 8 8v8h-5v-8a3 3 0 0 0-3-3H3z" opacity=".55"/><path d="M3 5h9a8 8 0 0 1 8 8v8h-5v-8a3 3 0 0 0-3-3H3z"/>',
   combine: '<rect class="b" x="3" y="7" width="11" height="11" rx="1"/><circle class="b2" cx="15" cy="10" r="6" opacity=".85"/><rect x="3" y="7" width="11" height="11" rx="1"/><circle cx="15" cy="10" r="6"/>',
   move: '<path d="M12 3v18M3 12h18M12 3 9.5 5.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5"/><rect class="b" x="9" y="9" width="6" height="6" rx="1"/>',
   del: '<path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/><path class="r" d="M10 11v6M14 11v6" style="stroke:var(--danger)"/>',
@@ -400,7 +402,7 @@ const bodyTint = new Map(); /* id -> 'target' | 'tool' (combine) */
 function styleBodies() {
   const hideForPreview = cmd && cmd.hideBody;
   for (const [id, e] of meshes) {
-    const visible = bodiesVisible() && isVis(id) && id !== hideForPreview;
+    const visible = bodiesVisible() && isVis(id) && id !== hideForPreview && !(cmd && cmd.hideBodies && cmd.hideBodies.has(id));
     e.mesh.visible = visible;
     const m = e.mesh.material, isSel = sel.has(id) || (cmd && cmd.highlight && cmd.highlight.has(id));
     const tint = bodyTint.get(id);
@@ -940,7 +942,7 @@ function featureTitle(i) {
   let n = 0; for (let j = 0; j <= i; j++) if (doc.features[j].type === f.type) n++;
   return Engine.FEATURE_LABEL[f.type] + ' ' + n;
 }
-const TL_ICON = { offsetface: 'pressface', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
+const TL_ICON = { offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
 function renderTimeline() {
   const tr = $('#tltrack'); tr.innerHTML = '';
   const m = viewMarker === null ? doc.marker : viewMarker;
@@ -1013,7 +1015,7 @@ document.addEventListener('pointerdown', e => { const m = $('#ctxmenu'); if (!m.
 const RIBBON = {
   solid: [
     ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'], ['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus'], ['bolt', 'Šroub'], ['nut', 'Matice']]],
-    ['Upravit', [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení'], ['combine', 'Kombinovat'], ['move', 'Přesunout', 'M'], ['rotate', 'Otočit', 'R'], ['scale', 'Měřítko'], ['center', 'Zarovnat'], ['facemode', 'Plochy', 'G'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole'], ['del', 'Odstranit', 'Del']]],
+    ['Upravit', [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení'], ['combine', 'Kombinovat'], ['splitbody', 'Rozříznout'], ['move', 'Přesunout', 'M'], ['rotate', 'Otočit', 'R'], ['scale', 'Měřítko'], ['center', 'Zarovnat'], ['facemode', 'Plochy', 'G'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole'], ['del', 'Odstranit', 'Del']]],
     ['Výběr', [['selall', 'Vybrat vše', 'Ctrl+A']]],
     ['Kontrola', [['measure', 'Měřit', 'I']]],
     ['Vložit', [['import', 'Importovat']]]
@@ -1054,6 +1056,7 @@ function runCommand(id) {
     case 'bolt': case 'nut': startFastener(id); break;
     case 'fillet': case 'chamfer': startEdgeMod(id); break;
     case 'combine': startCombine(); break;
+    case 'splitbody': startSplitBody(); break;
     case 'move': startMove(); break;
     case 'rotate': startRotate(); break;
     case 'thread': startThread(); break;
@@ -1192,6 +1195,8 @@ function editFeature(i) {
     case 'center': startCenter(i, ef); break;
     case 'offsetface': startPressFace(i, ef); break;
     case 'splitface': startSplitFace(i, ef); break;
+    case 'bendface': startBendFace(i, ef); break;
+    case 'splitbody': startSplitBody(i, ef); break;
     case 'revolve': startRevolve(i, ef); break;
     case 'mirror': startMirror(i, ef); break;
     case 'pattern': startPattern(i, ef); break;
@@ -2576,7 +2581,7 @@ function syncFaceBar() {
   if (key === faceBarKey) return;
   faceBarKey = key; bar.hidden = !show; document.body.classList.toggle('has-facebar', !!show); if (!show) { bar.innerHTML = ''; return; }
   const pl = selFace.kind === 'plane', acts = pl
-    ? [['ext', 'Vysunout', 'extrude'], ['press', 'Posunout plochu', 'pressface'], ['split', 'Rozdělit plochu', 'splitface'], ['al', 'Zarovnat k…', 'center'], ['sk', 'Skica z plochy', 'sketchi'], ['esk', 'Prázdná skica', 'sketch']]
+    ? [['ext', 'Vysunout', 'extrude'], ['press', 'Posunout plochu', 'pressface'], ['split', 'Rozdělit plochu', 'splitface'], ['bend', 'Ohnout', 'bendface'], ['al', 'Zarovnat k…', 'center'], ['sk', 'Skica z plochy', 'sketchi'], ['esk', 'Prázdná skica', 'sketch']]
     : [['press', selFace.cyl.internal ? 'Průměr otvoru' : 'Změnit průměr', 'pressface'], ['al', 'Zarovnat k…', 'center'], ['thr', 'Závit', 'thread']];
   bar.innerHTML = `<span class="fb-t"></span><div class="fb-a">${acts.map(([k, l, ic]) => `<button class="fb-b" data-fb="${k}"><span class="ico">${svg(ic, 18)}</span>${l}</button>`).join('')}<button class="ibtn" data-fb="x" aria-label="Zrušit výběr plochy" title="Zrušit výběr plochy">${svg('close', 16)}</button></div>`;
   $('.fb-t', bar).textContent = faceText(selFace);
@@ -2587,6 +2592,7 @@ document.addEventListener('click', e => {
   if (k === 'ext') extrudeFace();
   else if (k === 'press') startPressFace();
   else if (k === 'split') startSplitFace(undefined, undefined, s);
+  else if (k === 'bend') startBendFace(undefined, undefined, s);
   else if (k === 'sk') faceToSketch();
   else if (k === 'esk') enterSketch({ id: newId(), type: 'sketch', name: 'Skica ' + (doc.features.filter(x => x.type === 'sketch').length + 1), plane: Engine.basisFromPlane(s.n, s.w), ents: [] }, null);
   else if (k === 'thr') { startThread(); if (cmd && cmd.setFace) cmd.setFace(s.bodyId, s.cyl); }
@@ -2624,6 +2630,7 @@ function faceContext(e) {
     ['Vysunout (nové těleso, přidat nebo vyříznout)…', () => extrudeFace(), selFace.kind !== 'plane'],
     [selFace.kind === 'cyl' ? (selFace.cyl.internal ? 'Změnit průměr otvoru…' : 'Změnit průměr…') : 'Posunout plochu (vysunout / zapustit)…', () => startPressFace()],
     ['Rozdělit plochu čarou…', () => startSplitFace(undefined, undefined, selFace), selFace.kind !== 'plane'],
+    ['Ohnout plochu kolem hrany…', () => startBendFace(undefined, undefined, selFace), selFace.kind !== 'plane'],
     ['Skica z plochy (Ctrl+D)', () => faceToSketch(), selFace.kind !== 'plane'],
     ['Nová prázdná skica na ploše', () => { const s = selFace; enterSketch({ id: newId(), type: 'sketch', name: 'Skica ' + (doc.features.filter(x => x.type === 'sketch').length + 1), plane: Engine.basisFromPlane(s.n, s.w), ents: [] }, null); }, selFace.kind !== 'plane'],
     ['Závit na této ploše…', () => { const s = selFace; startThread(); if (cmd && cmd.setFace) cmd.setFace(s.bodyId, s.cyl); }, selFace.kind !== 'cyl'],
@@ -2723,6 +2730,225 @@ function startPressFace(editIndex, f) {
     ok() { if (!this.result) return null; const o = this.feature(); o.id = f ? f.id : newId(); return o; },
     after() { selFace = null; drawFaces(); },
     cleanup() { clearTimeout(this.timer); this.hideBody = null; }
+  };
+  beginCmd(c); c.init();
+}
+
+/* ================= bend a face about one of its edges ================= */
+/* straight pieces of the outline of a (part of a) planar face, as [a, b] world points */
+function faceEdgesOf(regionPolys) {
+  const out = [];
+  for (const loop of K.faceLoops(regionPolys, regionPolys.map((_, i) => i))) {
+    const n = loop.length; if (n < 3) continue;
+    const dir = (a, b) => K.vnorm(K.vsub(b, a));
+    const corner = []; for (let i = 0; i < n; i++) { const a = loop[(i - 1 + n) % n], b = loop[i], c = loop[(i + 1) % n]; if (K.vdot(dir(a, b), dir(b, c)) < 1 - 1e-6) corner.push(i); }
+    for (let k = 0; k < corner.length; k++) { const a = loop[corner[k]], b = loop[corner[(k + 1) % corner.length]]; if (K.vdot(K.vsub(b, a), K.vsub(b, a)) > 1e-6) out.push([a, b]); }
+  }
+  return out;
+}
+function startBendFace(editIndex, f, face) {
+  const R = TOUCH ? 24 : 14, r6 = x => Math.round(x * 1e6) / 1e6, r4 = x => Math.round(x * 1e4) / 1e4;
+  const c = {
+    editIndex, body: f ? f.body : null, desc: f ? { n: f.n, w: f.w, p: f.p, ...(f.clip ? { clip: f.clip } : {}) } : null,
+    axis: f ? { a: f.axis.a.slice(), b: f.axis.b.slice() } : null, angle: f ? f.angle : 90, radius: f ? (f.radius || 0) : 0,
+    edges: [], hoverEdge: -1, timer: null, tool: null, hideBody: null,
+    init() {
+      if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
+      openDialog({
+        title: 'Ohnout plochu', icon: 'bendface',
+        fields: [{ k: 'sel', id: 'face', label: 'Plocha' }, { k: 'sel', id: 'axis', label: 'Osa ohybu' },
+          { k: 'num', id: 'angle', label: 'Úhel', unit: '°', value: this.angle }, { k: 'num', id: 'radius', label: 'Poloměr ohybu', value: this.radius }, { k: 'note', id: 'n' }],
+        onChange: id => {
+          if (id === 'angle') { const v = dlg.get('angle'); if (isFinite(v)) this.angle = v; }
+          if (id === 'radius') { const v = dlg.get('radius'); if (v >= 0) this.radius = v; }
+          this.update();
+        }
+      });
+      if (!f && face && face.kind === 'plane') this.useFace(face, true); else this.loadEdges(); 
+      this.update();
+    },
+    regionPolys() {
+      const b = cur.bodies.find(x => x.id === this.body); if (!b || !this.desc) return null;
+      const g = K.planarFace(b.polys, this.desc.n, this.desc.w, this.desc.p); if (!g) return null;
+      return this.desc.clip ? Engine.clipRegion(b.polys, g, this.desc.clip) : g.map(i => b.polys[i]);
+    },
+    loadEdges() { const rp = this.regionPolys(); this.edges = rp ? faceEdgesOf(rp) : []; },
+    useFace(fc, first) {
+      this.body = fc.bodyId; this.desc = { n: fc.n.map(r6), w: r6(fc.w), p: fc.p.map(r4), ...(fc.clip ? { clip: fc.clip } : {}) };
+      this.loadEdges();
+      /* default axis: the lowest edge (a bend downwards), the longer one when two are equally low */
+      let best = null, bk = Infinity;
+      for (const [a, b] of this.edges) { const z = (a[2] + b[2]) / 2, L = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), key = Math.round(z * 1e3) * 1e6 - L; if (key < bk) { bk = key; best = [a, b]; } }
+      this.axis = best ? { a: best[0].map(r4), b: best[1].map(r4) } : null;
+      if (!first) this.update();
+    },
+    feature() { return { id: f ? f.id : 'tmp', type: 'bendface', body: this.body, ...this.desc, axis: this.axis, angle: this.angle, radius: this.radius }; },
+    update() {
+      clearGroup(G.overlay);
+      const has = !!this.desc, L = this.axis ? Math.hypot(...[0, 1, 2].map(k => this.axis.b[k] - this.axis.a[k])) : 0;
+      dlg.set('face', { text: has ? 'Rovinná plocha' : 'Klepněte na rovinnou plochu', has, active: !has });
+      dlg.set('axis', { text: this.axis ? `Hrana ${fmtc(L, 2)} mm` : 'Klepněte na hranu plochy', has: !!this.axis, active: has });
+      setPrompt(!has ? 'Klepněte na rovinnou plochu, kterou chcete ohnout' : 'Klepnutím na jinou hranu plochy změníte osu ohybu');
+      if (has) {
+        const rp = this.regionPolys(); if (rp) G.overlay.add(faceOverlay(rp, planeKey(rp[0]), tok.accent, 0.2));
+        const seg = [];
+        this.edges.forEach(([a, b], i) => { if (i === this.hoverEdge) seg.push(...a, ...b); });
+        if (seg.length) { const l = noRay(new THREE.LineSegments(lineGeo(seg), new THREE.LineBasicMaterial({ color: tok.accent, depthTest: false, transparent: true }))); l.renderOrder = 12; G.overlay.add(l); }
+        if (this.axis) { const l = noRay(new THREE.LineSegments(lineGeo([...this.axis.a, ...this.axis.b]), new THREE.LineBasicMaterial({ color: tok.orange, depthTest: false, transparent: true }))); l.renderOrder = 13; G.overlay.add(l); G.overlay.add(mpts([v3(this.axis.a), v3(this.axis.b)], tok.orange, 8)); }
+      }
+      this.schedule();
+    },
+    schedule() {
+      clearTimeout(this.timer); clearGroup(G.preview); this.tool = null;
+      if (!this.desc || !this.axis) { dlg.set('n', this.desc ? 'Klepněte na hranu plochy, kolem které se má plocha ohnout.' : 'Vyberte rovinnou stěnu tělesa, třeba čelo hranolu.'); dlg.okEnabled(false); requestRender(); return; }
+      dlg.set('n', 'Počítám náhled…'); dlg.okEnabled(false);
+      this.timer = setTimeout(() => {
+        if (cmd !== this) return;
+        try {
+          const b = cur.bodies.find(x => x.id === this.body);
+          this.tool = Engine.bendFaceTool(b.polys, this.feature());
+          G.preview.add(previewMesh(this.tool, 'join'));
+          dlg.set('n', 'Plocha se otočí kolem oranžové hrany do prostoru před sebou. Koncovou plochu pak vysunete pod úhlem (režim Plochy › Vysunout).'); dlg.okEnabled(true);
+        } catch (e) { dlg.set('n', '!' + e.message); }
+        requestRender();
+      }, 150);
+    },
+    edgeAt(ev) {
+      const [mx, my] = evPx(ev); let best = -1, bd = R;
+      this.edges.forEach(([a, b], i) => { const pa = toPx(v3(a)), pb = toPx(v3(b)); if (pa[2] >= 1 || pb[2] >= 1) return; const [d] = segDist(mx, my, pa, pb); if (d < bd) { bd = d; best = i; } });
+      return best;
+    },
+    onMove(ev) {
+      if (!this.desc) { dom.style.cursor = hitBodies(ev) ? 'pointer' : ''; return; }
+      const i = this.edgeAt(ev); dom.style.cursor = i >= 0 || hitBodies(ev) ? 'pointer' : '';
+      if (i !== this.hoverEdge) { this.hoverEdge = i; this.update(); }
+    },
+    onClick(ev) {
+      if (this.desc) { const i = this.edgeAt(ev); if (i >= 0) { const [a, b] = this.edges[i]; this.axis = { a: a.map(r4), b: b.map(r4) }; this.update(); return; } }
+      const h = hitBodies(ev), fc = h ? faceAtHit(h) : null;
+      if (!fc) return;
+      if (fc.kind !== 'plane') { toast('Ohnout lze jen rovinnou plochu.'); return; }
+      this.useFace(fc);
+    },
+    ok() {
+      /* Enter in a field confirms before the delayed preview has run: check the bend right away */
+      if (!this.tool && this.desc && this.axis) { try { const b = cur.bodies.find(x => x.id === this.body); this.tool = Engine.bendFaceTool(b.polys, this.feature()); } catch (e) { dlg.set('n', '!' + e.message); return null; } }
+      if (!this.tool) return null; const o = this.feature(); o.id = f ? f.id : newId(); return o;
+    },
+    after() { selFace = null; hoverFace = null; setTimeout(() => toast('Ohyb je hotový. Koncovou plochu vysunete v režimu Plochy: klepněte na ni a zvolte Vysunout.'), 700); },
+    cleanup() { clearTimeout(this.timer); }
+  };
+  beginCmd(c); c.init();
+}
+
+/* ================= split bodies with a plane ================= */
+const SPLIT_PLANES = { XY: [0, 0, 1], XZ: [0, 1, 0], YZ: [1, 0, 0] };
+function startSplitBody(editIndex, f) {
+  const c = {
+    editIndex, bodies: new Set(f ? (f.bodies || []) : [...sel]), mode: f ? (f.mode || 'XY') : 'XY', off: f ? (Number(f.offset) || 0) : null,
+    faceN: f && f.mode === 'face' ? f.n.slice() : null, faceW: f && f.mode === 'face' ? Number(f.w) - (Number(f.offset) || 0) : 0,
+    keep: f ? (f.keep || 'both') : 'both', pick: 'bodies', timer: null, ok_: false, hideBodies: new Set(), highlight: new Set(),
+    ids() { return [...this.bodies].filter(id => meshes.has(id)); },
+    init() {
+      if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
+      if (this.off === null) this.off = this.centerOff();
+      openDialog({
+        title: 'Rozříznout', icon: 'splitbody',
+        fields: [{ k: 'sel', id: 'bodies', label: 'Tělesa' },
+          { k: 'opt', id: 'mode', label: 'Řezná rovina', options: [['XY', 'Rovina XY (vodorovně)'], ['XZ', 'Rovina XZ (zepředu)'], ['YZ', 'Rovina YZ (zboku)'], ['face', 'Rovina plochy tělesa']], value: this.mode },
+          { k: 'sel', id: 'plane', label: 'Plocha' },
+          { k: 'num', id: 'off', label: 'Odsazení', value: this.off },
+          { k: 'seg', id: 'keep', label: 'Ponechat', options: [['both', 'Obě části'], ['pos', 'Nad rovinou'], ['neg', 'Pod rovinou']], value: this.keep },
+          { k: 'note', id: 'n' }],
+        onSel: id => { this.pick = id; this.update(); },
+        onChange: id => {
+          if (id === 'mode') { this.mode = dlg.get('mode'); if (this.mode === 'face') { if (!this.faceN) this.pick = 'plane'; this.off = 0; } else { this.off = this.centerOff(); } dlg.set('off', this.off); }
+          if (id === 'off') { const v = dlg.get('off'); if (isFinite(v)) this.off = v; }
+          if (id === 'keep') this.keep = dlg.get('keep');
+          this.update();
+        }
+      });
+      this.update();
+    },
+    /* principal planes start in the middle of the selection (cuts it in half) */
+    centerOff() {
+      const n = SPLIT_PLANES[this.mode] || [0, 0, 1], ids = this.ids(); if (!ids.length) return 0;
+      const bb = K.bbox(cur.bodies.filter(b => ids.includes(b.id)).flatMap(b => b.polys)), k = n.indexOf(1);
+      return Math.round((bb.min[k] + bb.max[k]) / 2 * 1000) / 1000;
+    },
+    plane() {
+      if (this.mode === 'face') return this.faceN ? { n: this.faceN, w: this.faceW + this.off } : null;
+      return { n: SPLIT_PLANES[this.mode], w: this.off };
+    },
+    update() {
+      const ids = this.ids(), pl = this.plane();
+      this.highlight = new Set(ids);
+      dlg.set('bodies', { ...bodySelText(new Set(ids)), active: this.pick === 'bodies' });
+      dlg.show('plane', this.mode === 'face');
+      dlg.set('plane', { text: this.faceN ? 'Rovinná plocha' : 'Klepněte na rovinnou plochu', has: !!this.faceN, active: this.pick === 'plane' });
+      setPrompt(this.pick === 'plane' ? 'Klepněte na rovinnou plochu, jejíž rovina těleso rozřízne' : 'Klepnutím na tělesa vyberte, co rozříznout');
+      clearGroup(G.overlay);
+      if (pl && ids.length) {
+        /* the cutting plane as a translucent square around the selection */
+        const bb = K.bbox(cur.bodies.filter(b => ids.includes(b.id)).flatMap(b => b.polys)), D = Math.hypot(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]) * 0.65 + 2;
+        const B = Engine.basisFromPlane(pl.n, pl.w), cc = [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2), d = K.vsub(cc, B.o), cu = K.vdot(d, B.u), cv = K.vdot(d, B.v);
+        const P = (x, y) => K.vadd(B.o, K.vadd(K.vmul(B.u, x), K.vmul(B.v, y)));
+        const q = [P(cu - D, cv - D), P(cu + D, cv - D), P(cu + D, cv + D), P(cu - D, cv + D)];
+        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([...q[0], ...q[1], ...q[2], ...q[0], ...q[2], ...q[3]], 3));
+        const m = noRay(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: tok.orange, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false })));
+        m.renderOrder = 4; G.overlay.add(m);
+        G.overlay.add(noRay(new THREE.LineLoop(lineGeo([...q[0], ...q[1], ...q[2], ...q[3]]), new THREE.LineBasicMaterial({ color: tok.orange }))));
+      }
+      this.schedule();
+      styleBodies();
+    },
+    schedule() {
+      clearTimeout(this.timer); clearGroup(G.preview); this.ok_ = false; this.hideBodies = new Set();
+      const ids = this.ids(), pl = this.plane();
+      if (!ids.length || !pl) { dlg.set('n', !ids.length ? 'Vyberte tělesa, která chcete rozříznout.' : 'Vyberte plochu, podle které se má řezat.'); dlg.okEnabled(false); requestRender(); return; }
+      dlg.set('n', 'Počítám náhled…'); dlg.okEnabled(false);
+      this.timer = setTimeout(() => { if (cmd === this) this.compute(); }, 150);
+    },
+    compute() {
+        clearTimeout(this.timer); clearGroup(G.preview); this.hideBodies = new Set();
+        const ids = this.ids(), pl = this.plane(); if (!ids.length || !pl) return false;
+        let cut = 0;
+        for (const b of cur.bodies.filter(x => ids.includes(x.id))) {
+          const hs = Engine.halfSpace(pl.n, pl.w, K.bbox(b.polys)), pos = K.boolean(b.polys, hs, 'intersect'), neg = K.boolean(b.polys, hs, 'subtract');
+          if (!pos.length || !neg.length || Math.abs(K.signedVolume(pos)) < 1e-6 || Math.abs(K.signedVolume(neg)) < 1e-6) continue;
+          cut++; this.hideBodies.add(b.id);
+          /* the part that stays is shown like the body, the part that goes away in red */
+          G.preview.add(previewMesh(pos, this.keep === 'neg' ? 'cut' : 'join'));
+          G.preview.add(previewMesh(neg, this.keep === 'pos' ? 'cut' : 'intersect'));
+        }
+        styleBodies();
+        if (!cut) { dlg.set('n', '!Rovina řezu žádné vybrané těleso neprotíná.'); }
+        else { this.ok_ = true; dlg.set('n', this.keep === 'both' ? `Rozřízne se ${plural(cut, 'těleso', 'tělesa', 'těles')}, z každého vzniknou dvě (modře a oranžově).` : 'Červeně je část, která se odstraní.'); }
+        dlg.okEnabled(this.ok_); requestRender();
+        return this.ok_;
+    },
+    onMove(ev) { dom.style.cursor = hitBodies(ev) ? 'pointer' : ''; },
+    onClick(ev) {
+      const h = hitBodies(ev); if (!h) return;
+      if (this.mode === 'face' && this.pick === 'plane') {
+        const fc = faceAtHit(h);
+        if (!fc || fc.kind !== 'plane') { toast('Vyberte rovinnou plochu.'); return; }
+        this.faceN = fc.n.map(v => Math.round(v * 1e6) / 1e6); this.faceW = Math.round(fc.w * 1e5) / 1e5;
+        if (!this.ids().length) this.bodies.add(fc.bodyId);
+        this.pick = 'bodies'; this.update(); return;
+      }
+      const id = h.object.userData.bodyId;
+      if (this.bodies.has(id)) this.bodies.delete(id); else this.bodies.add(id);
+      if (this.mode !== 'face' && this.bodies.size === 1 && this.off === 0) { this.off = this.centerOff(); dlg.set('off', this.off); }
+      if (this.mode === 'face' && !this.faceN) this.pick = 'plane';
+      this.update();
+    },
+    ok() {
+      if (!this.ok_ && !this.compute()) return null;
+      const pl = this.plane(), r6 = x => Math.round(x * 1e6) / 1e6;
+      return { id: f ? f.id : newId(), type: 'splitbody', bodies: this.ids(), mode: this.mode, offset: this.off, n: pl.n.map(r6), w: r6(pl.w), keep: this.keep };
+    },
+    cleanup() { clearTimeout(this.timer); this.hideBodies = new Set(); this.highlight = null; }
   };
   beginCmd(c); c.init();
 }
