@@ -394,21 +394,22 @@ function toolForFastener(f) {
       const w = Math.max(0.6, s * 0.13) + tol, l = s * 0.6, dep = Math.min(hk * 0.6, hk - 0.4);
       polys = KK.boolean(polys, KK.boolean(slotBox(w, l, dep, false), slotBox(w, l, dep, true), 'union'), 'subtract');
     }
+    if (f.chamfer !== false) {
+      /* 45° lead-in at the tip, down to the thread root diameter (cut before the thread: cleaner mesh) */
+      const T = hk + L, c = Math.min(P, L / 3), rm = thread ? Math.max(0.3, de / 2 - 0.6134 * P) : Math.max(0.3, r - c), R = rm + c;
+      const keep = KK.translate(KK.primitive('cone', { r: R, h: R }), [0, 0, T - c + R / 2]);
+      const ring = KK.boolean(cylAlong([0, 0, T - c], [0, 0, 1], r + 1, c + 1), keep, 'subtract');
+      polys = KK.boolean(polys, ring, 'subtract');
+    }
     /* thread undercut (DIN 76 style): a short plain neck below the head, slightly under the thread root diameter */
     const g = thread && f.undercut ? Math.min(2.5 * P, L / 3) : 0;
     if (thread) {
-      const tl = Math.min(L - g, Number(f.tlen) > 0 ? Number(f.tlen) : L);
+      /* the thread stops 0.05 mm short of the head: ending exactly on the head face left slivers in the mesh */
+      const tl = Math.min(L - g, Number(f.tlen) > 0 ? Number(f.tlen) : L, L - 0.05);
       if (tl >= P / 2) polys = KK.boolean(polys, threadTool({ pitch: P, size: de, r, len: L, start: 0, length: tl, fromEnd: true, ax: [0, 0, 1], c: [0, 0, hk] }), 'subtract');
     }
     if (g > 0) {
       const rg = Math.max(0.3, de / 2 - 0.6134 * P - 0.1), ring = KK.boolean(cylAlong([0, 0, hk], [0, 0, 1], r + 1, g), cylAlong([0, 0, hk - 0.5], [0, 0, 1], rg, g + 1), 'subtract');
-      polys = KK.boolean(polys, ring, 'subtract');
-    }
-    if (f.chamfer !== false) {
-      /* 45° lead-in at the tip, down to the thread root diameter */
-      const T = hk + L, c = Math.min(P, L / 3), rm = thread ? Math.max(0.3, de / 2 - 0.6134 * P) : Math.max(0.3, r - c), R = rm + c;
-      const keep = KK.translate(KK.primitive('cone', { r: R, h: R }), [0, 0, T - c + R / 2]);
-      const ring = KK.boolean(cylAlong([0, 0, T - c], [0, 0, 1], r + 1, c + 1), keep, 'subtract');
       polys = KK.boolean(polys, ring, 'subtract');
     }
   } else {

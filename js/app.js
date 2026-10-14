@@ -176,6 +176,17 @@ const planeMeshes = PLANE_DEFS.map(([name, col]) => {
 function planeMatrix(P) { const m = new THREE.Matrix4(); m.makeBasis(v3(P.u), v3(P.v), v3(P.n)); m.setPosition(v3(P.o)); return m; }
 const P3 = (P, x, y, z = 0) => new V3(P.o[0] + P.u[0] * x + P.v[0] * y + P.n[0] * z, P.o[1] + P.u[1] * x + P.v[1] * y + P.n[1] * z, P.o[2] + P.u[2] * x + P.v[2] * y + P.n[2] * z);
 const P2 = (P, p) => { const d = [p.x - P.o[0], p.y - P.o[1], p.z - P.o[2]]; return [d[0] * P.u[0] + d[1] * P.u[1] + d[2] * P.u[2], d[0] * P.v[0] + d[1] * P.v[1] + d[2] * P.v[2]]; };
+/* sketch plane on a body face: origin in the middle of the face (centre of its bounding box in the plane), so the grid
+   and the sketch coordinates start at the face centre and not where the world origin projects onto the plane */
+function facePlane(n, w, regionPolys) {
+  const B = Engine.basisFromPlane(n, w), r = a => a.map(x => Math.round(x * 1e6) / 1e6);
+  if (!regionPolys || !regionPolys.length) return { o: r(B.o), u: r(B.u), v: r(B.v), n: r(B.n) };
+  let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+  for (const q of regionPolys) for (const p of q.v) { const d = K.vsub(p, B.o), a = K.vdot(d, B.u), b = K.vdot(d, B.v); u0 = Math.min(u0, a); u1 = Math.max(u1, a); v0 = Math.min(v0, b); v1 = Math.max(v1, b); }
+  const r4 = x => Math.round(x * 1e4) / 1e4, cu = r4((u0 + u1) / 2), cv = r4((v0 + v1) / 2);
+  const o = K.vadd(B.o, K.vadd(K.vmul(B.u, cu), K.vmul(B.v, cv)));
+  return { o: o.map(x => Math.round(x * 1e4) / 1e4), u: r(B.u), v: r(B.v), n: r(B.n) };
+}
 function planeFromPoly(p) {
   const n = p.n, o = [n[0] * p.w, n[1] * p.w, n[2] * p.w];
   let u, v;
@@ -1241,7 +1252,8 @@ function startSketchCmd() {
       if (hb && (!hp || hb.distance <= hp.distance + 1e-6)) {
         const { pi, poly } = polyOfHit(hb), polys = hb.object.userData.polys;
         if (smoothFor(polys)[pi]) return { bad: true };
-        return { face: true, plane: planeFromPoly(poly), polys, key: planeKey(poly) };
+        const cen = poly.v.reduce((a, v) => K.vadd(a, K.vmul(v, 1 / poly.v.length)), [0, 0, 0]), g = K.planarFace(polys, poly.n, poly.w, cen);
+        return { face: true, plane: facePlane(poly.n, poly.w, g ? g.map(i => polys[i]) : [poly]), polys, key: planeKey(poly) };
       }
       if (hp) return { plane: hp.object.userData.plane, mesh: hp.object };
       return null;
@@ -2601,7 +2613,7 @@ document.addEventListener('click', e => {
   else if (k === 'split') startSplitFace(undefined, undefined, s);
   else if (k === 'bend') startBendFace(undefined, undefined, s);
   else if (k === 'sk') faceToSketch();
-  else if (k === 'esk') enterSketch({ id: newId(), type: 'sketch', name: 'Skica ' + (doc.features.filter(x => x.type === 'sketch').length + 1), plane: Engine.basisFromPlane(s.n, s.w), ents: [] }, null);
+  else if (k === 'esk') enterSketch({ id: newId(), type: 'sketch', name: 'Skica ' + (doc.features.filter(x => x.type === 'sketch').length + 1), plane: facePlane(s.n, s.w, facePolys(s)), ents: [] }, null);
   else if (k === 'thr') { startThread(); if (cmd && cmd.setFace) cmd.setFace(s.bodyId, s.cyl); }
   else if (k === 'al') { setFaceMode(false, true); startCenter(undefined, undefined, { face: s }); }
   else if (k === 'x') { selFace = null; drawFaces(); updateInfo(); }
@@ -2639,7 +2651,7 @@ function faceContext(e) {
     ['Rozdělit plochu čarou…', () => startSplitFace(undefined, undefined, selFace), selFace.kind !== 'plane'],
     ['Ohnout plochu kolem hrany…', () => startBendFace(undefined, undefined, selFace), selFace.kind !== 'plane'],
     ['Skica z plochy (Ctrl+D)', () => faceToSketch(), selFace.kind !== 'plane'],
-    ['Nová prázdná skica na ploše', () => { const s = selFace; enterSketch({ id: newId(), type: 'sketch', name: 'Skica ' + (doc.features.filter(x => x.type === 'sketch').length + 1), plane: Engine.basisFromPlane(s.n, s.w), ents: [] }, null); }, selFace.kind !== 'plane'],
+    ['Nová prázdná skica na ploše', () => { const s = selFace; enterSketch({ id: newId(), type: 'sketch', name: 'Skica ' + (doc.features.filter(x => x.type === 'sketch').length + 1), plane: facePlane(s.n, s.w, facePolys(s)), ents: [] }, null); }, selFace.kind !== 'plane'],
     ['Závit na této ploše…', () => { const s = selFace; startThread(); if (cmd && cmd.setFace) cmd.setFace(s.bodyId, s.cyl); }, selFace.kind !== 'cyl'],
     ['Zarovnat k jiné ploše…', () => { const s = selFace; setFaceMode(false, true); startCenter(undefined, undefined, { face: s }); }],
     null,
@@ -2659,9 +2671,8 @@ function extrudeFace() {
 }
 /* copy a planar face outline into a new sketch on the same plane (circles stay circles, so their size is editable) */
 function faceSketch(s) {
-  const B = Engine.basisFromPlane(s.n, s.w), r4 = x => Math.round(x * 1e4) / 1e4;
+  const fp = facePolys(s), B = facePlane(s.n, s.w, fp), r4 = x => Math.round(x * 1e4) / 1e4;
   const ents = [];
-  const fp = facePolys(s);
   for (const loop of K.faceLoops(fp, fp.map((_, i) => i))) {
     let pts = loop.map(q => { const d = K.vsub(q, B.o); return [K.vdot(d, B.u), K.vdot(d, B.v)]; });
     /* drop collinear points */

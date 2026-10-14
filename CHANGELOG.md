@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 0.80
+- Skica na ploše tělesa (Vytvořit skicu, Skica z plochy, Prázdná skica, i na části rozdělené plochy): počátek skici a mřížky je uprostřed plochy, ne v průmětu počátku souřadnic (u těles mimo počátek ležel na kraji plochy nebo mimo ni). Souřadnice a přichytávání k mřížce se tak počítají od středu plochy.
+- Kontrola modelů: krychle, válec, koule, kužel, torus, šroub i matice mají střed podstavy v počátku, uzavřenou síť a správný objem.
+- Šroub: čistší síť. Závit končí 0,05 mm před hlavou (dřív končil přesně na ploše hlavy a vznikaly drobné vady sítě) a zkosení hrotu se vyřízne před závitem. U matic se závitem zůstává pár drobných vad sítě v zahloubení, slicery je opraví automaticky.
+
 ## Beta 0.79
 - Plochy: oprava výběru válcové plochy vedle ohybu nebo jiné zakřivené plochy. Výběr „přetékal“ do sousední plochy (pruh v ohybu), takže nesouhlasila ani délka plochy. Teď se vybere jen samotný válec (stejná vzdálenost stěn od osy), délka i průměr odpovídají.
 
