@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.78
+- Drátový model ukazuje celou síť tělesa (všechny trojúhelníky slabou čarou, ostré hrany výrazně), takže jsou vidět i zakřivené plochy, ne jen základní obrysy.
+
 ## Beta 0.77
 - Ohnout plochu: místo hrany se volí směr ohybu. Tlačítka nesou názvy os (+X, +Y, −X, −Y, u svislých ploch +Z/−Z) a posuvník Natočení směru (0–360°) dovolí ohnout libovolným směrem. Osa ohybu leží na okraji plochy v tomto směru, takže se u válce ohyb už nenatáčí kolem osy Z podle náhodné plošky kružnice. Klepnutí na hranu plochy nastaví směr kolmo k ní.
 - Ohnout plochu: úhel (1–180°) a poloměr ohybu (0–20 mm) mají posuvník, výchozí poloměr je 2 mm. U zaoblených ploch okno upozorní, když je poloměr menší než 1 mm (ohyb se pak na vnitřní straně zúží do bodu).

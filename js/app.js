@@ -409,9 +409,12 @@ function styleBodies() {
     m.color.copy(tok.body);
     if (tint === 'tool') m.color.lerp(tok.orange, 0.5);
     else if (isSel || tint === 'target') m.color.lerp(tok.accent, 0.45);
-    m.wireframe = false;
-    m.visible = settings.style !== 'w';
-    m.transparent = false; m.opacity = 1;
+    /* wireframe: the whole triangle mesh as thin lines (so curved faces show their shape too), sharp edges drawn over it */
+    const wire = settings.style === 'w';
+    m.wireframe = wire;
+    m.visible = true;
+    if (wire) { m.color.lerp(tok.edge, 0.55); m.transparent = true; m.opacity = 0.6; m.depthWrite = false; }
+    else { m.transparent = false; m.opacity = 1; m.depthWrite = true; }
     e.edges.visible = settings.style !== 's';
     /* sharp edges are drawn softly (a shade darker than the body); selection and hover keep strong colours */
     const strong = isSel || tint || hoverBody === id;
