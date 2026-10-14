@@ -2479,7 +2479,7 @@ function startFastener(type, editIndex, f) {
   const bolt = type === 'bolt', pivot = new THREE.Object3D(); scene.add(pivot);
   const c = {
     editIndex, tool: null, gizmoDrag: false, timer: null,
-    v: f ? { size: f.size, len: f.len, head: f.head || 'hex', thread: f.thread !== false, chamfer: f.chamfer !== false, undercut: !!f.undercut, tlen: f.tlen || 0, tol: f.tol != null ? f.tol : 0.2 } : { size: 6, len: 20, head: 'hex', thread: true, chamfer: true, undercut: false, tlen: 0, tol: 0.2 },
+    v: f ? { size: f.size, len: f.len, head: f.head || 'hex', thread: f.thread !== false, chamfer: f.chamfer !== false, undercut: !!f.undercut, tlen: f.tlen || 0, tol: f.tol != null ? f.tol : (bolt ? TOL_BOLT : TOL_NUT) } : { size: 6, len: 20, head: 'hex', thread: true, chamfer: true, undercut: false, tlen: 0, tol: bolt ? TOL_BOLT : TOL_NUT },
     pos: f ? f.pos.slice() : [0, 0, 0], op: f ? f.op : 'new', autoOp: false,
     init() {
       const sizes = FAST_SIZES.map(d => [String(d), 'M' + fmtc(d, 1)]);
@@ -3838,11 +3838,13 @@ function cylinderAt(polys, pi) {
   if (axis[dom3] < 0) { cOut = K.vadd(base, K.vmul(axis, t1 - t0)); aOut = K.vmul(axis, -1); }
   return { c: cOut.map(r6), ax: aOut.map(r6), r: r6(r), len: r6(t1 - t0), internal, group };
 }
+/* default 3D-print clearances on the diameter, from print tests: bolt / pin 0.15 mm, nut / hole 0.35 mm */
+const TOL_BOLT = 0.15, TOL_NUT = 0.35;
 const threadLabel = (d, p) => `M${fmtc(d, 1)} × ${fmtc(p, 2)}`;
 function startThread(editIndex, f) {
   const c = {
     editIndex, body: f ? f.body : null, face: f ? { c: f.c, ax: f.ax, r: f.r, len: f.len, internal: f.internal } : null,
-    size: f ? f.size : 10, pitch: f ? f.pitch : 1.5, left: f ? !!f.left : false, full: f ? f.full !== false : true, tol: f ? (Number(f.tol) || 0) : 0.2,
+    size: f ? f.size : 10, pitch: f ? f.pitch : 1.5, left: f ? !!f.left : false, full: f ? f.full !== false : true, tol: f ? (Number(f.tol) || 0) : TOL_BOLT, tolSet: !!f,
     length: f ? (f.length || 10) : 10, start: f ? (f.start || 0) : 0, fromEnd: f ? !!f.fromEnd : false,
     hover: null, timer: null, tool: null, handles: [], hgrp: null, drag: null, hoverH: null,
     init() {
@@ -3862,7 +3864,7 @@ function startThread(editIndex, f) {
           if (id === 'size') { this.size = parseFloat(dlg.get('size')); const t = Engine.THREADS.find(x => x[0] === this.size); if (t) { this.pitch = t[1]; dlg.set('pitch', t[1]); } }
           else if (id === 'pitch') { const v = dlg.get('pitch'); if (v > 0) this.pitch = v; }
           else if (id === 'hand') this.left = dlg.get('hand') === 'l';
-          else if (id === 'tol') { const v = dlg.get('tol'); if (v >= 0 && v <= 1) this.tol = v; }
+          else if (id === 'tol') { const v = dlg.get('tol'); if (v >= 0 && v <= 1) { this.tol = v; this.tolSet = true; } }
           else if (id === 'full') this.full = dlg.get('full');
           else if (id === 'from') this.fromEnd = dlg.get('from') === 'b';
           else if (id === 'length') { const v = dlg.get('length'); if (v > 0) { this.length = v; this.full = false; dlg.set('full', false); } }
@@ -3884,6 +3886,8 @@ function startThread(editIndex, f) {
       this.body = bodyId; this.face = { c: cyl.c, ax: cyl.ax, r: cyl.r, len: cyl.len, internal: cyl.internal };
       const s = Engine.suggestThread(cyl.r, cyl.internal); this.size = s.d; this.pitch = s.p;
       dlg.set('size', String(s.d)); dlg.set('pitch', s.p);
+      /* default clearance by kind: a hole (nut side) needs more than a pin (bolt side) */
+      if (!this.tolSet) { this.tol = cyl.internal ? TOL_NUT : TOL_BOLT; dlg.set('tol', this.tol); }
       if (this.start > cyl.len) { this.start = 0; dlg.set('start', 0); }
       this.update();
     },

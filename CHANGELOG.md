@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 0.94
+- Výchozí vůle pro 3D tisk podle tiskového testu: šroub 0,15 mm, matice 0,35 mm.
+- Příkaz Závit nastaví vůli podle vybrané plochy: čep 0,15 mm, díra 0,35 mm. Ručně zadaná hodnota se nepřepisuje a uložené prvky si vůli ponechávají.
+
 ## Beta 0.93
 - Skica: u vybrané čáry se už nezobrazují rámečky s délkou a úhlem. Při zapnutých kótách jsou délky v kótách a u otevřené čáry je v kótě i úhel (oblouk od osy X). Při vypnutých kótách se rámečky ukazují dál.
 - Při tažení za táhla tvaru se rámeček s rozměrem při zapnutých kótách neukazuje, kóty se mění přímo.
