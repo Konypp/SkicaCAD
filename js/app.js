@@ -694,6 +694,21 @@ function updateSketchDims() {
     out.push(hit(ed, tx, E[1], label, 0, an), text(tx, E[1], label, 0, an));
   };
   const rot = (cx, cy, a, x, y) => [cx + x * Math.cos(a) - y * Math.sin(a), cy + x * Math.sin(a) + y * Math.cos(a)];
+  /* angle of segment a→b against the sketch X axis: dashed reference line, arc and the value */
+  const angleDim = (a, b) => {
+    const A = px(a[0], a[1]), B = px(b[0], b[1]), X = px(a[0] + 1, a[1]); if (!ok(A, B, X)) return;
+    const sl = Math.hypot(B[0] - A[0], B[1] - A[1]); if (sl < 24) return;
+    const r = [X[0] - A[0], X[1] - A[1]], rl = Math.hypot(r[0], r[1]); if (rl < 1e-6) return;
+    const a0 = Math.atan2(r[1], r[0]), a1 = Math.atan2(B[1] - A[1], B[0] - A[0]);
+    let da = a1 - a0; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI;
+    const R = Math.min(30, sl * 0.6), L = R + 10, n = Math.max(2, Math.ceil(Math.abs(da) / 0.15));
+    let path = `M${A[0]},${A[1]}L${A[0] + Math.cos(a0) * L},${A[1] + Math.sin(a0) * L}`;
+    out.push(`<path d="${path}" stroke-dasharray="3 2"/>`);
+    let arc = ''; for (let j = 0; j <= n; j++) { const t = a0 + da * j / n; arc += (j ? 'L' : 'M') + (A[0] + Math.cos(t) * R) + ',' + (A[1] + Math.sin(t) * R); }
+    out.push(`<path d="${arc}"/>`);
+    const deg = dirAngle(a, b), shown = deg > 180 ? deg - 360 : deg, tm = a0 + da / 2;
+    out.push(text(A[0] + Math.cos(tm) * (R + 12), A[1] + Math.sin(tm) * (R + 12), fmtc(shown, 1) + '°'));
+  };
   /* sketch made from a face: how far each outline has moved from where it was on the face */
   if (sk.f.orig) {
     const cen = e => { const pl = entityPolylines([e])[0]; if (!pl || !pl.pts.length) return null; let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const q of pl.pts) { x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[0]); y1 = Math.max(y1, q[1]); } return [(x0 + x1) / 2, (y0 + y1) / 2]; };
@@ -734,6 +749,10 @@ function updateSketchDims() {
       const n = e.pts.length, segs = e.closed ? n : n - 1; if (segs > 40 || n < 2) continue;
       const c = e.pts.reduce((s, q) => [s[0] + q[0] / n, s[1] + q[1] / n], [0, 0]);
       for (let k = 0; k < segs; k++) { const a = e.pts[k], b = e.pts[(k + 1) % n]; lin(a, b, c, null, ed('L' + k, Math.hypot(b[0] - a[0], b[1] - a[1]))); }
+      if (i < 0 && n >= 2) angleDim(e.pts[n - 2], e.pts[n - 1]); /* the segment being drawn: its angle too */
+    } else if (e.t === 'spline' && i < 0 && e.pts.length >= 2) {
+      const a = e.pts[e.pts.length - 2], b = e.pts[e.pts.length - 1];
+      lin(a, b, [a[0] + (a[1] - b[1]), a[1] + (b[0] - a[0])], null, null); angleDim(a, b);
     }
   }
   box.innerHTML = out.join(''); skDimsOn = true;
@@ -1555,6 +1574,8 @@ function updateDimLabel(ev) {
   if (ev) lastPointer = evPx(ev);
   const d = draftEntity();
   if (!sk || !d || !lastPointer) { el.hidden = true; return; }
+  /* with dimensions shown the sizes and the angle are in the dimensions themselves, no extra box at the pointer */
+  if (showSkDims()) { el.hidden = true; return; }
   let t = '';
   if (d.t === 'rect') t = `${fmtc(Math.abs(d.w), 2)} × ${fmtc(Math.abs(d.h), 2)} mm`;
   else if (d.t === 'circle') t = `Ø ${fmtc(d.r * 2, 2)} mm`;

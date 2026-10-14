@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.90
+- Skica: při kreslení čáry a křivky se u kurzoru už nezobrazuje rámeček s délkou a úhlem. Délka i úhel (oblouk od osy X) jsou přímo v kótách. Když jsou kóty vypnuté, rámeček se ukazuje dál.
+
 ## Beta 0.89
 - Otočit: volba Položit na podložku (Z = 0) je ve výchozím stavu znovu zapnutá. Otočit celý model zůstává vypnuté.
 
