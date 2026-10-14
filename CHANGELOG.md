@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 0.93
+- Skica: u vybrané čáry se už nezobrazují rámečky s délkou a úhlem. Při zapnutých kótách jsou délky v kótách a u otevřené čáry je v kótě i úhel (oblouk od osy X). Při vypnutých kótách se rámečky ukazují dál.
+- Při tažení za táhla tvaru se rámeček s rozměrem při zapnutých kótách neukazuje, kóty se mění přímo.
+
 ## Beta 0.92
 - Skica: nástroj Vystřihnout je nahrazen nástrojem Kombinovat (X). V paletě zvolíte operaci: Odečíst, Sjednotit, Průnik nebo Rozdělit (čarou či křivkou). Klepnete na první tvar a pak na druhý tvar nebo čáru.
 - Sjednotit spojí dva překrývající se tvary do jednoho obrysu jedním krokem. Oříznout (T) dál slouží k odstranění jednotlivých úseků čar.

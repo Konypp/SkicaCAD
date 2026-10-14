@@ -738,7 +738,7 @@ function updateSketchDims() {
       out.push(`<text class="moved" x="${A[0] - u[0] * 8}" y="${A[1] - u[1] * 8 + (u[1] > 0 ? -8 : 12)}" text-anchor="${u[0] > 0 ? 'end' : 'start'}">${EN() ? 'Moved' : 'Posun'} ${f1(L)} mm (X ${f1(dx)} · Y ${f1(dy)})</text>`);
     });
   }
-  const ents = showSkDims() ? sk.f.ents.map((e, i) => [e, i]).filter(([e, i]) => !(i === sk.selEnt && e.t === 'poly' && !sk.tool)) : [];
+  const ents = showSkDims() ? sk.f.ents.map((e, i) => [e, i]) : [];
   const d = showSkDims() ? draftEntity() : null; if (d) ents.push([d, -1]);
   if (ents.length > 80) { box.innerHTML = out.join(''); skDimsOn = true; return; }
   for (const [e, i] of ents) {
@@ -766,6 +766,7 @@ function updateSketchDims() {
       /* a trimmed outline keeps arcs as short chords: those get no length, only the straight sides do */
       for (let k = 0; k < segs; k++) { if (isChord(e, k)) continue; const a = e.pts[k], b = e.pts[(k + 1) % n]; lin(a, b, c, null, ed('L' + k, Math.hypot(b[0] - a[0], b[1] - a[1]))); }
       if (i < 0 && n >= 2) angleDim(e.pts[n - 2], e.pts[n - 1]); /* the segment being drawn: its angle too */
+      else if (i === sk.selEnt && !sk.tool && !e.closed && segs <= 6) for (let k = 0; k < segs; k++) if (!isChord(e, k)) angleDim(e.pts[k], e.pts[k + 1]); /* a selected open line: angles of its segments */
     } else if (e.t === 'spline' && i < 0 && e.pts.length >= 2) {
       const a = e.pts[e.pts.length - 2], b = e.pts[e.pts.length - 1];
       lin(a, b, [a[0] + (a[1] - b[1]), a[1] + (b[0] - a[0])], null, null); angleDim(a, b);
@@ -801,7 +802,8 @@ let segLabelsOn = false;
 function updateSegLabels() {
   const box = $('#seglabels');
   const e = sk && sk.f.ents[sk.selEnt];
-  if (!e || e.t !== 'poly' || sk.tool) { if (segLabelsOn) { box.innerHTML = ''; segLabelsOn = false; } return; }
+  /* with dimensions shown, lengths and angles are in the dimensions: no label boxes */
+  if (!e || e.t !== 'poly' || sk.tool || showSkDims()) { if (segLabelsOn) { box.innerHTML = ''; segLabelsOn = false; } return; }
   const P = sk.f.plane, n = e.pts.length, segs = e.closed ? n : n - 1, html = [];
   if (segs > 40 && !e.tr) { box.innerHTML = ''; return; }
   const scr = e.pts.map(q => toPx(P3(P, q[0], q[1])));
@@ -1617,7 +1619,7 @@ function sketchDrag(ev) {
     const [ne, label] = applyShapeHandle(sk.drag.orig, sk.drag.shape, p);
     sk.f.ents[sk.drag.ei] = ne;
     if (ne.t !== 'rect') sk.gridHot = null;
-    const el = $('#dim'), px = evPx(ev); el.textContent = label; el.hidden = !label; el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px';
+    const el = $('#dim'), px = evPx(ev); el.textContent = label; el.hidden = !label || showSkDims(); /* with dimensions shown the new size is in them */ el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px';
     redrawSketch(); return;
   }
   ray.setFromCamera(evNdc(ev), cam());
