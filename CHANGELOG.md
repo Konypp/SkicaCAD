@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta 1.00
+- Nový příkaz **Pant** (skupina Vytvořit): generátor pantu pro 3D tisk.
+  - Typ **Tištěný vcelku**: tiskne se jako jeden kus bez podpěr. Čep patří ke křídlu B a kuželovými konci drží v jamkách krajních kloubů křídla A; mezi díly je všude vůle (výchozí 0,35 mm). Křídlo se otočí asi o 170°.
+  - Typ **Na šroub**: v ose je díra pro šroub s maticí, dialog doporučí délku šroubu.
+  - Parametry: délka, šířka a tloušťka křídla, 3/5/7 kloubů, průměr čepu, vůle, 0–3 otvory pro zápustné šrouby M2–M4 v každém křídle, osa podél X nebo Y.
+  - Lze vytvořit celý pant, nebo jen křídlo A či B. Při operaci Spojit se křídlo připojí jen k tělesu, kterého se opravdu dotýká, takže krabička a víko zůstanou samostatná.
+
 ## Beta 0.99
 - Nový příkaz **Díra** (H): klepnete na místo na rovné stěně a vyberete velikost šroubu M2–M24.
   - Typy díry: průchozí (ISO 273), se zahloubením pro imbus (DIN 974), zápustná 90° (ISO 15065), se závitem.

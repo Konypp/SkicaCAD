@@ -61,6 +61,7 @@ const ICONS = {
   skdup: '<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>',
   bolt: '<path class="b" d="M7 3h10l2 3.5-2 3.5H7L5 6.5z"/><path d="M9.5 10v11h5V10"/><path d="M9.5 13l5 1.5M9.5 16l5 1.5M9.5 19l5 1.5"/>',
   nut: '<path class="b" d="M7.5 4h9l4.5 8-4.5 8h-9L3 12z"/><circle cx="12" cy="12" r="3.6"/>',
+  hinge: '<path class="b" d="M2 6h7.5v12H2z"/><path d="M2 6h7.5v12H2zM14.5 6H22v12h-7.5z"/><rect x="9.5" y="4" width="5" height="5" rx="1.2"/><rect x="9.5" y="15" width="5" height="5" rx="1.2"/><rect class="o" x="9.5" y="9.5" width="5" height="5" rx="1.2" style="stroke:var(--orange)"/><path d="M12 3v18" stroke-dasharray="1.6 1.6"/>',
   thauto: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" style="fill:currentColor;stroke:none"/>',
   thlight: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
   thdark: '<path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/>',
@@ -1029,7 +1030,7 @@ function featureTitle(i) {
   let n = 0; for (let j = 0; j <= i; j++) if (doc.features[j].type === f.type) n++;
   return Engine.FEATURE_LABEL[f.type] + ' ' + n;
 }
-const TL_ICON = { shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
+const TL_ICON = { shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
 function renderTimeline() {
   const tr = $('#tltrack'); tr.innerHTML = '';
   const m = viewMarker === null ? doc.marker : viewMarker;
@@ -1101,7 +1102,7 @@ document.addEventListener('pointerdown', e => { const m = $('#ctxmenu'); if (!m.
 /* ================= ribbon ================= */
 const RIBBON = {
   solid: [
-    ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'], ['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus'], ['bolt', 'Šroub'], ['nut', 'Matice']]],
+    ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'], ['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus'], ['bolt', 'Šroub'], ['nut', 'Matice'], ['hinge', 'Pant']]],
     ['Upravit', [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení'], ['hole', 'Díra', 'H'], ['shell', 'Skořepina'], ['combine', 'Kombinovat'], ['splitbody', 'Rozříznout'], ['move', 'Přesunout', 'M'], ['rotate', 'Otočit', 'R'], ['scale', 'Měřítko'], ['center', 'Zarovnat'], ['facemode', 'Plochy', 'G'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole'], ['del', 'Odstranit', 'Del']]],
     ['Výběr', [['selall', 'Vybrat vše', 'Ctrl+A']]],
     ['Kontrola', [['measure', 'Měřit', 'I']]],
@@ -1141,6 +1142,7 @@ function runCommand(id) {
     case 'extrude': startExtrude(); break;
     case 'box': case 'cylinder': case 'sphere': case 'cone': case 'torus': startPrimitive(id); break;
     case 'bolt': case 'nut': startFastener(id); break;
+    case 'hinge': startHinge(); break;
     case 'fillet': case 'chamfer': startEdgeMod(id); break;
     case 'combine': startCombine(); break;
     case 'hole': startHole(); break;
@@ -1283,6 +1285,7 @@ function editFeature(i) {
     case 'extrude': startExtrude(i, ef); break;
     case 'box': case 'cylinder': case 'sphere': case 'cone': case 'torus': startPrimitive(f.type, i, ef); break;
     case 'bolt': case 'nut': startFastener(f.type, i, ef); break;
+    case 'hinge': startHinge(i, ef); break;
     case 'fillet': case 'chamfer': startEdgeMod(f.type, i, ef); break;
     case 'combine': startCombine(i, ef); break;
     case 'move': startMove(i, ef); break;
@@ -2634,6 +2637,83 @@ function startFastener(type, editIndex, f) {
   beginCmd(c); c.init();
 }
 
+/* ================= hinge ================= */
+function startHinge(editIndex, f) {
+  const pivot = new THREE.Object3D(); scene.add(pivot);
+  const D0 = { kind: 'print', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_NUT, holes: 2, hd: 3, part: 'both', rot: 0 };
+  const c = {
+    editIndex, tool: null, gizmoDrag: false, timer: null,
+    v: f ? { ...D0, ...f } : { ...D0 },
+    pos: f ? f.pos.slice() : [0, 0, 0], op: f ? f.op : 'new',
+    init() {
+      openDialog({
+        title: 'Pant', icon: 'hinge',
+        fields: [{ k: 'seg', id: 'kind', label: 'Typ', options: [['print', 'Tištěný vcelku'], ['screw', 'Na šroub']], value: this.v.kind },
+          { k: 'num', id: 'len', label: 'Délka pantu', value: this.v.len },
+          { k: 'num', id: 'w', label: 'Šířka křídla', value: this.v.w },
+          { k: 'num', id: 't', label: 'Tloušťka křídla', value: this.v.t },
+          { k: 'seg', id: 'cnt', label: 'Počet kloubů', options: [['3', '3'], ['5', '5'], ['7', '7']], value: String(this.v.n) },
+          { k: 'num', id: 'pin', label: this.v.kind === 'screw' ? 'Průměr šroubu v ose' : 'Průměr čepu', value: this.v.pin },
+          { k: 'num', id: 'tol', label: 'Vůle pro 3D tisk', value: this.v.tol },
+          { k: 'opt', id: 'holes', label: 'Otvory v křídle', options: [['0', 'Žádné'], ['1', '1'], ['2', '2'], ['3', '3']], value: String(this.v.holes) },
+          { k: 'opt', id: 'hd', label: 'Zápustné šrouby', options: [['2', 'M2'], ['2.5', 'M2,5'], ['3', 'M3'], ['4', 'M4']], value: String(this.v.hd) },
+          { k: 'seg', id: 'part', label: 'Vytvořit', options: [['both', 'Celý pant'], ['a', 'Křídlo A'], ['b', 'Křídlo B']], value: this.v.part },
+          { k: 'seg', id: 'rot', label: 'Osa pantu', options: [['0', 'Podél X'], ['90', 'Podél Y']], value: String(this.v.rot) },
+          { k: 'xyz', id: 'pos', label: 'Poloha (střed osy)', value: this.pos },
+          { k: 'opt', id: 'op', label: 'Operace', options: OPS, value: this.op }, { k: 'note', id: 'n' }, { k: 'note', id: 'n2' }, { k: 'note', id: 'n3' }],
+        onChange: id => {
+          if (id === 'pos') this.pos = dlg.get('pos');
+          else if (id === 'op') this.op = dlg.get('op');
+          else if (id === 'kind' || id === 'part') this.v[id] = dlg.get(id);
+          else if (id === 'cnt') this.v.n = parseFloat(dlg.get('cnt'));
+          else if (id === 'holes' || id === 'rot' || id === 'hd') this.v[id] = parseFloat(dlg.get(id));
+          else { const x = dlg.get(id); if (isFinite(x) && x >= 0) this.v[id] = x; }
+          if (id === 'kind') { const l = $('#dialog [data-row="pin"] label'); if (l) l.textContent = this.v.kind === 'screw' ? 'Průměr šroubu v ose' : 'Průměr čepu'; }
+          this.schedule();
+        }
+      });
+      transform.setMode('translate'); transform.setSpace('world');
+      transform.addEventListener('objectChange', this.onGizmo);
+      transform.addEventListener('dragging-changed', this.onDragChange);
+      transform.attach(pivot);
+      setPrompt('Pant leží naplocho v poloze pro tisk. Klepnutím do pohledu ho umístíte, manipulátorem posunete.');
+      this.update();
+    },
+    feature() { const v = this.v; return { id: f ? f.id : 'tmp', type: 'hinge', kind: v.kind, len: v.len, w: v.w, t: v.t, n: v.n, pin: v.pin, tol: v.tol, holes: v.holes, hd: v.hd, part: v.part, rot: v.rot, pos: this.pos.slice(), op: this.op }; },
+    schedule() { clearTimeout(this.timer); dlg.set('n', 'Počítám…'); this.timer = setTimeout(() => this.update(), 150); },
+    update() {
+      clearGroup(G.preview); this.tool = null;
+      if (!this.gizmoDrag) pivot.position.set(this.pos[0], this.pos[1], this.pos[2]);
+      try {
+        const H = Engine.hingeDims(this.feature());
+        this.tool = Engine.toolForHinge(this.feature());
+        G.preview.add(previewMesh(this.tool, this.op));
+        dlg.set('n', `Kloub Ø ${fmtc(2 * H.R, 1)} mm, ${H.N} × ${fmtc(H.k, 1)} mm, mezera ${fmtc(H.c, 2)} mm`);
+        dlg.set('n2', H.screw ? `Do osy šroub M${fmtc(H.pd, 1)} × ${Math.ceil(H.L + 2)} mm s maticí.` : 'Tiskne se vcelku bez podpěr; po tisku pant několikrát protočte, aby se uvolnil.');
+        dlg.set('n3', this.op === 'new' ? '' : this.v.part === 'both' ? 'Pro připojení ke dvěma tělesům vytvořte zvlášť křídlo A a křídlo B ve stejné poloze.' : `Osu dejte alespoň ${fmtc(H.R + H.c + 0.1, 1)} mm za hranu tělesa, jinak se ho dotknou i klouby druhého křídla.`);
+        dlg.okEnabled(true);
+      } catch (e) { dlg.set('n', '!' + e.message); dlg.set('n2', ''); dlg.set('n3', ''); dlg.okEnabled(false); }
+      requestRender();
+    },
+    onClick(ev) {
+      const h = hitBodies(ev); let p;
+      if (h) p = h.point; else { ray.setFromCamera(evNdc(ev), cam()); p = ray.ray.intersectPlane(new THREE.Plane(new V3(0, 0, 1), 0), new V3()); }
+      if (!p) return;
+      this.pos = [snapV(p.x), snapV(p.y), Math.round(p.z * 1000) / 1000]; dlg.set('pos', this.pos); this.schedule();
+    },
+    onGizmo: null, onDragChange: null,
+    ok() { if (!this.tool) return null; const out = this.feature(); out.id = f ? f.id : newId(); return out; },
+    cleanup() {
+      clearTimeout(this.timer);
+      transform.removeEventListener('objectChange', this.onGizmo);
+      transform.removeEventListener('dragging-changed', this.onDragChange);
+      transform.detach(); transform.enabled = true; scene.remove(pivot); controls.enabled = true;
+    }
+  };
+  c.onGizmo = () => { const p = pivot.position; c.pos = [snapV(p.x), snapV(p.y), snapV(p.z)]; dlg.set('pos', c.pos); };
+  c.onDragChange = e => { controls.enabled = !e.value; c.gizmoDrag = e.value; if (!e.value) { pivot.position.set(c.pos[0], c.pos[1], c.pos[2]); c.schedule(); } };
+  beginCmd(c); c.init();
+}
 /* ================= fillet / chamfer ================= */
 function startEdgeMod(mode, editIndex, f) {
   const c = {

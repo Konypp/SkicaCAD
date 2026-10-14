@@ -4,7 +4,7 @@
 self.SKICA = {
   name: 'SkicaCAD',
   stage: 'Beta',
-  version: '0.99',
+  version: '1.00',
 };
 self.SKICA.full = `${self.SKICA.name} ${self.SKICA.stage} ${self.SKICA.version}`;
 self.SKICA.fileTag = `${self.SKICA.name}-${self.SKICA.stage}-${self.SKICA.version}`;

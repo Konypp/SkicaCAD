@@ -7,7 +7,7 @@ const PLANES = {
   XZ: { o: [0, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] },
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
-const FEATURE_LABEL = { shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
+const FEATURE_LABEL = { hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
   fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
@@ -541,6 +541,85 @@ function toolForPrimitive(f) {
   const pos = f.pos || [0, 0, 0];
   return KK.translate(KK.primitive(f.type, p), [pos[0], pos[1], pos[2] + PRIM[f.type].lift(p)]);
 }
+/* ---------- hinge (print-in-place or for a screw), lying flat: axis along x, leaves in ±y, z up ---------- */
+const HINGE_WALL = 1.2;
+function hingeDims(f) {
+  const L = Number(f.len), W = Number(f.w), t = Number(f.t), N = Math.round(Number(f.n)) || 3, pd = Number(f.pin), c = Math.max(0, Math.min(1.5, Number(f.tol) || 0)), screw = f.kind === 'screw';
+  if (!(L >= 6 && L <= 500)) throw new Error('Délka pantu musí být 6 až 500 mm');
+  if (!(pd >= 1 && pd <= 20)) throw new Error('Průměr čepu musí být 1 až 20 mm');
+  if (![3, 5, 7].includes(N)) throw new Error('Počet kloubů musí být 3, 5 nebo 7');
+  const pr = pd / 2, R = pr + c + HINGE_WALL, zc = 0.75 * R;
+  if (!(t >= 0.8)) throw new Error('Tloušťka křídla musí být alespoň 0,8 mm');
+  if (t > zc + R - 0.3) throw new Error('Křídlo je na tento čep příliš silné (nejvýš ' + (Math.floor((zc + R - 0.3) * 10) / 10).toString().replace('.', ',') + ' mm), zvětšete průměr čepu');
+  if (!(W >= R + c + 2)) throw new Error('Křídlo musí být široké alespoň ' + (Math.ceil((R + c + 2) * 10) / 10).toString().replace('.', ',') + ' mm');
+  const k = (L - (N - 1) * c) / N, rt = Math.max(0.4, pr * 0.35), ch = pr - rt, D = c * Math.SQRT2;
+  const kMin = screw ? 2 : HINGE_WALL + D + ch + 1.5;
+  if (k < kMin) throw new Error('Klouby jsou příliš krátké, prodlužte pant nebo zvolte méně kloubů');
+  return { L, W, t, N, pd, pr, c, R, zc, k, rt, ch, D, screw };
+}
+const YZB = { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] };
+/* 2D outline (y, z) of one leaf section: the knuckle (circle cut flat at z = 0 so it prints without supports) merged with the plate */
+function hingeSection(H, side) {
+  const { R, zc, t, W } = H, a0 = Math.asin(-zc / R), a1 = Math.PI - a0, pts = [], M = 40;
+  /* arc from the right end of the flat bottom, over the top, down the left side to z = t */
+  const aT = Math.PI - Math.asin(Math.max(-1, Math.min(1, (t - zc) / R)));
+  for (let i = 0; i <= M; i++) { const a = a0 + (aT - a0) * i / M; pts.push([R * Math.cos(a), zc + R * Math.sin(a)]); }
+  pts.push([-W, t], [-W, 0]);
+  void a1;
+  return side < 0 ? pts : pts.map(([y, z]) => [-y, z]).reverse();
+}
+function prismX(pts, x0, x1) { return KK.extrudeProfiles([{ pts, closed: true }], YZB, x0, x1); }
+function coneX(o, dir, r0, r1, h) { return KK.transform(KK.translate(KK.primitive('cone', { r: r0, rt: r1, h }), [0, 0, h / 2]), frameMatrix(o, dir)); }
+function hingeParts(f) {
+  const H = hingeDims(f), { L, W, t, N, pr, c, R, zc, k, rt, ch, D, screw } = H;
+  const leaf = side => {
+    let acc = prismX(side < 0 ? [[-W, 0], [-(R + c), 0], [-(R + c), t], [-W, t]] : [[R + c, 0], [W, 0], [W, t], [R + c, t]], 0, L);
+    for (let i = side < 0 ? 0 : 1; i < N; i += 2) { const x0 = i * (k + c); acc = KK.boolean(acc, prismX(hingeSection(H, side), x0, x0 + k), 'union'); }
+    return acc;
+  };
+  let A = leaf(-1), B = leaf(1);
+  /* screw holes in the plates: through, countersunk from the top when the plate is thick enough */
+  const nh = Math.round(Number(f.holes) || 0);
+  if (nh > 0) {
+    const hd = Math.max(1, Number(f.hd) || 3), hr = hd / 2 + 0.2, csk = hd > 0 && hd - hr + 0.2 < t * 0.75;
+    const ym = (R + c + W) / 2;
+    if (W - (R + c) < 2 * hd + 1.5) throw new Error('Křídlo je na otvory pro šrouby příliš úzké');
+    for (const side of [-1, 1]) {
+      let cut = null;
+      for (let j = 0; j < nh; j++) {
+        const x = nh === 1 ? L / 2 : 2 + hr + hd / 2 + (L - 2 * (2 + hr + hd / 2)) * j / (nh - 1), o = [x, side * ym, 0];
+        let h = cylAlong([o[0], o[1], -1], [0, 0, 1], hr, t + 2);
+        if (csk) h = KK.boolean(h, coneX([o[0], o[1], t - (hd - hr)], [0, 0, 1], hr, hd + 0.2, hd - hr + 0.21), 'union');
+        cut = cut ? KK.boolean(cut, h, 'union') : h;
+      }
+      if (side < 0) A = KK.boolean(A, cut, 'subtract'); else B = KK.boolean(B, cut, 'subtract');
+    }
+  }
+  if (screw) {
+    const hole = cylAlong([-1, 0, zc], [1, 0, 0], pr + c, L + 2);
+    A = KK.boolean(A, hole, 'subtract'); B = KK.boolean(B, hole, 'subtract');
+  } else {
+    /* the pin belongs to leaf B; its cone tips sit in blind cone sockets in A's end knuckles, which keeps the two leaves together */
+    const w = HINGE_WALL, xa = w + D + ch, xb = L - w - D - ch;
+    let pin = cylAlong([xa, 0, zc], [1, 0, 0], pr, xb - xa);
+    pin = KK.boolean(pin, coneX([xa, 0, zc], [-1, 0, 0], pr, rt, ch), 'union');
+    pin = KK.boolean(pin, coneX([xb, 0, zc], [1, 0, 0], pr, rt, ch), 'union');
+    const hs = pr + c - rt, sa = w + hs, sb = L - w - hs;
+    let sock = cylAlong([sa - 0.01, 0, zc], [1, 0, 0], pr + c, sb - sa + 0.02);
+    sock = KK.boolean(sock, coneX([sa, 0, zc], [-1, 0, 0], pr + c, rt, hs), 'union');
+    sock = KK.boolean(sock, coneX([sb, 0, zc], [1, 0, 0], pr + c, rt, hs), 'union');
+    A = KK.boolean(A, sock, 'subtract');
+    B = KK.boolean(B, pin, 'union');
+  }
+  return { A, B, H };
+}
+function toolForHinge(f) {
+  const { A, B } = hingeParts(f), part = f.part || 'both';
+  const polys = part === 'a' ? A : part === 'b' ? B : A.concat(B);
+  /* the hinge is modelled centred on its axis: x from -L/2, axis at y = 0, lying on z = 0 */
+  const L = Number(f.len), pos = (f.pos || [0, 0, 0]).map(Number), rz = Number(f.rot) || 0;
+  return KK.transform(KK.translate(polys, [-L / 2, 0, 0]), eulerMatrix([0, 0, 0], pos, [0, 0, rz]));
+}
 function applyTool(bodies, f, tool, newBody) {
   const op = f.op || 'new';
   if (op === 'new') return bodies.concat([newBody(tool)]);
@@ -573,6 +652,17 @@ function step(state, f) {
       out = applyTool(bodies, f, toolForPrimitive(f), newBody); break;
     case 'bolt': case 'nut':
       out = applyTool(bodies, f, toolForFastener(f), polys => ({ id: f.id, name: (f.type === 'bolt' ? 'Šroub M' + f.size + '×' + f.len : 'Matice M' + f.size + (f.low ? ' nízká' : '')).replace('.', ','), polys, from: f.id })); break;
+    case 'hinge': {
+      /* the two leaves interlock, so a bounding-box test would also catch the body on the other leaf: join only bodies the hinge really touches */
+      const tool = toolForHinge(f);
+      let ff = f;
+      if ((f.op || 'new') !== 'new' && !(f.targets && f.targets.length)) {
+        const e = 0.05, touches = b => [[0, 0, 0], [0, 0, -e], [0, 0, e], [-e, 0, 0], [e, 0, 0], [0, -e, 0], [0, e, 0]].some(d => KK.signedVolume(KK.boolean(b.polys, d[0] || d[1] || d[2] ? KK.translate(tool, d) : tool, 'intersect')) > 1e-4);
+        const t = bodies.filter(b => b.visible !== false && overlaps(b.polys, tool) && touches(b)).map(b => b.id);
+        ff = { ...f, targets: t.length ? t : ['\u0000none'] };
+      }
+      out = applyTool(bodies, ff, tool, polys => ({ id: f.id, name: ('Pant ' + f.len + '×' + (2 * f.w) + (f.part === 'a' ? ' – křídlo A' : f.part === 'b' ? ' – křídlo B' : '')).replace('.', ','), polys, from: f.id })); break;
+    }
     case 'import':
       out = applyTool(bodies, f, importPolys(f), polys => ({ id: f.id, name: f.name || ('Import ' + (++n)), polys, from: f.id })); break;
     case 'mirror': case 'pattern': {
@@ -799,7 +889,7 @@ function makeRebuilder() {
   };
 }
 
-return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, hingeDims, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 
