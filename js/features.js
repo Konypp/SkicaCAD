@@ -7,7 +7,7 @@ const PLANES = {
   XZ: { o: [0, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] },
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
-const FEATURE_LABEL = { sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
+const FEATURE_LABEL = { shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
   fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
@@ -31,13 +31,16 @@ function closedLoops(sk) {
     else if (e.t === 'ellipse' && e.rx > 1e-6 && e.ry > 1e-6) out.push({ ei: i, pts: KK.profilePoints(e) });
     else if (e.t === 'spline' && e.closed && e.pts.length >= 3) { const pts = KK.profilePoints(e); if (Math.abs(KK.area2D(pts)) > 1e-6) out.push({ ei: i, pts }); }
     else if (e.t === 'poly' && e.closed && e.pts.length >= 3) { const pts = KK.profilePoints(e); if (Math.abs(KK.area2D(pts)) > 1e-6) out.push({ ei: i, pts }); }
+    else if (e.t === 'text' && typeof skicaTextLoops === 'function') for (const pts of skicaTextLoops(e)) if (Math.abs(KK.area2D(pts)) > 1e-6) out.push({ ei: i, pts, txt: true });
   });
   return out;
 }
 function regions(sk) {
   const L = closedLoops(sk).map(l => ({ ...l, a: Math.abs(KK.area2D(l.pts)) }));
   L.forEach(A => { A.parents = L.filter(B => B !== A && B.a > A.a && A.pts.every(p => KK.inPoly2D(p, B.pts))).sort((s, t) => s.a - t.a); });
-  return L.map(A => ({ ei: A.ei, pts: A.pts, holes: L.filter(C => C.parents[0] === A).map(C => ({ ei: C.ei, pts: C.pts })) }));
+  /* the inside of a letter (the hole of an "o") is not a profile of its own */
+  return L.filter(A => !A.txt || A.parents.filter(B => B.ei === A.ei).length % 2 === 0)
+    .map(A => ({ ei: A.ei, pts: A.pts, holes: L.filter(C => C.parents[0] === A).map(C => ({ ei: C.ei, pts: C.pts })) }));
 }
 
 /* ---------- small math ---------- */
@@ -121,10 +124,10 @@ function toolForExtrude(f, sketches) {
   const z0 = f.sym ? -Math.abs(d) / 2 : Math.min(0, d), z1 = f.sym ? Math.abs(d) / 2 : Math.max(0, d);
   let tool = [];
   for (const ei of sel) {
-    const r = regs.find(x => x.ei === ei); if (!r) continue;
+    for (const r of regs.filter(x => x.ei === ei)) { /* a text element has one region per letter */
     const solid = KK.extrudeProfiles([{ t: 'poly', pts: r.pts }, ...r.holes.map(h => ({ t: 'poly', pts: h.pts }))], B, z0, z1);
     tool = tool.length ? KK.boolean(tool, solid, 'union') : solid;
-  }
+  } }
   if (!tool.length) throw new Error('Vyberte profil');
   return tool;
 }
@@ -145,10 +148,10 @@ function toolForRevolve(f, sketches) {
   const ax = revolveAxis(f, sk), regs = regions(sk), sel = f.regions && f.regions.length ? f.regions : regs.map(r => r.ei);
   let tool = [];
   for (const ei of sel) {
-    const r = regs.find(x => x.ei === ei); if (!r) continue;
+    for (const r of regs.filter(x => x.ei === ei)) {
     const solid = KK.revolveProfiles([{ t: 'poly', pts: r.pts }, ...r.holes.map(h => ({ t: 'poly', pts: h.pts }))], sk.plane, ax, Math.max(-360, Math.min(360, ang)) * Math.PI / 180);
     tool = tool.length ? KK.boolean(tool, solid, 'union') : solid;
-  }
+  } }
   if (!tool.length) throw new Error('Vyberte profil');
   return tool;
 }
@@ -359,6 +362,40 @@ function offsetFaceTool(polys, f) {
   const tool = d > 0 ? KK.extrudeProfiles(loops, B, -0.01, d) : KK.extrudeProfiles(loops, B, d, 0.01);
   return [{ op: d > 0 ? 'union' : 'subtract', tool }];
 }
+/* ---------- shell (skořepina): hollow a body with a given wall thickness, optionally opening chosen planar faces ----------
+   Every vertex moves to the point lying t inside all faces around it (least squares over their planes); faces chosen
+   as open move t outward instead, so the inner solid pokes through them and the subtraction opens them. */
+function shellBody(polys, f) {
+  const t = Number(f.t);
+  if (!(t >= 0.1)) throw new Error('Tloušťka stěny musí být alespoň 0,1 mm');
+  const open = new Set();
+  for (const fd of f.faces || []) { const g = KK.planarFace(polys, fd.n, fd.w, fd.p); if (!g || !g.length) throw new Error('Otevřená plocha nebyla nalezena'); g.forEach(i => open.add(i)); }
+  const vm = new Map();
+  polys.forEach((p, i) => {
+    const d = KK.vdot(p.n, p.v[0]) + (open.has(i) ? t : -t);
+    for (const v of p.v) {
+      const k = KK.qk(v); let e = vm.get(k); if (!e) vm.set(k, e = { v, pl: [] });
+      const q = e.pl.find(x => KK.vdot(x.n, p.n) > 1 - 1e-7);
+      if (!q) e.pl.push({ n: p.n, d }); else if (open.has(i)) q.d = d; /* an open face wins over a coplanar closed piece */
+    }
+  });
+  const eps = 1e-6;
+  for (const e of vm.values()) {
+    const A = [[eps, 0, 0], [0, eps, 0], [0, 0, eps]], b = [eps * e.v[0], eps * e.v[1], eps * e.v[2]];
+    for (const { n, d } of e.pl) for (let r = 0; r < 3; r++) { for (let c = 0; c < 3; c++) A[r][c] += n[r] * n[c]; b[r] += n[r] * d; }
+    const det = M => M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
+    const D = det(A); if (Math.abs(D) < 1e-18) { e.x = e.v; continue; }
+    e.x = [0, 1, 2].map(c => det(A.map((row, r) => row.map((x, j) => (j === c ? b[r] : x)))) / D);
+    /* a vertex must not run far away (nearly parallel faces around a sharp edge) */
+    const L = Math.hypot(e.x[0] - e.v[0], e.x[1] - e.v[1], e.x[2] - e.v[2]); if (L > t * 6) { const s = t * 6 / L; e.x = e.v.map((v, k) => v + (e.x[k] - v) * s); }
+  }
+  const inner = polys.map(p => KK.mkPoly(p.v.map(v => vm.get(KK.qk(v)).x))).filter(Boolean);
+  const V0 = KK.signedVolume(polys), Vi = KK.signedVolume(inner);
+  if (!(Vi > V0 * 1e-4) || Vi >= V0) throw new Error('Stěna je na toto těleso příliš silná');
+  const out = KK.boolean(polys, inner, 'subtract'), V1 = KK.signedVolume(out);
+  if (!out.length || !(V1 > 0) || V1 >= V0 - 1e-6) throw new Error('Skořepinu se nepodařilo vytvořit');
+  return out;
+}
 function offsetFace(polys, f) {
   let out = polys;
   for (const s of offsetFaceTool(polys, f)) out = KK.boolean(out, s.tool, s.op);
@@ -379,6 +416,67 @@ const SLOT_HEADS = { 2: [3.8, 1.3, 0.5, 0.6], 2.5: [4.5, 1.6, 0.6, 0.7], 3: [5.5
 const PAN_HEADS = { 2: [4, 1.6], 2.5: [5, 1.75], 3: [5.6, 2.4], 4: [8, 3.1], 5: [9.5, 3.7], 6: [12, 4.6], 8: [16, 6], 10: [20, 7.5], 12: [24, 9], 16: [32, 12], 20: [40, 15], 24: [48, 18] };
 const XYB = { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] };
 const hexPrism = (af, z0, z1) => KK.extrudeProfiles([{ t: 'ngon', x: 0, y: 0, r: af / Math.sqrt(3), n: 6, a: 30 }], XYB, z0, z1);
+/* ---------- hole for a bolt (Díra) with an optional nut pocket ----------
+   clearance holes ISO 273 medium, counterbores for socket heads DIN 974, 90° countersinks ISO 15065 */
+const HOLE_CLEAR = { 2: 2.4, 2.5: 2.9, 3: 3.4, 4: 4.5, 5: 5.5, 6: 6.6, 8: 9, 10: 11, 12: 13.5, 16: 17.5, 20: 22, 24: 26 };
+const HOLE_CBORE = { 2: 4.4, 2.5: 5.5, 3: 6.5, 4: 8, 5: 10, 6: 11, 8: 15, 10: 18, 12: 20, 16: 26, 20: 33, 24: 40 };
+const HOLE_CSINK = { 2: 4.4, 2.5: 5.5, 3: 6.3, 4: 8.3, 5: 10.4, 6: 12.4, 8: 16.4, 10: 20.4, 12: 24.4, 16: 32.4, 20: 40.4, 24: 48.4 };
+/* how deep a ray from p along a runs inside the polys: the nearest face where it leaves the material (the far side of the wall) */
+function rayExit(polys, p, a) {
+  let best = Infinity;
+  for (const q of polys) {
+    const dn = KK.vdot(q.n, a); if (dn < 1e-9) continue; /* only faces the ray leaves through */
+    const t = (q.w - KK.vdot(q.n, p)) / dn; if (!(t > 1e-4) || t >= best) continue;
+    const x = KK.vadd(p, KK.vmul(a, t)), ax = Math.abs(q.n[0]) > Math.abs(q.n[1]) ? (Math.abs(q.n[0]) > Math.abs(q.n[2]) ? 0 : 2) : (Math.abs(q.n[1]) > Math.abs(q.n[2]) ? 1 : 2);
+    const i0 = ax === 0 ? 1 : 0, i1 = ax === 2 ? 1 : 2;
+    if (KK.inPoly2D([x[i0], x[i1]], q.v.map(v => [v[i0], v[i1]]))) best = t;
+  }
+  return isFinite(best) ? best : 0;
+}
+/* f: { size, kind: 'clear' | 'socket' | 'csk' | 'thread', n (face normal, out of the body), p (point on the face), through, depth, cbDepth, tol,
+        nut: 'none' | 'top' | 'bottom' | 'side', nutLow, nutTol, nutDepth, nutDir (deg, in the face plane) } */
+function toolForHole(f, bodies) {
+  const d = Number(f.size), M = FASTENERS[d]; if (!M) throw new Error('Neznámá velikost závitu');
+  const [P, s, , m0] = M, tol = Math.max(0, Math.min(1, Number(f.tol) || 0)), n = KK.vnorm(f.n), a = KK.vmul(n, -1), p = f.p;
+  const B = basisFromPlane(n, KK.vdot(n, p)), U = B.u, V = KK.cross(a, U), W = KK.cross(n, U);
+  const mat = [U[0], U[1], U[2], 0, V[0], V[1], V[2], 0, a[0], a[1], a[2], 0, p[0], p[1], p[2], 1];
+  let depth = Number(f.depth) || 0;
+  if (f.through !== false) {
+    const b = (bodies || []).find(x => x.id === f.body), polys = b ? b.polys : (bodies || []).flatMap(x => x.polys);
+    depth = rayExit(polys, KK.vadd(p, KK.vmul(a, -1e-3)), a);
+    if (!(depth > 0.05)) throw new Error('Díra neprochází tělesem, klepněte na stěnu tělesa');
+  }
+  if (!(depth > 0.05)) throw new Error('Zadejte hloubku díry');
+  const z1 = f.through !== false ? depth + 1 : depth, cyl = (r, za, zb) => KK.translate(KK.primitive('cylinder', { r, h: zb - za }), [0, 0, (za + zb) / 2]);
+  const parts = [];
+  if (f.kind === 'thread') {
+    const de = d + tol, rh = (de - 1.0825 * P) / 2;
+    parts.push(cyl(rh, -1, z1));
+    parts.push(threadTool({ internal: true, pitch: P, size: de, r: rh, len: depth, start: 0, full: true, ax: [0, 0, 1], c: [0, 0, 0] }));
+  } else {
+    const rb = (HOLE_CLEAR[d] || d * 1.1) / 2 + tol / 2;
+    parts.push(cyl(rb, -1, z1));
+    if (f.kind === 'socket') { const rc = (HOLE_CBORE[d] || M[4] + 1) / 2 + tol / 2, cd = Number(f.cbDepth) > 0 ? Number(f.cbDepth) : d + 0.4; parts.push(cyl(rc, -1, Math.min(cd, depth))); }
+    if (f.kind === 'csk') { const R = (HOLE_CSINK[d] || d * 2) / 2 + tol / 2, h = R - rb; parts.push(cyl(R, -1, 0.001)); if (h > 0.01) parts.push(KK.translate(KK.primitive('cone', { r: R, rt: rb, h }), [0, 0, h / 2])); }
+  }
+  if (f.nut && f.nut !== 'none') {
+    const nt = Number(f.nutTol); const ntol = nt >= 0 && nt <= 1 ? nt : 0.3;
+    const af = s + ntol, hN = (f.nutLow ? THIN_NUT[d] : m0) + ntol;
+    /* hex flats parallel to the insertion direction (local +y after the turn) */
+    const dir = (Number(f.nutDir) || 0) * Math.PI / 180, dw = KK.vadd(KK.vmul(U, Math.cos(dir)), KK.vmul(W, Math.sin(dir)));
+    const lx = KK.vdot(dw, U), ly = KK.vdot(dw, V), turn = Math.atan2(ly, lx) - Math.PI / 2, c = Math.cos(turn), sn = Math.sin(turn);
+    const rotZ = [c, sn, 0, 0, -sn, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+    if (f.nut === 'top') parts.push(hexPrism(af, -1, hN));
+    else if (f.nut === 'bottom') parts.push(hexPrism(af, depth - hN, depth + 1));
+    else {
+      const zc = Math.max(hN / 2 + 0.4, Math.min(depth - hN / 2 - 0.4, Number(f.nutDepth) || depth / 2)), L = 1000;
+      parts.push(KK.transform(hexPrism(af, zc - hN / 2, zc + hN / 2), rotZ));
+      parts.push(KK.transform(KK.translate(KK.primitive('box', { w: af, d: L, h: hN }), [0, L / 2, zc]), rotZ));
+    }
+  }
+  let tool = parts[0]; for (const q of parts.slice(1)) tool = KK.boolean(tool, q, 'union');
+  return KK.transform(tool, mat);
+}
 /* a bolt stands on its head (head z 0..k, shank above it), a nut lies on z = 0; tol is the 3D-printing clearance */
 function toolForFastener(f) {
   const d = Number(f.size), M = FASTENERS[d]; if (!M) throw new Error('Neznámá velikost závitu');
@@ -548,6 +646,14 @@ function step(state, f) {
       out = bodies.map(x => map.get(x.id) || x);
       break;
     }
+    case 'hole':
+      out = applyTool(bodies, { ...f, op: 'cut' }, toolForHole(f, bodies), newBody); break;
+    case 'shell': {
+      const b = bodies.find(x => x.id === f.body);
+      if (!b) throw new Error('Těleso neexistuje');
+      out = bodies.map(x => (x === b ? { ...x, polys: shellBody(b.polys, f) } : x));
+      break;
+    }
     case 'offsetface': {
       const b = bodies.find(x => x.id === f.body);
       if (!b) throw new Error('Těleso neexistuje');
@@ -693,7 +799,7 @@ function makeRebuilder() {
   };
 }
 
-return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

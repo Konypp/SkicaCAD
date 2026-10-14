@@ -11,7 +11,7 @@ const ASSETS = [
   './', './index.html', './version.js', './manifest.webmanifest',
   './css/style.css',
   './vendor/three/three.min.js', './vendor/three/OrbitControls.js', './vendor/three/TransformControls.js',
-  './js/i18n.js', './js/kernel.js', './js/features.js', './js/importers.js', './js/app.js',
+  './js/i18n.js', './js/kernel.js', './js/font.js', './js/features.js', './js/importers.js', './js/app.js',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png',
   './icons/apple-touch-icon.png', './icons/favicon-32.png',
 ];

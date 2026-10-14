@@ -1,5 +1,15 @@
 # Changelog
 
+## Beta 0.99
+- Nový příkaz **Díra** (H): klepnete na místo na rovné stěně a vyberete velikost šroubu M2–M24.
+  - Typy díry: průchozí (ISO 273), se zahloubením pro imbus (DIN 974), zápustná 90° (ISO 15065), se závitem.
+  - Díra jde skrz stěnu, nebo do zadané hloubky. Polohu lze zadat i číslem a tlačítkem dát díru do středu plochy.
+  - Kapsa pro matici: na straně šroubu, na druhé straně, nebo boční vsuvka ve zvolené hloubce a směru. Volitelně pro nízkou matici a s vůlí kapsy.
+- Nový příkaz **Skořepina**: z plného tělesa udělá duté se zadanou tloušťkou stěny. Klepnutím na rovné stěny je otevřete, takže vznikne např. krabička.
+- Skica, nový nástroj **Odsadit** (O): vzdálenost a směr (ven / dovnitř) nastavíte v paletě a klepnete na obrys. Kružnice, obdélník, mnohoúhelník a drážka zůstávají svým tvarem, ostatní obrysy se odsadí jako čára.
+- Skica, nový nástroj **Text**: zadáte text, výšku písmen a tučné písmo a klepnete na začátek. Písmena jsou uzavřené profily pro vysunutí nebo vyříznutí, včetně české diakritiky (písmo DejaVu Sans). Text, polohu, výšku, natočení a mezery upravíte v paletě.
+- Soubor › **Exportovat 3MF**: formát pro moderní slicery (PrusaSlicer, Bambu Studio, OrcaSlicer). Každé viditelné těleso je samostatný objekt, jednotky mm.
+
 ## Beta 0.98
 - Matice: nová volba Výška – Normální (ISO 4032) nebo Nízká (ISO 4035, pojistná matice). Nízká má přibližně poloviční výšku, např. M3 1,8 mm, M6 3,2 mm, M10 5 mm, M12 6 mm. Šířka klíče zůstává stejná.
 - Těleso se jmenuje „Matice M6 nízká“.

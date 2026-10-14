@@ -152,6 +152,8 @@ button { cursor: pointer; }
 .fnum input:focus-visible { outline: none; }
 .fnum .u { padding: 0 7px 0 2px; color: var(--muted); font: 11px var(--mono); }
 .fnum .ax { width: 18px; text-align: center; font: 600 11px var(--mono); }
+.fnum.ftext { flex: 1; margin-bottom: 6px; }
+.fnum.ftext input { text-align: left; font-family: var(--sans, inherit); }
 .ax-x { color: #e5484d; } .ax-y { color: #2f9e6a; } .ax-z { color: #4f7ae0; }
 .xyz { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
 .fsel { height: 28px; border: 1px solid var(--line); border-radius: 4px; background: var(--field); padding: 0 6px; width: 100%; }
