@@ -2751,7 +2751,7 @@ function startBendFace(editIndex, f, face) {
   const c = {
     editIndex, body: f ? f.body : null, desc: f ? { n: f.n, w: f.w, p: f.p, ...(f.clip ? { clip: f.clip } : {}) } : null,
     axis: f ? { a: f.axis.a.slice(), b: f.axis.b.slice() } : null, angle: f ? f.angle : 90, radius: f ? (f.radius || 0) : 0,
-    edges: [], hoverEdge: -1, timer: null, tool: null, hideBody: null,
+    edges: [], hoverEdge: -1, timer: null, tool: null, hideBody: null, radiusSet: !!f,
     init() {
       if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
       openDialog({
@@ -2760,7 +2760,7 @@ function startBendFace(editIndex, f, face) {
           { k: 'num', id: 'angle', label: 'Úhel', unit: '°', value: this.angle }, { k: 'num', id: 'radius', label: 'Poloměr ohybu', value: this.radius }, { k: 'note', id: 'n' }],
         onChange: id => {
           if (id === 'angle') { const v = dlg.get('angle'); if (isFinite(v)) this.angle = v; }
-          if (id === 'radius') { const v = dlg.get('radius'); if (v >= 0) this.radius = v; }
+          if (id === 'radius') { const v = dlg.get('radius'); if (v >= 0) { this.radius = v; this.radiusSet = true; } }
           this.update();
         }
       });
@@ -2780,7 +2780,23 @@ function startBendFace(editIndex, f, face) {
       let best = null, bk = Infinity;
       for (const [a, b] of this.edges) { const z = (a[2] + b[2]) / 2, L = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), key = Math.round(z * 1e3) * 1e6 - L; if (key < bk) { bk = key; best = [a, b]; } }
       this.axis = best ? { a: best[0].map(r4), b: best[1].map(r4) } : null;
+      this.autoRadius();
       if (!first) this.update();
+    },
+    /* the axis lies on a rounded outline (one short facet of a circle) instead of a real straight edge */
+    curved() {
+      if (!this.axis || !this.edges.length) return false;
+      const L = Math.hypot(...[0, 1, 2].map(k => this.axis.b[k] - this.axis.a[k]));
+      let ext = 0; for (const [a] of this.edges) ext = Math.max(ext, Math.hypot(...[0, 1, 2].map(k => a[k] - this.axis.a[k])));
+      return L < 0.25 * ext;
+    },
+    /* a rounded face bent with radius 0 pinches to a single point on the inner side (the swept circles all touch the axis):
+       give it a bend radius right away; an explicit radius the user typed is kept */
+    halfWidth() { let ext = 0; if (this.axis) for (const [a] of this.edges) ext = Math.max(ext, Math.hypot(...[0, 1, 2].map(k => a[k] - this.axis.a[k]))); return ext / 2; },
+    autoRadius() {
+      if (this.radiusSet || !(this.radius <= 0) || !this.curved()) return;
+      this.radius = Math.max(1, Math.round(this.halfWidth() * 2) / 2); /* inner radius = half the face width: a smooth elbow like a bent rod or pipe */
+      if (dlg) dlg.set('radius', this.radius);
     },
     feature() { return { id: f ? f.id : 'tmp', type: 'bendface', body: this.body, ...this.desc, axis: this.axis, angle: this.angle, radius: this.radius }; },
     update() {
@@ -2808,7 +2824,7 @@ function startBendFace(editIndex, f, face) {
           const b = cur.bodies.find(x => x.id === this.body);
           this.tool = Engine.bendFaceTool(b.polys, this.feature());
           G.preview.add(previewMesh(this.tool, 'join'));
-          dlg.set('n', 'Plocha se otočí kolem oranžové hrany do prostoru před sebou. Koncovou plochu pak vysunete pod úhlem (režim Plochy › Vysunout).'); dlg.okEnabled(true);
+          const half = this.halfWidth(); dlg.set('n', this.curved() && this.radius < half * 0.5 ? `Zaoblená plocha s malým poloměrem ohybu: na vnitřní straně se ohyb zužuje až do jednoho bodu (vypadá jako spoj). Plynulý ohyb dá poloměr kolem ${fmtc(half, 1)} mm (polovina šířky plochy).` : 'Plocha se otočí kolem oranžové hrany do prostoru před sebou. Koncovou plochu pak vysunete pod úhlem (režim Plochy › Vysunout).'); dlg.okEnabled(true);
         } catch (e) { dlg.set('n', '!' + e.message); }
         requestRender();
       }, 150);
@@ -2824,7 +2840,7 @@ function startBendFace(editIndex, f, face) {
       if (i !== this.hoverEdge) { this.hoverEdge = i; this.update(); }
     },
     onClick(ev) {
-      if (this.desc) { const i = this.edgeAt(ev); if (i >= 0) { const [a, b] = this.edges[i]; this.axis = { a: a.map(r4), b: b.map(r4) }; this.update(); return; } }
+      if (this.desc) { const i = this.edgeAt(ev); if (i >= 0) { const [a, b] = this.edges[i]; this.axis = { a: a.map(r4), b: b.map(r4) }; this.autoRadius(); this.update(); return; } }
       const h = hitBodies(ev), fc = h ? faceAtHit(h) : null;
       if (!fc) return;
       if (fc.kind !== 'plane') { toast('Ohnout lze jen rovinnou plochu.'); return; }

@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 0.76
+- Ohnout plochu: u zaoblených ploch (podstava válce, kruhová plocha) se poloměr ohybu nastaví sám na polovinu šířky plochy, takže vznikne plynulé koleno jako u ohnuté tyče. S poloměrem 0 se ohyb kruhové plochy na vnitřní straně geometricky zužuje do jediného bodu (vypadá jako spoj); okno na to upozorní a doporučí poloměr. Zadaný poloměr se nepřepisuje.
+- Ohnout plochu: oprava chyby „Profil protíná osu rotace“, když osa ležela na zaokrouhlené hraně kruhové plochy.
+
 ## Beta 0.75
 - Ohnout plochu: oprava. U zaoblených ploch (např. podstava válce) s poloměrem ohybu 0 vznikalo na okraji „slepené“ místo (hrany sdílené čtyřmi plochami), protože se ohyb dotýkal stěny tělesa jen tečně. Ohyb teď začíná nepatrně uvnitř tělesa, výsledek je čisté uzavřené těleso při jakémkoli poloměru i úhlu a koncová plocha leží přesně v zadaném úhlu.
 

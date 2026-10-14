@@ -306,6 +306,7 @@
     [/^Plocha se rozdělí na části (.+) mm² a (.+) mm²\. Každou pak vyberete a upravíte samostatně\.$/, 'The face splits into parts of $1 mm² and $2 mm². You can then select and edit each one separately.'],
     [/^Rozřízne se (\d+) (těleso|tělesa|těles), z každého vzniknou dvě \(modře a oranžově\)\.$/, (m, k) => `${k} ${k === '1' ? 'body is' : 'bodies are'} split, each into two (blue and orange).`],
     [/^Hrana ([\d,.]+) mm$/, 'Edge $1 mm'], [/^Ohnout plochu (\d+)$/, 'Bend face $1'], [/^Rozříznout (\d+)$/, 'Split body $1'],
+    [/^Zaoblená plocha s malým poloměrem ohybu: na vnitřní straně se ohyb zužuje až do jednoho bodu \(vypadá jako spoj\)\. Plynulý ohyb dá poloměr kolem (.+) mm \(polovina šířky plochy\)\.$/, 'Rounded face with a small bend radius: on the inner side the bend narrows down to a single point (looks like a joint). A radius of about $1 mm (half the face width) gives a smooth bend.'],
     [/^Kružnice · Ø (.+)$/, 'Circle · Ø $1'], [/^Oblouk · R (.+)$/, 'Arc · R $1'], [/^Hrana · délka (.+)$/, 'Edge · length $1'],
     [/^Vzdálenost (.+) mm$/, 'Distance $1 mm'], [/^Vzdálenost (.+)$/, 'Distance $1'],
     [/^Průměr plochy Ø(.+) neodpovídá velikosti (.+) \((díra pro ni má mít|čep má mít) Ø(.+)\)\.$/, (m, a, b, c, d) => `The face diameter Ø${a} does not match size ${b} (${c === 'čep má mít' ? 'the pin should be' : 'the hole should be'} Ø${d}).`],

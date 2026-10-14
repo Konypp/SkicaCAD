@@ -299,8 +299,11 @@ function bendFaceTool(polys, f) {
   const all = loops.flat(); let side = 0;
   for (const q of all) side += (q[0] - A[0]) * -d[1] + (q[1] - A[1]) * d[0];
   if (side < 0) d = [-d[0], -d[1]];
-  const r = Math.max(0, Number(f.radius) || 0), per = [-d[1], d[0]], P0 = [A[0] - per[0] * r, A[1] - per[1] * r];
-  for (const q of all) if ((q[0] - P0[0]) * per[0] + (q[1] - P0[1]) * per[1] < -1e-4) throw new Error('Osa ohybu musí ležet na okraji plochy, ne uvnitř');
+  const per = [-d[1], d[0]];
+  /* points a hair across the axis (rounded coordinates) push the axis out by that much; more means the axis cuts the face */
+  let minD = Infinity; for (const q of all) minD = Math.min(minD, (q[0] - A[0]) * per[0] + (q[1] - A[1]) * per[1]);
+  if (minD < -1e-3) throw new Error('Osa ohybu musí ležet na okraji plochy, ne uvnitř');
+  const r = Math.max(0, Number(f.radius) || 0) + Math.max(0, -minD) + 1e-6, P0 = [A[0] - per[0] * r, A[1] - per[1] * r];
   /* the sweep starts slightly (EPS) inside the body, so the union never meets the face coplanar and the swept side walls
      never run tangent to the body's walls (that left a pinched, non-manifold rim on cylinders); the end face stays at the angle */
   const EPS = 0.5, sg = ang < 0 ? -1 : 1;
