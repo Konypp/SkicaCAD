@@ -395,6 +395,7 @@ function makeBodyEntry(b) {
 }
 function disposeEntry(e) {
   e.mesh.geometry.dispose(); e.mesh.material.dispose(); e.edges.geometry.dispose(); e.edges.material.dispose();
+  if (e.facets) { e.facets.geometry.dispose(); e.facets.material.dispose(); }
   G.bodies.remove(e.mesh);
 }
 function syncBodies() {
@@ -420,17 +421,24 @@ function styleBodies() {
     m.color.copy(tok.body);
     if (tint === 'tool') m.color.lerp(tok.orange, 0.5);
     else if (isSel || tint === 'target') m.color.lerp(tok.accent, 0.45);
-    /* wireframe: the whole triangle mesh as thin lines (so curved faces show their shape too), sharp edges drawn over it */
+    /* wireframe: the edges of the facets the body is made of (every edge where the surface turns, however little, so curved
+       faces show their shape), no triangle diagonals inside flat faces; sharp edges are drawn stronger over them */
     const wire = settings.style === 'w';
-    m.wireframe = wire;
-    m.visible = true;
-    if (wire) { m.color.lerp(tok.edge, 0.55); m.transparent = true; m.opacity = 0.6; m.depthWrite = false; }
-    else { m.transparent = false; m.opacity = 1; m.depthWrite = true; }
+    m.wireframe = false; m.transparent = false; m.opacity = 1; m.depthWrite = true;
+    m.visible = !wire;
+    if (wire && !e.facets) {
+      const arr = [];
+      for (const ed of K.edgeMapOf(e.polys).values()) { if (ed.ps.length === 2 && K.vdot(e.polys[ed.ps[0]].n, e.polys[ed.ps[1]].n) > 0.99999) continue; arr.push(...ed.a, ...ed.b); }
+      e.facets = noRay(new THREE.LineSegments(lineGeo(arr), new THREE.LineBasicMaterial({ color: tok.edge.clone(), transparent: true, opacity: 0.45 })));
+      e.mesh.add(e.facets);
+    }
+    if (e.facets) { e.facets.visible = wire; e.facets.material.color.copy(tok.muted); e.facets.material.opacity = 0.5; }
     e.edges.visible = settings.style !== 's';
     /* sharp edges are drawn softly (a shade darker than the body); selection and hover keep strong colours */
     const strong = isSel || tint || hoverBody === id;
     e.edges.material.color.copy(isSel || tint ? (tint === 'tool' ? tok.orange : tok.accent) : (hoverBody === id ? tok['accent-hover'] : softEdge()));
     e.edges.material.transparent = !strong; e.edges.material.opacity = strong ? 1 : 0.55; e.edges.material.depthWrite = strong;
+    if (wire && !strong) { e.edges.material.color.copy(tok.muted); e.edges.material.transparent = false; e.edges.material.opacity = 1; }
   }
   requestRender();
 }

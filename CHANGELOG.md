@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.81
+- Drátový model kreslí hrany plošek, ze kterých se těleso skládá, místo všech trojúhelníků: krychle má jen 12 hran, válec svislé linky po obvodu a čisté podstavy, koule poledníky a rovnoběžky, rovné stěny jsou bez úhlopříček. Ostré hrany jsou výraznější, barvy odpovídají světlému i tmavému režimu. Tělesa jdou v drátovém modelu dál vybírat.
+
 ## Beta 0.80
 - Skica na ploše tělesa (Vytvořit skicu, Skica z plochy, Prázdná skica, i na části rozdělené plochy): počátek skici a mřížky je uprostřed plochy, ne v průmětu počátku souřadnic (u těles mimo počátek ležel na kraji plochy nebo mimo ni). Souřadnice a přichytávání k mřížce se tak počítají od středu plochy.
 - Kontrola modelů: krychle, válec, koule, kužel, torus, šroub i matice mají střed podstavy v počátku, uzavřenou síť a správný objem.
