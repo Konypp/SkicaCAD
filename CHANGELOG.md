@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.82
+- Kužel: nové pole Horní průměr (výchozí 0 = špička). S nenulovou hodnotou vznikne komolý kužel, horní průměr může být i větší než spodní (obrácený kužel). Horní průměr má v náhledu vlastní táhlo a lze ho dodatečně upravit.
+
 ## Beta 0.81
 - Drátový model kreslí hrany plošek, ze kterých se těleso skládá, místo všech trojúhelníků: krychle má jen 12 hran, válec svislé linky po obvodu a čisté podstavy, koule poledníky a rovnoběžky, rovné stěny jsou bez úhlopříček. Ostré hrany jsou výraznější, barvy odpovídají světlému i tmavému režimu. Tělesa jdou v drátovém modelu dál vybírat.
 

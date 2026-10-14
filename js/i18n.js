@@ -23,7 +23,7 @@
     'Vytvořit skicu': 'Create sketch', 'Vysunutí': 'Extrude', 'Rotace': 'Revolve', 'Závit': 'Thread', 'Krychle': 'Cube', 'Válec': 'Cylinder', 'Koule': 'Sphere',
     'Kužel': 'Cone', 'Torus': 'Torus', 'Zaoblení': 'Fillet', 'Zkosení': 'Chamfer', 'Kombinovat': 'Combine', 'Přesunout': 'Move', 'Otočit': 'Rotate',
     'Měřítko': 'Scale', 'Vycentrovat': 'Center', 'Plochy': 'Faces', 'Zrcadlit': 'Mirror', 'Pole': 'Pattern', 'Odstranit': 'Delete', 'Vybrat vše': 'Select all',
-    'Měřit': 'Measure', 'Importovat': 'Import', 'Import': 'Import', 'Upravit plochu': 'Edit face', 'Čára': 'Line', 'Křivka': 'Spline', 'Obdélník': 'Rectangle',
+    'Měřit': 'Measure', 'Horní průměr': 'Top diameter', 'Importovat': 'Import', 'Import': 'Import', 'Upravit plochu': 'Edit face', 'Čára': 'Line', 'Křivka': 'Spline', 'Obdélník': 'Rectangle',
     'Kružnice': 'Circle', 'Elipsa': 'Ellipse', 'Mnohoúhelník': 'Polygon', 'Drážka': 'Slot', 'Zaoblit rohy': 'Round corners', 'Smazat': 'Delete',
     'DXF / SVG': 'DXF / SVG', 'Dokončit skicu': 'Finish sketch', 'Skica': 'Sketch', 'Skici': 'Sketches', 'Tělesa': 'Bodies', 'Těleso': 'Body', 'Počátek': 'Origin',
     'Měřit od': 'Measure from', 'Odstranit těleso': 'Delete body', 'Upravit plochu ': 'Edit face',

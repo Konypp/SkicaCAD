@@ -594,6 +594,9 @@ function primitive(type, p) {
     if (type === 'cylinder') {
       const top = ring(p.r, N, h2); add(top);
       for (let i = 0; i < N; i++) { const j = (i + 1) % N; add([bot[i], bot[j], top[j], top[i]]); }
+    } else if (p.rt > 1e-3) { /* truncated cone (frustum) with top radius rt */
+      const top = ring(p.rt, N, h2); add(top);
+      for (let i = 0; i < N; i++) { const j = (i + 1) % N; add([bot[i], bot[j], top[j], top[i]]); }
     } else {
       for (let i = 0; i < N; i++) { const j = (i + 1) % N; add([bot[i], bot[j], [0, 0, h2]]); }
     }

@@ -2092,18 +2092,20 @@ const PRIM_FIELDS = {
   box: [['w', 'Šířka (X)', 30], ['d', 'Hloubka (Y)', 30], ['h', 'Výška (Z)', 30]],
   cylinder: [['D', 'Průměr', 30], ['h', 'Výška', 30]],
   sphere: [['D', 'Průměr', 30]],
-  cone: [['D', 'Průměr', 30], ['h', 'Výška', 30]],
+  cone: [['D', 'Průměr', 30], ['Dt', 'Horní průměr', 0], ['h', 'Výška', 30]],
   torus: [['R', 'Poloměr', 25], ['t', 'Poloměr trubice', 6]]
 };
 function primParams(type, vals) {
   if (type === 'box') return { w: vals.w, d: vals.d, h: vals.h };
-  if (type === 'cylinder' || type === 'cone') return { r: vals.D / 2, h: vals.h };
+  if (type === 'cone') return { r: vals.D / 2, h: vals.h, rt: Math.max(0, vals.Dt || 0) / 2 };
+  if (type === 'cylinder') return { r: vals.D / 2, h: vals.h };
   if (type === 'sphere') return { r: vals.D / 2 };
   return { R: vals.R, t: vals.t };
 }
 function primVals(type, p) {
   if (type === 'box') return { w: p.w, d: p.d, h: p.h };
-  if (type === 'cylinder' || type === 'cone') return { D: p.r * 2, h: p.h };
+  if (type === 'cone') return { D: p.r * 2, Dt: (p.rt || 0) * 2, h: p.h };
+  if (type === 'cylinder') return { D: p.r * 2, h: p.h };
   if (type === 'sphere') return { D: p.r * 2 };
   return { R: p.R, t: p.t };
 }
@@ -2115,8 +2117,12 @@ function primHandles(type, v) {
     q('w', 'Šířka', [0, 0, v.h / 2], [1, 0, 0], v.w / 2, s => ({ w: 2 * s })),
     q('d', 'Hloubka', [0, 0, v.h / 2], [0, 1, 0], v.d / 2, s => ({ d: 2 * s })),
     q('h', 'Výška', [0, 0, 0], [0, 0, 1], v.h, s => ({ h: s }))];
-  if (type === 'cylinder' || type === 'cone') return [
-    q('D', 'Průměr', [0, 0, type === 'cone' ? 0 : v.h / 2], DIAG, v.D / 2, s => ({ D: 2 * s })),
+  if (type === 'cone') return [
+    q('D', 'Průměr', [0, 0, 0], DIAG, v.D / 2, s => ({ D: 2 * s })),
+    q('Dt', 'Horní průměr', [0, 0, v.h], [-DIAG[0], -DIAG[1], 0], (v.Dt || 0) / 2, s => ({ Dt: Math.max(0, 2 * s) })),
+    q('h', 'Výška', [0, 0, 0], [0, 0, 1], v.h, s => ({ h: s }))];
+  if (type === 'cylinder') return [
+    q('D', 'Průměr', [0, 0, v.h / 2], DIAG, v.D / 2, s => ({ D: 2 * s })),
     q('h', 'Výška', [0, 0, 0], [0, 0, 1], v.h, s => ({ h: s }))];
   if (type === 'sphere') return [q('D', 'Průměr', [0, 0, v.D / 2], DIAG, v.D / 2, s => ({ D: 2 * s }))];
   return [
@@ -2141,7 +2147,7 @@ function startPrimitive(type, editIndex, f) {
           if (id === 'uni') { this.uniform = dlg.get('uni'); return; }
           if (id === 'pos') this.pos = dlg.get('pos');
           else if (id === 'op') { this.op = dlg.get('op'); this.autoOp = false; }
-          else { const v = dlg.get(id); if (isFinite(v) && v > 0) this.vals[id] = v; }
+          else { const v = dlg.get(id); if (isFinite(v) && (v > 0 || (id === 'Dt' && v >= 0))) this.vals[id] = v; }
           this.update();
         }
       });
@@ -2216,10 +2222,10 @@ function startPrimitive(type, editIndex, f) {
         for (const k in this.vals) { this.vals[k] = Math.round(this.vals[k] * f2 * 1000) / 1000; dlg.set(k, this.vals[k]); }
         this.update();
       } else for (const k in nv) {
-        let v = Math.round(nv[k] / st) * st; v = Math.max(st, Math.round(v * 1000) / 1000);
+        let v = Math.round(nv[k] / st) * st; v = Math.max(k === 'Dt' ? 0 : st, Math.round(v * 1000) / 1000); /* a cone may end in a point */
         if (type === 'torus' && k === 'R') v = Math.max(v, this.vals.t + st);
         if (type === 'torus' && k === 't') v = Math.min(v, this.vals.R - st);
-        if (v > 0 && v !== this.vals[k]) { this.vals[k] = v; dlg.set(k, v); this.update(); }
+        if ((v > 0 || k === 'Dt') && v !== this.vals[k]) { this.vals[k] = v; dlg.set(k, v); this.update(); }
       }
       const el = $('#dim'), px = evPx(ev), label = defs.find(x => x[0] === h.k)[1];
       el.textContent = `${label}: ${fmtc(this.vals[h.k], 2)} mm`; el.hidden = false;

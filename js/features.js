@@ -427,7 +427,7 @@ function toolForFastener(f) {
   return KK.translate(polys, pos);
 }
 function toolForPrimitive(f) {
-  const p = {}; for (const k in f.p) p[k] = Math.max(0.01, Number(f.p[k]) || 0);
+  const p = {}; for (const k in f.p) p[k] = Math.max(k === 'rt' ? 0 : 0.01, Number(f.p[k]) || 0); /* a cone's top radius may be 0 (pointed cone) */
   if (f.type === 'torus' && p.t >= p.R) throw new Error('Trubice musí být menší než hlavní poloměr');
   const pos = f.pos || [0, 0, 0];
   return KK.translate(KK.primitive(f.type, p), [pos[0], pos[1], pos[2] + PRIM[f.type].lift(p)]);
