@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 0.84
+- Rozříznout: táhla přímo v modelu. Šipka ze středu posouvá rovinu, šipky na okrajích plochy ji natáčejí kolem obou os, táhlo v rohu mění velikost řezné plochy a u zmenšené plochy dvě šipky ve středu posouvají plochu v rovině. Hodnoty se při tažení zobrazují u kurzoru a zapisují do okna.
+- Ohnout plochu: táhla v modelu pro úhel (táhlo na konci ohybu, otáčí se kolem osy ohybu, s přichytáváním po 5°) a pro poloměr ohybu (šipka na ose ohybu).
+- Řezná plocha přes celé těleso se kreslí jen o něco větší než vybraná tělesa, aby táhla zůstala na obrazovce.
+
 ## Beta 0.83
 - Rozříznout: řeznou rovinu lze posuvníky posunout (Posun roviny), natočit kolem obou os ležících v rovině (−90° až 90°) a zmenšit (Velikost řezné plochy). Zmenšená plocha odřízne jen část tělesa před sebou ve směru šipky a dá se posouvat v rovině. Šipka v náhledu ukazuje stranu „nad rovinou“. Rozsahy posuvníků se řídí velikostí vybraných těles a popisky ukazují skutečné osy.
 
