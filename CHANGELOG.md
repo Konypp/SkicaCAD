@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.79
+- Plochy: oprava výběru válcové plochy vedle ohybu nebo jiné zakřivené plochy. Výběr „přetékal“ do sousední plochy (pruh v ohybu), takže nesouhlasila ani délka plochy. Teď se vybere jen samotný válec (stejná vzdálenost stěn od osy), délka i průměr odpovídají.
+
 ## Beta 0.78
 - Drátový model ukazuje celou síť tělesa (všechny trojúhelníky slabou čarou, ostré hrany výrazně), takže jsou vidět i zakřivené plochy, ne jen základní obrysy.
 

@@ -3349,23 +3349,46 @@ function cylinderAt(polys, pi) {
     if (d < 0.99999 && d > lim) { const c = K.cross(p0.n, polys[nb].n); if (Math.hypot(c[0], c[1], c[2]) > 1e-6) { axis = K.vnorm(c); break; } }
   }
   if (!axis) return null;
-  const group = new Set([pi]), st = [pi];
-  while (st.length) {
-    const i = st.pop();
-    for (const nb of adj[i]) { if (group.has(nb)) continue; const q = polys[nb]; if (Math.abs(K.vdot(q.n, axis)) < 0.02 && K.vdot(q.n, polys[i].n) > lim) { group.add(nb); st.push(nb); } }
-  }
-  if (group.size < 6) return null;
+  /* grow over neighbours whose normal is perpendicular to the axis (breadth first, nearest first) */
+  const grow = ok => {
+    const g = new Set([pi]), order = [pi];
+    for (let h = 0; h < order.length; h++) {
+      const i = order[h];
+      for (const nb of adj[i]) { if (g.has(nb)) continue; const q = polys[nb]; if (Math.abs(K.vdot(q.n, axis)) < 0.02 && K.vdot(q.n, polys[i].n) > lim && ok(nb)) { g.add(nb); order.push(nb); } }
+    }
+    return { g, order };
+  };
   const tt = Math.abs(axis[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0], e1 = K.vnorm(K.cross(axis, tt)), e2 = K.cross(axis, e1);
+  const fit = idx => {
+    const p2 = []; for (const i of idx) for (const v of polys[i].v) p2.push([K.vdot(v, e1), K.vdot(v, e2)]);
+    const A = p2[0]; let B = A, bd = 0, C = A, cd = 0;
+    for (const q of p2) { const d = Math.hypot(q[0] - A[0], q[1] - A[1]); if (d > bd) { bd = d; B = q; } }
+    for (const q of p2) { const d = Math.abs((B[0] - A[0]) * (q[1] - A[1]) - (B[1] - A[1]) * (q[0] - A[0])); if (d > cd) { cd = d; C = q; } }
+    const D = 2 * (A[0] * (B[1] - C[1]) + B[0] * (C[1] - A[1]) + C[0] * (A[1] - B[1]));
+    if (Math.abs(D) < 1e-9) return null;
+    const s = q => q[0] * q[0] + q[1] * q[1];
+    const cx = (s(A) * (B[1] - C[1]) + s(B) * (C[1] - A[1]) + s(C) * (A[1] - B[1])) / D, cy = (s(A) * (C[0] - B[0]) + s(B) * (A[0] - C[0]) + s(C) * (B[0] - A[0])) / D;
+    return { cx, cy, r: Math.hypot(A[0] - cx, A[1] - cy) };
+  };
+  /* a torus or other curved surface next to the cylinder has strips with the same kind of normals: fit the circle on the polygons
+     nearest to the tapped one, keep only polygons lying on that cylinder and regrow from the tapped polygon through them */
+  const first = grow(() => true);
+  if (first.g.size < 6) return null;
+  const f0 = fit(first.order.slice(0, Math.min(first.order.length, 40)));
+  if (!f0) return null;
+  const Q = K.vadd(K.vmul(e1, f0.cx), K.vmul(e2, f0.cy)), planeDist = P => Math.abs(K.vdot(P.n, Q) - P.w), d0 = planeDist(p0);
+  const onCyl = i => {
+    const P = polys[i];
+    if (!P.v.every(v => Math.abs(Math.hypot(K.vdot(v, e1) - f0.cx, K.vdot(v, e2) - f0.cy) - f0.r) < 0.03 * f0.r + 0.01)) return false;
+    /* all facets of one cylinder lie at the same distance from its axis (a neighbouring torus strip lies a little further out) */
+    return Math.abs(planeDist(P) - d0) < Math.max(1e-3, 5e-4 * f0.r);
+  };
+  const group = grow(onCyl).g;
+  if (group.size < 6) return null;
   const pts = []; for (const i of group) for (const v of polys[i].v) pts.push(v);
   const p2 = pts.map(v => [K.vdot(v, e1), K.vdot(v, e2)]);
-  const A = p2[0]; let B = A, bd = 0, C = A, cd = 0;
-  for (const q of p2) { const d = Math.hypot(q[0] - A[0], q[1] - A[1]); if (d > bd) { bd = d; B = q; } }
-  for (const q of p2) { const d = Math.abs((B[0] - A[0]) * (q[1] - A[1]) - (B[1] - A[1]) * (q[0] - A[0])); if (d > cd) { cd = d; C = q; } }
-  const D = 2 * (A[0] * (B[1] - C[1]) + B[0] * (C[1] - A[1]) + C[0] * (A[1] - B[1]));
-  if (Math.abs(D) < 1e-9) return null;
-  const s = q => q[0] * q[0] + q[1] * q[1];
-  const cx = (s(A) * (B[1] - C[1]) + s(B) * (C[1] - A[1]) + s(C) * (A[1] - B[1])) / D, cy = (s(A) * (C[0] - B[0]) + s(B) * (A[0] - C[0]) + s(C) * (B[0] - A[0])) / D;
-  const r = Math.hypot(A[0] - cx, A[1] - cy);
+  const ff = fit(group); if (!ff) return null;
+  const { cx, cy, r } = ff;
   const angs = [];
   for (const q of p2) { const d = Math.hypot(q[0] - cx, q[1] - cy); if (Math.abs(d - r) > 0.03 * r + 0.01) return null; angs.push(Math.atan2(q[1] - cy, q[0] - cx)); }
   angs.sort((x, y) => x - y);
