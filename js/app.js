@@ -2767,35 +2767,54 @@ function startPressFace(editIndex, f) {
 }
 
 /* ================= drag handles in the 3D view (shared by Ohnout and Rozříznout) ================= */
-/* orange arrow (cone + short shaft) with a ball at its foot; keeps its size on screen; turns blue when hovered or dragged */
+/* same language as the move / rotate / scale manipulator: an arrow moves, an arc turns, a little cube resizes;
+   colour of the axis it works along (or turns about), yellow while hovered or dragged; keeps its size on screen */
+const HANDLE_AXIS_COL = [0xff0000, 0x00ff00, 0x0000ff];
+function handleColor(v) {
+  if (!v) return new THREE.Color(0xff9900);
+  const a = [Math.abs(v.x), Math.abs(v.y), Math.abs(v.z)], k = a.indexOf(Math.max(...a));
+  return new THREE.Color(a[k] > 0.9 ? HANDLE_AXIS_COL[k] : 0xff9900);
+}
 function makeHandleSet(n) {
   const grp = new THREE.Group(), hs = [];
+  const mk = g => { const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: tok.orange, depthTest: false, transparent: true })); m.renderOrder = 14; return m; };
   for (let i = 0; i < n; i++) {
-    const mk = g => { const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: tok.orange, depthTest: false, transparent: true })); m.renderOrder = 14; return m; };
-    const cone = mk(new THREE.ConeGeometry(1, 2.6, 18)), ball = mk(new THREE.SphereGeometry(0.7, 14, 10));
+    const cone = mk(new THREE.ConeGeometry(1, 2.6, 18)), ball = mk(new THREE.SphereGeometry(0.7, 14, 10)), cube = mk(new THREE.BoxGeometry(1.7, 1.7, 1.7));
+    const arc = mk(new THREE.TorusGeometry(3.2, 0.32, 8, 32, Math.PI * 0.6));
     const shaft = noRay(new THREE.Line(lineGeo([0, 0, 0, 0, 0, 0]), new THREE.LineBasicMaterial({ color: tok.orange, depthTest: false, transparent: true })));
     shaft.frustumCulled = false; shaft.renderOrder = 14;
-    grp.add(cone, ball, shaft); hs.push({ cone, ball, shaft });
+    grp.add(cone, ball, cube, arc, shaft); hs.push({ cone, ball, cube, arc, shaft });
   }
   grp.visible = false; scene.add(grp);
   return { grp, hs, dispose() { scene.remove(grp); disposeObj(grp); } };
 }
-function placeHandle(h, tip, dir, hot) {
-  const s = arrowSize(tip), col = hot ? tok.accent : tok.orange;
+/* kind 'move' (arrow along dir), 'scale' (cube along dir) or 'rot' (arc about axis, its middle facing dir) */
+function placeHandle(h, tip, dir, hot, kind = 'move', axis = null) {
+  const s = arrowSize(tip), col = hot ? new THREE.Color(0xffd000) : handleColor(kind === 'rot' ? axis : dir);
+  for (const o of [h.cone, h.cube, h.arc, h.shaft]) o.visible = false;
   h.ball.visible = true; h.ball.scale.setScalar(s); h.ball.position.copy(tip);
-  h.cone.visible = h.shaft.visible = !!dir;
-  if (dir) {
-    h.cone.scale.setScalar(s); h.cone.quaternion.setFromUnitVectors(new V3(0, 1, 0), dir); h.cone.position.copy(tip).addScaledVector(dir, s * 2.2);
-    const b = tip.clone().addScaledVector(dir, s * 1.2), pa = h.shaft.geometry.attributes.position;
+  if (kind === 'rot' && axis) {
+    const ax = axis.clone().normalize(), q = new THREE.Quaternion().setFromUnitVectors(new V3(0, 0, 1), ax);
+    /* the torus arc starts on local +X: turn it about the axis so that the arc is centred on dir */
+    const x0 = new V3(1, 0, 0).applyQuaternion(q), d = dir ? dir.clone().sub(ax.clone().multiplyScalar(dir.dot(ax))) : x0.clone();
+    if (d.lengthSq() > 1e-9) { d.normalize(); const ang = Math.atan2(x0.clone().cross(d).dot(ax), x0.dot(d)) - Math.PI * 0.3; q.premultiply(new THREE.Quaternion().setFromAxisAngle(ax, ang)); }
+    h.arc.visible = true; h.arc.scale.setScalar(s); h.arc.quaternion.copy(q);
+    /* the arc passes through the tip: its centre lies 3.2 units back along dir */
+    h.arc.position.copy(tip).addScaledVector(d.lengthSq() > 0 ? d : x0, -3.2 * s);
+  } else if (dir) {
+    const head = kind === 'scale' ? h.cube : h.cone;
+    head.visible = true; head.scale.setScalar(s); head.quaternion.setFromUnitVectors(new V3(0, 1, 0), dir); head.position.copy(tip).addScaledVector(dir, s * (kind === 'scale' ? 2.4 : 2.2));
+    h.shaft.visible = true;
+    const b = tip.clone().addScaledVector(dir, s * 1.6), pa = h.shaft.geometry.attributes.position;
     pa.setXYZ(0, tip.x, tip.y, tip.z); pa.setXYZ(1, b.x, b.y, b.z); pa.needsUpdate = true;
   }
-  for (const o of [h.cone, h.ball, h.shaft]) o.material.color.copy(col);
+  for (const o of [h.cone, h.ball, h.cube, h.arc, h.shaft]) o.material.color.copy(col);
 }
-function hideHandle(h) { h.cone.visible = h.ball.visible = h.shaft.visible = false; }
+function hideHandle(h) { h.cone.visible = h.ball.visible = h.shaft.visible = h.cube.visible = h.arc.visible = false; }
 function handleHit(ev, set) {
   if (!set.grp.visible) return -1;
   ray.setFromCamera(evNdc(ev), cam());
-  for (let i = 0; i < set.hs.length; i++) for (const o of [set.hs[i].cone, set.hs[i].ball]) { if (!o.visible) continue; o.updateMatrixWorld(true); if (ray.intersectObject(o, false).length) return i; }
+  for (let i = 0; i < set.hs.length; i++) for (const o of [set.hs[i].cone, set.hs[i].ball, set.hs[i].cube, set.hs[i].arc]) { if (!o.visible) continue; o.updateMatrixWorld(true); if (ray.intersectObject(o, false).length) return i; }
   return -1;
 }
 function dimLabel(ev, text) { const el = $('#dim'), px = evPx(ev); el.textContent = text; el.hidden = false; el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px'; }
@@ -2817,17 +2836,18 @@ function startBendFace(editIndex, f, face) {
   const c = {
     editIndex, body: f ? f.body : null, desc: f ? { n: f.n, w: f.w, p: f.p, ...(f.clip ? { clip: f.clip } : {}) } : null,
     axis: f ? { a: f.axis.a.slice(), b: f.axis.b.slice() } : null, angle: f ? f.angle : 90, radius: f ? (f.radius || 0) : 2,
-    phi: f && isFinite(f.phi) ? f.phi : null, outline: [], edges: [], hoverEdge: -1, timer: null, tool: null, hset: null, hHot: -1, hdrag: null,
+    phi: f && isFinite(f.phi) ? f.phi : null, outline: [], edges: [], hoverEdge: -1, timer: null, tool: null, hset: null, hHot: -1, hdrag: null, hmode: 'rot',
     init() {
       if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
       openDialog({
         title: 'Ohnout plochu', icon: 'bendface',
-        fields: [{ k: 'sel', id: 'face', label: 'Plocha' },
+        fields: [{ k: 'sel', id: 'face', label: 'Plocha' }, { k: 'seg', id: 'hmode', label: 'Táhla', options: [['rot', 'Natočení'], ['move', 'Poloměr']], value: this.hmode },
           { k: 'seg', id: 'dir', label: 'Směr ohybu', options: [['0', '+X'], ['90', '+Y'], ['180', '−X'], ['270', '−Y']] },
           { k: 'num', id: 'phi', label: 'Natočení směru', unit: '°', value: 0, range: [0, 360, 1] },
           { k: 'num', id: 'angle', label: 'Úhel', unit: '°', value: this.angle, range: [1, 180, 1] },
           { k: 'num', id: 'radius', label: 'Poloměr ohybu', value: this.radius, range: [0, 20, 0.5] }, { k: 'note', id: 'n' }],
         onChange: id => {
+          if (id === 'hmode') { this.hmode = dlg.get('hmode'); requestRender(); return; }
           if (id === 'angle') { const v = dlg.get('angle'); if (isFinite(v) && v > 0) this.angle = Math.min(180, v); }
           if (id === 'radius') { const v = dlg.get('radius'); if (v >= 0) this.radius = v; }
           if (id === 'phi') { const v = dlg.get('phi'); if (isFinite(v)) { this.phi = ((v % 360) + 360) % 360; this.makeAxis(); } }
@@ -2835,7 +2855,7 @@ function startBendFace(editIndex, f, face) {
           this.update();
         }
       });
-      this.hset = makeHandleSet(2);
+      this.hset = makeHandleSet(3);
       if (!f && face && face.kind === 'plane') this.useFace(face); else { this.loadOutline(); if (this.desc) { if (this.phi === null) this.phi = this.phiOfAxis(); this.labels(); } }
       this.update();
     },
@@ -2896,9 +2916,17 @@ function startBendFace(editIndex, f, face) {
       hs.grp.visible = !!g; if (!g) return;
       const th = this.angle * D2R, tipA = g.O.clone().addScaledVector(g.r0, g.rho * Math.cos(th)).addScaledVector(g.n, g.rho * Math.sin(th));
       const tan = g.r0.clone().multiplyScalar(-Math.sin(th)).addScaledVector(g.n, Math.cos(th)).normalize();
-      placeHandle(hs.hs[0], tipA, tan, this.hHot === 0);
-      placeHandle(hs.hs[1], g.O.clone(), g.dir, this.hHot === 1);
+      hs.hs.forEach(hideHandle);
+      if (this.hmode === 'rot') {
+        placeHandle(hs.hs[0], tipA, tan, this.hHot === 0, 'rot', g.k);
+        /* direction of the bend: an arc about the face normal on the face edge in the bend direction */
+        const cen = this.faceCen(), dirTip = cen.clone().addScaledVector(g.dir, this.reach(g.dir) * 0.6);
+        placeHandle(hs.hs[2], dirTip, g.dir, this.hHot === 2, 'rot', g.n);
+      } else placeHandle(hs.hs[1], g.O.clone(), g.dir, this.hHot === 1, 'move');
     },
+    faceCen() { return this.outline.reduce((s2, q) => s2.add(v3(q)), new V3()).multiplyScalar(1 / Math.max(1, this.outline.length)); },
+    /* distance from the face centre to its outline in direction d */
+    reach(d) { const c0 = this.faceCen(); let m = 0; for (const q of this.outline) m = Math.max(m, v3(q).sub(c0).dot(d)); return Math.max(1, m); },
     onDown(ev) {
       const i = handleHit(ev, this.hset); if (i < 0) return false;
       this.hdrag = { i }; controls.enabled = false; return true;
@@ -2915,6 +2943,15 @@ function startBendFace(editIndex, f, face) {
         a = Math.max(1, Math.min(180, Math.round(a / (settings.gridSnap ? 5 : 1)) * (settings.gridSnap ? 5 : 1)));
         if (a !== this.angle) { this.angle = a; dlg.set('angle', a); this.update(); }
         dimLabel(ev, `Úhel ${fmtc(this.angle, 0)}°`);
+      } else if (d.i === 2) {
+        /* direction: pointer on the face plane, angle around the face centre in the face's own X/Y frame */
+        ray.setFromCamera(evNdc(ev), cam());
+        const pl = new THREE.Plane().setFromNormalAndCoplanarPoint(g.n, this.faceCen()), x = new V3();
+        if (!ray.ray.intersectPlane(pl, x)) return;
+        const { U, V } = this.frame(), q = x.sub(this.faceCen()), st = settings.gridSnap ? 5 : 1;
+        let p = Math.atan2(q.dot(v3(V)), q.dot(v3(U))) / D2R; p = ((Math.round(p / st) * st) % 360 + 360) % 360;
+        if (p !== this.phi) { this.phi = p; dlg.set('phi', p); dlg.set('dir', String(p)); this.makeAxis(); this.update(); }
+        dimLabel(ev, `Směr ${this.axisName(this.dirOf(this.phi))} · ${fmtc(this.phi, 0)}°`);
       } else {
         /* radius: distance of the bend axis from the face edge */
         const t = lineParam(ev, g.mid, g.dir); if (t === null) return;
@@ -2936,7 +2973,7 @@ function startBendFace(editIndex, f, face) {
       const has = !!this.desc;
       dlg.set('face', { text: has ? 'Rovinná plocha' : 'Klepněte na rovinnou plochu', has, active: !has });
       ['dir', 'phi'].forEach(id => dlg.show(id, has));
-      setPrompt(!has ? 'Klepněte na rovinnou plochu, kterou chcete ohnout' : 'Úhel a poloměr táhněte za oranžová táhla, směr zvolte tlačítky, posuvníkem nebo klepnutím na hranu');
+      setPrompt(!has ? 'Klepněte na rovinnou plochu, kterou chcete ohnout' : 'Táhly natočíte úhel a směr ohybu (přepínač Táhla: Poloměr), směr jde zvolit i tlačítky nebo klepnutím na hranu');
       if (has) {
         const rp = this.regionPolys(); if (rp && rp.length) G.overlay.add(faceOverlay(rp, planeKey(rp[0]), tok.accent, 0.2));
         if (this.hoverEdge >= 0 && this.edges[this.hoverEdge]) { const [a, b2] = this.edges[this.hoverEdge]; const l = noRay(new THREE.LineSegments(lineGeo([...a, ...b2]), new THREE.LineBasicMaterial({ color: tok.accent, depthTest: false, transparent: true }))); l.renderOrder = 12; G.overlay.add(l); }
@@ -3013,7 +3050,7 @@ function startSplitBody(editIndex, f) {
     editIndex, bodies: new Set(f ? (f.bodies || []) : [...sel]), mode: f ? (f.mode || 'XY') : 'XY', off: f ? (Number(f.offset) || 0) : null,
     faceN: f && f.mode === 'face' ? (f.fn || f.n).slice() : null, faceW: f && f.mode === 'face' ? (f.fw !== undefined ? Number(f.fw) : Number(f.w) - (Number(f.offset) || 0)) : 0,
     tilt: f && f.tilt ? f.tilt.slice() : [0, 0], shift: f && f.shift ? f.shift.slice() : [0, 0], size: f && f.size ? Number(f.size) : null,
-    keep: f ? (f.keep || 'both') : 'both', pick: 'bodies', timer: null, ok_: false, hideBodies: new Set(), highlight: new Set(), hset: null, hHot: -1, hdrag: null,
+    keep: f ? (f.keep || 'both') : 'both', pick: 'bodies', timer: null, ok_: false, hideBodies: new Set(), highlight: new Set(), hset: null, hHot: -1, hdrag: null, hmode: 'move',
     ids() { return [...this.bodies].filter(id => meshes.has(id)); },
     /* bounding box of the selection, cached (the handles ask for it every frame) */
     bb() {
@@ -3035,6 +3072,7 @@ function startSplitBody(editIndex, f) {
         fields: [{ k: 'sel', id: 'bodies', label: 'Tělesa' },
           { k: 'opt', id: 'mode', label: 'Řezná rovina', options: [['XY', 'Rovina XY (vodorovně)'], ['XZ', 'Rovina XZ (zepředu)'], ['YZ', 'Rovina YZ (zboku)'], ['face', 'Rovina plochy tělesa']], value: this.mode },
           { k: 'sel', id: 'plane', label: 'Plocha' },
+          { k: 'seg', id: 'hmode', label: 'Táhla', options: [['move', 'Posun'], ['rot', 'Natočení'], ['scale', 'Velikost']], value: this.hmode },
           { k: 'num', id: 'off', label: 'Posun roviny', value: this.off, range: [-100, 100, 0.5] },
           { k: 'num', id: 'ta', label: 'Natočení kolem X', unit: '°', value: this.tilt[0], range: [-90, 90, 1] },
           { k: 'num', id: 'tb', label: 'Natočení kolem Y', unit: '°', value: this.tilt[1], range: [-90, 90, 1] },
@@ -3054,6 +3092,7 @@ function startSplitBody(editIndex, f) {
           if (id === 'su') num('su', v => { this.shift[0] = v; });
           if (id === 'sv') num('sv', v => { this.shift[1] = v; });
           if (id === 'keep') this.keep = dlg.get('keep');
+          if (id === 'hmode') { this.hmode = dlg.get('hmode'); requestRender(); return; }
           this.update();
         }
       });
@@ -3156,12 +3195,15 @@ function startSplitBody(editIndex, f) {
       const hs = this.hset; if (!hs) return;
       const pl = this.ids().length ? this.plane() : null; hs.grp.visible = !!pl; if (!pl) return;
       const H = this.visH(), P = v3(pl.P), n = v3(pl.n), U = v3(pl.U), V = v3(pl.V), b0 = this.base(), B = Engine.basisFromPlane(b0.n, b0.w);
-      placeHandle(hs.hs[0], P.clone(), v3(b0.n).normalize(), this.hHot === 0);
-      placeHandle(hs.hs[1], P.clone().addScaledVector(V, H), n, this.hHot === 1);
-      placeHandle(hs.hs[2], P.clone().addScaledVector(U, H), n, this.hHot === 2);
-      placeHandle(hs.hs[3], P.clone().addScaledVector(U, H).addScaledVector(V, H), U.clone().add(V).normalize(), this.hHot === 3);
-      if (pl.rect) { placeHandle(hs.hs[4], P.clone().addScaledVector(U, -H * 0.5), v3(B.u).negate(), this.hHot === 4); placeHandle(hs.hs[5], P.clone().addScaledVector(V, -H * 0.5), v3(B.v).negate(), this.hHot === 5); }
-      else { hideHandle(hs.hs[4]); hideHandle(hs.hs[5]); }
+      const m = this.hmode;
+      hs.hs.forEach(hideHandle);
+      if (m === 'move') {
+        placeHandle(hs.hs[0], P.clone(), v3(b0.n).normalize(), this.hHot === 0, 'move');
+        if (pl.rect) { placeHandle(hs.hs[4], P.clone().addScaledVector(U, -H * 0.5), v3(B.u).negate(), this.hHot === 4, 'move'); placeHandle(hs.hs[5], P.clone().addScaledVector(V, -H * 0.5), v3(B.v).negate(), this.hHot === 5, 'move'); }
+      } else if (m === 'rot') {
+        placeHandle(hs.hs[1], P.clone().addScaledVector(V, H), V.clone(), this.hHot === 1, 'rot', U.clone());
+        placeHandle(hs.hs[2], P.clone().addScaledVector(U, H), U.clone(), this.hHot === 2, 'rot', V.clone());
+      } else placeHandle(hs.hs[3], P.clone().addScaledVector(U, H).addScaledVector(V, H), U.clone().add(V).normalize(), this.hHot === 3, 'scale');
     },
     onDown(ev) {
       const i = handleHit(ev, this.hset); if (i < 0) return false;

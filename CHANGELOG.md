@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 0.85
+- Táhla u Rozříznout a Ohnout plochu mají tvar a barvy jako manipulátor Přesunout / Otočit / Měřítko: šipka posouvá, oblouk otáčí, kostička mění velikost; barva odpovídá ose (X červená, Y zelená, Z modrá, šikmo oranžová), táhlo pod kurzorem nebo při tažení zežloutne.
+- V obou oknech přepínač Táhla ukáže jen táhla jednoho druhu (Rozříznout: Posun / Natočení / Velikost, Ohnout: Natočení / Poloměr), aby se nepletla.
+- Ohnout plochu: nové táhlo pro směr ohybu (oblouk kolem normály plochy, přichytávání po 5°); úhel i směr jsou v režimu Natočení, který je výchozí.
+
 ## Beta 0.84
 - Rozříznout: táhla přímo v modelu. Šipka ze středu posouvá rovinu, šipky na okrajích plochy ji natáčejí kolem obou os, táhlo v rohu mění velikost řezné plochy a u zmenšené plochy dvě šipky ve středu posouvají plochu v rovině. Hodnoty se při tažení zobrazují u kurzoru a zapisují do okna.
 - Ohnout plochu: táhla v modelu pro úhel (táhlo na konci ohybu, otáčí se kolem osy ohybu, s přichytáváním po 5°) a pro poloměr ohybu (šipka na ose ohybu).
