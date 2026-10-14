@@ -295,6 +295,7 @@
     [/^Mezera mezi krabičkou a víkem ([\d.,]+) mm \(nejméně ([\d.,]+) mm\)\.$/, 'Gap between box and lid $1 mm (at least $2 mm).'],
     [/^Mezera mezi krabičkou a víkem musí být alespoň ([\d.,]+) mm \(teď ([\d.,]+) mm\)$/, 'The gap between box and lid must be at least $1 mm (now $2 mm)'],
     [/^Panty se nevejdou podél hrany \(([\d.,]+) mm\)$/, 'The hinges do not fit along the edge ($1 mm)'],
+    [/^Krabička je na pant příliš nízká, potřebuje výšku alespoň ([\d.,]+) mm$/, 'The box is too low for the hinge; it needs to be at least $1 mm tall'],
     [/^Do osy šroub M([\d.,]+) × (\d+) mm s maticí\.$/, 'Axis screw M$1 × $2 mm with a nut.'],
     [/^Křídlo je na tento čep příliš silné \(nejvýš ([\d.,]+) mm\), zvětšete průměr čepu$/, 'The leaf is too thick for this pin (max $1 mm); increase the pin diameter'],
     [/^Křídlo musí být široké alespoň ([\d.,]+) mm$/, 'The leaf must be at least $1 mm wide'],

@@ -652,6 +652,9 @@ function boxHingeTools(f, boxPolys, lidPolys) {
   const o = 1 - ax, s0 = Math.max(a.min[o], b.min[o]), s1 = Math.min(a.max[o], b.max[o]), span = s1 - s0, L = Number(f.len), cnt = Math.max(1, Math.min(4, Math.round(Number(f.count) || 1)));
   if (span < L * cnt + 2 * (cnt - 1)) throw new Error('Panty se nevejdou podél hrany (' + (Math.round(span * 10) / 10).toString().replace('.', ',') + ' mm)');
   const { A, B, H } = boxHingeLocal(f, G);
+  /* the 45° web reaches R·√2 + G/2 (+1 mm grip) below the rim; it must stay above the print bed */
+  const need = H.R * Math.SQRT2 + G / 2 + 1, low = Math.max(a.min[2], b.min[2]);
+  if (a.max[2] - need < low - 1e-6) throw new Error('Krabička je na pant příliš nízká, potřebuje výšku alespoň ' + (Math.ceil(need * 10) / 10).toString().replace('.', ',') + ' mm');
   /* local y points from the box to the lid, local x along the edge, z up; keep it right-handed */
   const ey = [0, 0, 0]; ey[ax] = dir; const ex = [ey[1], -ey[0], 0], zA = a.max[2];
   const mid = (dir > 0 ? a.max[ax] + b.min[ax] : b.max[ax] + a.min[ax]) / 2;

@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 1.02
+- Pant krabičky s víkem: kontrola výšky. Šikmá podpěra kloubu sahá pod horní hranu (u čepu Ø 3 mm asi 9 mm), u nižší krabičky by trčela pod podložku, proto dialog teď upozorní, jakou nejmenší výšku krabička potřebuje.
+
 ## Beta 1.01
 - Pant, nový typ **Krabička s víkem**: krabička a víko stojí na podložce vedle sebe otevřené nahoru (horní hrany ve stejné výšce, mezera mezi nimi alespoň 2 × (poloměr kloubu + vůle), pro čep Ø 3 mm asi 6,8 mm). Klepnete na krabičku a na víko a panty se samy umístí doprostřed mezery na horní hranu a připojí ke stěnám obou těles.
   - Klouby drží na stěně šikmou podpěrou 45°, takže se vše vytiskne vcelku bez podpěr; víko se po tisku překlopí o 180° a dosedne na krabičku.
