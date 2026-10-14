@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 0.97
+- Moje návrhy: dva návrhy už nemohou mít stejný název. Když zadáte název, který už existuje, aplikace k němu přidá pořadí, např. „Držák (2)“, a oznámí to.
+- Totéž platí pro nový návrh „Bez názvu“ a pro otevřený soubor se stejným názvem. Během psaní názvu se nic nepřejmenovává, kontrola proběhne až po potvrzení.
+
 ## Beta 0.96
 - Gizmo posunu: tažením za středový bod se tělesa posouvají jen v rovině X a Y, výška (Z) se nemění. Pro Z je dál modrá šipka.
 - Rozříznout a Ohnout ponechávají volný pohyb středového bodu.

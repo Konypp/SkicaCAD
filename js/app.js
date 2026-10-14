@@ -252,11 +252,30 @@ try {
   localStorage.removeItem(KEY);
 } catch (e) { /* ignore */ }
 
+/* design names are unique in the library: a clash gets " (2)", " (3)", … */
+function uniqueName(name, uid) {
+  const key = x => String(x || '').trim().toLocaleLowerCase();
+  const taken = new Set(libList().filter(x => x.uid !== uid).map(x => key(x.name)));
+  const nm = String(name || '').trim() || (EN() ? 'Untitled' : 'Bez názvu');
+  if (!taken.has(key(nm))) return nm;
+  const base = nm.replace(/\s*\(\d+\)$/, '');
+  for (let i = 2; i < 1000; i++) { const c = `${base} (${i})`; if (!taken.has(key(c))) return c; }
+  return nm;
+}
+/* rename the open design if its name is taken; quiet while the name is being typed */
+function ensureUniqueName(announce) {
+  const nm = uniqueName(doc.name, doc.uid);
+  if (nm === doc.name) return false;
+  doc.name = nm; const el = $('#docname'); if (el) el.value = nm;
+  if (announce) toast(`Návrh s tímto názvem už existuje, název změněn na „${nm}“.`);
+  return true;
+}
 let doc = emptyDoc();
 let hist = [], hi = -1, quotaWarned = false;
 const saveDoc = () => {
   if (!doc.uid) doc.uid = newUid();
   if (!doc.features.length) return;
+  if (document.activeElement !== $('#docname') && ensureUniqueName(false) && typeof renderBrowser === 'function') renderBrowser();
   scheduleThumb();
   try { libStore(doc); checkStorage(); } catch (e) { if (!quotaWarned) { quotaWarned = true; toast('Úložiště prohlížeče je plné. Zálohujte knihovnu (Soubor › Zálohovat knihovnu) a smažte staré návrhy (Soubor › Moje návrhy).'); } }
 };
@@ -5398,7 +5417,7 @@ $('#fileinput').addEventListener('change', e => {
   })();
 });
 $('#docname').addEventListener('input', e => { doc.name = e.target.value; saveDoc(); renderBrowser(); });
-$('#docname').addEventListener('change', () => pushHist());
+$('#docname').addEventListener('change', () => { if (ensureUniqueName(true)) { saveDoc(); renderBrowser(); } pushHist(); });
 $('#undo').addEventListener('click', undo);
 $('#redo').addEventListener('click', redo);
 

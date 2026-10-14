@@ -278,6 +278,7 @@
 
   /* patterns for texts that contain numbers or names: [regular expression, English template] */
   const PATTERNS = [
+    [/^Návrh s tímto názvem už existuje, název změněn na „(.+)“\.$/, 'A design with this name already exists, renamed to “$1”.'],
     [/^Úložiště návrhů je zaplněné z (\d+) %\. Zálohujte knihovnu \(Soubor › Zálohovat knihovnu\) a smažte staré návrhy \(Soubor › Moje návrhy\)\.$/, 'Design storage is $1 % full. Back up the library (File › Back up library) and delete old designs (File › My designs).'],
     [/^Úložiště: (<?\d+) % \((.+) z ~(.+)\)$/, 'Storage: $1 % ($2 of ~$3)'],
     [/^Záloha knihovny uložena \((\d+) (návrh|návrhy|návrhů)\)$/, (m, n) => `Library backup saved (${n} design${n === '1' ? '' : 's'})`],
