@@ -8,7 +8,7 @@ const PLANES = {
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
 const FEATURE_LABEL = { sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
-  fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
+  fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
 function blobPolys(id) {
@@ -207,6 +207,74 @@ function basisFromPlane(n, w) {
   else { v = KK.vnorm(KK.vsub([0, 0, 1], KK.vmul(n, n[2]))); u = KK.cross(v, n); }
   return { o, u, v, n };
 }
+/* ---------- split faces ----------
+   A body keeps its dividing lines (seams): {n, w, a, b} = the face plane and two points of the line. The mesh itself is not cut,
+   the part of a face is cut out when it is used (selection, Upravit plochu, sketch from face). */
+function seamXform(seams, m) {
+  if (!seams || !seams.length) return seams;
+  const P = v => [m[0] * v[0] + m[4] * v[1] + m[8] * v[2] + m[12], m[1] * v[0] + m[5] * v[1] + m[9] * v[2] + m[13], m[2] * v[0] + m[6] * v[1] + m[10] * v[2] + m[14]];
+  const c0 = [m[0], m[1], m[2]], c1 = [m[4], m[5], m[6]], c2 = [m[8], m[9], m[10]], det = KK.vdot(c0, KK.cross(c1, c2));
+  const ca = KK.cross(c1, c2), cb = KK.cross(c2, c0), cc = KK.cross(c0, c1); /* normals transform with the inverse transpose */
+  return seams.map(q => {
+    let n = [0, 1, 2].map(k => q.n[0] * ca[k] + q.n[1] * cb[k] + q.n[2] * cc[k]);
+    n = KK.vnorm(det < 0 ? KK.vmul(n, -1) : n);
+    const A = P(q.a), B = P(q.b);
+    return { n, w: KK.vdot(n, A), a: A, b: B };
+  });
+}
+const xfBody = (x, m) => ({ ...x, polys: KK.transform(x.polys, m), seams: seamXform(x.seams, m) });
+const mvBody = (x, t) => ({ ...x, polys: KK.translate(x.polys, t), seams: seamXform(x.seams, [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, t[0], t[1], t[2], 1]) });
+function seamPatch(polys, q) { return KK.planarFace(polys, q.n, q.w, q.a) || KK.planarFace(polys, q.n, q.w, q.b); }
+function seamPlane(q) { const m = KK.vnorm(KK.cross(q.n, KK.vsub(q.b, q.a))); return { m, d: KK.vdot(m, q.a) }; }
+/* half-planes cutting out the part of a planar face (polygon indices `group`) that contains point p */
+function faceClip(polys, seams, n, w, group, p) {
+  const out = [], gs = new Set(group);
+  for (const q of seams || []) {
+    if (KK.vdot(q.n, n) < 0.9999 || Math.abs(q.w - w) > 2e-3) continue;
+    const g = seamPatch(polys, q); if (!g || !g.some(i => gs.has(i))) continue;
+    const h = seamPlane(q), sd = KK.vdot(h.m, p) - h.d;
+    out.push(sd >= 0 ? h : { m: KK.vmul(h.m, -1), d: -h.d });
+  }
+  return out;
+}
+function clipConvex(v, h) {
+  const out = [], E = 1e-9;
+  for (let i = 0; i < v.length; i++) {
+    const a = v[i], b = v[(i + 1) % v.length], da = KK.vdot(h.m, a) - h.d, db = KK.vdot(h.m, b) - h.d;
+    if (da >= -E) out.push(a);
+    if ((da > E && db < -E) || (da < -E && db > E)) { const t = da / (da - db); out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]); }
+  }
+  return out;
+}
+/* the face polygons clipped to the half-planes (convex pieces in the face plane) */
+function clipRegion(polys, group, clip) {
+  const out = [];
+  for (const i of group) {
+    let v = polys[i].v;
+    for (const h of clip) { v = clipConvex(v, h); if (v.length < 3) break; }
+    if (v.length >= 3) { const q = { v, n: polys[i].n, w: polys[i].w }; if (KK.surfaceArea([q]) > 1e-8) out.push(q); }
+  }
+  return out;
+}
+/* polyline segments (flat xyz array) where the seams cross their faces, for drawing */
+function seamSegments(polys, seams) {
+  const arr = [];
+  for (const q of seams || []) {
+    const g = seamPatch(polys, q); if (!g) continue;
+    const h = seamPlane(q), dir = KK.vnorm(KK.vsub(q.b, q.a));
+    for (const i of g) {
+      const v = polys[i].v; let t0 = Infinity, t1 = -Infinity;
+      for (let k = 0; k < v.length; k++) {
+        const a = v[k], b = v[(k + 1) % v.length], da = KK.vdot(h.m, a) - h.d, db = KK.vdot(h.m, b) - h.d;
+        if ((da >= 0) === (db >= 0) && Math.abs(da) > 1e-9 && Math.abs(db) > 1e-9) continue;
+        const t = Math.abs(da - db) < 1e-12 ? 0 : da / (da - db), x = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+        const s = KK.vdot(KK.vsub(x, q.a), dir); t0 = Math.min(t0, s); t1 = Math.max(t1, s);
+      }
+      if (t1 - t0 > 1e-6) { const A = KK.vadd(q.a, KK.vmul(dir, t0)), B = KK.vadd(q.a, KK.vmul(dir, t1)); arr.push(...A, ...B); }
+    }
+  }
+  return arr;
+}
 /* direct face edit: new diameter for a cylindrical face, or push / pull a planar face */
 function offsetFaceTool(polys, f) {
   if (f.kind === 'cyl') {
@@ -227,7 +295,9 @@ function offsetFaceTool(polys, f) {
   const g = KK.planarFace(polys, f.n, f.w, f.p);
   if (!g) throw new Error('Plocha nebyla nalezena');
   const B = basisFromPlane(f.n, f.w);
-  const loops = KK.faceLoops(polys, g).map(l => ({ t: 'poly', pts: l.map(q => { const dq = KK.vsub(q, B.o); return [KK.vdot(dq, B.u), KK.vdot(dq, B.v)]; }) }));
+  const cp = f.clip && f.clip.length ? clipRegion(polys, g, f.clip) : null;
+  if (cp && !cp.length) throw new Error('Část plochy nebyla nalezena');
+  const loops = (cp ? KK.faceLoops(cp, cp.map((_, i) => i)) : KK.faceLoops(polys, g)).map(l => ({ t: 'poly', pts: l.map(q => { const dq = KK.vsub(q, B.o); return [KK.vdot(dq, B.u), KK.vdot(dq, B.v)]; }) }));
   if (!loops.length) throw new Error('Obrys plochy se nepodařilo určit');
   const tool = d > 0 ? KK.extrudeProfiles(loops, B, -0.01, d) : KK.extrudeProfiles(loops, B, d, 0.01);
   return [{ op: d > 0 ? 'union' : 'subtract', tool }];
@@ -364,13 +434,15 @@ function step(state, f) {
       let added = [], k = 0;
       const repl = new Map();
       for (const b of sel) {
+        const MIR = { YZ: [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], XZ: [1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], XY: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1] };
         const copies = mats.map(m => (m ? KK.transform(b.polys, m) : KK.mirror(b.polys, f.plane || 'YZ')));
+        const cseams = mats.map(m => seamXform(b.seams, m || MIR[f.plane || 'YZ']));
         if (f.join) {
           let acc = b.polys; for (const c of copies) acc = KK.boolean(acc, c, 'union');
-          repl.set(b.id, acc);
-        } else copies.forEach(c => added.push({ id: f.id + '_' + (k++), name: 'Těleso ' + (++n), polys: c, from: f.id }));
+          repl.set(b.id, acc); if (b.seams) repl.set(b.id + '\u0000s', [].concat(b.seams, ...cseams.filter(Boolean)));
+        } else copies.forEach((c, j) => added.push({ id: f.id + '_' + (k++), name: 'Těleso ' + (++n), polys: c, from: f.id, ...(cseams[j] ? { seams: cseams[j] } : {}) }));
       }
-      out = bodies.map(b => (repl.has(b.id) ? { ...b, polys: repl.get(b.id) } : b)).concat(added);
+      out = bodies.map(b => (repl.has(b.id) ? { ...b, polys: repl.get(b.id), ...(repl.has(b.id + '\u0000s') ? { seams: repl.get(b.id + '\u0000s') } : {}) } : b)).concat(added);
       break;
     }
     case 'fillet': case 'chamfer': {
@@ -412,7 +484,7 @@ function step(state, f) {
       const bb = KK.bbox(sel.flatMap(x => x.polys)), mid = [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2);
       const c = f.pivot === 'origin' ? [0, 0, 0] : f.pivot === 'base' ? [mid[0], mid[1], bb.min[2]] : mid;
       const m = [s[0], 0, 0, 0, 0, s[1], 0, 0, 0, 0, s[2], 0, c[0] * (1 - s[0]), c[1] * (1 - s[1]), c[2] * (1 - s[2]), 1];
-      const map = new Map(sel.map(x => [x.id, { ...x, polys: KK.transform(x.polys, m) }]));
+      const map = new Map(sel.map(x => [x.id, xfBody(x, m)]));
       out = bodies.map(x => map.get(x.id) || x);
       break;
     }
@@ -429,7 +501,7 @@ function step(state, f) {
         const b = bodies.find(x => x.id === f.body);
         if (!b) throw new Error('Těleso neexistuje');
         const m = alignFaceMatrix(f.src, f.dst, !!f.flip, !!f.centerOn, Number(f.gap) || 0);
-        out = bodies.map(x => (x === b ? { ...x, polys: KK.transform(x.polys, m) } : x));
+        out = bodies.map(x => (x === b ? xfBody(x, m) : x));
         break;
       }
       const sel = f.all ? bodies.slice() : bodies.filter(x => (f.bodies || []).includes(x.id));
@@ -454,7 +526,7 @@ function step(state, f) {
           f.z === 'center' ? -(bb.min[2] + bb.max[2]) / 2 : f.z === 'keep' ? 0 : -bb.min[2]];
       }
       const gs = shift(KK.bbox(sel.flatMap(x => x.polys)));
-      const map = new Map(sel.map(x => [x.id, { ...x, polys: KK.translate(x.polys, f.each ? shift(KK.bbox(x.polys)) : gs) }]));
+      const map = new Map(sel.map(x => [x.id, mvBody(x, f.each ? shift(KK.bbox(x.polys)) : gs)]));
       out = bodies.map(x => map.get(x.id) || x);
       break;
     }
@@ -464,10 +536,10 @@ function step(state, f) {
       const bb = KK.bbox(sel.flatMap(x => x.polys));
       const c = f.pivot === 'origin' ? [0, 0, 0] : [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2);
       const m = eulerMatrix(c, [0, 0, 0], (f.r || [0, 0, 0]).map(Number));
-      let moved = sel.map(x => ({ ...x, polys: KK.transform(x.polys, m) }));
+      let moved = sel.map(x => xfBody(x, m));
       if (f.ground) {
         const mz = Math.min(...moved.map(x => KK.bbox(x.polys).min[2]));
-        if (Math.abs(mz) > 1e-9) moved = moved.map(x => ({ ...x, polys: KK.translate(x.polys, [0, 0, -mz]) }));
+        if (Math.abs(mz) > 1e-9) moved = moved.map(x => mvBody(x, [0, 0, -mz]));
       }
       const map = new Map(moved.map(x => [x.id, x]));
       out = bodies.map(x => map.get(x.id) || x);
@@ -481,10 +553,22 @@ function step(state, f) {
       if (f.copy) {
         const cnt = Math.max(1, Math.min(100, Math.round(Number(f.count) || 1))), added = [];
         let k = 0;
-        for (const x of sel) { let p = x.polys; for (let j = 1; j <= cnt; j++) { p = KK.transform(p, m); added.push({ id: f.id + (k ? '_' + k : ''), name: 'Těleso ' + (++n), polys: p, from: f.id }); k++; } }
+        for (const x of sel) { let p = x.polys, sm = x.seams; for (let j = 1; j <= cnt; j++) { p = KK.transform(p, m); sm = seamXform(sm, m); added.push({ id: f.id + (k ? '_' + k : ''), name: 'Těleso ' + (++n), polys: p, from: f.id, ...(sm ? { seams: sm } : {}) }); k++; } }
         out = bodies.concat(added);
       }
-      else out = bodies.map(x => (sel.includes(x) ? { ...x, polys: KK.transform(x.polys, m) } : x));
+      else out = bodies.map(x => (sel.includes(x) ? xfBody(x, m) : x));
+      break;
+    }
+    case 'splitface': {
+      const b = bodies.find(x => x.id === f.body);
+      if (!b) throw new Error('Těleso neexistuje');
+      const q = { n: f.n.map(Number), w: Number(f.w), a: f.a.map(Number), b: f.b.map(Number) }, d = KK.vsub(q.b, q.a);
+      if (KK.vdot(d, d) < 1e-8) throw new Error('Body dělicí čáry splývají');
+      const g = seamPatch(b.polys, q);
+      if (!g) throw new Error('Plocha nebyla nalezena');
+      const h = seamPlane(q), A = clipRegion(b.polys, g, [h]), B = clipRegion(b.polys, g, [{ m: KK.vmul(h.m, -1), d: -h.d }]);
+      if (KK.surfaceArea(A) < 1e-4 || KK.surfaceArea(B) < 1e-4) throw new Error('Čára plochu nerozdělí, musí plochou procházet');
+      out = bodies.map(x => (x === b ? { ...x, seams: (x.seams || []).concat([q]) } : x));
       break;
     }
     case 'del': {
@@ -522,7 +606,7 @@ function makeRebuilder() {
   };
 }
 
-return { FASTENERS, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

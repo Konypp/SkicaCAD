@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta 0.73
+- Plochy: nová akce Rozdělit plochu (v liště vybrané rovinné plochy i v kontextové nabídce). Dvěma body (přichytí se k rohům, středům hran, hranám po krocích mřížky, jinak k mřížce) nebo jedním bodem a tlačítkem Vodorovně / Svisle se vede dělicí čára. Části plochy se pak vybírají samostatně a dají se posunout, vysunout nebo převést na skicu. Rozdělení je krok v časové ose (lze upravit), dělicí čára se zobrazuje jako hrana a přenáší se při přesunu, otočení, měřítku, zarovnání, zrcadlení i poli. Tvar tělesa a export se nemění.
+- Otočit: oprava chyby, kvůli které se náhled otočení (rychlá tlačítka, zadané úhly, manipulátor) překresloval až s další událostí. Po OK tělesa zůstanou na novém místě, neodskakují na chvíli zpět. Úhly a pokládání už zbytečně nepřepočítávají výběr.
+- Otočit: ve výchozím stavu je vypnuté Položit na podložku i Otočit celý model.
+- Přesunout: po OK tělesa neodskakují zpět, dokud se model nepřepočítá.
+- Plochy: zvýraznění plochy pod kurzorem nezůstává po úpravě modelu viset na staré poloze.
+
 ## Beta 0.72
 - Závit: nové pole Vůle pro 3D tisk (výchozí 0,2 mm, stejně jako u šroubu a matice). U čepu zmenší celý profil závitu, u díry ho zvětší, takže závit na čepu odpovídá šroubu a závit v díře matici se stejnou vůlí. Čep i díru stačí kreslit v jmenovitém rozměru (čep Ø = M, díra Ø = malý průměr matice, ten se nabídne sám). Dřívější závity si ponechají vůli 0.
 
