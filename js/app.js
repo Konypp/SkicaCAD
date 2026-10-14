@@ -1426,7 +1426,9 @@ function draftEntity() {
   if (sk.tool === 'rect') return corner ? { t: 'rect', x: d.p[0], y: d.p[1], w: dx, h: dy } : { t: 'rect', x: d.p[0] - dx, y: d.p[1] - dy, w: 2 * dx, h: 2 * dy };
   if (sk.tool === 'circle') { if (corner) { const q = sq(); return { t: 'circle', x: q.cx, y: q.cy, r: q.r }; } return { t: 'circle', x: d.p[0], y: d.p[1], r: sr(Math.hypot(dx, dy)) }; }
   if (corner && sk.tool === 'ngon') { const q = sq(); return { t: 'ngon', x: q.cx, y: q.cy, r: q.r, n: sk.ngonN, a: 90 }; }
-  if (corner && sk.tool === 'ellipse') return { t: 'ellipse', x: d.p[0] + dx / 2, y: d.p[1] + dy / 2, rx: Math.max(0.01, Math.abs(dx) / 2), ry: Math.max(0.01, Math.abs(dy) / 2), a: 0 };
+  /* ellipse: two clicks, the box it fits in (from a corner or from the centre); a flat box gets half the other axis */
+  const eFix = (rx, ry) => (rx < 1e-3 && ry < 1e-3 ? [rx, ry] : rx < 1e-3 ? [ry / 2, ry] : ry < 1e-3 ? [rx, rx / 2] : [rx, ry]);
+  if (corner && sk.tool === 'ellipse') { const [rx, ry] = eFix(Math.abs(dx) / 2, Math.abs(dy) / 2); return { t: 'ellipse', x: d.p[0] + dx / 2, y: d.p[1] + dy / 2, rx, ry, a: 0 }; }
   if (corner && sk.tool === 'slot') {
     const W = Math.abs(dx), H = Math.abs(dy), cx = d.p[0] + dx / 2, cy = d.p[1] + dy / 2;
     if (W >= H) { const w = Math.max(0.01, H), hl = Math.max(0.005, (W - w) / 2); return { t: 'slot', x1: cx - hl, y1: cy, x2: cx + hl, y2: cy, w }; }
@@ -1435,11 +1437,7 @@ function draftEntity() {
   if (sk.tool === 'line') return { t: 'poly', pts: d.pts.concat([c]), closed: false };
   if (sk.tool === 'spline') return { t: 'spline', pts: d.pts.concat([c]), closed: false };
   if (sk.tool === 'ngon') return { t: 'ngon', x: d.p[0], y: d.p[1], r: sr(Math.hypot(c[0] - d.p[0], c[1] - d.p[1])), n: sk.ngonN, a: Math.atan2(c[1] - d.p[1], c[0] - d.p[0]) / D2R };
-  if (sk.tool === 'ellipse') {
-    if (!d.p2) { const rx = sr(Math.hypot(c[0] - d.p[0], c[1] - d.p[1])); return { t: 'ellipse', x: d.p[0], y: d.p[1], rx, ry: rx * 0.5, a: Math.atan2(c[1] - d.p[1], c[0] - d.p[0]) / D2R }; }
-    const rx = sr(Math.hypot(d.p2[0] - d.p[0], d.p2[1] - d.p[1]));
-    return { t: 'ellipse', x: d.p[0], y: d.p[1], rx, ry: Math.max(0.01, sr(slotHalfWidth(d.p, d.p2, c))), a: Math.atan2(d.p2[1] - d.p[1], d.p2[0] - d.p[0]) / D2R };
-  }
+  if (sk.tool === 'ellipse') { const [rx, ry] = eFix(Math.abs(dx), Math.abs(dy)); return { t: 'ellipse', x: d.p[0], y: d.p[1], rx, ry, a: 0 }; }
   if (sk.tool === 'slot') {
     if (!d.p2) return { t: 'poly', pts: [d.p, c], closed: false };
     /* the two clicks are the outer ends of the slot (overall length); the arc centres sit half the width inside */
@@ -1469,7 +1467,7 @@ function setSketchTool(t) {
     spline: drawMode('spline') === 'free' ? 'Křivka od ruky: táhněte prstem nebo myší, po puštění se tah převede na hladkou křivku. Když skončíte u začátku, křivka se uzavře.' : 'Křivka: klepejte nebo táhněte na body, kterými má křivka projít; klepnutím na první bod ji uzavřete, dvojím klepnutím nebo Enter ukončíte. Body pak jde přetáhnout.',
     ngon: drawMode('ngon') === 'corner' ? 'Mnohoúhelník z rohu: klepněte na roh čtverce, do kterého se vepíše, pak na protější roh. Počet stran nastavíte v paletě.' : 'Mnohoúhelník: klepněte na střed, pak na vrchol. Počet stran nastavíte v paletě.',
     slot: drawMode('slot') === 'corner' ? 'Drážka z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se drážka vejde' : 'Drážka: klepněte na jeden konec, pak na druhý konec drážky (celková délka), třetím klepnutím určíte šířku',
-    ellipse: drawMode('ellipse') === 'corner' ? 'Elipsa z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se elipsa vepíše' : 'Elipsa: klepněte na střed, pak na konec hlavní osy, třetím klepnutím určíte šířku',
+    ellipse: drawMode('ellipse') === 'corner' ? 'Elipsa z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se elipsa vepíše' : 'Elipsa ze středu: klepněte na střed, pak na roh obdélníku, do kterého se elipsa vepíše. Natočení nastavíte v paletě.',
     skfillet: 'Zaoblení rohů: nastavte poloměr v paletě a klepněte na obdélník, mnohoúhelník nebo uzavřený obrys',
     sktrim: COMB_PROMPT1[combOp()],
     skjoin: JOIN_PROMPT1,
@@ -1694,17 +1692,13 @@ function sketchClick0(ev) {
   } else if (sk.tool === 'ngon') {
     if (!sk.draft) sk.draft = { p };
     else { sk.cursor = p; const d = draftEntity(); if (d && d.r > 1e-6) { f.ents.push({ t: 'ngon', x: d.x, y: d.y, r: Math.round(d.r * 1000) / 1000, n: d.n, a: Math.round(d.a * 100) / 100 }); sk.selEnt = f.ents.length - 1; } sk.draft = null; renderPalette(); }
-  } else if ((sk.tool === 'ellipse' || sk.tool === 'slot') && drawMode(sk.tool) === 'corner') {
+  } else if (sk.tool === 'ellipse' || (sk.tool === 'slot' && drawMode(sk.tool) === 'corner')) {
     if (!sk.draft) sk.draft = { p };
     else {
       sk.cursor = p; const d = draftEntity(), r3 = v => Math.round(v * 1000) / 1000;
       if (d && (d.t === 'slot' ? d.w > 1e-6 : d.rx > 1e-6 && d.ry > 1e-6)) { for (const k of ['x', 'y', 'rx', 'ry', 'x1', 'y1', 'x2', 'y2', 'w']) if (d[k] !== undefined) d[k] = r3(d[k]); f.ents.push(d); sk.selEnt = f.ents.length - 1; }
       sk.draft = null; renderPalette();
     }
-  } else if (sk.tool === 'ellipse') {
-    if (!sk.draft) sk.draft = { p };
-    else if (!sk.draft.p2) { if (Math.hypot(p[0] - sk.draft.p[0], p[1] - sk.draft.p[1]) > 1e-6) sk.draft.p2 = p; }
-    else { const d = draftEntity(); if (d && d.rx > 1e-6 && d.ry > 1e-6) { const r3 = v => Math.round(v * 1000) / 1000; f.ents.push({ t: 'ellipse', x: d.x, y: d.y, rx: r3(d.rx), ry: r3(d.ry), a: Math.round(d.a * 100) / 100 }); sk.selEnt = f.ents.length - 1; } sk.draft = null; renderPalette(); }
   } else if (sk.tool === 'slot') {
     if (!sk.draft) sk.draft = { p };
     else if (!sk.draft.p2) { if (Math.hypot(p[0] - sk.draft.p[0], p[1] - sk.draft.p[1]) > 1e-6) sk.draft.p2 = p; }
@@ -2709,6 +2703,12 @@ function startMove(editIndex, f, preset) {
     },
     defaultSpacing() { const k = 'xyz'.indexOf(this.dir); const v = k >= 0 ? this.size.getComponent(k) : this.size.x; return Math.round((v + 5) * 10) / 10; },
     axisToT() { if (this.dir === 'free') return; const k = 'xyz'.indexOf(this.dir); this.t = [0, 0, 0]; this.t[k] = this.spacing; dlg.set('t', this.t); },
+    /* arrow keys: shift by a step along X / Y (PageUp / PageDown along Z) */
+    nudge(v) {
+      this.t = this.t.map((x, k) => Math.round((x + v[k]) * 1e4) / 1e4); dlg.set('t', this.t);
+      if (this.dir !== 'free') { this.dir = 'free'; dlg.set('dir', 'free'); }
+      this.fields(); this.apply(true);
+    },
     fields() {
       dlg.show('count', this.copy); dlg.show('dir', this.copy); dlg.show('spacing', this.copy && this.dir !== 'free');
       const n = this.copy ? this.count * this.bodies.size : 0;
@@ -5098,12 +5098,37 @@ document.addEventListener('keydown', e => {
     else if (tlSel !== null) deleteFeature(tlSel);
     return;
   }
+  /* arrow keys (PageUp / PageDown = Z): move the selected sketch element, the bodies in Move (selected bodies open Move), or pan the view; one grid step, Shift ×10 */
+  const AR = { ArrowLeft: [-1, 0, 0], ArrowRight: [1, 0, 0], ArrowUp: [0, 1, 0], ArrowDown: [0, -1, 0], PageUp: [0, 0, 1], PageDown: [0, 0, -1] }[k];
+  if (AR) { if (nudgeKeys(AR, e.shiftKey)) e.preventDefault(); return; }
   const map = sk ? { l: 'line', k: 'spline', r: 'rect', c: 'circle', e: 'ellipse', p: 'ngon', d: 'slot', x: 'sktrim', t: 'sksegtrim', j: 'skjoin', q: 'skcons' } : cmd ? {} : { s: 'sketch', e: 'extrude', f: 'fillet', m: 'move', r: 'rotate', t: 'thread', i: 'measure', g: 'facemode' };
   const id = map[k.toLowerCase()];
   if (id) { e.preventDefault(); runCommand(id); return; }
   if (k === 'F6') { e.preventDefault(); fitView(); }
 });
 
+function nudgeKeys(v, big) {
+  const st = (settings.snap || 1) * (big ? 10 : 1);
+  if (sk) {
+    if (sk.tool || v[2]) return false;
+    const e = sk.f.ents[sk.selEnt];
+    if (!e) { panView(v, big); return true; }
+    sk.f.ents[sk.selEnt] = translateEnt(e, v[0] * st, v[1] * st);
+    const n = sk.f.ents[sk.selEnt], r4 = x => Math.round(x * 1e4) / 1e4; if (n.pts) n.pts = n.pts.map(q => [r4(q[0]), r4(q[1])]); for (const kk of ['x', 'y', 'x1', 'y1', 'x2', 'y2']) if (typeof n[kk] === 'number') n[kk] = r4(n[kk]);
+    renderPalette(); redrawSketch(); return true;
+  }
+  if (cmd) { if (!cmd.nudge) return false; cmd.nudge(v.map(x => x * st)); return true; }
+  if (sel.size) { startMove(); if (cmd && cmd.nudge) cmd.nudge(v.map(x => x * st)); return true; }
+  if (v[2]) return false;
+  panView(v, big); return true;
+}
+/* pan the view by a tenth of its height (Shift: half) along the screen axes */
+function panView(v, big) {
+  const c = cam(), H = dom.clientHeight || 600, d = worldPerPx(controls.target) * H * (big ? 0.5 : 0.1);
+  const right = new V3().setFromMatrixColumn(c.matrixWorld, 0), up = new V3().setFromMatrixColumn(c.matrixWorld, 1);
+  const off = right.multiplyScalar(v[0] * d).add(up.multiplyScalar(v[1] * d));
+  c.position.add(off); controls.target.add(off); controls.update(); requestRender();
+}
 /* ================= navigation bar ================= */
 const STYLES = ['se', 's', 'w'], STYLE_LABEL = { se: 'Stínování s hranami', s: 'Stínování', w: 'Drátový model' };
 function applyNav() {

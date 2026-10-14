@@ -1,5 +1,13 @@
 # Changelog
 
+## Beta 0.95
+- Skica: elipsa se kreslí na dvě klepnutí. Ze středu: střed, pak roh obdélníku, do kterého se vepíše. Z rohu: dva protější rohy. Natočení se nastavuje v paletě. Když je obdélník plochý, druhá osa dostane polovinu první, takže nevznikne „čára“.
+- Šipky na klávesnici posouvají o krok mřížky, se Shiftem o 10 kroků:
+  - ve skice vybraný prvek;
+  - v příkazu Přesunout tělesa (PageUp / PageDown v ose Z);
+  - u vybraných těles otevřou Přesunout s posunem.
+- Když není nic vybráno, šipky posouvají pohled.
+
 ## Beta 0.94
 - Výchozí vůle pro 3D tisk podle tiskového testu: šroub 0,15 mm, matice 0,35 mm.
 - Příkaz Závit nastaví vůli podle vybrané plochy: čep 0,15 mm, díra 0,35 mm. Ručně zadaná hodnota se nepřepisuje a uložené prvky si vůli ponechávají.
