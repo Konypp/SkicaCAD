@@ -301,10 +301,18 @@ function bendFaceTool(polys, f) {
   if (side < 0) d = [-d[0], -d[1]];
   const r = Math.max(0, Number(f.radius) || 0), per = [-d[1], d[0]], P0 = [A[0] - per[0] * r, A[1] - per[1] * r];
   for (const q of all) if ((q[0] - P0[0]) * per[0] + (q[1] - P0[1]) * per[1] < -1e-4) throw new Error('Osa ohybu musí ležet na okraji plochy, ne uvnitř');
-  const tool = KK.revolveProfiles(loops.map(l => ({ t: 'poly', pts: l })), B, { p: P0, d }, ang * Math.PI / 180);
+  /* the sweep starts slightly (EPS) inside the body, so the union never meets the face coplanar and the swept side walls
+     never run tangent to the body's walls (that left a pinched, non-manifold rim on cylinders); the end face stays at the angle */
+  const EPS = 0.5, sg = ang < 0 ? -1 : 1;
+  const tool = KK.revolveProfiles(loops.map(l => ({ t: 'poly', pts: l })), B, { p: P0, d }, (ang + sg * EPS) * Math.PI / 180);
   if (!tool.length) throw new Error('Ohyb se nepodařilo vytvořit');
-  /* sink the tool 0.01 mm into the body so that the union does not meet a coplanar face */
-  return KK.translate(tool, KK.vmul(f.n, -0.01));
+  const o3 = KK.vadd(B.o, KK.vadd(KK.vmul(B.u, P0[0]), KK.vmul(B.v, P0[1]))), k = KK.vnorm(KK.vadd(KK.vmul(B.u, d[0]), KK.vmul(B.v, d[1])));
+  /* rotation by -EPS about the bend axis (Rodrigues), column-major; the sweep turns from the face towards +n about k x per */
+  const per3 = KK.vadd(KK.vmul(B.u, -d[1]), KK.vmul(B.v, d[0])), sgnAx = KK.vdot(KK.cross(per3, B.n), k) >= 0 ? 1 : -1;
+  const th = -sg * sgnAx * EPS * Math.PI / 180, c = Math.cos(th), s = Math.sin(th), t = 1 - c, [x, y, z] = k;
+  const Rm = [t * x * x + c, t * x * y + s * z, t * x * z - s * y, t * x * y - s * z, t * y * y + c, t * y * z + s * x, t * x * z + s * y, t * y * z - s * x, t * z * z + c];
+  const ro = [o3[0] - (Rm[0] * o3[0] + Rm[3] * o3[1] + Rm[6] * o3[2]), o3[1] - (Rm[1] * o3[0] + Rm[4] * o3[1] + Rm[7] * o3[2]), o3[2] - (Rm[2] * o3[0] + Rm[5] * o3[1] + Rm[8] * o3[2])];
+  return KK.transform(tool, [Rm[0], Rm[1], Rm[2], 0, Rm[3], Rm[4], Rm[5], 0, Rm[6], Rm[7], Rm[8], 0, ro[0], ro[1], ro[2], 1]);
 }
 /* half-space solid on the +n side of the plane n·x = w, large enough to contain the given bounding box */
 function halfSpace(n, w, bb) {

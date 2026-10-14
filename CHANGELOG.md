@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 0.75
+- Ohnout plochu: oprava. U zaoblených ploch (např. podstava válce) s poloměrem ohybu 0 vznikalo na okraji „slepené“ místo (hrany sdílené čtyřmi plochami), protože se ohyb dotýkal stěny tělesa jen tečně. Ohyb teď začíná nepatrně uvnitř tělesa, výsledek je čisté uzavřené těleso při jakémkoli poloměru i úhlu a koncová plocha leží přesně v zadaném úhlu.
+
 ## Beta 0.74
 - Nový příkaz Rozříznout (Upravit): rozřízne vybraná tělesa rovinou XY, XZ, YZ nebo rovinou vybrané plochy, s odsazením (u hlavních rovin začíná uprostřed výběru). Ponechá obě části jako samostatná tělesa, nebo jen část nad či pod rovinou. Náhled ukazuje obě části barevně a řeznou rovinu.
 - Plochy: nová akce Ohnout (i v kontextové nabídce). Rovinná plocha (i část rozdělené plochy) se otočí kolem zvolené hrany o zadaný úhel, volitelně s poloměrem ohybu. Vznikne zaoblený přechod a koncová plocha pod úhlem, kterou lze dál vysunout (Plochy › Vysunout). Výchozí osa je spodní hrana plochy, klepnutím na jinou hranu se změní.
