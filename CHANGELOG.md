@@ -1,5 +1,11 @@
 # Changelog
 
+## Beta 0.92
+- Skica: nástroj Vystřihnout je nahrazen nástrojem Kombinovat (X). V paletě zvolíte operaci: Odečíst, Sjednotit, Průnik nebo Rozdělit (čarou či křivkou). Klepnete na první tvar a pak na druhý tvar nebo čáru.
+- Sjednotit spojí dva překrývající se tvary do jednoho obrysu jedním krokem. Oříznout (T) dál slouží k odstranění jednotlivých úseků čar.
+- Výsledky Kombinovat a Oříznout ukazují kóty, táhla a řádky v paletě jen u rovných stran. Oblouky ani drobné zbytky u průsečíků se nevypisují.
+- Anglicky: Kombinovat = Combine, Oříznout = Trim.
+
 ## Beta 0.91
 - Skica: vybraný tvar má táhla pro změnu rozměrů jako kružnice. Obdélník: rohy a středy stran. Mnohoúhelník: vrchol (poloměr). Elipsa: konce obou os. Drážka: oba konce (délka) a bok (šířka). Popisky kót táhla nezakrývají.
 - Skica: nový nástroj Oříznout (T). Klepnutím na úsek čáry mezi průsečíky se úsek odstraní a navazující čáry se spojí do jednoho obrysu (např. kružnice + obdélník → jeden tvar). Úsek, který se odstraní, se při najetí zvýrazní. Prvek bez průsečíku se odstraní celý.

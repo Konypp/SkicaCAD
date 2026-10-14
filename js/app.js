@@ -52,7 +52,7 @@ const ICONS = {
   skdel: '<path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/>',
   finish: '<circle class="g" cx="12" cy="12" r="9" opacity=".2"/><circle cx="12" cy="12" r="9" style="stroke:var(--ok)"/><path d="m7.5 12.5 3 3 6-6.5" style="stroke:var(--ok);stroke-width:2.2"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
-  sktrim: '<circle cx="6.5" cy="17" r="2.6"/><circle cx="17.5" cy="17" r="2.6"/><path d="M8.4 15.2 16 4M15.6 15.2 8 4"/><path class="o" d="M3 10h18" stroke-dasharray="2 2" style="stroke:var(--orange)"/>',
+  sktrim: '<circle cx="9" cy="12" r="6"/><circle cx="15" cy="12" r="6"/><path class="o" d="M12 7.2a6 6 0 0 1 0 9.6" style="stroke:var(--orange)"/>',
   sksegtrim: '<circle cx="10" cy="13" r="6"/><path d="M12 4h9v9h-5"/><path class="o" d="M13.5 7.5 16 10" stroke-dasharray="2 2" style="stroke:var(--orange)"/><path d="M3 21 8 16M8 21 3 16" style="stroke:var(--orange)"/>',
   skjoin: '<path d="M4 6c3-2 6 2 9 0"/><path d="M4 18c3 2 6-2 9 0"/><path d="M13 6 18 12 13 18M4 6v12" stroke-dasharray="2 2" style="stroke:var(--orange)"/>',
   skcons: '<path d="M3 20 21 4" stroke-dasharray="3 2.5"/><circle cx="3.5" cy="19.5" r="1.6"/><circle cx="20.5" cy="4.5" r="1.6"/>',
@@ -660,7 +660,9 @@ function polyTurn(e, j) {
   const p0 = e.pts[(j - 1 + n) % n], p1 = e.pts[j % n], p2 = e.pts[(j + 1) % n];
   let d = Math.abs(Math.atan2(p2[1] - p1[1], p2[0] - p1[0]) - Math.atan2(p1[1] - p0[1], p1[0] - p0[0])) / D2R; return d > 180 ? 360 - d : d;
 }
-const isChord = (e, k) => !!e.tr && (polyTurn(e, k) < 12 || polyTurn(e, k + 1) < 12);
+/* chords of arcs (small turn at an end) and slivers shorter than 1 % of the outline left over at intersections */
+const polyLen = e => { const n = e.pts.length, m = e.closed ? n : n - 1; let L = 0; for (let k = 0; k < m; k++) L += Math.hypot(e.pts[(k + 1) % n][0] - e.pts[k][0], e.pts[(k + 1) % n][1] - e.pts[k][1]); return L; };
+const isChord = (e, k) => { if (!e.tr) return false; if (polyTurn(e, k) < 12 || polyTurn(e, k + 1) < 12) return true; const n = e.pts.length, a = e.pts[k % n], b = e.pts[(k + 1) % n]; return Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.01 * polyLen(e); };
 const isSmoothPt = (e, j) => !!e.tr && polyTurn(e, j) < 12;
 function updateSketchDims() {
   const box = $('#skdims'); if (!box) return;
@@ -1078,7 +1080,7 @@ const RIBBON = {
   ],
   sketch: [
     ['Vytvořit', [['line', 'Čára', 'L'], ['spline', 'Křivka', 'K'], ['rect', 'Obdélník', 'R'], ['circle', 'Kružnice', 'C'], ['ellipse', 'Elipsa', 'E'], ['ngon', 'Mnohoúhelník', 'P'], ['slot', 'Drážka', 'D']]],
-    ['Upravit', [['skfillet', 'Zaoblit rohy'], ['sktrim', 'Vystřihnout', 'X'], ['sksegtrim', 'Oříznout', 'T'], ['skjoin', 'Spojit', 'J'], ['skcons', 'Pomocná', 'Q'], ['skdel', 'Smazat', 'Del']]],
+    ['Upravit', [['skfillet', 'Zaoblit rohy'], ['sktrim', 'Kombinovat', 'X'], ['sksegtrim', 'Oříznout', 'T'], ['skjoin', 'Spojit', 'J'], ['skcons', 'Pomocná', 'Q'], ['skdel', 'Smazat', 'Del']]],
     ['Vložit', [['skimport', 'DXF / SVG']]],
     ['Dokončit', [['finish', 'Dokončit skicu', 'Enter']]]
   ]
@@ -1467,7 +1469,7 @@ function setSketchTool(t) {
     slot: drawMode('slot') === 'corner' ? 'Drážka z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se drážka vejde' : 'Drážka: klepněte na jeden konec, pak na druhý konec drážky (celková délka), třetím klepnutím určíte šířku',
     ellipse: drawMode('ellipse') === 'corner' ? 'Elipsa z rohu: klepněte na roh, pak na protější roh obdélníku, do kterého se elipsa vepíše' : 'Elipsa: klepněte na střed, pak na konec hlavní osy, třetím klepnutím určíte šířku',
     skfillet: 'Zaoblení rohů: nastavte poloměr v paletě a klepněte na obdélník, mnohoúhelník nebo uzavřený obrys',
-    sktrim: 'Vystřihnout: klepněte na uzavřený tvar, ze kterého se má vystřihovat',
+    sktrim: COMB_PROMPT1[combOp()],
     skjoin: JOIN_PROMPT1,
     sksegtrim: 'Oříznout: klepněte na úsek čáry mezi průsečíky, úsek se odstraní a navazující čáry se spojí do jednoho obrysu'
   };
@@ -1817,12 +1819,27 @@ function midMarker(P, q, color) {
   const l = noRay(new THREE.Line(lineGeo(arr), new THREE.LineBasicMaterial({ color, depthTest: false })));
   l.renderOrder = 12; return l;
 }
-/* ---------- Vystřihnout (cut out part of a closed shape by another shape or by a line) ---------- */
+/* ---------- Kombinovat tvary: union, subtraction or intersection of two closed shapes, or splitting a shape along a line ---------- */
+const COMB_OPS = [['subtract', 'Odečíst'], ['union', 'Sjednotit'], ['intersect', 'Průnik'], ['split', 'Rozdělit']];
+const combOp = () => (sk && sk.combOp) || 'subtract';
+const COMB_PROMPT1 = {
+  subtract: 'Odečíst: klepněte na uzavřený tvar, od kterého se má odečítat',
+  union: 'Sjednotit: klepněte na první uzavřený tvar',
+  intersect: 'Průnik: klepněte na první uzavřený tvar',
+  split: 'Rozdělit: klepněte na uzavřený tvar, který se má rozdělit'
+};
+const COMB_PROMPT2 = {
+  subtract: 'Teď klepněte na tvar, který se odečte (nebo na čáru, podél které se tvar rozdělí)',
+  union: 'Teď klepněte na druhý tvar, oba se spojí do jednoho obrysu',
+  intersect: 'Teď klepněte na druhý tvar, zůstane jen jejich společná část',
+  split: 'Teď klepněte na čáru nebo křivku, podél které se tvar rozdělí'
+};
 const XY_B = { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] };
 const isClosedEnt = e => e && (['rect', 'circle', 'ngon', 'slot', 'ellipse'].includes(e.t) || ((e.t === 'poly' || e.t === 'spline') && e.closed));
 /* 2D boolean of a closed sketch entity with a closed point loop, done with the solid kernel on thin prisms; returns outline loops */
 function clip2D(ent, cutPts, op) {
-  const A = K.extrudeProfiles([ent], XY_B, 0, 1), B = K.extrudeProfiles([{ t: 'poly', pts: cutPts, closed: true }], XY_B, -1, 2);
+  /* for a union both tops lie at z = 1 so the merged top face is the outline; otherwise the cutter pokes through */
+  const A = K.extrudeProfiles([ent], XY_B, 0, 1), B = K.extrudeProfiles([{ t: 'poly', pts: cutPts, closed: true }], XY_B, -1, op === 'union' ? 1 : 2);
   const R = K.boolean(A, B, op), idx = [];
   R.forEach((p, i) => { if (p.n[2] > 0.999 && p.v.every(v => Math.abs(v[2] - 1) < 1e-6)) idx.push(i); });
   const r4 = x => Math.round(x * 1e4) / 1e4;
@@ -1846,41 +1863,45 @@ function sketchRawPoint(ev) {
   return hit ? P2(P, hit) : null;
 }
 function trimClick(ev) {
-  const f = sk.f, c = sk.cut || (sk.cut = {});
+  const f = sk.f, c = sk.cut || (sk.cut = {}), op = combOp(), done = () => setPrompt(COMB_PROMPT1[op]);
   if (c.parts) {
     const p = sketchRawPoint(ev); if (!p) return;
     const hitPart = [c.parts.a, c.parts.b].find(list => list.some(i => f.ents[i] && K.inPoly2D(p, K.profilePoints(f.ents[i]))));
     if (!hitPart) { toast('Klepněte dovnitř jedné z částí.'); return; }
     [...hitPart].sort((x, y) => y - x).forEach(i => f.ents.splice(i, 1));
-    sk.cut = null; sk.selEnt = -1; setPrompt('Část odstraněna. Klepněte na další tvar, ze kterého se má vystřihovat.'); renderPalette(); redrawSketch(); return;
+    sk.cut = null; sk.selEnt = -1; toast('Část odstraněna.'); done(); renderPalette(); redrawSketch(); return;
   }
   pickSketchEntity(ev);
   const i = sk.selEnt; if (i < 0) return;
   if (c.target === undefined || c.target === null || !f.ents[c.target]) {
-    if (!isClosedEnt(f.ents[i])) { toast('Nejprve klepněte na uzavřený tvar, ze kterého se má vystřihovat.'); return; }
-    c.target = i; setPrompt('Teď klepněte na tvar, který se vystřihne, nebo na čáru, podél které se tvar rozdělí'); return;
+    if (!isClosedEnt(f.ents[i])) { toast('Nejprve klepněte na uzavřený tvar.'); return; }
+    c.target = i; setPrompt(COMB_PROMPT2[op]); return;
   }
   if (i === c.target) return;
   const tgt = f.ents[c.target], cut = f.ents[i];
+  /* results keep arcs as short chords: tr marks them so only the straight sides get dimensions and handles */
+  const put = pts => f.ents.push({ t: 'poly', pts, closed: true, tr: true }) - 1;
   try {
-    if (isClosedEnt(cut)) {
-      const loops = clip2D(tgt, K.profilePoints(cut), 'subtract');
+    if (isClosedEnt(cut) && op !== 'split') {
+      const loops = clip2D(tgt, K.profilePoints(cut), op);
+      if (op === 'union' && loops.length > 1) { toast('Tvary se nepřekrývají, nic se nespojilo.'); sk.cut = null; sk.selEnt = -1; done(); renderPalette(); redrawSketch(); return; }
       const rm = [c.target, i].sort((x, y) => y - x); rm.forEach(k => f.ents.splice(k, 1));
-      loops.forEach(pts => f.ents.push({ t: 'poly', pts, closed: true }));
+      loops.forEach(put);
       sk.cut = null; sk.selEnt = loops.length ? f.ents.length - 1 : -1;
-      toast(loops.length ? 'Vystřiženo.' : 'Tvar byl vystřižen celý.');
-      setPrompt('Klepněte na další tvar, ze kterého se má vystřihovat');
-    } else {
+      toast(op === 'union' ? 'Spojeno do jednoho tvaru.' : op === 'intersect' ? (loops.length ? 'Zůstala společná část.' : 'Tvary se nepřekrývají, nic nezůstalo.') : (loops.length ? 'Odečteno.' : 'Tvar byl odečten celý.'));
+      done();
+    } else if (isClosedEnt(cut)) { toast('Pro rozdělení klepněte na čáru nebo křivku.'); return; }
+    else {
       const line = entityPolylines([cut])[0].pts;
       if (line.length < 2) return;
       const side = sidePolygon(line), a = clip2D(tgt, side, 'intersect'), b = clip2D(tgt, side, 'subtract');
-      if (!a.length || !b.length) { toast('Čára tvar neprotíná, nic se nerozdělilo.'); sk.cut = null; return; }
+      if (!a.length || !b.length) { toast('Čára tvar neprotíná, nic se nerozdělilo.'); sk.cut = null; done(); return; }
       const rm = [c.target, i].sort((x, y) => y - x); rm.forEach(k => f.ents.splice(k, 1));
-      const ia = a.map(pts => f.ents.push({ t: 'poly', pts, closed: true }) - 1), ib = b.map(pts => f.ents.push({ t: 'poly', pts, closed: true }) - 1);
+      const ia = a.map(put), ib = b.map(put);
       sk.cut = { parts: { a: ia, b: ib } }; sk.selEnt = -1;
       setPrompt('Tvar je rozdělený. Klepněte do části, kterou chcete odstranit (Esc nechá obě části)');
     }
-  } catch (e) { toast('Vystřižení se nepodařilo: ' + e.message); sk.cut = null; }
+  } catch (e) { toast('Kombinace tvarů se nepodařila: ' + e.message); sk.cut = null; }
   renderPalette(); redrawSketch();
 }
 /* ---------- trimming a segment: the part of an element between its two nearest intersections with other elements ---------- */
@@ -1986,12 +2007,13 @@ function renderPalette() {
   const nr = Engine.regions(sk.f).length;
   const tb = $('#pal-tool');
   if (tb) {
-    const hasMode = !!DRAW_DEFAULT[sk.tool], want = (hasMode ? 'm-' + sk.tool + '-' + drawMode(sk.tool) : '') + (sk.tool === 'ngon' ? '+ngon' : '') + (sk.tool === 'skfillet' ? 'fr' : '');
+    const hasMode = !!DRAW_DEFAULT[sk.tool], want = (hasMode ? 'm-' + sk.tool + '-' + drawMode(sk.tool) : '') + (sk.tool === 'ngon' ? '+ngon' : '') + (sk.tool === 'skfillet' ? 'fr' : '') + (sk.tool === 'sktrim' ? 'comb-' + combOp() : '');
     if (tb.dataset.kind !== want) {
       tb.dataset.kind = want;
       const opts = sk.tool === 'spline' ? [['points', 'Bod po bodu'], ['free', 'Od ruky']] : [['corner', 'Z rohu'], ['center', sk.tool === 'slot' ? 'Od konce ke konci' : 'Ze středu']];
       const modeRow = hasMode ? `<div class="frow"><span class="fl">Kreslit</span><div class="seg">${opts.map(([v, l]) => `<button data-rmode="${v}" aria-pressed="${drawMode(sk.tool) === v}">${l}</button>`).join('')}</div></div>` : '';
-      tb.innerHTML = modeRow + (sk.tool === 'ngon' ? `<div class="frow"><label for="pal-ngon">Počet stran</label><span class="fnum"><input id="pal-ngon" value="${sk.ngonN}" inputmode="numeric" autocomplete="off"><span class="u">ks</span></span></div>`
+      const combRow = sk.tool === 'sktrim' ? `<div class="frow"><div class="seg">${COMB_OPS.map(([v, l]) => `<button data-cmode="${v}" aria-pressed="${combOp() === v}">${l}</button>`).join('')}</div></div>` : '';
+      tb.innerHTML = modeRow + combRow + (sk.tool === 'ngon' ? `<div class="frow"><label for="pal-ngon">Počet stran</label><span class="fnum"><input id="pal-ngon" value="${sk.ngonN}" inputmode="numeric" autocomplete="off"><span class="u">ks</span></span></div>`
         : want === 'fr' ? `<div class="frow"><label for="pal-fr">Poloměr rohů</label><span class="fnum"><input id="pal-fr" value="${fmtc(sk.frR, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div>`
         : '');
     }
@@ -2023,6 +2045,7 @@ function renderPalette() {
 }
 $('#dialog').addEventListener('click', e => {
   if (!sk) return;
+  const cm = e.target.closest('[data-cmode]'); if (cm && sk.tool === 'sktrim') { sk.combOp = cm.dataset.cmode; sk.cut = null; setSketchTool('sktrim'); return; }
   const rm = e.target.closest('[data-rmode]'); if (rm && DRAW_DEFAULT[sk.tool]) { settings.drawModes = { ...(settings.drawModes || {}), [sk.tool]: rm.dataset.rmode }; saveSettings(); sk.draft = null; setSketchTool(sk.tool); return; }
   const du = e.target.closest('[data-entdup]'); if (du) { sk.selEnt = +du.dataset.entdup; duplicateSel(); return; }
   const d = e.target.closest('[data-entdel]'); if (d) { sk.f.ents.splice(+d.dataset.entdel, 1); sk.selEnt = -1; renderPalette(); redrawSketch(); return; }
