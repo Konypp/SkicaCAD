@@ -2640,10 +2640,10 @@ function startFastener(type, editIndex, f) {
 /* ================= hinge ================= */
 function startHinge(editIndex, f) {
   const pivot = new THREE.Object3D(); scene.add(pivot);
-  const D0 = { kind: 'print', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_NUT, holes: 2, hd: 3, part: 'both', rot: 0, count: 2 };
+  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_NUT, holes: 2, hd: 3, part: 'both', rot: 0, count: 2 };
   const c = {
     editIndex, tool: null, tools: null, gizmoDrag: false, timer: null,
-    v: f ? { ...D0, ...f } : { ...D0 },
+    v: f ? { ...D0, style: 'out', ...f } : { ...D0 },
     pos: f && f.pos ? f.pos.slice() : [0, 0, 0], op: f && f.op ? f.op : 'new',
     box: f ? f.box || null : null, lid: f ? f.lid || null : null, pick: 'box', highlight: new Set(),
     init() {
@@ -2651,6 +2651,7 @@ function startHinge(editIndex, f) {
       openDialog({
         title: 'Pant', icon: 'hinge',
         fields: [{ k: 'seg', id: 'kind', label: 'Typ', options: [['print', 'Tištěný vcelku'], ['screw', 'Na šroub'], ['box', 'Krabička s víkem']], value: this.v.kind },
+          { k: 'seg', id: 'style', label: 'Umístění', options: [['flush', 'Zapuštěný'], ['out', 'Na stěně']], value: this.v.style },
           { k: 'sel', id: 'box', label: 'Krabička' }, { k: 'sel', id: 'lid', label: 'Víko' },
           { k: 'num', id: 'len', label: 'Délka pantu', value: this.v.len },
           { k: 'opt', id: 'count', label: 'Počet pantů', options: [['1', '1'], ['2', '2'], ['3', '3']], value: String(this.v.count) },
@@ -2669,7 +2670,7 @@ function startHinge(editIndex, f) {
         onChange: id => {
           if (id === 'pos') this.pos = dlg.get('pos');
           else if (id === 'op') this.op = dlg.get('op');
-          else if (id === 'kind' || id === 'part') this.v[id] = dlg.get(id);
+          else if (id === 'kind' || id === 'part' || id === 'style') this.v[id] = dlg.get(id);
           else if (id === 'cnt') this.v.n = parseFloat(dlg.get('cnt'));
           else if (id === 'holes' || id === 'rot' || id === 'hd' || id === 'count') this.v[id] = parseFloat(dlg.get(id));
           else { const x = dlg.get(id); if (isFinite(x) && x >= 0) this.v[id] = x; }
@@ -2690,14 +2691,14 @@ function startHinge(editIndex, f) {
     isBox() { return this.v.kind === 'box'; },
     layout() {
       const bx = this.isBox();
-      for (const id of ['box', 'lid', 'count']) dlg.show(id, bx);
+      for (const id of ['style', 'box', 'lid', 'count']) dlg.show(id, bx);
       for (const id of ['w', 't', 'holes', 'hd', 'part', 'rot', 'pos', 'op']) dlg.show(id, !bx);
       if (bx) transform.detach(); else transform.attach(pivot);
       if (bx && !this.box) this.pick = 'box'; else if (bx && !this.lid) this.pick = 'lid';
     },
     feature() {
       const v = this.v;
-      if (this.isBox()) return { id: f ? f.id : 'tmp', type: 'hinge', kind: 'box', box: this.box, lid: this.lid, len: v.len, n: v.n, pin: v.pin, tol: v.tol, count: v.count };
+      if (this.isBox()) return { id: f ? f.id : 'tmp', type: 'hinge', kind: 'box', style: v.style, box: this.box, lid: this.lid, len: v.len, n: v.n, pin: v.pin, tol: v.tol, count: v.count };
       return { id: f ? f.id : 'tmp', type: 'hinge', kind: v.kind, len: v.len, w: v.w, t: v.t, n: v.n, pin: v.pin, tol: v.tol, holes: v.holes, hd: v.hd, part: v.part, rot: v.rot, pos: this.pos.slice(), op: this.op };
     },
     schedule() { clearTimeout(this.timer); dlg.set('n', 'Počítám…'); this.timer = setTimeout(() => this.update(), 150); },
@@ -2720,8 +2721,8 @@ function startHinge(editIndex, f) {
           this.tool = T.A.concat(T.B);
           G.preview.add(previewMesh(this.tool, 'join'));
           dlg.set('n', `Kloub Ø ${fmtc(2 * H.R, 1)} mm, ${H.N} × ${fmtc(H.k, 1)} mm, mezera ${fmtc(H.c, 2)} mm`);
-          dlg.set('n2', `Mezera mezi krabičkou a víkem ${fmtc(T.G, 1)} mm (nejméně ${fmtc(2 * (H.R + H.c), 1)} mm).`);
-          dlg.set('n3', 'Tiskne se vcelku bez podpěr; víko se po tisku překlopí o 180° na krabičku.');
+          dlg.set('n2', T.flush ? `Mezera mezi krabičkou a víkem ${fmtc(T.G, 1)} mm (nejvýš ${fmtc(Math.floor(2 * (H.R - 0.6) * 10) / 10, 1)} mm).` : `Mezera mezi krabičkou a víkem ${fmtc(T.G, 1)} mm (nejméně ${fmtc(2 * (H.R + H.c), 1)} mm).`);
+          dlg.set('n3', T.flush ? 'Klouby jsou zapuštěné do horní hrany obou stěn, zevnitř je podél pantu žebro. Tiskne se vcelku bez podpěr; víko se po tisku překlopí o 180°.' : 'Tiskne se vcelku bez podpěr; víko se po tisku překlopí o 180° na krabičku.');
         } else {
           setPrompt('Pant leží naplocho v poloze pro tisk. Klepnutím do pohledu ho umístíte, manipulátorem posunete.');
           const H = Engine.hingeDims(F);

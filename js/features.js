@@ -605,6 +605,10 @@ function hingeParts(f) {
 }
 /* the pin belongs to leaf B; its cone tips sit in blind cone sockets in A's end knuckles, which keeps the two leaves together (axis along x at height az) */
 function hingePin(H, A, B, az) {
+  const { pin, sock } = pinParts(H, az);
+  return { A: KK.boolean(A, sock, 'subtract'), B: KK.boolean(B, pin, 'union') };
+}
+function pinParts(H, az) {
   const { L, pr, c, rt, ch, D } = H, w = HINGE_WALL, xa = w + D + ch, xb = L - w - D - ch;
   let pin = cylAlong([xa, 0, az], [1, 0, 0], pr, xb - xa);
   pin = KK.boolean(pin, coneX([xa, 0, az], [-1, 0, 0], pr, rt, ch), 'union');
@@ -613,7 +617,7 @@ function hingePin(H, A, B, az) {
   let sock = cylAlong([sa - 0.01, 0, az], [1, 0, 0], pr + c, sb - sa + 0.02);
   sock = KK.boolean(sock, coneX([sa, 0, az], [-1, 0, 0], pr + c, rt, hs), 'union');
   sock = KK.boolean(sock, coneX([sb, 0, az], [1, 0, 0], pr + c, rt, hs), 'union');
-  return { A: KK.boolean(A, sock, 'subtract'), B: KK.boolean(B, pin, 'union') };
+  return { pin, sock };
 }
 /* ---------- box hinge: box and lid stand side by side with their rims at the same height; the axis lies on the rim
    in the middle of the gap, each leaf hangs down the facing wall on a 45° web so the whole thing prints in one piece.
@@ -638,6 +642,33 @@ function boxHingeLocal(f, G) {
   }
   return { H, ...hingePin(H, A, B, 0) };
 }
+/* ---------- flush box hinge: the knuckles sit on the rim, sunk into both walls, so nothing sticks out behind the box.
+   Each knuckle is a teardrop (circle with a 45° point downwards) so it prints without supports; the other part's wall
+   gets a teardrop pocket (radius + clearance) where the knuckle passes. Local frame as boxHingeLocal: rim at z = 0. */
+function teardrop(r) {
+  const pts = [], M = 40;
+  for (let i = 0; i <= M; i++) { const a = -Math.PI / 4 + (1.5 * Math.PI) * i / M; pts.push([r * Math.cos(a), r * Math.sin(a)]); }
+  pts.push([0, -r * Math.SQRT2]);
+  return pts;
+}
+function boxHingeFlushLocal(f, G) {
+  const H = hingeDims({ ...f, w: 1e3, t: 1, kind: 'print' }), { L, N, k, c, R } = H, gw = G / 2;
+  if (gw > R - 0.6) throw new Error('Pro zapuštěný pant musí být krabička a víko blíž u sebe: mezera nejvýš ' + (Math.floor(2 * (R - 0.6) * 10) / 10).toString().replace('.', ',') + ' mm (teď ' + (Math.round(G * 10) / 10).toString().replace('.', ',') + ' mm)');
+  if (G < Math.max(0.4, c) - 1e-6) throw new Error('Mezera mezi krabičkou a víkem musí být alespoň ' + Math.max(0.4, c).toString().replace('.', ',') + ' mm');
+  const knuckle = teardrop(R), pocket = teardrop(R + c);
+  let A = null, B = null, cutA = null, cutB = null;
+  const add = (acc, p) => (acc ? KK.boolean(acc, p, 'union') : p);
+  for (let i = 0; i < N; i++) {
+    const x0 = i * (k + c), kn = prismX(knuckle, x0, x0 + k), pk = prismX(pocket, x0 - c, x0 + k + c);
+    if (i % 2) { B = add(B, kn); cutA = add(cutA, pk); } else { A = add(A, kn); cutB = add(cutB, pk); }
+  }
+  /* a rib on the inside of each back wall along the hinge, so the pocket does not cut through a thin wall;
+     its underside slopes at 45° towards the wall, parallel to the pocket's point, so it prints without supports */
+  const rc = R + c, Wb = Math.max(rc + 1.2, gw + 0.8), zW = -rc * Math.SQRT2 + Wb - 1.7, z0 = zW - (Wb - gw);
+  const rib = side => prismX([[gw, 0], [Wb, 0], [Wb, zW], [gw, z0]].map(([y, z]) => [side * y, z]), -c, L + c);
+  const { pin, sock } = pinParts(H, 0);
+  return { H, A, B: KK.boolean(B, pin, 'union'), cutA, cutB, sock, addA: rib(-1), addB: rib(1), depth: -z0 };
+}
 /* place the box hinge(s) from the two bodies: returns world-space tools for the box and for the lid */
 function boxHingeTools(f, boxPolys, lidPolys) {
   const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys);
@@ -651,21 +682,21 @@ function boxHingeTools(f, boxPolys, lidPolys) {
   if (G <= 0) throw new Error('Krabička a víko se překrývají, postavte je vedle sebe s mezerou');
   const o = 1 - ax, s0 = Math.max(a.min[o], b.min[o]), s1 = Math.min(a.max[o], b.max[o]), span = s1 - s0, L = Number(f.len), cnt = Math.max(1, Math.min(4, Math.round(Number(f.count) || 1)));
   if (span < L * cnt + 2 * (cnt - 1)) throw new Error('Panty se nevejdou podél hrany (' + (Math.round(span * 10) / 10).toString().replace('.', ',') + ' mm)');
-  const { A, B, H } = boxHingeLocal(f, G);
-  /* the 45° web reaches R·√2 + G/2 (+1 mm grip) below the rim; it must stay above the print bed */
-  const need = H.R * Math.SQRT2 + G / 2 + 1, low = Math.max(a.min[2], b.min[2]);
+  const flush = f.style === 'flush';
+  const P = flush ? boxHingeFlushLocal(f, G) : boxHingeLocal(f, G), H = P.H;
+  /* how far below the rim the hinge reaches: the 45° web (R·√2 + G/2 + 1 mm grip), or the teardrop pocket; it must stay above the print bed */
+  const need = flush ? P.depth + 1 : H.R * Math.SQRT2 + G / 2 + 1, low = Math.max(a.min[2], b.min[2]);
   if (a.max[2] - need < low - 1e-6) throw new Error('Krabička je na pant příliš nízká, potřebuje výšku alespoň ' + (Math.ceil(need * 10) / 10).toString().replace('.', ',') + ' mm');
   /* local y points from the box to the lid, local x along the edge, z up; keep it right-handed */
   const ey = [0, 0, 0]; ey[ax] = dir; const ex = [ey[1], -ey[0], 0], zA = a.max[2];
   const mid = (dir > 0 ? a.max[ax] + b.min[ax] : b.max[ax] + a.min[ax]) / 2;
-  let TA = null, TB = null;
+  const out = { H, G, flush };
   for (let j = 0; j < cnt; j++) {
     const cAlong = s0 + span * (j + 0.5) / cnt, org = [0, 0, zA]; org[ax] = mid; org[o] = cAlong - ex[o] * L / 2;
     const m = [ex[0], ex[1], ex[2], 0, ey[0], ey[1], ey[2], 0, 0, 0, 1, 0, org[0], org[1], org[2], 1];
-    const ta = KK.transform(A, m), tb = KK.transform(B, m);
-    TA = TA ? TA.concat(ta) : ta; TB = TB ? TB.concat(tb) : tb;
+    for (const key of ['A', 'B', 'cutA', 'cutB', 'sock', 'addA', 'addB']) if (P[key]) { const t = KK.transform(P[key], m); out[key] = out[key] ? out[key].concat(t) : t; }
   }
-  return { A: TA, B: TB, H, G };
+  return out;
 }
 function toolForHinge(f) {
   const { A, B } = hingeParts(f), part = f.part || 'both';
@@ -711,7 +742,14 @@ function step(state, f) {
       if (!bx || !ld) throw new Error('Krabička nebo víko chybí');
       if (bx === ld) throw new Error('Krabička a víko musí být dvě různá tělesa');
       const T = boxHingeTools(f, bx.polys, ld.polys);
-      out = bodies.map(b => (b === bx ? { ...b, polys: KK.boolean(b.polys, T.A, 'union') } : b === ld ? { ...b, polys: KK.boolean(b.polys, T.B, 'union') } : b));
+      let pb = bx.polys, pl = ld.polys;
+      if (T.addA) pb = KK.boolean(pb, T.addA, 'union');
+      if (T.addB) pl = KK.boolean(pl, T.addB, 'union');
+      if (T.cutA) pb = KK.boolean(pb, T.cutA, 'subtract');
+      if (T.cutB) pl = KK.boolean(pl, T.cutB, 'subtract');
+      pb = KK.boolean(pb, T.A, 'union'); pl = KK.boolean(pl, T.B, 'union');
+      if (T.sock) pb = KK.boolean(pb, T.sock, 'subtract');
+      out = bodies.map(b => (b === bx ? { ...b, polys: pb } : b === ld ? { ...b, polys: pl } : b));
       break;
     } else {
       /* the two leaves interlock, so a bounding-box test would also catch the body on the other leaf: join only bodies the hinge really touches */

@@ -1,5 +1,11 @@
 # Changelog
 
+## Beta 1.03
+- Pant krabičky s víkem má nové umístění **Zapuštěný** (nově výchozí): klouby sedí na horní hraně a jsou zapuštěné do stěn krabičky i víka, takže za krabičkou nic netrčí a díly stojí těsně vedle sebe (mezera 0,4 mm až asi 4,8 mm pro čep Ø 3 mm).
+  - Klouby mají tvar kapky (kruh se špičkou 45° dolů) a kapsy ve stěně druhého dílu stejný tvar s vůlí, takže se vše vytiskne vcelku bez podpěr.
+  - Zevnitř zadních stěn přibude podél pantu žebro se šikmým spodkem, aby kapsa neprořízla tenkou stěnu.
+  - Původní pant na stěně zůstává jako volba **Na stěně**.
+
 ## Beta 1.02
 - Pant krabičky s víkem: kontrola výšky. Šikmá podpěra kloubu sahá pod horní hranu (u čepu Ø 3 mm asi 9 mm), u nižší krabičky by trčela pod podložku, proto dialog teď upozorní, jakou nejmenší výšku krabička potřebuje.
 
