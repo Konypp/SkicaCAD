@@ -84,6 +84,7 @@ const ICONS = {
   revolve: '<path class="o" d="M13 4h4v15h-4z" opacity=".7"/><path d="M13 4h4v15h-4z"/><path d="M9 2v20" stroke-dasharray="2 2"/><path class="b" d="M5.5 8.5c-2 .8-2 6.2 0 7l1.2-1.8c-.9-1-.9-2.4 0-3.4z" opacity=".9"/><path d="M5.5 8.5c-2 .8-2 6.2 0 7M5.5 15.5l-.2-2.3 2.1.9"/>',
   mirror: '<path d="M12 2v20" stroke-dasharray="2 2"/><path class="b" d="M3 7h6v10H3z"/><path d="M3 7h6v10H3z"/><path class="b2" d="M15 7h6v10h-6z" opacity=".55"/><path d="M15 7h6v10h-6z" stroke-dasharray="2 1.5"/>',
   pattern: '<circle cx="12" cy="12" r="1.2" fill="currentColor"/><rect class="b" x="9.5" y="2.5" width="5" height="5" rx="1"/><rect class="b2" x="16.5" y="9.5" width="5" height="5" rx="1"/><rect class="b2" x="9.5" y="16.5" width="5" height="5" rx="1"/><rect class="b2" x="2.5" y="9.5" width="5" height="5" rx="1"/><rect x="9.5" y="2.5" width="5" height="5" rx="1"/><rect x="16.5" y="9.5" width="5" height="5" rx="1"/><rect x="9.5" y="16.5" width="5" height="5" rx="1"/><rect x="2.5" y="9.5" width="5" height="5" rx="1"/>',
+  simulate: '<path class="b" d="M3 14h18v7H3z"/><path d="M3 14h18v7H3z"/><path class="o" d="M4 12 17 4.5" style="stroke:var(--orange)"/><path d="M20 3.5a8 8 0 0 1 1 7" stroke-dasharray="2 2"/><path d="m21.6 8.3-.6 2.4-2.2-1"/>',
   measure: '<path class="o" d="M3 15 15 3l6 6L9 21z" opacity=".55"/><path d="M3 15 15 3l6 6L9 21zM7 11l2 2M10 8l3 3M13 5l2 2M16 12l-2-2M10 14l-1-1"/>',
   import: '<path d="M12 3v11M8 10l4 4 4-4"/><path class="b" d="M4 15v5h16v-5" opacity=".6"/><path d="M4 15v5h16v-5"/>',
   ngon: '<path class="o" d="M12 3.5 19.4 7.8v8.4L12 20.5l-7.4-4.3V7.8z" opacity=".35"/><path d="M12 3.5 19.4 7.8v8.4L12 20.5l-7.4-4.3V7.8z"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/>',
@@ -1109,7 +1110,7 @@ const RIBBON = {
     ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'], ['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus'], ['bolt', 'Šroub'], ['nut', 'Matice'], ['hinge', 'Pant'], ['latch', 'Západka']]],
     ['Upravit', [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení'], ['hole', 'Díra', 'H'], ['shell', 'Skořepina'], ['combine', 'Kombinovat'], ['splitbody', 'Rozříznout'], ['move', 'Přesunout', 'M'], ['rotate', 'Otočit', 'R'], ['scale', 'Měřítko'], ['center', 'Zarovnat'], ['facemode', 'Plochy', 'G'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole'], ['del', 'Odstranit', 'Del']]],
     ['Výběr', [['selall', 'Vybrat vše', 'Ctrl+A']]],
-    ['Kontrola', [['measure', 'Měřit', 'I']]],
+    ['Kontrola', [['measure', 'Měřit', 'I'], ['simulate', 'Simulace']]],
     ['Vložit', [['import', 'Importovat']]]
   ],
   sketch: [
@@ -1165,6 +1166,7 @@ function runCommand(id) {
     case 'mirror': startMirror(); break;
     case 'pattern': startPattern(); break;
     case 'measure': startMeasure(); break;
+    case 'simulate': startSimulate(); break;
     case 'import': pickImportFile('.stl,.obj,.dxf,.svg,.zip'); break;
     case 'del': deleteSelected(); break;
   }
@@ -2898,6 +2900,161 @@ function startLatch(editIndex, f) {
     },
     ok() { if (!this.tool) return null; const out = this.feature(); out.id = f ? f.id : newId(); return out; },
     cleanup() { clearTimeout(this.timer); this.highlight = null; styleBodies(); }
+  };
+  beginCmd(c); c.init();
+}
+
+/* ================= simulation: opening and closing a box =================
+   The lid turns about its hinge axis (swing, stored by the box hinge); levers and flaps of latches (pivot) turn first
+   and then ride on the lid. Without a hinge the lid lifts straight up. Clashes are checked on sampled positions. */
+function startSimulate() {
+  const LIFT = 20;
+  const c = {
+    lid: null, prog: 0, anim: null, scan: null, clash: [], moved: new Set(), clashIds: new Set(), info: null,
+    init() {
+      const cands = cur.bodies.filter(b => b.swing || cur.bodies.some(r => r.rides === b.id) || doc.features.some(f => (f.type === 'latch' || f.type === 'hinge') && f.lid === b.id));
+      const picked = [...sel].find(id => cands.some(b => b.id === id));
+      this.lid = picked || (cands[0] && cands[0].id) || null;
+      openDialog({ title: 'Simulace', icon: 'simulate', fields: [{ k: 'sel', id: 'lid', label: 'Víko' },
+        { k: 'num', id: 'prog', label: 'Průběh', unit: '%', value: 0, range: [0, 100, 1] },
+        { k: 'btns', id: 'go', label: 'Přehrát', options: [['open', 'Otevřít'], ['close', 'Zavřít'], ['loop', 'Dokola']] },
+        { k: 'note', id: 'n' }, { k: 'note', id: 'n2' }],
+        onSel: () => {},
+        onBtn: (id, v) => this.play(v),
+        onChange: id => { if (id === 'prog') { const x = dlg.get('prog'); if (isFinite(x)) { this.stop(); this.prog = Math.max(0, Math.min(100, x)); this.pose(); } } }
+      });
+      dlg.okLabel('Zavřít');
+      this.setup();
+    },
+    setup() {
+      this.stop(); this.reset();
+      const lb = this.lid && bodyById(this.lid);
+      dlg.set('lid', { text: lb ? bodyName(lb) : 'Klepněte na víko', has: !!lb, active: true });
+      if (!lb) { dlg.set('n', '!Klepněte na víko. Simulace potřebuje víko připojené pantem krabičky nebo víko se západkou na ose.'); dlg.set('n2', ''); this.info = null; requestRender(); return; }
+      const riders = cur.bodies.filter(b => b.rides === lb.id), levers = riders.filter(b => b.pivot);
+      const I = new THREE.Matrix4();
+      let O = I, U = I, axis = null, pt = null, sg = 1, Phi = 0;
+      if (lb.swing) {
+        const e = lb.swing.M; U = new THREE.Matrix4().fromArray(e);
+        if (!lb.swing.open) O = U;
+        const i = [0, 5, 10].findIndex(k => e[k] > 0.5);
+        axis = new THREE.Vector3(i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0);
+        pt = new THREE.Vector3(e[12] / 2, e[13] / 2, e[14] / 2 + (lb.swing.lift || 0));
+        /* the lid as printed (open, lying beside the box) and the way it swings up */
+        const bb = K.bbox(lb.polys), cs = [];
+        for (const x of [bb.min[0], bb.max[0]]) for (const y of [bb.min[1], bb.max[1]]) for (const z of [bb.min[2], bb.max[2]]) cs.push(new THREE.Vector3(x, y, z).applyMatrix4(O));
+        const ctr = cs.reduce((acc, v) => acc.add(v), new THREE.Vector3()).multiplyScalar(1 / 8);
+        const up = a => ctr.clone().sub(pt).applyAxisAngle(axis, a).z;
+        sg = up(Math.PI / 2) >= up(-Math.PI / 2) ? 1 : -1;
+        /* with the axis above the rim the lid turns a little past 180° until its front edge reaches the rim */
+        const ob = new THREE.Box3().setFromPoints(cs), rim = [];
+        for (const x of [ob.min.x, ob.max.x]) for (const y of [ob.min.y, ob.max.y]) rim.push(new THREE.Vector3(x, y, lb.swing.zp));
+        Phi = 180;
+        const low = d => Math.min(...rim.map(v => v.clone().sub(pt).applyAxisAngle(axis, sg * (180 + d) * Math.PI / 180).z + pt.z)) - lb.swing.zp;
+        if ((lb.swing.lift || 0) > 1e-6 && low(10) < 0) { let d0 = 0, d1 = 10; for (let k = 0; k < 40; k++) { const m = (d0 + d1) / 2; if (low(m) > 0) d0 = m; else d1 = m; } Phi = 180 + d0; }
+      }
+      const other = cur.bodies.filter(b => b.id !== lb.id && b.rides !== lb.id && isVis(b.id));
+      const spring = doc.features.some(f => f.type === 'latch' && f.lid === lb.id && (f.style === 'out' || f.style === 'flush'));
+      this.info = { lb, riders, levers, O, U, axis, pt, sg, Phi, other, spring, tA: levers.length ? 30 : 0 };
+      for (const b of [lb, ...riders]) this.moved.add(b.id);
+      dlg.set('n', (lb.swing ? 'Víko se otáčí na ose pantu' : 'Víko nemá pant krabičky, simulace ho jen zvedne') + (levers.length ? '; nejdřív se odklopí ' + (levers.length === 1 ? 'západka' : 'západky') + '.' : '.'));
+      this.pose(); this.startScan();
+    },
+    /* the pose at progress t (0–100): matrices for the lid, its riders and the levers */
+    mats(t) {
+      const S = this.info, I = new THREE.Matrix4();
+      const fa = S.tA ? Math.min(1, t / S.tA) : 1, fb = Math.max(0, (t - S.tA) / (100 - S.tA));
+      let L, Uc = S.U;
+      if (S.axis) {
+        const a = S.sg * S.Phi * (1 - fb) * Math.PI / 180;
+        L = new THREE.Matrix4().makeTranslation(S.pt.x, S.pt.y, S.pt.z).multiply(new THREE.Matrix4().makeRotationAxis(S.axis, a)).multiply(new THREE.Matrix4().makeTranslation(-S.pt.x, -S.pt.y, -S.pt.z));
+      } else L = new THREE.Matrix4().makeTranslation(0, 0, fb * LIFT);
+      const out = new Map(); out.set(S.lb.id, L.clone().multiply(S.O));
+      for (const r of S.riders) {
+        if (r.pivot) {
+          const p = r.pivot, d = new THREE.Vector3(...p.d).normalize();
+          const P = new THREE.Matrix4().makeTranslation(p.p[0], p.p[1], p.p[2]).multiply(new THREE.Matrix4().makeRotationAxis(d, fa * p.a * Math.PI / 180)).multiply(new THREE.Matrix4().makeTranslation(-p.p[0], -p.p[1], -p.p[2]));
+          out.set(r.id, L.clone().multiply(Uc).multiply(P));
+        } else out.set(r.id, r.openPose ? L.clone().multiply(S.O) : L.clone().multiply(Uc));
+      }
+      return { out, angle: S.axis ? fb * S.Phi : fb * LIFT, fa, fb };
+    },
+    pose() {
+      const S = this.info; if (!S) return;
+      const { out, angle, fa } = this.mats(this.prog);
+      for (const [id, M] of out) { const e = meshes.get(id); if (!e) continue; e.mesh.matrixAutoUpdate = false; e.mesh.matrix.copy(M); e.mesh.matrixWorldNeedsUpdate = true; }
+      dlg.set('prog', Math.round(this.prog));
+      const lv = S.levers.length ? `západka ${Math.round(fa * 100)} % · ` : '';
+      dlg.set('n2', this.scan ? `${lv}víko ${S.axis ? Math.round(angle) + '°' : fmtc(angle, 1) + ' mm'} · kontroluji kolize… ${this.scan}` : this.clashText(lv, angle));
+      /* clashing bodies near this position turn red */
+      const k = this.clash.find(q => Math.abs(q.t - this.prog) <= q.step / 2 + 0.01);
+      this.clashIds = new Set(k ? k.ids : []);
+      styleBodies();
+      for (const id of this.clashIds) { const e = meshes.get(id); if (e) { e.mesh.material.color.copy(tok.body).lerp(tok.danger, 0.6); e.edges.material.color.copy(tok.danger); } }
+      requestRender();
+    },
+    clashText(lv, angle) {
+      const S = this.info, pos = `${lv}víko ${S.axis ? Math.round(angle) + '°' : fmtc(angle, 1) + ' mm'}`;
+      if (!this.done) return pos;
+      const bad = this.clash.filter(q => q.ids.length), snap = this.clash.some(q => q.snap) ? ' Pružná západka těsně před zavřením zaskočí (tam se díly krátce překrývají, to je v pořádku).' : '';
+      if (!bad.length) return pos + ' · bez kolizí v celém rozsahu.' + snap;
+      const desc = bad.map(q => q.label).filter((x, i, a) => a.indexOf(x) === i);
+      return '!' + pos + ' · kolize: ' + desc.slice(0, 6).join(', ') + (desc.length > 6 ? '…' : '') + '.' + snap;
+    },
+    startScan() {
+      const S = this.info; this.clash = []; this.done = false;
+      const steps = [];
+      if (S.tA) for (let i = 1; i <= 8; i++) steps.push({ t: S.tA * i / 8, step: S.tA / 8 });
+      /* the lid: finely near the closed position (snapping latches, the hinge), then every 5° */
+      const fbs = S.axis ? [0, 1, 2, 3, 4, 6, 8, 10].map(a => a / S.Phi) : [0, 0.05, 0.1, 0.25, 0.5, 0.75, 1];
+      if (S.axis) for (let a = 15; a < S.Phi; a += 5) fbs.push(a / S.Phi);
+      if (S.axis) fbs.push(1);
+      fbs.forEach((fb, i) => { const t = S.tA + (100 - S.tA) * fb, nb = fbs[i + 1] !== undefined ? fbs[i + 1] : fb, pb = i ? fbs[i - 1] : fb; steps.push({ t, step: Math.max(0.5, (100 - S.tA) * (nb - pb)) }); });
+      const moving = [S.lb, ...S.riders], token = {}; this.scanTok = token;
+      /* a clash is a real overlap: some volume and thicker than a rounding sliver in every direction */
+      const vol = (a, b) => { if (!Engine.overlaps(a, b)) return 0; const i = K.boolean(a, b, 'intersect'); if (!i.length) return 0; const bb = K.bbox(i); return Math.min(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]) < 0.03 ? 0 : K.signedVolume(i); };
+      let i = 0;
+      const next = () => {
+        if (this.scanTok !== token || cmd !== this) return;
+        if (i >= steps.length) { this.scan = null; this.done = true; this.pose(); return; }
+        const st = steps[i++], { out, angle, fa } = this.mats(st.t), ids = new Set();
+        const P = new Map(moving.map(b => [b.id, K.transform(b.polys, out.get(b.id).elements)]));
+        for (const m of moving) {
+          for (const o of S.other) if (vol(P.get(m.id), o.polys) > 0.05) { ids.add(m.id); ids.add(o.id); }
+          /* levers turn against the lid while they swing open */
+          if (m.pivot && st.t <= S.tA + 1e-9 && vol(P.get(m.id), P.get(S.lb.id)) > 0.05) { ids.add(m.id); ids.add(S.lb.id); }
+        }
+        const lbl = st.t <= S.tA + 1e-9 && S.tA ? `západka ${Math.round(fa * 100)} %` : (S.axis ? Math.round(angle) + '°' : fmtc(angle, 1) + ' mm');
+        const snap = S.spring && st.t > S.tA && angle < (S.axis ? 8 : 6);
+        this.clash.push({ t: st.t, step: st.step, ids: snap ? [] : [...ids], snap: snap && ids.size > 0, label: lbl });
+        this.scan = Math.round(i / steps.length * 100) + ' %';
+        dlg && this.pose();
+        setTimeout(next, 0);
+      };
+      this.scan = '0 %'; setTimeout(next, 30);
+    },
+    play(mode) {
+      this.stop();
+      let dir = mode === 'close' ? -1 : 1, last = performance.now();
+      const run = now => {
+        if (cmd !== this) return;
+        const dt = Math.min(0.1, (now - last) / 1000); last = now;
+        this.prog += dir * dt * 25;
+        if (this.prog >= 100) { this.prog = 100; if (mode === 'loop') dir = -1; else { this.pose(); this.anim = null; return; } }
+        if (this.prog <= 0) { this.prog = 0; if (mode === 'loop') dir = 1; else { this.pose(); this.anim = null; return; } }
+        this.pose(); this.anim = requestAnimationFrame(run);
+      };
+      this.anim = requestAnimationFrame(run);
+    },
+    stop() { if (this.anim) cancelAnimationFrame(this.anim); this.anim = null; },
+    reset() {
+      for (const id of this.moved) { const e = meshes.get(id); if (e) { e.mesh.matrixAutoUpdate = true; e.mesh.matrix.identity(); e.mesh.position.set(0, 0, 0); e.mesh.rotation.set(0, 0, 0); e.mesh.updateMatrix(); } }
+      this.moved = new Set(); this.clashIds = new Set(); styleBodies();
+    },
+    onMove(ev) { const h = hitBodies(ev); dom.style.cursor = h ? 'pointer' : ''; },
+    onClick(ev) { const h = hitBodies(ev); if (!h) return; const id = h.object.userData.bodyId, b = bodyById(id); this.lid = b && b.rides ? b.rides : id; this.prog = 0; this.setup(); },
+    ok() { endCmd(false); return null; },
+    cleanup() { this.stop(); this.scanTok = null; this.reset(); requestRender(); }
   };
   beginCmd(c); c.init();
 }

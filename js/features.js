@@ -846,7 +846,7 @@ function rotLatchLocal(f) {
   }
   /* centre the swept area (from x = -reach to wv/2) on the chosen place */
   const dx = (reach - wv / 2) / 2, mv = p => (p ? KK.translate(p, [dx, 0, 0]) : p);
-  return { lever: mv(lever), boxAdd: mv(stud), lidAdd: mv(boss), boxCut: mv(boxCut), lidCut: mv(lidCut), W: reach + wv / 2 + 1, depth: ec + rs + c + 1, ov: pz + wv / 2 + 1.5 };
+  return { lever: mv(lever), pivot: { p: [dx, 0, pz], d: [0, 1, 0], a: 90 }, boxAdd: mv(stud), lidAdd: mv(boss), boxCut: mv(boxCut), lidCut: mv(lidCut), W: reach + wv / 2 + 1, depth: ec + rs + c + 1, ov: pz + wv / 2 + 1.5 };
 }
 /* flip latch (like a spring latch on the wall, but the tab turns on an axle): a flap hangs on an axle in two lugs of the
    LID; it flips from the top down and its hook goes under a ridge on the box. The ridge's underside is undercut, so a
@@ -889,12 +889,13 @@ function flipLatchLocal(f) {
       boxAdd = KK.boolean(boxAdd, KK.boolean(prismX([[wi, 0], [fl, 0], [fl, zbot - c - 1], [wi, zbot - c - 1 - dep]], -W / 2 - 1, W / 2 + 1), boxCut, 'subtract'), 'union');
       lidAdd = prismX([[wi, 0], [fl, 0], [fl, zTop + 1], [wi, zTop + 1 + dep]], -W / 2 - 1, W / 2 + 1);
     }
-    return { lever: mv(flap), boxAdd, lidAdd, boxCut, lidCut, W: W + 2, depth: -zbot + c + 2 + Math.max(0, dep), ov: zTop + 1 + Math.max(0, dep) };
+    return { lever: mv(flap), pivot: { p: [0, uA + d, zA], d: [1, 0, 0], a: 100 }, boxAdd, lidAdd, boxCut, lidCut, W: W + 2, depth: -zbot + c + 2 + Math.max(0, dep), ov: zTop + 1 + Math.max(0, dep) };
   }
-  return { lever: flap, boxAdd, lidAdd, boxCut, lidCut, W, depth: -zbot + 1, ov: zA + uo + 1 };
+  return { lever: flap, pivot: { p: [0, uA, zA], d: [1, 0, 0], a: 150 }, boxAdd, lidAdd, boxCut, lidCut, W, depth: -zbot + 1, ov: zA + uo + 1 };
 }
-function latchTools(f, boxPolys, lidPolys) {
-  const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys), zp = a.max[2];
+function latchTools(f, boxPolys, lidPolys, zRim) {
+  /* the parting plane: the box rim (hinge knuckles of a box hinge may stand above it, so the hinge passes it on) */
+  const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys), zp = zRim !== undefined ? zRim : a.max[2];
   if (b.min[2] > zp + 0.05 || b.max[2] < zp + 0.5) throw new Error('Víko musí ležet na krabičce (zavřená krabička)');
   const side = f.side || '-y', k = side[1] === 'x' ? 0 : 1, sg = side[0] === '-' ? -1 : 1, o = 1 - k;
   const face = sg > 0 ? a.max[k] : a.min[k];
@@ -906,7 +907,7 @@ function latchTools(f, boxPolys, lidPolys) {
   if (zp - a.min[2] < P.depth + 1) throw new Error('Krabička je na západku příliš nízká');
   if (rot && b.max[2] - zp < P.ov) throw new Error(flip ? 'Víko je na sklopnou západku příliš nízké' : 'Víko je na páčku příliš nízké, zkraťte páčku');
   const eu = [0, 0, 0]; eu[k] = sg; const ex = KK.cross(eu, [0, 0, 1]);
-  const out = { box: null, lid: null, cut: null, cutLid: null, lever: null };
+  const out = { box: null, lid: null, cut: null, cutLid: null, lever: null, levers: [] };
   const put = (key, polys) => { out[key] = out[key] ? (key === 'lever' ? out[key].concat(polys) : KK.boolean(out[key], polys, 'union')) : polys; };
   for (let j = 0; j < cnt; j++) {
     const cAlong = s0 + (s1 - s0) * (j + 0.5) / cnt + sh, org = [0, 0, zp]; org[k] = face; org[o] = cAlong;
@@ -916,6 +917,9 @@ function latchTools(f, boxPolys, lidPolys) {
       if (P.boxAdd) put('box', KK.transform(P.boxAdd, m)); if (P.boxCut) put('cut', KK.transform(P.boxCut, m));
       if (P.lidAdd) put('lid', KK.transform(P.lidAdd, m));
       if (P.lidCut) put('cutLid', KK.transform(P.lidCut, m)); put('lever', KK.transform(P.lever, m));
+      const tp = q => [m[0] * q[0] + m[4] * q[1] + m[8] * q[2] + m[12], m[1] * q[0] + m[5] * q[1] + m[9] * q[2] + m[13], m[2] * q[0] + m[6] * q[1] + m[10] * q[2] + m[14]];
+      const pv = P.pivot, td = q => [m[0] * q[0] + m[4] * q[1] + m[8] * q[2], m[1] * q[0] + m[5] * q[1] + m[9] * q[2], m[2] * q[0] + m[6] * q[1] + m[10] * q[2]];
+      out.levers.push({ polys: KK.transform(P.lever, m), pivot: { p: tp(pv.p), d: td(pv.d), a: pv.a } });
     } else {
       for (const L of P.box) put('box', KK.transform(prismX(L, -P.W / 2, P.W / 2), m));
       for (const L of P.lid) put('lid', KK.transform(prismX(L, -P.W / 2, P.W / 2), m));
@@ -927,17 +931,17 @@ function latchTools(f, boxPolys, lidPolys) {
 /* the latch on a box and lid; when the lid lies open beside the box (a hinge printed in one piece turned it over), the
    lid is folded shut for the latch and opened again afterwards */
 function latchApply(f, bx, ld) {
-  const zp = KK.bbox(bx.polys).max[2], lb = KK.bbox(ld.polys), onBox = lb.min[2] <= zp + 0.05 && lb.max[2] >= zp + 0.5;
-  const fold = !onBox && ld.fold ? ld.fold : null;
+  const zp = ld.swing ? ld.swing.zp : KK.bbox(bx.polys).max[2], lb = KK.bbox(ld.polys), onBox = lb.min[2] <= zp + 0.05 && lb.max[2] >= zp + 0.5;
+  const fold = ld.fold || null; /* a lid with fold is stored open (turned over by a box hinge) */
   const lidP = fold ? KK.transform(ld.polys, fold) : ld.polys;
   if (!fold && !onBox) throw new Error('Víko musí ležet na krabičce, nebo být připojené pantem krabičky (tisk vcelku)');
-  const T = latchTools(f, bx.polys, lidP), sep = f.out === 'new', back = p => (p && fold ? KK.transform(p, fold) : p);
+  const T = latchTools(f, bx.polys, lidP, ld.swing ? ld.swing.zp : undefined), sep = f.out === 'new', back = p => (p && fold ? KK.transform(p, fold) : p);
   let pb = bx.polys, pl = lidP;
   if (T.cut) pb = KK.boolean(pb, T.cut, 'subtract');
   if (T.box && !sep) pb = KK.boolean(pb, T.box, 'union');
   if (T.lid && !sep) pl = KK.boolean(pl, T.lid, 'union');
   if (T.cutLid) pl = KK.boolean(pl, T.cutLid, 'subtract'); /* after the boss, so the axle hole goes through it */
-  return { box: pb, lid: back(pl), partBox: sep ? T.box : null, partLid: sep ? back(T.lid) : null, lever: T.lever, T, fold, preview: [].concat(T.box || [], T.lid ? back(T.lid) : [], T.lever || []), previewCut: [].concat(T.cut || [], T.cutLid ? back(T.cutLid) : []) };
+  return { box: pb, lid: back(pl), partBox: sep ? T.box : null, partLid: sep ? back(T.lid) : null, lever: T.lever, levers: T.levers, T, fold, preview: [].concat(T.box || [], T.lid ? back(T.lid) : [], T.lever || []), previewCut: [].concat(T.cut || [], T.cutLid ? back(T.cutLid) : []) };
 }
 function toolForHinge(f) {
   const { A, B } = hingeParts(f), part = f.part || 'both';
@@ -983,11 +987,13 @@ function step(state, f) {
       if (!bx || !ld) throw new Error('Krabička nebo víko chybí');
       if (bx === ld) throw new Error('Krabička a víko musí být dvě různá tělesa');
       let R, fold = null;
-      if (f.kind === 'closed') { R = closedHingeResult(f, bx.polys, ld.polys); if (!R.pinMode) fold = R.U; }
-      else { const T = boxHingeTools(f, bx.polys, ld.polys); R = applyBoxHinge(T, bx.polys, ld.polys, f.out === 'new'); fold = T.fold; }
-      /* fold: turns the open lid shut (a later latch is built on the closed box) */
-      out = bodies.map(b => (b === bx ? { ...b, polys: R.box } : b === ld ? { ...b, polys: R.lid, fold } : b));
-      if (R.partA) out = out.concat([{ id: f.id + 'a', name: 'Pant – díl krabičky', polys: R.partA, from: f.id }, { id: f.id + 'b', name: 'Pant – díl víka', polys: R.partB, from: f.id }]);
+      let swing;
+      if (f.kind === 'closed') { R = closedHingeResult(f, bx.polys, ld.polys); if (!R.pinMode) fold = R.U; swing = { M: R.U, open: !R.pinMode, lift: R.T.lift, zp: KK.bbox(bx.polys).max[2] }; }
+      else { const T = boxHingeTools(f, bx.polys, ld.polys); R = applyBoxHinge(T, bx.polys, ld.polys, f.out === 'new'); fold = T.fold; swing = { M: T.fold, open: true, lift: T.lift, zp: KK.bbox(bx.polys).max[2] }; }
+      /* fold: turns the open lid shut (a later latch is built on the closed box); swing: the hinge axis for the simulation
+         (M = the 180° turn on the rim plane, open = the lid is stored turned open; the real axis is lift above the rim) */
+      out = bodies.map(b => (b === bx ? { ...b, polys: R.box } : b === ld ? { ...b, polys: R.lid, fold, swing } : b));
+      if (R.partA) out = out.concat([{ id: f.id + 'a', name: 'Pant – díl krabičky', polys: R.partA, from: f.id }, { id: f.id + 'b', name: 'Pant – díl víka', polys: R.partB, from: f.id, rides: ld.id, openPose: swing.open }]);
       break;
     } else {
       /* the two leaves interlock, so a bounding-box test would also catch the body on the other leaf: join only bodies the hinge really touches */
@@ -1007,8 +1013,10 @@ function step(state, f) {
       const R = latchApply(f, bx, ld);
       out = bodies.map(b => (b === bx ? { ...b, polys: R.box } : b === ld ? { ...b, polys: R.lid } : b));
       if (R.partBox) out.push({ id: f.id + 'a', name: 'Západka – díl krabičky', polys: R.partBox, from: f.id });
-      if (R.partLid) out.push({ id: f.id + 'b', name: 'Západka – díl víka', polys: R.partLid, from: f.id });
-      if (R.lever) out.push({ id: f.id + 'p', name: f.style === 'flip' || f.style === 'flipflush' ? 'Západka – jazýček' : 'Západka – páčka', polys: R.lever, from: f.id });
+      if (R.partLid) out.push({ id: f.id + 'b', name: 'Západka – díl víka', polys: R.partLid, from: f.id, rides: ld.id, openPose: !!R.fold });
+      const nm = f.style === 'flip' || f.style === 'flipflush' ? 'Západka – jazýček' : 'Západka – páčka';
+      /* each lever is its own body; pivot (in the closed-lid position) lets the simulation turn it, rides: it moves with the lid */
+      (R.levers || []).forEach((L, i) => out.push({ id: f.id + 'p' + (i ? i + 1 : ''), name: nm + (R.levers.length > 1 ? ' ' + (i + 1) : ''), polys: L.polys, from: f.id, rides: ld.id, pivot: L.pivot }));
       break;
     }
     case 'import':

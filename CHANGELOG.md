@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 1.09
+- Nový příkaz **Simulace** (skupina Kontrola): ukáže, jak se krabička otevírá a zavírá. Víko se otáčí na skutečné ose pantu krabičky (u osy nad okrajem se zavře o kousek přes 180°, až dosedne vpředu). Páčky a jazýčky západek na ose se nejdřív odklopí a pak jedou s víkem. Víko bez pantu se jen zvedne. Posuvník Průběh, tlačítka Otevřít, Zavřít a Dokola. Na pozadí se zkontrolují kolize v celém rozsahu (u zavřené polohy jemněji); tělesa, která do sebe narazí, zčervenají a dialog vypíše polohy. Zaskočení pružné západky těsně před zavřením se za kolizi nepočítá.
+- Opraveno: západka přidaná **po pantu** krabičky brala za rovinu dělení vrchol kloubů pantu místo okraje krabičky, takže lišta a háček vyšly o pár milimetrů výš (na to přišla simulace). Teď se použije okraj krabičky uložený pantem.
+- Více páček nebo jazýčků jedné západky (počet 2–3) jsou samostatná tělesa (Západka – jazýček 1, 2…), aby se v simulaci mohly otáčet každý na své ose.
+
 ## Beta 1.08
 - Západka, nová provedení **Sklopná na ose na stěně** a **Sklopná na ose zapuštěná** (jako na kufru s nářadím): jazýček visí na ose ve dvou očkách víka, sklopí se shora dolů a jeho háček zajede pod lištu na krabičce. Spodní strana lišty je podříznutá (30°) a lišta leží tak nízko, že tah víka háček přitlačí ke stěně: západka se sama neotevře. Otevře se zatažením za spodní okraj jazýčku. Jazýček je samostatné těleso, tiskne se naležato na vnější ploše.
 - Na stěně: osa ze šroubu M3 (samořezný do vzdálenějšího očka) nebo z kusu filamentu 1,75 mm natlačeného do oček. Zapuštěná: jazýček leží v kapse zarovnaný se stěnou, do jeho očka se vlepí kus filamentu a jazýček se zvenku zacvakne do zářezů na koncích kapsy; kde je stěna tenčí než kapsa, je zevnitř nálitek se zkosením 45°.
