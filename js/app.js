@@ -2661,7 +2661,7 @@ function startFastener(type, editIndex, f) {
 /* ================= hinge ================= */
 function startHinge(editIndex, f) {
   const pivot = new THREE.Object3D(); scene.add(pivot);
-  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_HINGE, holes: 2, hd: 3, part: 'both', rot: 0, count: 2, side: '+y', join: 'print', pinKind: 'fil', gap: 1, shift: 0, out: 'join' };
+  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_HINGE, holes: 2, hd: 3, part: 'both', rot: 0, count: 2, side: '+y', join: 'print', pinKind: 'fil', gap: 1, shift: 0, out: 'join', lift: 0.4 };
   const c = {
     editIndex, tool: null, tools: null, gizmoDrag: false, timer: null,
     v: f ? { ...D0, style: 'out', ...f } : { ...D0 },
@@ -2687,6 +2687,7 @@ function startHinge(editIndex, f) {
           { k: 'seg', id: 'cnt', label: 'Počet kloubů', options: [['2', '2'], ['3', '3'], ['5', '5'], ['7', '7']], value: String(this.v.n) },
           { k: 'num', id: 'pin', label: this.v.kind === 'screw' ? 'Průměr šroubu v ose' : 'Průměr čepu', value: this.v.pin },
           { k: 'num', id: 'tol', label: 'Vůle pro 3D tisk', value: this.v.tol },
+          { k: 'num', id: 'lift', label: 'Rezerva při zavření (osa nad okrajem)', value: this.v.lift },
           { k: 'opt', id: 'holes', label: 'Otvory v křídle', options: [['0', 'Žádné'], ['1', '1'], ['2', '2'], ['3', '3']], value: String(this.v.holes) },
           { k: 'opt', id: 'hd', label: 'Zápustné šrouby', options: [['2', 'M2'], ['2.5', 'M2,5'], ['3', 'M3'], ['4', 'M4']], value: String(this.v.hd) },
           { k: 'seg', id: 'part', label: 'Vytvořit', options: [['both', 'Celý pant'], ['a', 'Křídlo A'], ['b', 'Křídlo B']], value: this.v.part },
@@ -2721,15 +2722,15 @@ function startHinge(editIndex, f) {
     layout() {
       const bx = this.isBox(), cl = this.isClosed(), pin = cl && this.v.join === 'pin';
       for (const id of ['style', 'box', 'lid', 'count', 'shift', 'out']) dlg.show(id, bx);
-      dlg.show('join', cl); dlg.show('side', cl); dlg.show('pinKind', pin); dlg.show('pin', !pin); dlg.show('gap', cl && !pin && this.v.style === 'flush');
+      dlg.show('join', cl); dlg.show('side', cl); dlg.show('lift', bx && !pin); dlg.show('pinKind', pin); dlg.show('pin', !pin); dlg.show('gap', cl && !pin && this.v.style === 'flush');
       for (const id of ['w', 't', 'holes', 'hd', 'part', 'rot', 'pos', 'op']) dlg.show(id, !bx);
       if (bx) transform.detach(); else transform.attach(pivot);
       if (bx && !this.box) this.pick = 'box'; else if (bx && !this.lid) this.pick = 'lid';
     },
     feature() {
       const v = this.v;
-      if (this.isClosed()) return { id: f ? f.id : 'tmp', type: 'hinge', kind: 'closed', style: v.style, side: v.side, join: v.join, pinKind: v.pinKind, gap: v.gap, box: this.box, lid: this.lid, len: v.len, n: v.n, pin: v.pin, tol: v.tol, count: v.count, shift: v.shift, out: v.out };
-      if (this.isBox()) return { id: f ? f.id : 'tmp', type: 'hinge', kind: 'box', style: v.style, box: this.box, lid: this.lid, len: v.len, n: v.n, pin: v.pin, tol: v.tol, count: v.count, shift: v.shift, out: v.out };
+      if (this.isClosed()) return { id: f ? f.id : 'tmp', type: 'hinge', kind: 'closed', style: v.style, side: v.side, join: v.join, pinKind: v.pinKind, gap: v.gap, box: this.box, lid: this.lid, len: v.len, n: v.n, pin: v.pin, tol: v.tol, count: v.count, shift: v.shift, out: v.out, lift: v.lift };
+      if (this.isBox()) return { id: f ? f.id : 'tmp', type: 'hinge', kind: 'box', style: v.style, box: this.box, lid: this.lid, len: v.len, n: v.n, pin: v.pin, tol: v.tol, count: v.count, shift: v.shift, out: v.out, lift: v.lift };
       return { id: f ? f.id : 'tmp', type: 'hinge', kind: v.kind, len: v.len, w: v.w, t: v.t, n: v.n, pin: v.pin, tol: v.tol, holes: v.holes, hd: v.hd, part: v.part, rot: v.rot, pos: this.pos.slice(), op: this.op };
     },
     schedule() { clearTimeout(this.timer); dlg.set('n', 'Počítám…'); this.timer = setTimeout(() => this.update(), 150); },

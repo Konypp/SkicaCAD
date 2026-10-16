@@ -714,11 +714,15 @@ function boxHingeTools(f, boxPolys, lidPolys) {
   /* local y points from the box to the lid, local x along the edge, z up; keep it right-handed */
   const ey = [0, 0, 0]; ey[ax] = dir; const ex = [ey[1], -ey[0], 0], zA = f.zRim !== undefined ? f.zRim : a.max[2];
   const mid = (dir > 0 ? a.max[ax] + b.min[ax] : b.max[ax] + a.min[ax]) / 2;
-  const out = { H, G, flush };
+  const lift = f.pinHole ? 0 : Math.max(0, Math.min(2, f.lift === undefined ? 0 : Number(f.lift) || 0));
+  const out = { H, G, flush, lift };
   for (let j = 0; j < cnt; j++) {
     const cAlong = s0 + span * (j + 0.5) / cnt + sh, org = [0, 0, zA]; org[ax] = mid; org[o] = cAlong - ex[o] * L / 2;
     const m = [ex[0], ex[1], ex[2], 0, ey[0], ey[1], ey[2], 0, 0, 0, 1, 0, org[0], org[1], org[2], 1];
-    for (const key of ['A', 'B', 'cutA', 'cutB', 'sock', 'sockB', 'addA', 'addB']) if (P[key]) { const t = KK.transform(P[key], m); out[key] = out[key] ? out[key].concat(t) : t; }
+    /* the hinge itself sits 'lift' above the rims: a lid turned 180° about it then comes down 2 × lift above the box at the
+       hinge side, so it closes onto its front edge first and nothing at the hinge (play, a slightly fat print) holds it open */
+    const mL = m.slice(); mL[14] += lift;
+    for (const key of ['A', 'B', 'cutA', 'cutB', 'sock', 'sockB', 'addA', 'addB']) if (P[key]) { const t = KK.transform(P[key], key === 'addA' || key === 'addB' ? m : mL); out[key] = out[key] ? out[key].concat(t) : t; }
   }
   return out;
 }

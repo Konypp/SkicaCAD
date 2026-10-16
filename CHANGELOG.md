@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 1.06
+- Pant krabičky (tisk vcelku): nová volba **Rezerva při zavření** (výchozí 0,4 mm). Osa pantu leží o tuto hodnotu nad okrajem krabičky, takže víko při zavírání nejdřív dosedne vpředu a u pantu má volno. Dřív ležela osa přesně v rovině okrajů: víko se pak opřelo o okraj u pantu a i nepatrná nepřesnost tisku ho nechala vpředu pootevřené (páka asi 10 : 1). U pantu na kolík/šroub se nepoužívá, tam stačí vůle díry.
+
 ## Beta 1.05
 - Nový příkaz **Západka** (skupina Vytvořit) pro krabičku navrženou zavřenou: provedení **Na stěně** (pružný jazýček z víka se zobáčkem zaskočí pod lištu na krabičce) nebo **Zasunutá** (pružný jazýček zajede dovnitř krabičky a jeho výstupek zaskočí do drážky ve stěně, zvenku není vidět). Šířka, počet 1–3, posun podél hrany, vůle; výsledek přidat k tělesům nebo jako nová tělesa. Všechny převisy 45°, tiskne se bez podpěr. Západku přidejte dřív než pant navržený na zavřené krabičce.
 - Pant: **2 klouby** (čep končí dvojitým kuželem zachyceným v kloubu, takže díly drží osově oběma směry), u pantu krabičky **posun podél hrany** a volba **Výsledek: nová tělesa** (díl krabičky a díl víka zůstanou samostatná tělesa; kapsy, žebra a díry pro čep se do krabičky a víka vyříznou).
