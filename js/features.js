@@ -7,7 +7,7 @@ const PLANES = {
   XZ: { o: [0, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] },
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
-const FEATURE_LABEL = { hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
+const FEATURE_LABEL = { latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
   fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
@@ -547,15 +547,17 @@ function hingeDims(f) {
   const L = Number(f.len), W = Number(f.w), t = Number(f.t), N = Math.round(Number(f.n)) || 3, pd = Number(f.pin), c = Math.max(0, Math.min(1.5, Number(f.tol) || 0)), screw = f.kind === 'screw';
   if (!(L >= 6 && L <= 500)) throw new Error('Délka pantu musí být 6 až 500 mm');
   if (!(pd >= 1 && pd <= 20)) throw new Error('Průměr čepu musí být 1 až 20 mm');
-  if (![3, 5, 7].includes(N)) throw new Error('Počet kloubů musí být 3, 5 nebo 7');
-  const pr = pd / 2, R = pr + c + HINGE_WALL, zc = 0.75 * R;
+  if (![2, 3, 5, 7].includes(N)) throw new Error('Počet kloubů musí být 2, 3, 5 nebo 7');
+  /* two knuckles: the pin ends in a bulb (double cone) caught in a cavity of knuckle A, so the leaves stay together both ways */
+  const pr = pd / 2, bulb = N === 2 && !screw, be = c + 0.4, D0 = c * Math.SQRT2;
+  const R = bulb ? Math.max(pr + c + HINGE_WALL, pr + be + D0 + 0.9) : pr + c + HINGE_WALL, zc = 0.75 * R;
   if (!(t >= 0.8)) throw new Error('Tloušťka křídla musí být alespoň 0,8 mm');
   if (t > zc + R - 0.3) throw new Error('Křídlo je na tento čep příliš silné (nejvýš ' + (Math.floor((zc + R - 0.3) * 10) / 10).toString().replace('.', ',') + ' mm), zvětšete průměr čepu');
   if (!(W >= R + c + 2)) throw new Error('Křídlo musí být široké alespoň ' + (Math.ceil((R + c + 2) * 10) / 10).toString().replace('.', ',') + ' mm');
   const k = (L - (N - 1) * c) / N, rt = Math.max(0.4, pr * 0.35), ch = pr - rt, D = c * Math.SQRT2;
-  const kMin = screw ? 2 : HINGE_WALL + D + ch + 1.5;
+  const kMin = screw ? 2 : bulb ? HINGE_WALL + D + (pr + be - rt) + be + 1.5 : HINGE_WALL + D + ch + 1.5;
   if (k < kMin) throw new Error('Klouby jsou příliš krátké, prodlužte pant nebo zvolte méně kloubů');
-  return { L, W, t, N, pd, pr, c, R, zc, k, rt, ch, D, screw };
+  return { L, W, t, N, pd, pr, c, R, zc, k, rt, ch, D, screw, bulb, be };
 }
 const YZB = { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] };
 /* 2D outline (y, z) of one leaf section: the knuckle (circle cut flat at z = 0 so it prints without supports) merged with the plate */
@@ -609,6 +611,18 @@ function hingePin(H, A, B, az) {
   return { A: KK.boolean(A, sock, 'subtract'), B: KK.boolean(B, pin, 'union') };
 }
 function pinParts(H, az) {
+  if (H.bulb) {
+    /* knuckle A (x 0..k) holds the bulb; the pin runs on through knuckle B (fused to it) */
+    const { L, pr, c, rt, D, be } = H, w = HINGE_WALL, rb = pr + be, x0 = w + D, x1 = x0 + (rb - rt), x2 = x1 + be;
+    let pin = cylAlong([x2 - 0.01, 0, az], [1, 0, 0], pr, L - w - x2 + 0.01);
+    pin = KK.boolean(pin, coneX([x1, 0, az], [-1, 0, 0], rb, rt, x1 - x0), 'union');
+    pin = KK.boolean(pin, coneX([x1, 0, az], [1, 0, 0], rb, pr, be), 'union');
+    const rbS = rb + D, x3 = x1 + (rbS - pr - c);
+    let sock = cylAlong([x3 - 0.01, 0, az], [1, 0, 0], pr + c, L - x3 + 0.02);
+    sock = KK.boolean(sock, coneX([x1, 0, az], [-1, 0, 0], rbS, rt, x1 - w), 'union');
+    sock = KK.boolean(sock, coneX([x1, 0, az], [1, 0, 0], rbS, pr + c, rbS - pr - c), 'union');
+    return { pin, sock };
+  }
   const { L, pr, c, rt, ch, D } = H, w = HINGE_WALL, xa = w + D + ch, xb = L - w - D - ch;
   let pin = cylAlong([xa, 0, az], [1, 0, 0], pr, xb - xa);
   pin = KK.boolean(pin, coneX([xa, 0, az], [-1, 0, 0], pr, rt, ch), 'union');
@@ -680,7 +694,7 @@ function boxHingeFlushLocal(f, G) {
 /* place the box hinge(s) from the two bodies: returns world-space tools for the box and for the lid */
 function boxHingeTools(f, boxPolys, lidPolys) {
   const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys);
-  if (Math.abs(a.max[2] - b.max[2]) > 0.05) throw new Error('Krabička a víko musí mít horní hranu ve stejné výšce');
+  if (f.zRim === undefined && Math.abs(a.max[2] - b.max[2]) > 0.05) throw new Error('Krabička a víko musí mít horní hranu ve stejné výšce');
   let ax = -1, G = -1, dir = 0;
   for (const k of [0, 1]) {
     const g1 = b.min[k] - a.max[k], g2 = a.min[k] - b.max[k];
@@ -689,6 +703,8 @@ function boxHingeTools(f, boxPolys, lidPolys) {
   }
   if (G <= 0) throw new Error('Krabička a víko se překrývají, postavte je vedle sebe s mezerou');
   const o = 1 - ax, s0 = Math.max(a.min[o], b.min[o]), s1 = Math.min(a.max[o], b.max[o]), span = s1 - s0, L = Number(f.len), cnt = Math.max(1, Math.min(4, Math.round(Number(f.count) || 1)));
+  const sh = Number(f.shift) || 0;
+  if (Math.abs(sh) > 1e-9 && (s0 + span * 0.5 / cnt + sh - L / 2 < s0 - 1e-6 || s0 + span * (cnt - 0.5) / cnt + sh + L / 2 > s1 + 1e-6)) throw new Error('Posunutý pant by přesahoval hranu');
   if (span < L * cnt + 2 * (cnt - 1)) throw new Error('Panty se nevejdou podél hrany (' + (Math.round(span * 10) / 10).toString().replace('.', ',') + ' mm)');
   const flush = f.style === 'flush';
   const P = flush ? boxHingeFlushLocal(f, G) : boxHingeLocal(f, G), H = P.H;
@@ -696,22 +712,29 @@ function boxHingeTools(f, boxPolys, lidPolys) {
   const need = flush ? P.depth + 1 : H.R * Math.SQRT2 + G / 2 + 1, low = Math.max(a.min[2], b.min[2]);
   if (a.max[2] - need < low - 1e-6) throw new Error('Krabička je na pant příliš nízká, potřebuje výšku alespoň ' + (Math.ceil(need * 10) / 10).toString().replace('.', ',') + ' mm');
   /* local y points from the box to the lid, local x along the edge, z up; keep it right-handed */
-  const ey = [0, 0, 0]; ey[ax] = dir; const ex = [ey[1], -ey[0], 0], zA = a.max[2];
+  const ey = [0, 0, 0]; ey[ax] = dir; const ex = [ey[1], -ey[0], 0], zA = f.zRim !== undefined ? f.zRim : a.max[2];
   const mid = (dir > 0 ? a.max[ax] + b.min[ax] : b.max[ax] + a.min[ax]) / 2;
   const out = { H, G, flush };
   for (let j = 0; j < cnt; j++) {
-    const cAlong = s0 + span * (j + 0.5) / cnt, org = [0, 0, zA]; org[ax] = mid; org[o] = cAlong - ex[o] * L / 2;
+    const cAlong = s0 + span * (j + 0.5) / cnt + sh, org = [0, 0, zA]; org[ax] = mid; org[o] = cAlong - ex[o] * L / 2;
     const m = [ex[0], ex[1], ex[2], 0, ey[0], ey[1], ey[2], 0, 0, 0, 1, 0, org[0], org[1], org[2], 1];
     for (const key of ['A', 'B', 'cutA', 'cutB', 'sock', 'sockB', 'addA', 'addB']) if (P[key]) { const t = KK.transform(P[key], m); out[key] = out[key] ? out[key].concat(t) : t; }
   }
   return out;
 }
-function applyBoxHinge(T, pb, pl) {
+/* sep: the knuckle parts stay separate bodies (the box and lid still get their pockets, ribs and pin holes) */
+function applyBoxHinge(T, pb, pl, sep) {
   if (T.addA) pb = KK.boolean(pb, T.addA, 'union');
   if (T.addB) pl = KK.boolean(pl, T.addB, 'union');
   if (T.cutA) pb = KK.boolean(pb, T.cutA, 'subtract');
   if (T.cutB) pl = KK.boolean(pl, T.cutB, 'subtract');
-  pb = KK.boolean(pb, T.A, 'union'); pl = KK.boolean(pl, T.B, 'union');
+  let pa = T.A, pB = T.B;
+  if (sep) {
+    if (T.sock) { pb = KK.boolean(pb, T.sock, 'subtract'); pa = KK.boolean(pa, T.sock, 'subtract'); }
+    if (T.sockB) { pl = KK.boolean(pl, T.sockB, 'subtract'); pB = KK.boolean(pB, T.sockB, 'subtract'); }
+    return { box: pb, lid: pl, partA: pa, partB: pB };
+  }
+  pb = KK.boolean(pb, pa, 'union'); pl = KK.boolean(pl, pB, 'union');
   if (T.sock) pb = KK.boolean(pb, T.sock, 'subtract');
   if (T.sockB) pl = KK.boolean(pl, T.sockB, 'subtract');
   return { box: pb, lid: pl };
@@ -724,7 +747,8 @@ function applyBoxHinge(T, pb, pl) {
 const CLOSED_PINS = { fil: 1.75, m2: 2, m3: 3 };
 function closedHingeGeom(f, boxPolys, lidPolys) {
   const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys), zp = a.max[2];
-  if (Math.abs(b.min[2] - zp) > 0.05) throw new Error('Víko musí ležet na krabičce (navrhněte krabičku zavřenou)');
+  /* the lid rests on the box rim (a latch tab may hang below the rim, so only its top half is checked) */
+  if (b.min[2] > zp + 0.05 || b.max[2] < zp + 0.5) throw new Error('Víko musí ležet na krabičce (navrhněte krabičku zavřenou)');
   const side = f.side || '+y', k = side[1] === 'x' ? 0 : 1, sg = side[0] === '-' ? -1 : 1, o = 1 - k;
   const face = sg > 0 ? a.max[k] : a.min[k], lface = sg > 0 ? b.max[k] : b.min[k];
   if (Math.abs(face - lface) > 0.05) throw new Error('Zadní stěna víka musí lícovat se zadní stěnou krabičky');
@@ -740,14 +764,59 @@ function closedHingeGeom(f, boxPolys, lidPolys) {
 }
 function closedHingeTools(f, boxPolys, lidPolys) {
   const { g, U, zp, a, b, pinMode } = closedHingeGeom(f, boxPolys, lidPolys);
-  if (!pinMode && Math.abs((b.max[2] - b.min[2]) - (zp - a.min[2])) > 0.05) throw new Error('Pro tisk vcelku musí být víko stejně vysoké jako krabička; nižší víko připojte na kolík nebo šroub');
+  if (!pinMode && Math.abs((b.max[2] - zp) - (zp - a.min[2])) > 0.05) throw new Error('Pro tisk vcelku musí být víko stejně vysoké jako krabička; nižší víko připojte na kolík nebo šroub');
   const open = KK.transform(lidPolys, U);
-  return { T: boxHingeTools({ ...g, kind: 'box' }, boxPolys, open), U, open, pinMode };
+  return { T: boxHingeTools({ ...g, kind: 'box', zRim: zp }, boxPolys, open), U, open, pinMode };
 }
 function closedHingeResult(f, boxPolys, lidPolys) {
   const { T, U, open, pinMode } = closedHingeTools(f, boxPolys, lidPolys);
-  const r = applyBoxHinge(T, boxPolys, open);
-  return { box: r.box, lid: pinMode ? KK.transform(r.lid, U) : r.lid, T, U, pinMode };
+  const r = applyBoxHinge(T, boxPolys, open, f.out === 'new');
+  const back = p => (p && pinMode ? KK.transform(p, U) : p);
+  return { box: r.box, lid: back(r.lid), partA: r.partA, partB: back(r.partB), T, U, pinMode };
+}
+/* ---------- latch for a box designed closed (lid lying on the box). Local frame: u = outward normal of the chosen wall
+   (wall face at u = 0), x along the edge, z up with the parting plane at z = 0 (box below, lid above).
+   'out'  (on the wall): a springy tab hangs from the lid over the box wall; its hook snaps under a ridge on the box.
+   'flush' (hidden): a springy lip hangs from the lid inside the box; its bump snaps into a groove in the box wall.
+   Every overhang is 45° both for the box (printed upright) and for the lid (printed upside down). */
+function latchParts(f) {
+  const c = Math.max(0.1, Math.min(1, Number(f.tol) || 0.4)), W = Math.max(4, Number(f.width) || 12), flush = f.style === 'flush';
+  const h = flush ? 0.6 : 1.0, t = flush ? 1.2 : 1.6, wall = Math.max(0.8, Number(f.wall) || 2);
+  let box = [], lid = [], cut = [];
+  if (!flush) {
+    const zr = -4, zh = zr - h - c * (Math.SQRT2 - 1), zb = zh - h - 1.5, ui = c + h, uo = ui + t;
+    box = [[[0, zr - h], [h, zr], [0, zr + h], [-0.8, zr + h + 0.8], [-0.8, zr - h - 0.8]]]; /* ridge (grips 0.8 into the wall) */
+    lid = [[[ui, zb], [uo, zb], [uo, 0], [ui, 0]],                                              /* tab */
+      [[ui + 0.01, zh - h], [ui + 0.01, zh + h], [c, zh]],                                      /* hook (apex c from the wall) */
+      [[-0.8, 0], [uo, 0], [-0.8, uo + 0.8]]];                                                  /* 45° bracket into the lid wall */
+    return { W, box, lid, cut, depth: -zb, zb };
+  }
+  const Hl = 5, ui = -(wall + c + t), uo = -(wall + c), zg = -Hl + 1.8;
+  lid = [[[ui, -Hl], [uo, -Hl], [uo, 0], [ui, 0]],                                              /* lip inside the box */
+    [[uo - 0.01, zg - h], [uo + h, zg], [uo - 0.01, zg + h]],                                    /* bump, 45° both ways */
+    [[-wall + 0.8, 0], [ui, 0], [-wall + 0.8, (-wall + 0.8) - ui]]];                             /* 45° bracket to the lid's inner wall */
+  cut = [[[-wall - 0.01, zg - h - c], [-wall + h + c, zg], [-wall - 0.01, zg + h + c]]];          /* groove in the box wall */
+  return { W, box, lid, cut, depth: Hl };
+}
+function latchTools(f, boxPolys, lidPolys) {
+  const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys), zp = a.max[2];
+  if (Math.abs(b.min[2] - zp) > 0.05) throw new Error('Víko musí ležet na krabičce: západku přidejte na zavřenou krabičku (před pantem)');
+  const side = f.side || '-y', k = side[1] === 'x' ? 0 : 1, sg = side[0] === '-' ? -1 : 1, o = 1 - k;
+  const face = sg > 0 ? a.max[k] : a.min[k];
+  const s0 = Math.max(a.min[o], b.min[o]), s1 = Math.min(a.max[o], b.max[o]), cnt = Math.max(1, Math.min(3, Math.round(Number(f.count) || 1))), sh = Number(f.shift) || 0;
+  const P = latchParts(f);
+  if (s1 - s0 < P.W * cnt + 2) throw new Error('Západka se nevejde podél hrany');
+  if (zp - a.min[2] < P.depth + 1) throw new Error('Krabička je na západku příliš nízká');
+  const eu = [0, 0, 0]; eu[k] = sg; const ex = KK.cross(eu, [0, 0, 1]);
+  const out = { box: null, lid: null, cut: null };
+  const add = (key, loops, x0, m) => { for (const L of loops) { const t = KK.transform(prismX(L, x0, -x0), m); out[key] = out[key] ? KK.boolean(out[key], t, 'union') : t; } };
+  for (let j = 0; j < cnt; j++) {
+    const cAlong = s0 + (s1 - s0) * (j + 0.5) / cnt + sh, org = [0, 0, zp]; org[k] = face; org[o] = cAlong;
+    if (cAlong - P.W / 2 < s0 - 1e-6 || cAlong + P.W / 2 > s1 + 1e-6) throw new Error('Posunutá západka by přesahovala hranu');
+    const m = [ex[0], ex[1], ex[2], 0, eu[0], eu[1], eu[2], 0, 0, 0, 1, 0, org[0], org[1], org[2], 1];
+    add('box', P.box, -P.W / 2, m); add('lid', P.lid, -P.W / 2, m); add('cut', P.cut, -P.W / 2 - 0.5, m);
+  }
+  return out;
 }
 function toolForHinge(f) {
   const { A, B } = hingeParts(f), part = f.part || 'both';
@@ -792,8 +861,9 @@ function step(state, f) {
       const bx = bodies.find(b => b.id === f.box), ld = bodies.find(b => b.id === f.lid);
       if (!bx || !ld) throw new Error('Krabička nebo víko chybí');
       if (bx === ld) throw new Error('Krabička a víko musí být dvě různá tělesa');
-      const R = f.kind === 'closed' ? closedHingeResult(f, bx.polys, ld.polys) : applyBoxHinge(boxHingeTools(f, bx.polys, ld.polys), bx.polys, ld.polys);
+      const R = f.kind === 'closed' ? closedHingeResult(f, bx.polys, ld.polys) : applyBoxHinge(boxHingeTools(f, bx.polys, ld.polys), bx.polys, ld.polys, f.out === 'new');
       out = bodies.map(b => (b === bx ? { ...b, polys: R.box } : b === ld ? { ...b, polys: R.lid } : b));
+      if (R.partA) out = out.concat([{ id: f.id + 'a', name: 'Pant – díl krabičky', polys: R.partA, from: f.id }, { id: f.id + 'b', name: 'Pant – díl víka', polys: R.partB, from: f.id }]);
       break;
     } else {
       /* the two leaves interlock, so a bounding-box test would also catch the body on the other leaf: join only bodies the hinge really touches */
@@ -805,6 +875,19 @@ function step(state, f) {
         ff = { ...f, targets: t.length ? t : ['\u0000none'] };
       }
       out = applyTool(bodies, ff, tool, polys => ({ id: f.id, name: ('Pant ' + f.len + '×' + (2 * f.w) + (f.part === 'a' ? ' – křídlo A' : f.part === 'b' ? ' – křídlo B' : '')).replace('.', ','), polys, from: f.id })); break;
+    }
+    case 'latch': {
+      const bx = bodies.find(b => b.id === f.box), ld = bodies.find(b => b.id === f.lid);
+      if (!bx || !ld) throw new Error('Krabička nebo víko chybí');
+      if (bx === ld) throw new Error('Krabička a víko musí být dvě různá tělesa');
+      const T = latchTools(f, bx.polys, ld.polys), sep = f.out === 'new';
+      let pb = bx.polys, pl = ld.polys;
+      if (T.cut) pb = KK.boolean(pb, T.cut, 'subtract');
+      if (T.box && !sep) pb = KK.boolean(pb, T.box, 'union');
+      if (T.lid && !sep) pl = KK.boolean(pl, T.lid, 'union');
+      out = bodies.map(b => (b === bx ? { ...b, polys: pb } : b === ld ? { ...b, polys: pl } : b));
+      if (sep) { if (T.box) out.push({ id: f.id + 'a', name: 'Západka – díl krabičky', polys: T.box, from: f.id }); if (T.lid) out.push({ id: f.id + 'b', name: 'Západka – díl víka', polys: T.lid, from: f.id }); }
+      break;
     }
     case 'import':
       out = applyTool(bodies, f, importPolys(f), polys => ({ id: f.id, name: f.name || ('Import ' + (++n)), polys, from: f.id })); break;
@@ -1032,7 +1115,7 @@ function makeRebuilder() {
   };
 }
 
-return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, latchTools, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

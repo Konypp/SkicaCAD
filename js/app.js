@@ -61,6 +61,7 @@ const ICONS = {
   skdup: '<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>',
   bolt: '<path class="b" d="M7 3h10l2 3.5-2 3.5H7L5 6.5z"/><path d="M9.5 10v11h5V10"/><path d="M9.5 13l5 1.5M9.5 16l5 1.5M9.5 19l5 1.5"/>',
   nut: '<path class="b" d="M7.5 4h9l4.5 8-4.5 8h-9L3 12z"/><circle cx="12" cy="12" r="3.6"/>',
+  latch: '<path class="b" d="M3 3h18v8H3z"/><path d="M3 3h18v8H3zM3 13h18v8H3z"/><path class="o" d="M14 7h3v9.5l-2 1.5" style="stroke:var(--orange)"/><path d="M13 16.5h5"/>',
   hinge: '<path class="b" d="M2 6h7.5v12H2z"/><path d="M2 6h7.5v12H2zM14.5 6H22v12h-7.5z"/><rect x="9.5" y="4" width="5" height="5" rx="1.2"/><rect x="9.5" y="15" width="5" height="5" rx="1.2"/><rect class="o" x="9.5" y="9.5" width="5" height="5" rx="1.2" style="stroke:var(--orange)"/><path d="M12 3v18" stroke-dasharray="1.6 1.6"/>',
   thauto: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" style="fill:currentColor;stroke:none"/>',
   thlight: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
@@ -1033,7 +1034,7 @@ function featureTitle(i) {
   let n = 0; for (let j = 0; j <= i; j++) if (doc.features[j].type === f.type) n++;
   return Engine.FEATURE_LABEL[f.type] + ' ' + n;
 }
-const TL_ICON = { shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
+const TL_ICON = { shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
 function renderTimeline() {
   const tr = $('#tltrack'); tr.innerHTML = '';
   const m = viewMarker === null ? doc.marker : viewMarker;
@@ -1105,7 +1106,7 @@ document.addEventListener('pointerdown', e => { const m = $('#ctxmenu'); if (!m.
 /* ================= ribbon ================= */
 const RIBBON = {
   solid: [
-    ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'], ['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus'], ['bolt', 'Šroub'], ['nut', 'Matice'], ['hinge', 'Pant']]],
+    ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'], ['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus'], ['bolt', 'Šroub'], ['nut', 'Matice'], ['hinge', 'Pant'], ['latch', 'Západka']]],
     ['Upravit', [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení'], ['hole', 'Díra', 'H'], ['shell', 'Skořepina'], ['combine', 'Kombinovat'], ['splitbody', 'Rozříznout'], ['move', 'Přesunout', 'M'], ['rotate', 'Otočit', 'R'], ['scale', 'Měřítko'], ['center', 'Zarovnat'], ['facemode', 'Plochy', 'G'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole'], ['del', 'Odstranit', 'Del']]],
     ['Výběr', [['selall', 'Vybrat vše', 'Ctrl+A']]],
     ['Kontrola', [['measure', 'Měřit', 'I']]],
@@ -1146,6 +1147,7 @@ function runCommand(id) {
     case 'box': case 'cylinder': case 'sphere': case 'cone': case 'torus': startPrimitive(id); break;
     case 'bolt': case 'nut': startFastener(id); break;
     case 'hinge': startHinge(); break;
+    case 'latch': startLatch(); break;
     case 'fillet': case 'chamfer': startEdgeMod(id); break;
     case 'combine': startCombine(); break;
     case 'hole': startHole(); break;
@@ -1289,6 +1291,7 @@ function editFeature(i) {
     case 'box': case 'cylinder': case 'sphere': case 'cone': case 'torus': startPrimitive(f.type, i, ef); break;
     case 'bolt': case 'nut': startFastener(f.type, i, ef); break;
     case 'hinge': startHinge(i, ef); break;
+    case 'latch': startLatch(i, ef); break;
     case 'fillet': case 'chamfer': startEdgeMod(f.type, i, ef); break;
     case 'combine': startCombine(i, ef); break;
     case 'move': startMove(i, ef); break;
@@ -2658,7 +2661,7 @@ function startFastener(type, editIndex, f) {
 /* ================= hinge ================= */
 function startHinge(editIndex, f) {
   const pivot = new THREE.Object3D(); scene.add(pivot);
-  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_HINGE, holes: 2, hd: 3, part: 'both', rot: 0, count: 2, side: '+y', join: 'print', pinKind: 'fil', gap: 1 };
+  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_HINGE, holes: 2, hd: 3, part: 'both', rot: 0, count: 2, side: '+y', join: 'print', pinKind: 'fil', gap: 1, shift: 0, out: 'join' };
   const c = {
     editIndex, tool: null, tools: null, gizmoDrag: false, timer: null,
     v: f ? { ...D0, style: 'out', ...f } : { ...D0 },
@@ -2677,9 +2680,11 @@ function startHinge(editIndex, f) {
           { k: 'sel', id: 'box', label: 'Krabička' }, { k: 'sel', id: 'lid', label: 'Víko' },
           { k: 'num', id: 'len', label: 'Délka pantu', value: this.v.len },
           { k: 'opt', id: 'count', label: 'Počet pantů', options: [['1', '1'], ['2', '2'], ['3', '3']], value: String(this.v.count) },
+          { k: 'num', id: 'shift', label: 'Posun podél hrany', value: this.v.shift, range: [-50, 50, 0.5] },
+          { k: 'seg', id: 'out', label: 'Výsledek', options: [['join', 'Přidat k tělesům'], ['new', 'Nová tělesa']], value: this.v.out },
           { k: 'num', id: 'w', label: 'Šířka křídla', value: this.v.w },
           { k: 'num', id: 't', label: 'Tloušťka křídla', value: this.v.t },
-          { k: 'seg', id: 'cnt', label: 'Počet kloubů', options: [['3', '3'], ['5', '5'], ['7', '7']], value: String(this.v.n) },
+          { k: 'seg', id: 'cnt', label: 'Počet kloubů', options: [['2', '2'], ['3', '3'], ['5', '5'], ['7', '7']], value: String(this.v.n) },
           { k: 'num', id: 'pin', label: this.v.kind === 'screw' ? 'Průměr šroubu v ose' : 'Průměr čepu', value: this.v.pin },
           { k: 'num', id: 'tol', label: 'Vůle pro 3D tisk', value: this.v.tol },
           { k: 'opt', id: 'holes', label: 'Otvory v křídle', options: [['0', 'Žádné'], ['1', '1'], ['2', '2'], ['3', '3']], value: String(this.v.holes) },
@@ -2692,10 +2697,10 @@ function startHinge(editIndex, f) {
         onChange: id => {
           if (id === 'pos') this.pos = dlg.get('pos');
           else if (id === 'op') this.op = dlg.get('op');
-          else if (['kind', 'part', 'style', 'join', 'pinKind', 'side'].includes(id)) this.v[id] = dlg.get(id);
+          else if (['kind', 'part', 'style', 'join', 'pinKind', 'side', 'out'].includes(id)) this.v[id] = dlg.get(id);
           else if (id === 'cnt') this.v.n = parseFloat(dlg.get('cnt'));
           else if (id === 'holes' || id === 'rot' || id === 'hd' || id === 'count') this.v[id] = parseFloat(dlg.get(id));
-          else { const x = dlg.get(id); if (isFinite(x) && x >= 0) this.v[id] = x; }
+          else { const x = dlg.get(id); if (isFinite(x) && (x >= 0 || id === 'shift')) this.v[id] = x; }
           if (id === 'join' || id === 'style') this.layout();
           if (id === 'kind') {
             const l = $('#dialog [data-row="pin"] label'); if (l) l.textContent = this.v.kind === 'screw' ? 'Průměr šroubu v ose' : 'Průměr čepu';
@@ -2715,7 +2720,7 @@ function startHinge(editIndex, f) {
     isClosed() { return this.v.kind === 'closed'; },
     layout() {
       const bx = this.isBox(), cl = this.isClosed(), pin = cl && this.v.join === 'pin';
-      for (const id of ['style', 'box', 'lid', 'count']) dlg.show(id, bx);
+      for (const id of ['style', 'box', 'lid', 'count', 'shift', 'out']) dlg.show(id, bx);
       dlg.show('join', cl); dlg.show('side', cl); dlg.show('pinKind', pin); dlg.show('pin', !pin); dlg.show('gap', cl && !pin && this.v.style === 'flush');
       for (const id of ['w', 't', 'holes', 'hd', 'part', 'rot', 'pos', 'op']) dlg.show(id, !bx);
       if (bx) transform.detach(); else transform.attach(pivot);
@@ -2723,8 +2728,8 @@ function startHinge(editIndex, f) {
     },
     feature() {
       const v = this.v;
-      if (this.isClosed()) return { id: f ? f.id : 'tmp', type: 'hinge', kind: 'closed', style: v.style, side: v.side, join: v.join, pinKind: v.pinKind, gap: v.gap, box: this.box, lid: this.lid, len: v.len, n: v.n, pin: v.pin, tol: v.tol, count: v.count };
-      if (this.isBox()) return { id: f ? f.id : 'tmp', type: 'hinge', kind: 'box', style: v.style, box: this.box, lid: this.lid, len: v.len, n: v.n, pin: v.pin, tol: v.tol, count: v.count };
+      if (this.isClosed()) return { id: f ? f.id : 'tmp', type: 'hinge', kind: 'closed', style: v.style, side: v.side, join: v.join, pinKind: v.pinKind, gap: v.gap, box: this.box, lid: this.lid, len: v.len, n: v.n, pin: v.pin, tol: v.tol, count: v.count, shift: v.shift, out: v.out };
+      if (this.isBox()) return { id: f ? f.id : 'tmp', type: 'hinge', kind: 'box', style: v.style, box: this.box, lid: this.lid, len: v.len, n: v.n, pin: v.pin, tol: v.tol, count: v.count, shift: v.shift, out: v.out };
       return { id: f ? f.id : 'tmp', type: 'hinge', kind: v.kind, len: v.len, w: v.w, t: v.t, n: v.n, pin: v.pin, tol: v.tol, holes: v.holes, hd: v.hd, part: v.part, rot: v.rot, pos: this.pos.slice(), op: this.op };
     },
     schedule() { clearTimeout(this.timer); dlg.set('n', 'Počítám…'); this.timer = setTimeout(() => this.update(), 150); },
@@ -2746,7 +2751,7 @@ function startHinge(editIndex, f) {
         if (this.isClosed()) {
           if (this.box === this.lid) throw new Error('Krabička a víko musí být dvě různá tělesa');
           const Rz = Engine.closedHingeResult(F, bodyById(this.box).polys, bodyById(this.lid).polys), H = Rz.T.H;
-          this.tool = Rz.box.concat(Rz.lid); this.hideBodies = new Set([this.box, this.lid]); styleBodies();
+          this.tool = Rz.box.concat(Rz.lid, Rz.partA || [], Rz.partB || []); this.hideBodies = new Set([this.box, this.lid]); styleBodies();
           G.preview.add(previewMesh(this.tool, 'new'));
           dlg.set('n', `Kloub Ø ${fmtc(2 * H.R, 1)} mm, ${H.N} × ${fmtc(H.k, 1)} mm, vůle ${fmtc(H.c, 2)} mm`);
           dlg.set('n2', Rz.pinMode ? `Do kloubů patří ${this.v.pinKind === 'fil' ? 'kus filamentu 1,75 mm' : 'šroub ' + this.v.pinKind.toUpperCase()} dlouhý ${Math.floor(H.L)} mm${this.v.pinKind === 'fil' ? '; konce zatavte nebo zaklepněte' : ''}.` : `Víko je odklopené o 180° vedle krabičky, mezera ${fmtc(Rz.T.G, 1)} mm.`);
@@ -2804,6 +2809,78 @@ function startHinge(editIndex, f) {
   };
   c.onGizmo = () => { const p = pivot.position; c.pos = [snapV(p.x), snapV(p.y), snapV(p.z)]; dlg.set('pos', c.pos); };
   c.onDragChange = e => { controls.enabled = !e.value; c.gizmoDrag = e.value; if (!e.value) { pivot.position.set(c.pos[0], c.pos[1], c.pos[2]); c.schedule(); } };
+  beginCmd(c); c.init();
+}
+
+/* ================= latch (box designed closed) ================= */
+function startLatch(editIndex, f) {
+  const D0 = { style: 'out', side: '-y', width: 12, count: 1, shift: 0, tol: TOL_HINGE, wall: 2, out: 'join' };
+  const c = {
+    editIndex, tool: null, timer: null, v: f ? { ...D0, ...f } : { ...D0 },
+    box: f ? f.box : null, lid: f ? f.lid : null, pick: 'box', highlight: new Set(),
+    init() {
+      if (!f && sel.size === 2) [this.box, this.lid] = [...sel];
+      openDialog({
+        title: 'Západka', icon: 'latch',
+        fields: [{ k: 'seg', id: 'style', label: 'Provedení', options: [['out', 'Na stěně'], ['flush', 'Zasunutá']], value: this.v.style },
+          { k: 'sel', id: 'box', label: 'Krabička' }, { k: 'sel', id: 'lid', label: 'Víko' },
+          { k: 'opt', id: 'side', label: 'Strana', options: [['-y', 'Přední (−Y)'], ['+y', 'Zadní (+Y)'], ['+x', 'Pravá (+X)'], ['-x', 'Levá (−X)']], value: this.v.side },
+          { k: 'num', id: 'width', label: 'Šířka západky', value: this.v.width },
+          { k: 'opt', id: 'count', label: 'Počet', options: [['1', '1'], ['2', '2'], ['3', '3']], value: String(this.v.count) },
+          { k: 'num', id: 'shift', label: 'Posun podél hrany', value: this.v.shift, range: [-50, 50, 0.5] },
+          { k: 'num', id: 'wall', label: 'Tloušťka stěny krabičky', value: this.v.wall },
+          { k: 'num', id: 'tol', label: 'Vůle pro 3D tisk', value: this.v.tol },
+          { k: 'seg', id: 'out', label: 'Výsledek', options: [['join', 'Přidat k tělesům'], ['new', 'Nová tělesa']], value: this.v.out },
+          { k: 'note', id: 'n' }, { k: 'note', id: 'n2' }],
+        onSel: id => { this.pick = id; this.update(); },
+        onChange: id => {
+          if (['style', 'side', 'out'].includes(id)) this.v[id] = dlg.get(id);
+          else if (id === 'count') this.v.count = parseFloat(dlg.get('count'));
+          else { const x = dlg.get(id); if (isFinite(x) && (x >= 0 || id === 'shift')) this.v[id] = x; }
+          if (id === 'style') dlg.show('wall', this.v.style === 'flush');
+          this.schedule();
+        }
+      });
+      dlg.show('wall', this.v.style === 'flush');
+      this.update();
+    },
+    feature() { const v = this.v; return { id: f ? f.id : 'tmp', type: 'latch', style: v.style, side: v.side, width: v.width, count: v.count, shift: v.shift, tol: v.tol, wall: v.wall, out: v.out, box: this.box, lid: this.lid }; },
+    schedule() { clearTimeout(this.timer); dlg.set('n', 'Počítám…'); this.timer = setTimeout(() => this.update(), 150); },
+    update() {
+      clearGroup(G.preview); this.tool = null;
+      this.highlight = new Set([this.box, this.lid].filter(Boolean)); styleBodies();
+      const bb = this.box && bodyById(this.box), lb = this.lid && bodyById(this.lid);
+      dlg.set('box', { text: bb ? bodyName(bb) : 'Klepněte na krabičku', has: !!bb, active: this.pick === 'box' });
+      dlg.set('lid', { text: lb ? bodyName(lb) : 'Klepněte na víko', has: !!lb, active: this.pick === 'lid' });
+      setPrompt(this.pick === 'box' ? 'Klepněte na stěnu krabičky, kde má být západka. Víko má ležet na krabičce (zavřená krabička).' : 'Klepněte na víko, které leží na krabičce.');
+      if (!bb || !lb) { dlg.set('n', ''); dlg.set('n2', ''); dlg.okEnabled(false); requestRender(); return; }
+      try {
+        if (this.box === this.lid) throw new Error('Krabička a víko musí být dvě různá tělesa');
+        const T = Engine.latchTools(this.feature(), bb.polys, lb.polys);
+        this.tool = [].concat(T.box || [], T.lid || [], T.cut || []);
+        if (T.box || T.lid) G.preview.add(previewMesh([].concat(T.box || [], T.lid || []), 'join'));
+        if (T.cut) G.preview.add(previewMesh(T.cut, 'cut'));
+        dlg.set('n', this.v.style === 'flush' ? 'Z víka do krabičky zajede pružný jazýček, jeho výstupek zaskočí do drážky ve stěně krabičky. Zvenku není vidět.' : 'Z víka visí přes stěnu krabičky pružný jazýček, jeho zobáček zaskočí pod lištu na krabičce. Otevře se zatažením za jazýček.');
+        dlg.set('n2', 'Všechny převisy jsou 45°, tiskne se bez podpěr. Západku přidejte dřív než pant navržený na zavřené krabičce.');
+        dlg.okEnabled(true);
+      } catch (e) { dlg.set('n', '!' + e.message); dlg.set('n2', ''); dlg.okEnabled(false); }
+      requestRender();
+    },
+    onMove(ev) { const h = hitBodies(ev); dom.style.cursor = h ? 'pointer' : ''; },
+    onClick(ev) {
+      const h = hitBodies(ev); if (!h) return;
+      const id = h.object.userData.bodyId;
+      if (this.pick === 'box' && h.face) {
+        const nn = h.face.normal.clone().transformDirection(h.object.matrixWorld);
+        if (Math.abs(nn.z) < 0.3) { const sd = Math.abs(nn.x) > Math.abs(nn.y) ? (nn.x > 0 ? '+x' : '-x') : (nn.y > 0 ? '+y' : '-y'); this.v.side = sd; dlg.set('side', sd); }
+      }
+      if (this.pick === 'box') { this.box = id; if (this.lid === id) this.lid = null; this.pick = this.lid ? 'box' : 'lid'; }
+      else { this.lid = id; if (this.box === id) this.box = null; this.pick = this.box ? 'lid' : 'box'; }
+      this.schedule(); this.update();
+    },
+    ok() { if (!this.tool) return null; const out = this.feature(); out.id = f ? f.id : newId(); return out; },
+    cleanup() { clearTimeout(this.timer); this.highlight = null; styleBodies(); }
+  };
   beginCmd(c); c.init();
 }
 

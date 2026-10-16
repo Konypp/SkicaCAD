@@ -1192,6 +1192,38 @@ function removal(polys, ch, mode, k) {
   }
   return { err: 'Tento typ hrany zatím nelze upravit.' };
 }
+/* rolling-ball corners: where three or more convex filleted straight edges meet at a vertex, the edge cuts alone leave
+   a spike (the corner lies inside all three cylinders but outside the ball). The corner cell between the three faces
+   and their offsets by k, minus the ball of radius k touching all three faces, is cut away as well. */
+function filletCorners(polys, chains, k) {
+  const ends = new Map(), out = [];
+  for (const ch of chains) {
+    if (ch.kind !== 'line') continue;
+    const fr = edgeFrame(polys, ch); if (!fr || !fr.convex) continue;
+    for (const p of [ch.line.p0, ch.line.p1]) { const key = qk(p); if (!ends.has(key)) ends.set(key, { V: p, ns: [] }); const e = ends.get(key); for (const n of [fr.n1, fr.n2]) if (!e.ns.some(m => vdot(m, n) > 0.999)) e.ns.push(vnorm(n)); e.cnt = (e.cnt || 0) + 1; }
+  }
+  const solve = (N, b) => { /* 3x3: rows N[i]·x = b[i] */
+    const [a, c, d] = N, det = vdot(a, cross(c, d)); if (Math.abs(det) < 1e-9) return null;
+    return vmul(vadd(vadd(vmul(cross(c, d), b[0]), vmul(cross(d, a), b[1])), vmul(cross(a, c), b[2])), 1 / det);
+  };
+  for (const { V, ns, cnt } of ends.values()) {
+    if (cnt < 3 || ns.length !== 3) continue;
+    const base = ns.map(n => vdot(n, V)), C = solve(ns, base.map(b => b - k)); if (!C) continue;
+    const P = (s0, s1, s2) => solve(ns, [base[0] + s0, base[1] + s1, base[2] + s2]);
+    const o = Math.min(0.05, k * 0.05), lo = -k, S = [o, lo];
+    const Q = []; for (const a of S) for (const b of S) for (const c of S) Q.push(P(a, b, c)); /* index = 4a + 2b + c */
+    if (Q.some(q => !q)) continue;
+    const cell = [];
+    const cc = vmul(Q.reduce((t, q) => vadd(t, q), [0, 0, 0]), 1 / 8);
+    const face = ids => { let v = ids.map(i => Q[i]); const fcn = vmul(v.reduce((t, q) => vadd(t, q), [0, 0, 0]), 1 / 4);
+      if (vdot(newellVec(v), vsub(fcn, cc)) < 0) v = v.slice().reverse(); const q = mkPoly(v); if (q) cell.push(q); };
+    face([0, 1, 3, 2]); face([4, 6, 7, 5]); face([0, 4, 5, 1]); face([2, 3, 7, 6]); face([0, 2, 6, 4]); face([1, 5, 7, 3]);
+    fixOrientation(cell);
+    const ball = translate(primitive('sphere', { r: k }), C);
+    out.push(boolean(clean(cell), ball, 'subtract'));
+  }
+  return out;
+}
 function modifyEdges(polys, chains, mode, k) {
   const parts = [];
   for (const ch of chains) {
@@ -1199,6 +1231,7 @@ function modifyEdges(polys, chains, mode, k) {
     if (r.err) return { err: r.err };
     parts.push(r);
   }
+  if (mode !== 'chamfer') for (const c of filletCorners(polys, chains, k)) parts.push({ polys: c, add: false });
   let cur = polys;
   for (const r of parts.filter(p => !p.add)) cur = boolean(cur, r.polys, 'subtract');
   for (const r of parts.filter(p => p.add)) cur = boolean(cur, r.polys, 'union');

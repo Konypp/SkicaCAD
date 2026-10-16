@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 1.05
+- Nový příkaz **Západka** (skupina Vytvořit) pro krabičku navrženou zavřenou: provedení **Na stěně** (pružný jazýček z víka se zobáčkem zaskočí pod lištu na krabičce) nebo **Zasunutá** (pružný jazýček zajede dovnitř krabičky a jeho výstupek zaskočí do drážky ve stěně, zvenku není vidět). Šířka, počet 1–3, posun podél hrany, vůle; výsledek přidat k tělesům nebo jako nová tělesa. Všechny převisy 45°, tiskne se bez podpěr. Západku přidejte dřív než pant navržený na zavřené krabičce.
+- Pant: **2 klouby** (čep končí dvojitým kuželem zachyceným v kloubu, takže díly drží osově oběma směry), u pantu krabičky **posun podél hrany** a volba **Výsledek: nová tělesa** (díl krabičky a díl víka zůstanou samostatná tělesa; kapsy, žebra a díry pro čep se do krabičky a víka vyříznou).
+- Zaoblení: kde se v jednom rohu potkají tři zaoblované hrany, roh je kulový (dřív tam zůstala špička).
+
 ## Beta 1.04
 - Pant, nový typ **Krabička navržená zavřená**: krabičku a víko namodelujete zavřené (víko leží na krabičce, zadní stěny lícují), klepnete na zadní stěnu krabičky a pant se navrhne přímo pro zavřenou polohu, takže víko vždy dosedne.
   - **Tisk vcelku**: aplikace víko sama odklopí o 180° vedle krabičky (víko musí být stejně vysoké jako krabička).
