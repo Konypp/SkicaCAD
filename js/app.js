@@ -2823,12 +2823,12 @@ function startLatch(editIndex, f) {
       if (!f && sel.size === 2) [this.box, this.lid] = [...sel];
       openDialog({
         title: 'Západka', icon: 'latch',
-        fields: [{ k: 'opt', id: 'style', label: 'Provedení', options: [['out', 'Pružná na stěně'], ['flush', 'Pružná zasunutá'], ['rot', 'Otočná páčka na stěně'], ['rotflush', 'Otočná páčka zapuštěná']], value: this.v.style },
+        fields: [{ k: 'opt', id: 'style', label: 'Provedení', options: [['out', 'Pružná na stěně'], ['flush', 'Pružná zasunutá'], ['rot', 'Otočná páčka na stěně'], ['rotflush', 'Otočná páčka zapuštěná'], ['flip', 'Sklopná na ose na stěně'], ['flipflush', 'Sklopná na ose zapuštěná']], value: this.v.style },
           { k: 'sel', id: 'box', label: 'Krabička' }, { k: 'sel', id: 'lid', label: 'Víko' },
           { k: 'opt', id: 'side', label: 'Strana', options: [['-y', 'Přední (−Y)'], ['+y', 'Zadní (+Y)'], ['+x', 'Pravá (+X)'], ['-x', 'Levá (−X)']], value: this.v.side },
           { k: 'num', id: 'width', label: 'Šířka západky', value: this.v.width },
           { k: 'num', id: 'lever', label: 'Délka páčky', value: this.v.lever },
-          { k: 'seg', id: 'axle', label: 'Osa páčky', options: [['screw', 'Šroub M3'], ['fil', 'Filament 1,75']], value: this.v.axle },
+          { k: 'seg', id: 'axle', label: 'Osa', options: [['screw', 'Šroub M3'], ['fil', 'Filament 1,75']], value: this.v.axle },
           { k: 'opt', id: 'count', label: 'Počet', options: [['1', '1'], ['2', '2'], ['3', '3']], value: String(this.v.count) },
           { k: 'num', id: 'shift', label: 'Posun podél hrany', value: this.v.shift, range: [-50, 50, 0.5] },
           { k: 'num', id: 'wall', label: 'Tloušťka stěny krabičky', value: this.v.wall },
@@ -2840,17 +2840,19 @@ function startLatch(editIndex, f) {
           if (['style', 'side', 'out', 'axle'].includes(id)) this.v[id] = dlg.get(id);
           else if (id === 'count') this.v.count = parseFloat(dlg.get('count'));
           else { const x = dlg.get(id); if (isFinite(x) && (x >= 0 || id === 'shift')) this.v[id] = x; }
-          if (id === 'style') { if (this.isRot() && this.v.width > 10) { this.v.width = 7; dlg.set('width', 7); } if (!this.isRot() && this.v.width < 8) { this.v.width = 12; dlg.set('width', 12); } this.layout(); }
+          if (id === 'style') { const cat = this.isFlip() ? 'flip' : this.isRot() ? 'rot' : 'spring'; if (cat !== this.cat) { const w = { flip: 16, rot: 7, spring: 12 }[cat]; this.v.width = w; dlg.set('width', w); } this.cat = cat; this.layout(); }
           this.schedule();
         }
       });
+      this.cat = this.isFlip() ? 'flip' : this.isRot() ? 'rot' : 'spring';
       this.layout();
       this.update();
     },
     isRot() { return this.v.style === 'rot' || this.v.style === 'rotflush'; },
+    isFlip() { return this.v.style === 'flip' || this.v.style === 'flipflush'; },
     layout() {
-      const rot = this.isRot();
-      dlg.show('wall', this.v.style !== 'out'); dlg.show('lever', rot); dlg.show('axle', rot); dlg.show('out', !rot);
+      const rot = this.isRot(), flip = this.isFlip();
+      dlg.show('wall', this.v.style !== 'out' && this.v.style !== 'flip'); dlg.show('lever', rot); dlg.show('axle', rot || this.v.style === 'flip'); dlg.show('out', !rot && !flip);
       const l = $('#dialog [data-row="width"] label'); if (l) l.textContent = rot ? 'Šířka páčky' : 'Šířka západky';
     },
     feature() { const v = this.v; return { id: f ? f.id : 'tmp', type: 'latch', style: v.style, side: v.side, width: v.width, count: v.count, shift: v.shift, tol: v.tol, wall: v.wall, out: v.out, lever: v.lever, axle: v.axle, box: this.box, lid: this.lid }; },
@@ -2872,8 +2874,12 @@ function startLatch(editIndex, f) {
         const st = this.v.style;
         dlg.set('n', st === 'flush' ? 'Z víka do krabičky zajede pružný jazýček, jeho výstupek zaskočí do drážky ve stěně krabičky. Zvenku není vidět.'
           : st === 'out' ? 'Z víka visí přes stěnu krabičky pružný jazýček, jeho zobáček zaskočí pod lištu na krabičce. Otevře se zatažením za jazýček.'
+          : st === 'flip' || st === 'flipflush' ? 'Jazýček visí na ose v očkách víka, sklopí se shora dolů a jeho háček zajede pod lištu na krabičce. Spodní strana lišty je podříznutá, takže tah víka háček přitlačí ke stěně. Otevře se zatažením za spodní okraj jazýčku.' + (st === 'flipflush' ? ' Jazýček leží v kapse zarovnaný se stěnou.' : '')
           : 'Páčka se otáčí na ose ve stěně víka a visí dolů přes krabičku; výřezem na konci zachytí kolík na krabičce. Odklopením páčky stranou (o 90°) se víko uvolní.' + (st === 'rotflush' ? ' Páčka leží v kapse zarovnaná se stěnou.' : ''));
-        dlg.set('n2', (st === 'rot' || st === 'rotflush' ? `Páčka je samostatné těleso, tiskněte ji naležato; osa: ${this.v.axle === 'fil' ? 'kus filamentu 1,75 mm (natlačit do díry ve víku)' : 'samořezný šroub M3 do díry ve víku'}. ` : 'Všechny převisy jsou 45°, tiskne se bez podpěr. ') + (Rz.fold ? 'Víko je připojené pantem; západka se spočítala na zavřené krabičce a víko zůstalo odklopené.' : ''));
+        const W = this.v.width;
+        dlg.set('n2', (st === 'flip' ? `Jazýček je samostatné těleso, tiskněte ho naležato na vnější ploše; osa: ${this.v.axle === 'fil' ? `kus filamentu 1,75 mm dlouhý ${W} mm (natlačit do oček)` : `šroub M3 × ${Math.max(6, W - 2)} mm (samořezný do vzdálenějšího očka)`}. `
+          : st === 'flipflush' ? `Jazýček je samostatné těleso, tiskněte ho naležato na vnější ploše; do jeho očka vlepte kus filamentu 1,75 mm dlouhý ${W} mm a jazýček zacvakněte zvenku do zářezů na koncích kapsy. ` : '')
+          + (st === 'rot' || st === 'rotflush' ? `Páčka je samostatné těleso, tiskněte ji naležato; osa: ${this.v.axle === 'fil' ? 'kus filamentu 1,75 mm (natlačit do díry ve víku)' : 'samořezný šroub M3 do díry ve víku'}. ` : st.startsWith('flip') ? '' : 'Všechny převisy jsou 45°, tiskne se bez podpěr. ') + (Rz.fold ? 'Víko je připojené pantem; západka se spočítala na zavřené krabičce a víko zůstalo odklopené.' : ''));
         dlg.okEnabled(true);
       } catch (e) { dlg.set('n', '!' + e.message); dlg.set('n2', ''); dlg.okEnabled(false); }
       requestRender();

@@ -848,18 +848,63 @@ function rotLatchLocal(f) {
   const dx = (reach - wv / 2) / 2, mv = p => (p ? KK.translate(p, [dx, 0, 0]) : p);
   return { lever: mv(lever), boxAdd: mv(stud), lidAdd: mv(boss), boxCut: mv(boxCut), lidCut: mv(lidCut), W: reach + wv / 2 + 1, depth: ec + rs + c + 1, ov: pz + wv / 2 + 1.5 };
 }
+/* flip latch (like a spring latch on the wall, but the tab turns on an axle): a flap hangs on an axle in two lugs of the
+   LID; it flips from the top down and its hook goes under a ridge on the box. The ridge's underside is undercut, so a
+   pull on the lid presses the hook towards the wall (self-locking); it opens by pulling the flap's lower edge outwards.
+   'flip' sits on the wall (axle: M3 screw or filament pushed through the lugs); 'flipflush' sits in a pocket level with
+   the wall (filament fixed in the flap clicks into slots in the pocket ends; a bulge inside backs the pocket).
+   The flap is a separate body, printed lying on its outer face. Local frame as latchParts. */
+function flipLatchLocal(f) {
+  const c = Math.max(0.1, Math.min(1, Number(f.tol) || 0.4)), flush = f.style === 'flipflush', wall = Math.max(0.8, Number(f.wall) || 2);
+  const W = Math.max(10, Number(f.width) || 14), screw = !flush && f.axle !== 'fil';
+  const knH = flush ? 0.85 : screw ? 1.7 : 1.0;        /* hole in the flap: filament glued in / free on the screw or filament */
+  const lugH = flush ? 0.875 + c / 2 : screw ? 1.25 : 0.9; /* hole in the lugs: free (snap slot) / M3 pilot / filament press fit */
+  const rk = Math.max(knH, lugH) + 1.2, lw = screw ? 3 : 2.5, h = 1.5, s = Math.tan(30 * Math.PI / 180);
+  const ui = h + c, uA = c + rk, uo = uA + rk, zA = rk + 0.4;
+  /* ridge low enough that the arc of the hook is flatter than the undercut (self-locking) */
+  const L = Math.max(8, (uA - (c + h) / 2) / (0.5 * s)), zr = zA + c - L;
+  const zh = zr - s * c - c, zbot = zh - 1.6 - (ui - c) - 2.5, xf = W / 2 - lw - c;
+  if (xf < 3) throw new Error('Západka je příliš úzká');
+  let flap = KK.extrudeProfiles([{ pts: [[ui, zbot], [uo, zbot], [uo, zA], [ui, zA]], closed: true }, { t: 'circle', x: uA, y: zA, r: rk }], YZB, -xf, xf);
+  flap = KK.boolean(flap, prismX([[ui + 0.02, zr - s * ui - c], [c, zh], [c, zh - 1.6], [ui + 0.02, zh - 1.6 - (ui - c)]], -xf, xf), 'union');
+  flap = KK.boolean(flap, KK.extrudeProfiles([{ t: 'circle', x: uA, y: zA, r: knH }], YZB, -xf - 1, xf + 1), 'subtract');
+  const ridge = prismX([[-0.8, zr + 0.8 * s], [h, zr - s * h], [h, zr + 0.4], [-0.8, zr + 0.4 + h + 0.8]], -xf, xf);
+  const hx = flush ? W / 2 : W / 2 + 0.5, hole = KK.extrudeProfiles([{ t: 'circle', x: uA, y: zA, r: lugH }], YZB, -hx, hx);
+  let boxAdd = ridge, lidAdd = null, boxCut = null, lidCut = hole;
+  const zTop = zA + rk + c;
+  if (!flush) {
+    const lug = KK.extrudeProfiles([{ pts: [[-0.8, zA - rk], [uA, zA - rk], [uo, zA], [-0.8, zA + uo + 0.8]], closed: true }, { t: 'circle', x: uA, y: zA, r: rk }], YZB, -W / 2, -W / 2 + lw);
+    lidAdd = KK.boolean(lug, KK.translate(lug, [W - lw, 0, 0]), 'union');
+  } else {
+    /* the pocket ends act as lugs: a slot (narrower than the filament) lets the axle click in from outside */
+    const pkB = prismX([[-0.01, zbot - c], [uo + 0.5, zbot - c], [uo + 0.5, 0.01], [-0.01, 0.01]], -(W / 2 - lw), W / 2 - lw);
+    const pkL = prismX([[-0.01, -0.5], [uo + 0.5, -0.5], [uo + 0.5, zTop], [-0.01, zTop]], -(W / 2 - lw), W / 2 - lw);
+    const slotC = prismX([[uA, zA - 0.75], [uo + 0.5, zA - 0.75], [uo + 0.5, zA + 0.75], [uA, zA + 0.75]], -hx, hx);
+    boxCut = pkB; lidCut = KK.boolean(KK.boolean(pkL, hole, 'union'), slotC, 'union');
+    const d = -uo, mv = p => (p ? KK.translate(p, [0, d, 0]) : p);
+    boxAdd = mv(boxAdd); boxCut = mv(boxCut); lidCut = mv(lidCut);
+    /* backing bulge on the inside where the wall is thinner than the pocket (45° towards the wall for printing) */
+    const fl = d - 1, wi = -wall + 0.3, dep = wi - fl;
+    if (dep > 0) {
+      boxAdd = KK.boolean(boxAdd, KK.boolean(prismX([[wi, 0], [fl, 0], [fl, zbot - c - 1], [wi, zbot - c - 1 - dep]], -W / 2 - 1, W / 2 + 1), boxCut, 'subtract'), 'union');
+      lidAdd = prismX([[wi, 0], [fl, 0], [fl, zTop + 1], [wi, zTop + 1 + dep]], -W / 2 - 1, W / 2 + 1);
+    }
+    return { lever: mv(flap), boxAdd, lidAdd, boxCut, lidCut, W: W + 2, depth: -zbot + c + 2 + Math.max(0, dep), ov: zTop + 1 + Math.max(0, dep) };
+  }
+  return { lever: flap, boxAdd, lidAdd, boxCut, lidCut, W, depth: -zbot + 1, ov: zA + uo + 1 };
+}
 function latchTools(f, boxPolys, lidPolys) {
   const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys), zp = a.max[2];
   if (b.min[2] > zp + 0.05 || b.max[2] < zp + 0.5) throw new Error('Víko musí ležet na krabičce (zavřená krabička)');
   const side = f.side || '-y', k = side[1] === 'x' ? 0 : 1, sg = side[0] === '-' ? -1 : 1, o = 1 - k;
   const face = sg > 0 ? a.max[k] : a.min[k];
   const s0 = Math.max(a.min[o], b.min[o]), s1 = Math.min(a.max[o], b.max[o]), cnt = Math.max(1, Math.min(3, Math.round(Number(f.count) || 1))), sh = Number(f.shift) || 0;
-  const rot = f.style === 'rot' || f.style === 'rotflush';
-  const P = rot ? rotLatchLocal(f) : latchParts(f);
+  const flip = f.style === 'flip' || f.style === 'flipflush', rot = flip || f.style === 'rot' || f.style === 'rotflush';
+  const P = flip ? flipLatchLocal(f) : rot ? rotLatchLocal(f) : latchParts(f);
   const Wx = P.W;
   if (s1 - s0 < Wx * cnt + 2) throw new Error('Západka se nevejde podél hrany');
   if (zp - a.min[2] < P.depth + 1) throw new Error('Krabička je na západku příliš nízká');
-  if (rot && b.max[2] - zp < P.ov) throw new Error('Víko je na páčku příliš nízké, zkraťte páčku');
+  if (rot && b.max[2] - zp < P.ov) throw new Error(flip ? 'Víko je na sklopnou západku příliš nízké' : 'Víko je na páčku příliš nízké, zkraťte páčku');
   const eu = [0, 0, 0]; eu[k] = sg; const ex = KK.cross(eu, [0, 0, 1]);
   const out = { box: null, lid: null, cut: null, cutLid: null, lever: null };
   const put = (key, polys) => { out[key] = out[key] ? (key === 'lever' ? out[key].concat(polys) : KK.boolean(out[key], polys, 'union')) : polys; };
@@ -963,7 +1008,7 @@ function step(state, f) {
       out = bodies.map(b => (b === bx ? { ...b, polys: R.box } : b === ld ? { ...b, polys: R.lid } : b));
       if (R.partBox) out.push({ id: f.id + 'a', name: 'Západka – díl krabičky', polys: R.partBox, from: f.id });
       if (R.partLid) out.push({ id: f.id + 'b', name: 'Západka – díl víka', polys: R.partLid, from: f.id });
-      if (R.lever) out.push({ id: f.id + 'p', name: 'Západka – páčka', polys: R.lever, from: f.id });
+      if (R.lever) out.push({ id: f.id + 'p', name: f.style === 'flip' || f.style === 'flipflush' ? 'Západka – jazýček' : 'Západka – páčka', polys: R.lever, from: f.id });
       break;
     }
     case 'import':

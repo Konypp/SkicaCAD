@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 1.08
+- Západka, nová provedení **Sklopná na ose na stěně** a **Sklopná na ose zapuštěná** (jako na kufru s nářadím): jazýček visí na ose ve dvou očkách víka, sklopí se shora dolů a jeho háček zajede pod lištu na krabičce. Spodní strana lišty je podříznutá (30°) a lišta leží tak nízko, že tah víka háček přitlačí ke stěně: západka se sama neotevře. Otevře se zatažením za spodní okraj jazýčku. Jazýček je samostatné těleso, tiskne se naležato na vnější ploše.
+- Na stěně: osa ze šroubu M3 (samořezný do vzdálenějšího očka) nebo z kusu filamentu 1,75 mm natlačeného do oček. Zapuštěná: jazýček leží v kapse zarovnaný se stěnou, do jeho očka se vlepí kus filamentu a jazýček se zvenku zacvakne do zářezů na koncích kapsy; kde je stěna tenčí než kapsa, je zevnitř nálitek se zkosením 45°.
+
 ## Beta 1.07
 - Západku jde přidat i **po pantu**: když je víko odklopené pantem krabičky (tisk vcelku), západka se spočítá na zavřené krabičce (víko se pro výpočet samo přiklopí) a víko zůstane odklopené.
 - Západka, nová provedení **Otočná páčka na stěně** a **Otočná páčka zapuštěná**: páčka se otáčí na ose ve stěně víka (samořezný šroub M3 nebo kus filamentu 1,75 mm), visí dolů přes krabičku a výřezem na konci zachytí kolík na krabičce. Odklopením stranou o 90° se víko uvolní. Zapuštěná páčka leží v kapse zarovnaná se stěnou (stěna aspoň 2,7 mm). Páčka je samostatné těleso, tiskne se naležato; zevnitř víka je pod osou kuželový nálitek.
