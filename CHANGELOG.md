@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 1.07
+- Západku jde přidat i **po pantu**: když je víko odklopené pantem krabičky (tisk vcelku), západka se spočítá na zavřené krabičce (víko se pro výpočet samo přiklopí) a víko zůstane odklopené.
+- Západka, nová provedení **Otočná páčka na stěně** a **Otočná páčka zapuštěná**: páčka se otáčí na ose ve stěně víka (samořezný šroub M3 nebo kus filamentu 1,75 mm), visí dolů přes krabičku a výřezem na konci zachytí kolík na krabičce. Odklopením stranou o 90° se víko uvolní. Zapuštěná páčka leží v kapse zarovnaná se stěnou (stěna aspoň 2,7 mm). Páčka je samostatné těleso, tiskne se naležato; zevnitř víka je pod osou kuželový nálitek.
+- Původní pružné západky se jmenují Pružná na stěně a Pružná zasunutá.
+
 ## Beta 1.06
 - Pant krabičky (tisk vcelku): nová volba **Rezerva při zavření** (výchozí 0,4 mm). Osa pantu leží o tuto hodnotu nad okrajem krabičky, takže víko při zavírání nejdřív dosedne vpředu a u pantu má volno. Dřív ležela osa přesně v rovině okrajů: víko se pak opřelo o okraj u pantu a i nepatrná nepřesnost tisku ho nechala vpředu pootevřené (páka asi 10 : 1). U pantu na kolík/šroub se nepoužívá, tam stačí vůle díry.
 

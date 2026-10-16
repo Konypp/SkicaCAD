@@ -715,7 +715,9 @@ function boxHingeTools(f, boxPolys, lidPolys) {
   const ey = [0, 0, 0]; ey[ax] = dir; const ex = [ey[1], -ey[0], 0], zA = f.zRim !== undefined ? f.zRim : a.max[2];
   const mid = (dir > 0 ? a.max[ax] + b.min[ax] : b.max[ax] + a.min[ax]) / 2;
   const lift = f.pinHole ? 0 : Math.max(0, Math.min(2, f.lift === undefined ? 0 : Number(f.lift) || 0));
-  const out = { H, G, flush, lift };
+  const zA0 = f.zRim !== undefined ? f.zRim : a.max[2], midA = (dir > 0 ? a.max[ax] + b.min[ax] : b.max[ax] + a.min[ax]) / 2;
+  const fold = ax === 1 ? [1, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 0, 0, 2 * midA, 2 * zA0, 1] : [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 2 * midA, 0, 2 * zA0, 1];
+  const out = { H, G, flush, lift, fold };
   for (let j = 0; j < cnt; j++) {
     const cAlong = s0 + span * (j + 0.5) / cnt + sh, org = [0, 0, zA]; org[ax] = mid; org[o] = cAlong - ex[o] * L / 2;
     const m = [ex[0], ex[1], ex[2], 0, ey[0], ey[1], ey[2], 0, 0, 0, 1, 0, org[0], org[1], org[2], 1];
@@ -802,25 +804,95 @@ function latchParts(f) {
   cut = [[[-wall - 0.01, zg - h - c], [-wall + h + c, zg], [-wall - 0.01, zg + h + c]]];          /* groove in the box wall */
   return { W, box, lid, cut, depth: Hl };
 }
+/* rotary latch: a lever turning on an axle (screw or a piece of filament) in the LID wall hangs down over the box;
+   a notch at its lower end hooks under a stud on the box, so the lid cannot lift. Swung aside (90°) it lies on the lid
+   and the lid opens. 'rot' sits on the wall, 'rotflush' sits in a pocket level with the wall. The lever is a separate
+   body (print it flat). Local frame as latchParts: u out of the wall, x along the edge, z up, parting plane z = 0. */
+function prismU(profiles, u0, u1) { return KK.extrudeProfiles(profiles, { o: [0, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] }, -u1, -u0); }
+function rotLatchLocal(f) {
+  const c = Math.max(0.1, Math.min(1, Number(f.tol) || 0.4)), flush = f.style === 'rotflush', wall = Math.max(0.8, Number(f.wall) || 2);
+  const Lv = Math.max(10, Number(f.lever) || 16), wv = Math.max(5, Math.min(Lv / 2, Number(f.width) || 7)), tv = flush ? 1.6 : 2;
+  const screw = f.axle !== 'fil', hole = screw ? 1.7 : 1.0, pilot = screw ? 1.25 : 0.9; /* M3 self-tapping / 1.75 mm filament (press fit) */
+  const rs = 1.6, ec = rs + c + 1.6, L = Lv - wv, pz = L - ec, reach = L + wv / 2;
+  if (flush && wall < tv + 0.3 + 0.8) throw new Error('Pro zapuštěnou otočnou západku musí mít stěna alespoň ' + (Math.ceil((tv + 1.1) * 10) / 10).toString().replace('.', ',') + ' mm (jinak zvolte otočnou na stěně)');
+  if (pz < wv / 2 + 0.5) throw new Error('Páčka je příliš krátká');
+  /* the lever hanging down (a = 0) or swung towards -x by a degrees */
+  const slot = (a, ext) => { const r = a * Math.PI / 180; return { t: 'slot', x1: 0, y1: pz, x2: -Math.sin(r) * L, y2: pz - Math.cos(r) * L, w: wv + 2 * ext }; };
+  const u0 = flush ? -tv - 0.1 : c, u1 = u0 + tv, floorU = flush ? -tv - 0.3 : 0;
+  /* the notch: the path of the stud seen from the lever while the lever end swings towards -x (it rises on an arc
+     about the axle), widened by the clearance; it opens at the lever's +x edge */
+  const tMax = Math.asin(Math.min(1, (wv / 2 + rs + c + 0.6) / L)), pathPts = [];
+  for (let i = 0; i <= 8; i++) { const t = tMax * i / 8; pathPts.push([L * Math.sin(t), pz - L * Math.cos(t)]); }
+  const R0 = rs + c, outline = [];
+  for (const [x, z] of pathPts) outline.push([x - R0 * Math.cos(Math.atan2(z - pz, x)), z - R0 * Math.sin(Math.atan2(z - pz, x))]);
+  for (const [x, z] of pathPts.slice().reverse()) outline.push([x + R0 * Math.cos(Math.atan2(z - pz, x)), z + R0 * Math.sin(Math.atan2(z - pz, x))]);
+  let lever = prismU([slot(0, 0), { t: 'circle', x: 0, y: pz, r: hole }], u0, u1);
+  let notchP = prismU([{ t: 'circle', x: 0, y: -ec, r: R0 }], u0 - 1, u1 + 1);
+  notchP = KK.boolean(notchP, prismU([{ pts: outline, closed: true }], u0 - 1, u1 + 1), 'union');
+  notchP = KK.boolean(notchP, prismU([{ t: 'circle', x: pathPts[8][0], y: pathPts[8][1], r: R0 }], u0 - 1, u1 + 1), 'union');
+  lever = KK.boolean(lever, notchP, 'subtract');
+  /* stud on the box (grips 0.8 into the wall or the pocket floor), level with the lever face */
+  const stud = prismU([{ t: 'circle', x: 0, y: -ec, r: rs }], floorU - 0.8, u1);
+  /* axle: pilot hole through the lid wall into a 45° boss on the inside */
+  const rb1 = pilot + 1.2, rb0 = rb1 + 2.5;
+  const boss = KK.transform(KK.translate(KK.primitive('cone', { r: rb0, rt: rb1, h: 2.5 }), [0, 0, 1.25]), frameMatrix([0, -wall + 0.01, pz], [0, -1, 0]));
+  let lidCut = KK.transform(KK.translate(KK.primitive('cylinder', { r: pilot, h: wall + 3.5 }), [0, 0, (wall + 3.5) / 2]), frameMatrix([0, floorU + 0.5, pz], [0, -1, 0]));
+  let boxCut = null;
+  if (flush) {
+    const pts = [[0, pz]]; for (let i = 0; i <= 12; i++) { const a = i / 12 * Math.PI / 2; pts.push([-Math.sin(a) * (reach + c), pz - Math.cos(a) * (reach + c)]); }
+    let pk = KK.boolean(prismU([slot(0, c)], floorU, 0.5), prismU([slot(90, c)], floorU, 0.5), 'union');
+    pk = KK.boolean(pk, prismU([{ pts, closed: true }], floorU, 0.5), 'union');
+    lidCut = KK.boolean(lidCut, pk, 'union'); boxCut = pk;
+  }
+  /* centre the swept area (from x = -reach to wv/2) on the chosen place */
+  const dx = (reach - wv / 2) / 2, mv = p => (p ? KK.translate(p, [dx, 0, 0]) : p);
+  return { lever: mv(lever), boxAdd: mv(stud), lidAdd: mv(boss), boxCut: mv(boxCut), lidCut: mv(lidCut), W: reach + wv / 2 + 1, depth: ec + rs + c + 1, ov: pz + wv / 2 + 1.5 };
+}
 function latchTools(f, boxPolys, lidPolys) {
   const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys), zp = a.max[2];
-  if (Math.abs(b.min[2] - zp) > 0.05) throw new Error('Víko musí ležet na krabičce: západku přidejte na zavřenou krabičku (před pantem)');
+  if (b.min[2] > zp + 0.05 || b.max[2] < zp + 0.5) throw new Error('Víko musí ležet na krabičce (zavřená krabička)');
   const side = f.side || '-y', k = side[1] === 'x' ? 0 : 1, sg = side[0] === '-' ? -1 : 1, o = 1 - k;
   const face = sg > 0 ? a.max[k] : a.min[k];
   const s0 = Math.max(a.min[o], b.min[o]), s1 = Math.min(a.max[o], b.max[o]), cnt = Math.max(1, Math.min(3, Math.round(Number(f.count) || 1))), sh = Number(f.shift) || 0;
-  const P = latchParts(f);
-  if (s1 - s0 < P.W * cnt + 2) throw new Error('Západka se nevejde podél hrany');
+  const rot = f.style === 'rot' || f.style === 'rotflush';
+  const P = rot ? rotLatchLocal(f) : latchParts(f);
+  const Wx = P.W;
+  if (s1 - s0 < Wx * cnt + 2) throw new Error('Západka se nevejde podél hrany');
   if (zp - a.min[2] < P.depth + 1) throw new Error('Krabička je na západku příliš nízká');
+  if (rot && b.max[2] - zp < P.ov) throw new Error('Víko je na páčku příliš nízké, zkraťte páčku');
   const eu = [0, 0, 0]; eu[k] = sg; const ex = KK.cross(eu, [0, 0, 1]);
-  const out = { box: null, lid: null, cut: null };
-  const add = (key, loops, x0, m) => { for (const L of loops) { const t = KK.transform(prismX(L, x0, -x0), m); out[key] = out[key] ? KK.boolean(out[key], t, 'union') : t; } };
+  const out = { box: null, lid: null, cut: null, cutLid: null, lever: null };
+  const put = (key, polys) => { out[key] = out[key] ? (key === 'lever' ? out[key].concat(polys) : KK.boolean(out[key], polys, 'union')) : polys; };
   for (let j = 0; j < cnt; j++) {
     const cAlong = s0 + (s1 - s0) * (j + 0.5) / cnt + sh, org = [0, 0, zp]; org[k] = face; org[o] = cAlong;
-    if (cAlong - P.W / 2 < s0 - 1e-6 || cAlong + P.W / 2 > s1 + 1e-6) throw new Error('Posunutá západka by přesahovala hranu');
+    if (cAlong - Wx / 2 < s0 - 1e-6 || cAlong + Wx / 2 > s1 + 1e-6) throw new Error('Posunutá západka by přesahovala hranu');
     const m = [ex[0], ex[1], ex[2], 0, eu[0], eu[1], eu[2], 0, 0, 0, 1, 0, org[0], org[1], org[2], 1];
-    add('box', P.box, -P.W / 2, m); add('lid', P.lid, -P.W / 2, m); add('cut', P.cut, -P.W / 2 - 0.5, m);
+    if (rot) {
+      if (P.boxAdd) put('box', KK.transform(P.boxAdd, m)); if (P.boxCut) put('cut', KK.transform(P.boxCut, m));
+      if (P.lidAdd) put('lid', KK.transform(P.lidAdd, m));
+      if (P.lidCut) put('cutLid', KK.transform(P.lidCut, m)); put('lever', KK.transform(P.lever, m));
+    } else {
+      for (const L of P.box) put('box', KK.transform(prismX(L, -P.W / 2, P.W / 2), m));
+      for (const L of P.lid) put('lid', KK.transform(prismX(L, -P.W / 2, P.W / 2), m));
+      for (const L of P.cut) put('cut', KK.transform(prismX(L, -P.W / 2 - 0.5, P.W / 2 + 0.5), m));
+    }
   }
   return out;
+}
+/* the latch on a box and lid; when the lid lies open beside the box (a hinge printed in one piece turned it over), the
+   lid is folded shut for the latch and opened again afterwards */
+function latchApply(f, bx, ld) {
+  const zp = KK.bbox(bx.polys).max[2], lb = KK.bbox(ld.polys), onBox = lb.min[2] <= zp + 0.05 && lb.max[2] >= zp + 0.5;
+  const fold = !onBox && ld.fold ? ld.fold : null;
+  const lidP = fold ? KK.transform(ld.polys, fold) : ld.polys;
+  if (!fold && !onBox) throw new Error('Víko musí ležet na krabičce, nebo být připojené pantem krabičky (tisk vcelku)');
+  const T = latchTools(f, bx.polys, lidP), sep = f.out === 'new', back = p => (p && fold ? KK.transform(p, fold) : p);
+  let pb = bx.polys, pl = lidP;
+  if (T.cut) pb = KK.boolean(pb, T.cut, 'subtract');
+  if (T.box && !sep) pb = KK.boolean(pb, T.box, 'union');
+  if (T.lid && !sep) pl = KK.boolean(pl, T.lid, 'union');
+  if (T.cutLid) pl = KK.boolean(pl, T.cutLid, 'subtract'); /* after the boss, so the axle hole goes through it */
+  return { box: pb, lid: back(pl), partBox: sep ? T.box : null, partLid: sep ? back(T.lid) : null, lever: T.lever, T, fold, preview: [].concat(T.box || [], T.lid ? back(T.lid) : [], T.lever || []), previewCut: [].concat(T.cut || [], T.cutLid ? back(T.cutLid) : []) };
 }
 function toolForHinge(f) {
   const { A, B } = hingeParts(f), part = f.part || 'both';
@@ -865,8 +937,11 @@ function step(state, f) {
       const bx = bodies.find(b => b.id === f.box), ld = bodies.find(b => b.id === f.lid);
       if (!bx || !ld) throw new Error('Krabička nebo víko chybí');
       if (bx === ld) throw new Error('Krabička a víko musí být dvě různá tělesa');
-      const R = f.kind === 'closed' ? closedHingeResult(f, bx.polys, ld.polys) : applyBoxHinge(boxHingeTools(f, bx.polys, ld.polys), bx.polys, ld.polys, f.out === 'new');
-      out = bodies.map(b => (b === bx ? { ...b, polys: R.box } : b === ld ? { ...b, polys: R.lid } : b));
+      let R, fold = null;
+      if (f.kind === 'closed') { R = closedHingeResult(f, bx.polys, ld.polys); if (!R.pinMode) fold = R.U; }
+      else { const T = boxHingeTools(f, bx.polys, ld.polys); R = applyBoxHinge(T, bx.polys, ld.polys, f.out === 'new'); fold = T.fold; }
+      /* fold: turns the open lid shut (a later latch is built on the closed box) */
+      out = bodies.map(b => (b === bx ? { ...b, polys: R.box } : b === ld ? { ...b, polys: R.lid, fold } : b));
       if (R.partA) out = out.concat([{ id: f.id + 'a', name: 'Pant – díl krabičky', polys: R.partA, from: f.id }, { id: f.id + 'b', name: 'Pant – díl víka', polys: R.partB, from: f.id }]);
       break;
     } else {
@@ -884,13 +959,11 @@ function step(state, f) {
       const bx = bodies.find(b => b.id === f.box), ld = bodies.find(b => b.id === f.lid);
       if (!bx || !ld) throw new Error('Krabička nebo víko chybí');
       if (bx === ld) throw new Error('Krabička a víko musí být dvě různá tělesa');
-      const T = latchTools(f, bx.polys, ld.polys), sep = f.out === 'new';
-      let pb = bx.polys, pl = ld.polys;
-      if (T.cut) pb = KK.boolean(pb, T.cut, 'subtract');
-      if (T.box && !sep) pb = KK.boolean(pb, T.box, 'union');
-      if (T.lid && !sep) pl = KK.boolean(pl, T.lid, 'union');
-      out = bodies.map(b => (b === bx ? { ...b, polys: pb } : b === ld ? { ...b, polys: pl } : b));
-      if (sep) { if (T.box) out.push({ id: f.id + 'a', name: 'Západka – díl krabičky', polys: T.box, from: f.id }); if (T.lid) out.push({ id: f.id + 'b', name: 'Západka – díl víka', polys: T.lid, from: f.id }); }
+      const R = latchApply(f, bx, ld);
+      out = bodies.map(b => (b === bx ? { ...b, polys: R.box } : b === ld ? { ...b, polys: R.lid } : b));
+      if (R.partBox) out.push({ id: f.id + 'a', name: 'Západka – díl krabičky', polys: R.partBox, from: f.id });
+      if (R.partLid) out.push({ id: f.id + 'b', name: 'Západka – díl víka', polys: R.partLid, from: f.id });
+      if (R.lever) out.push({ id: f.id + 'p', name: 'Západka – páčka', polys: R.lever, from: f.id });
       break;
     }
     case 'import':
@@ -1119,7 +1192,7 @@ function makeRebuilder() {
   };
 }
 
-return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, latchTools, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, latchTools, latchApply, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

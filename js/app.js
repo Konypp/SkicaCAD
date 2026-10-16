@@ -2815,7 +2815,7 @@ function startHinge(editIndex, f) {
 
 /* ================= latch (box designed closed) ================= */
 function startLatch(editIndex, f) {
-  const D0 = { style: 'out', side: '-y', width: 12, count: 1, shift: 0, tol: TOL_HINGE, wall: 2, out: 'join' };
+  const D0 = { style: 'out', side: '-y', width: 12, count: 1, shift: 0, tol: TOL_HINGE, wall: 2, out: 'join', lever: 16, axle: 'screw' };
   const c = {
     editIndex, tool: null, timer: null, v: f ? { ...D0, ...f } : { ...D0 },
     box: f ? f.box : null, lid: f ? f.lid : null, pick: 'box', highlight: new Set(),
@@ -2823,10 +2823,12 @@ function startLatch(editIndex, f) {
       if (!f && sel.size === 2) [this.box, this.lid] = [...sel];
       openDialog({
         title: 'Západka', icon: 'latch',
-        fields: [{ k: 'seg', id: 'style', label: 'Provedení', options: [['out', 'Na stěně'], ['flush', 'Zasunutá']], value: this.v.style },
+        fields: [{ k: 'opt', id: 'style', label: 'Provedení', options: [['out', 'Pružná na stěně'], ['flush', 'Pružná zasunutá'], ['rot', 'Otočná páčka na stěně'], ['rotflush', 'Otočná páčka zapuštěná']], value: this.v.style },
           { k: 'sel', id: 'box', label: 'Krabička' }, { k: 'sel', id: 'lid', label: 'Víko' },
           { k: 'opt', id: 'side', label: 'Strana', options: [['-y', 'Přední (−Y)'], ['+y', 'Zadní (+Y)'], ['+x', 'Pravá (+X)'], ['-x', 'Levá (−X)']], value: this.v.side },
           { k: 'num', id: 'width', label: 'Šířka západky', value: this.v.width },
+          { k: 'num', id: 'lever', label: 'Délka páčky', value: this.v.lever },
+          { k: 'seg', id: 'axle', label: 'Osa páčky', options: [['screw', 'Šroub M3'], ['fil', 'Filament 1,75']], value: this.v.axle },
           { k: 'opt', id: 'count', label: 'Počet', options: [['1', '1'], ['2', '2'], ['3', '3']], value: String(this.v.count) },
           { k: 'num', id: 'shift', label: 'Posun podél hrany', value: this.v.shift, range: [-50, 50, 0.5] },
           { k: 'num', id: 'wall', label: 'Tloušťka stěny krabičky', value: this.v.wall },
@@ -2835,17 +2837,23 @@ function startLatch(editIndex, f) {
           { k: 'note', id: 'n' }, { k: 'note', id: 'n2' }],
         onSel: id => { this.pick = id; this.update(); },
         onChange: id => {
-          if (['style', 'side', 'out'].includes(id)) this.v[id] = dlg.get(id);
+          if (['style', 'side', 'out', 'axle'].includes(id)) this.v[id] = dlg.get(id);
           else if (id === 'count') this.v.count = parseFloat(dlg.get('count'));
           else { const x = dlg.get(id); if (isFinite(x) && (x >= 0 || id === 'shift')) this.v[id] = x; }
-          if (id === 'style') dlg.show('wall', this.v.style === 'flush');
+          if (id === 'style') { if (this.isRot() && this.v.width > 10) { this.v.width = 7; dlg.set('width', 7); } if (!this.isRot() && this.v.width < 8) { this.v.width = 12; dlg.set('width', 12); } this.layout(); }
           this.schedule();
         }
       });
-      dlg.show('wall', this.v.style === 'flush');
+      this.layout();
       this.update();
     },
-    feature() { const v = this.v; return { id: f ? f.id : 'tmp', type: 'latch', style: v.style, side: v.side, width: v.width, count: v.count, shift: v.shift, tol: v.tol, wall: v.wall, out: v.out, box: this.box, lid: this.lid }; },
+    isRot() { return this.v.style === 'rot' || this.v.style === 'rotflush'; },
+    layout() {
+      const rot = this.isRot();
+      dlg.show('wall', this.v.style !== 'out'); dlg.show('lever', rot); dlg.show('axle', rot); dlg.show('out', !rot);
+      const l = $('#dialog [data-row="width"] label'); if (l) l.textContent = rot ? 'Šířka páčky' : 'Šířka západky';
+    },
+    feature() { const v = this.v; return { id: f ? f.id : 'tmp', type: 'latch', style: v.style, side: v.side, width: v.width, count: v.count, shift: v.shift, tol: v.tol, wall: v.wall, out: v.out, lever: v.lever, axle: v.axle, box: this.box, lid: this.lid }; },
     schedule() { clearTimeout(this.timer); dlg.set('n', 'Počítám…'); this.timer = setTimeout(() => this.update(), 150); },
     update() {
       clearGroup(G.preview); this.tool = null;
@@ -2853,16 +2861,19 @@ function startLatch(editIndex, f) {
       const bb = this.box && bodyById(this.box), lb = this.lid && bodyById(this.lid);
       dlg.set('box', { text: bb ? bodyName(bb) : 'Klepněte na krabičku', has: !!bb, active: this.pick === 'box' });
       dlg.set('lid', { text: lb ? bodyName(lb) : 'Klepněte na víko', has: !!lb, active: this.pick === 'lid' });
-      setPrompt(this.pick === 'box' ? 'Klepněte na stěnu krabičky, kde má být západka. Víko má ležet na krabičce (zavřená krabička).' : 'Klepněte na víko, které leží na krabičce.');
+      setPrompt(this.pick === 'box' ? 'Klepněte na stěnu krabičky, kde má být západka. Víko leží na krabičce, nebo je připojené pantem krabičky.' : 'Klepněte na víko.');
       if (!bb || !lb) { dlg.set('n', ''); dlg.set('n2', ''); dlg.okEnabled(false); requestRender(); return; }
       try {
         if (this.box === this.lid) throw new Error('Krabička a víko musí být dvě různá tělesa');
-        const T = Engine.latchTools(this.feature(), bb.polys, lb.polys);
-        this.tool = [].concat(T.box || [], T.lid || [], T.cut || []);
-        if (T.box || T.lid) G.preview.add(previewMesh([].concat(T.box || [], T.lid || []), 'join'));
-        if (T.cut) G.preview.add(previewMesh(T.cut, 'cut'));
-        dlg.set('n', this.v.style === 'flush' ? 'Z víka do krabičky zajede pružný jazýček, jeho výstupek zaskočí do drážky ve stěně krabičky. Zvenku není vidět.' : 'Z víka visí přes stěnu krabičky pružný jazýček, jeho zobáček zaskočí pod lištu na krabičce. Otevře se zatažením za jazýček.');
-        dlg.set('n2', 'Všechny převisy jsou 45°, tiskne se bez podpěr. Západku přidejte dřív než pant navržený na zavřené krabičce.');
+        const Rz = Engine.latchApply(this.feature(), bb, lb);
+        this.tool = Rz.preview.concat(Rz.previewCut);
+        if (Rz.preview.length) G.preview.add(previewMesh(Rz.preview, 'join'));
+        if (Rz.previewCut.length) G.preview.add(previewMesh(Rz.previewCut, 'cut'));
+        const st = this.v.style;
+        dlg.set('n', st === 'flush' ? 'Z víka do krabičky zajede pružný jazýček, jeho výstupek zaskočí do drážky ve stěně krabičky. Zvenku není vidět.'
+          : st === 'out' ? 'Z víka visí přes stěnu krabičky pružný jazýček, jeho zobáček zaskočí pod lištu na krabičce. Otevře se zatažením za jazýček.'
+          : 'Páčka se otáčí na ose ve stěně víka a visí dolů přes krabičku; výřezem na konci zachytí kolík na krabičce. Odklopením páčky stranou (o 90°) se víko uvolní.' + (st === 'rotflush' ? ' Páčka leží v kapse zarovnaná se stěnou.' : ''));
+        dlg.set('n2', (st === 'rot' || st === 'rotflush' ? `Páčka je samostatné těleso, tiskněte ji naležato; osa: ${this.v.axle === 'fil' ? 'kus filamentu 1,75 mm (natlačit do díry ve víku)' : 'samořezný šroub M3 do díry ve víku'}. ` : 'Všechny převisy jsou 45°, tiskne se bez podpěr. ') + (Rz.fold ? 'Víko je připojené pantem; západka se spočítala na zavřené krabičce a víko zůstalo odklopené.' : ''));
         dlg.okEnabled(true);
       } catch (e) { dlg.set('n', '!' + e.message); dlg.set('n2', ''); dlg.okEnabled(false); }
       requestRender();
