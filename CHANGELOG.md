@@ -1,5 +1,18 @@
 # Changelog
 
+## Beta 1.04
+- Pant, nový typ **Krabička navržená zavřená**: krabičku a víko namodelujete zavřené (víko leží na krabičce, zadní stěny lícují), klepnete na zadní stěnu krabičky a pant se navrhne přímo pro zavřenou polohu, takže víko vždy dosedne.
+  - **Tisk vcelku**: aplikace víko sama odklopí o 180° vedle krabičky (víko musí být stejně vysoké jako krabička).
+  - **Kolík / šroub**: klouby mají průchozí díru pro kus filamentu 1,75 mm nebo šroub M2/M3; krabička a víko se tisknou zvlášť, víko může být nižší než krabička.
+  - Umístění zapuštěné nebo na stěně, strana pantu ±X / ±Y.
+- Výchozí vůle pantů je 0,4 mm.
+- Zapuštěný pant: spodní hrana kloubu vychází šikmo 45° přímo z vlastní stěny, takže špička kloubu už nevisí v mezeře (tiskne se čistěji).
+- Pravé tlačítko na PC už neotevírá i nabídku prohlížeče (týká se hlavně nabídky tělesa a časové osy).
+- Shift při tažení zamkne směr: manipulátor posunu nechá jen převažující osu, ve skice se prvek nebo bod posune jen vodorovně nebo svisle.
+- Ctrl při změně velikosti zachová poměr stran: rohy obdélníku a elipsa ve skice, obrysy ve skice a táhla měřítka manipulátoru.
+- Měřit: klepnutí na válcovou plochu nebo kruhovou hranu hned ukáže průměr a poloměr.
+- Rozříznout: po natočení řezné roviny táhly se posun drží natočené roviny a rovina se posune přesně o tažený kus.
+
 ## Beta 1.03
 - Pant krabičky s víkem má nové umístění **Zapuštěný** (nově výchozí): klouby sedí na horní hraně a jsou zapuštěné do stěn krabičky i víka, takže za krabičkou nic netrčí a díly stojí těsně vedle sebe (mezera 0,4 mm až asi 4,8 mm pro čep Ø 3 mm).
   - Klouby mají tvar kapky (kruh se špičkou 45° dolů) a kapsy ve stěně druhého dílu stejný tvar s vůlí, takže se vše vytiskne vcelku bez podpěr.

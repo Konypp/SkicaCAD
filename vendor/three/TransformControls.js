@@ -300,6 +300,14 @@
 				if ( axis.indexOf( 'Y' ) === - 1 ) this._offset.y = 0;
 				if ( axis.indexOf( 'Z' ) === - 1 ) this._offset.z = 0;
 				if ( axis === 'XYZ' && this.freeXY && this.space !== 'local' ) this._offset.z = 0; // SkicaCAD patch: centre handle moves in X and Y only
+				if ( pointer.shift && axis.length > 1 ) { // SkicaCAD patch: Shift keeps only the largest component of a plane / free move
+
+					const ax = Math.abs( this._offset.x ), ay = Math.abs( this._offset.y ), az = Math.abs( this._offset.z ), m = Math.max( ax, ay, az );
+					if ( ax < m ) this._offset.x = 0;
+					if ( ay < m ) this._offset.y = 0;
+					if ( az < m ) this._offset.z = 0;
+
+				}
 
 				if ( space === 'local' && axis !== 'XYZ' ) {
 
@@ -418,6 +426,13 @@
 
 				} // Apply scale
 
+				if ( pointer.ctrl && axis !== 'XYZ' ) { // SkicaCAD patch: Ctrl keeps the proportions (the changed factor applies to all axes)
+
+					const fx = _tempVector2.x, fy = _tempVector2.y, fz = _tempVector2.z;
+					const f = [ fx, fy, fz ].reduce( ( b, v ) => ( Math.abs( v - 1 ) > Math.abs( b - 1 ) ? v : b ), 1 );
+					_tempVector2.set( f, f, f );
+
+				}
 
 				object.scale.copy( this._scaleStart ).multiply( _tempVector2 );
 
@@ -624,7 +639,9 @@
 			return {
 				x: ( pointer.clientX - rect.left ) / rect.width * 2 - 1,
 				y: - ( pointer.clientY - rect.top ) / rect.height * 2 + 1,
-				button: event.button
+				button: event.button,
+				shift: !! event.shiftKey, // SkicaCAD patch: Shift locks the drag to one direction
+				ctrl: !! ( event.ctrlKey || event.metaKey ) // SkicaCAD patch: Ctrl keeps the proportions when scaling
 			};
 
 		}

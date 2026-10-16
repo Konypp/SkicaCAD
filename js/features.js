@@ -632,7 +632,7 @@ function boxHingeSection(H, G, side) {
   return side < 0 ? pts : pts.map(([y, z]) => [-y, z]).reverse();
 }
 function boxHingeLocal(f, G) {
-  const H = hingeDims({ ...f, w: 1e3, t: 1, kind: 'print' }), { L, N, k, c, R } = H;
+  const H = hingeDims({ ...f, w: 1e3, t: 1, kind: f.pinHole ? 'screw' : 'print' }), { L, N, k, c, R } = H;
   if (G < 2 * (R + c) - 1e-6) throw new Error('Mezera mezi krabičkou a víkem musí být alespoň ' + (Math.ceil(2 * (R + c) * 10) / 10).toString().replace('.', ',') + ' mm (teď ' + (Math.round(G * 10) / 10).toString().replace('.', ',') + ' mm)');
   if (G > 30) throw new Error('Krabička a víko jsou od sebe příliš daleko (nejvýš 30 mm)');
   let A = null, B = null;
@@ -640,6 +640,7 @@ function boxHingeLocal(f, G) {
     const side = i % 2 ? 1 : -1, x0 = i * (k + c), pr = prismX(boxHingeSection(H, G, side), x0, x0 + k);
     if (side < 0) A = A ? KK.boolean(A, pr, 'union') : pr; else B = B ? KK.boolean(B, pr, 'union') : pr;
   }
+  if (f.pinHole) { const hole = cylAlong([-1, 0, 0], [1, 0, 0], f.pinHole / 2, L + 2); return { H, A: KK.boolean(A, hole, 'subtract'), B: KK.boolean(B, hole, 'subtract') }; }
   return { H, ...hingePin(H, A, B, 0) };
 }
 /* ---------- flush box hinge: the knuckles sit on the rim, sunk into both walls, so nothing sticks out behind the box.
@@ -652,22 +653,29 @@ function teardrop(r) {
   return pts;
 }
 function boxHingeFlushLocal(f, G) {
-  const H = hingeDims({ ...f, w: 1e3, t: 1, kind: 'print' }), { L, N, k, c, R } = H, gw = G / 2;
+  const H = hingeDims({ ...f, w: 1e3, t: 1, kind: f.pinHole ? 'screw' : 'print' }), { L, N, k, c, R } = H, gw = G / 2;
   if (gw > R - 0.6) throw new Error('Pro zapuštěný pant musí být krabička a víko blíž u sebe: mezera nejvýš ' + (Math.floor(2 * (R - 0.6) * 10) / 10).toString().replace('.', ',') + ' mm (teď ' + (Math.round(G * 10) / 10).toString().replace('.', ',') + ' mm)');
   if (G < Math.max(0.4, c) - 1e-6) throw new Error('Mezera mezi krabičkou a víkem musí být alespoň ' + Math.max(0.4, c).toString().replace('.', ',') + ' mm');
-  const knuckle = teardrop(R), pocket = teardrop(R + c);
+  /* the knuckle's underside is the teardrop's 45° edge run on down to its own wall, so no point of it hangs in the gap */
+  const knuckle = side => { const zj = -R * Math.SQRT2 - gw, pts = [];
+    for (let i = 0; i <= 40; i++) { const a = -Math.PI / 4 + (1.25 * Math.PI) * i / 40; pts.push([R * Math.cos(a), R * Math.sin(a)]); }
+    pts.push([-R, zj], [-gw, zj]);
+    return side < 0 ? pts : pts.map(([y, z]) => [-y, z]).reverse(); };
+  const pocket = teardrop(R + c);
   let A = null, B = null, cutA = null, cutB = null;
   const add = (acc, p) => (acc ? KK.boolean(acc, p, 'union') : p);
   for (let i = 0; i < N; i++) {
-    const x0 = i * (k + c), kn = prismX(knuckle, x0, x0 + k), pk = prismX(pocket, x0 - c, x0 + k + c);
+    const x0 = i * (k + c), kn = prismX(knuckle(i % 2 ? 1 : -1), x0, x0 + k), pk = prismX(pocket, x0 - c, x0 + k + c);
     if (i % 2) { B = add(B, kn); cutA = add(cutA, pk); } else { A = add(A, kn); cutB = add(cutB, pk); }
   }
   /* a rib on the inside of each back wall along the hinge, so the pocket does not cut through a thin wall;
      its underside slopes at 45° towards the wall, parallel to the pocket's point, so it prints without supports */
   const rc = R + c, Wb = Math.max(rc + 1.2, gw + 0.8), zW = -rc * Math.SQRT2 + Wb - 1.7, z0 = zW - (Wb - gw);
   const rib = side => prismX([[gw, 0], [Wb, 0], [Wb, zW], [gw, z0]].map(([y, z]) => [side * y, z]), -c, L + c);
+  const base = { H, A, cutA, cutB, addA: rib(-1), addB: rib(1), depth: -z0 };
+  if (f.pinHole) { const hole = cylAlong([-1, 0, 0], [1, 0, 0], f.pinHole / 2, L + 2); return { ...base, B, sock: hole, sockB: hole }; }
   const { pin, sock } = pinParts(H, 0);
-  return { H, A, B: KK.boolean(B, pin, 'union'), cutA, cutB, sock, addA: rib(-1), addB: rib(1), depth: -z0 };
+  return { ...base, B: KK.boolean(B, pin, 'union'), sock };
 }
 /* place the box hinge(s) from the two bodies: returns world-space tools for the box and for the lid */
 function boxHingeTools(f, boxPolys, lidPolys) {
@@ -694,9 +702,52 @@ function boxHingeTools(f, boxPolys, lidPolys) {
   for (let j = 0; j < cnt; j++) {
     const cAlong = s0 + span * (j + 0.5) / cnt, org = [0, 0, zA]; org[ax] = mid; org[o] = cAlong - ex[o] * L / 2;
     const m = [ex[0], ex[1], ex[2], 0, ey[0], ey[1], ey[2], 0, 0, 0, 1, 0, org[0], org[1], org[2], 1];
-    for (const key of ['A', 'B', 'cutA', 'cutB', 'sock', 'addA', 'addB']) if (P[key]) { const t = KK.transform(P[key], m); out[key] = out[key] ? out[key].concat(t) : t; }
+    for (const key of ['A', 'B', 'cutA', 'cutB', 'sock', 'sockB', 'addA', 'addB']) if (P[key]) { const t = KK.transform(P[key], m); out[key] = out[key] ? out[key].concat(t) : t; }
   }
   return out;
+}
+function applyBoxHinge(T, pb, pl) {
+  if (T.addA) pb = KK.boolean(pb, T.addA, 'union');
+  if (T.addB) pl = KK.boolean(pl, T.addB, 'union');
+  if (T.cutA) pb = KK.boolean(pb, T.cutA, 'subtract');
+  if (T.cutB) pl = KK.boolean(pl, T.cutB, 'subtract');
+  pb = KK.boolean(pb, T.A, 'union'); pl = KK.boolean(pl, T.B, 'union');
+  if (T.sock) pb = KK.boolean(pb, T.sock, 'subtract');
+  if (T.sockB) pl = KK.boolean(pl, T.sockB, 'subtract');
+  return { box: pb, lid: pl };
+}
+/* ---------- box hinge designed on the CLOSED box: the lid lies on the box, back walls flush. The axis is on the
+   parting plane behind (or, flush, just outside) the chosen back wall; the lid is turned 180° about it, the hinge
+   is built exactly as for the open pair, and then the lid is either left open beside the box (printed in one piece)
+   or turned back closed (printed separately and joined by a filament pin or a screw). Because the open pair is
+   made by turning the closed lid, the lid always closes onto the box exactly as it was designed. */
+const CLOSED_PINS = { fil: 1.75, m2: 2, m3: 3 };
+function closedHingeGeom(f, boxPolys, lidPolys) {
+  const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys), zp = a.max[2];
+  if (Math.abs(b.min[2] - zp) > 0.05) throw new Error('Víko musí ležet na krabičce (navrhněte krabičku zavřenou)');
+  const side = f.side || '+y', k = side[1] === 'x' ? 0 : 1, sg = side[0] === '-' ? -1 : 1, o = 1 - k;
+  const face = sg > 0 ? a.max[k] : a.min[k], lface = sg > 0 ? b.max[k] : b.min[k];
+  if (Math.abs(face - lface) > 0.05) throw new Error('Zadní stěna víka musí lícovat se zadní stěnou krabičky');
+  if (Math.min(a.max[o], b.max[o]) - Math.max(a.min[o], b.min[o]) <= 0) throw new Error('Víko neleží nad krabičkou');
+  const pinMode = f.join === 'pin', pinD = pinMode ? (CLOSED_PINS[f.pinKind] || 1.75) : Number(f.pin) || 3;
+  const g = { ...f, pin: pinD, pinHole: pinMode ? pinD + Math.max(0.2, Number(f.tol) || 0.4) : 0 };
+  const H = hingeDims({ ...g, w: 1e3, t: 1, kind: pinMode ? 'screw' : 'print' });
+  const d = f.style === 'flush' ? Math.max(0.2, (Number(f.gap) || 1) / 2) : H.R + H.c;
+  const axc = face + sg * d;
+  /* turning by 180° about the axis (along the other horizontal direction, on the parting plane) */
+  const U = k === 1 ? [1, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 0, 0, 2 * axc, 2 * zp, 1] : [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 2 * axc, 0, 2 * zp, 1];
+  return { g, U, zp, a, b, pinMode, H };
+}
+function closedHingeTools(f, boxPolys, lidPolys) {
+  const { g, U, zp, a, b, pinMode } = closedHingeGeom(f, boxPolys, lidPolys);
+  if (!pinMode && Math.abs((b.max[2] - b.min[2]) - (zp - a.min[2])) > 0.05) throw new Error('Pro tisk vcelku musí být víko stejně vysoké jako krabička; nižší víko připojte na kolík nebo šroub');
+  const open = KK.transform(lidPolys, U);
+  return { T: boxHingeTools({ ...g, kind: 'box' }, boxPolys, open), U, open, pinMode };
+}
+function closedHingeResult(f, boxPolys, lidPolys) {
+  const { T, U, open, pinMode } = closedHingeTools(f, boxPolys, lidPolys);
+  const r = applyBoxHinge(T, boxPolys, open);
+  return { box: r.box, lid: pinMode ? KK.transform(r.lid, U) : r.lid, T, U, pinMode };
 }
 function toolForHinge(f) {
   const { A, B } = hingeParts(f), part = f.part || 'both';
@@ -737,19 +788,12 @@ function step(state, f) {
       out = applyTool(bodies, f, toolForPrimitive(f), newBody); break;
     case 'bolt': case 'nut':
       out = applyTool(bodies, f, toolForFastener(f), polys => ({ id: f.id, name: (f.type === 'bolt' ? 'Šroub M' + f.size + '×' + f.len : 'Matice M' + f.size + (f.low ? ' nízká' : '')).replace('.', ','), polys, from: f.id })); break;
-    case 'hinge': if (f.kind === 'box') {
+    case 'hinge': if (f.kind === 'box' || f.kind === 'closed') {
       const bx = bodies.find(b => b.id === f.box), ld = bodies.find(b => b.id === f.lid);
       if (!bx || !ld) throw new Error('Krabička nebo víko chybí');
       if (bx === ld) throw new Error('Krabička a víko musí být dvě různá tělesa');
-      const T = boxHingeTools(f, bx.polys, ld.polys);
-      let pb = bx.polys, pl = ld.polys;
-      if (T.addA) pb = KK.boolean(pb, T.addA, 'union');
-      if (T.addB) pl = KK.boolean(pl, T.addB, 'union');
-      if (T.cutA) pb = KK.boolean(pb, T.cutA, 'subtract');
-      if (T.cutB) pl = KK.boolean(pl, T.cutB, 'subtract');
-      pb = KK.boolean(pb, T.A, 'union'); pl = KK.boolean(pl, T.B, 'union');
-      if (T.sock) pb = KK.boolean(pb, T.sock, 'subtract');
-      out = bodies.map(b => (b === bx ? { ...b, polys: pb } : b === ld ? { ...b, polys: pl } : b));
+      const R = f.kind === 'closed' ? closedHingeResult(f, bx.polys, ld.polys) : applyBoxHinge(boxHingeTools(f, bx.polys, ld.polys), bx.polys, ld.polys);
+      out = bodies.map(b => (b === bx ? { ...b, polys: R.box } : b === ld ? { ...b, polys: R.lid } : b));
       break;
     } else {
       /* the two leaves interlock, so a bounding-box test would also catch the body on the other leaf: join only bodies the hinge really touches */
@@ -988,7 +1032,7 @@ function makeRebuilder() {
   };
 }
 
-return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, hingeDims, boxHingeTools, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

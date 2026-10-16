@@ -108,6 +108,9 @@ renderer.domElement.tabIndex = 0;
 vp.insertBefore(renderer.domElement, vp.firstChild);
 const dom = renderer.domElement;
 dom.addEventListener('contextmenu', e => e.preventDefault());
+/* the app has its own right-click menus: keep the browser's menu away everywhere except in text fields
+   (the app's menu opens under the pointer, so the browser's 'contextmenu' event lands on that menu, not on the canvas) */
+document.addEventListener('contextmenu', e => { if (!(e.target.closest && e.target.closest('input, textarea, [contenteditable="true"]'))) e.preventDefault(); });
 
 const scene = new THREE.Scene();
 const persp = new THREE.PerspectiveCamera(30, 1, 0.5, 20000); persp.up.set(0, 0, 1);
@@ -1584,7 +1587,7 @@ function shapeHandles(e) {
   return H;
 }
 /* drag of a size handle: o = the shape before the drag, p = pointer in the sketch; returns the new shape and a label */
-function applyShapeHandle(o, k, p) {
+function applyShapeHandle(o, k, p, keep) {
   const r4 = v => Math.round(v * 1e4) / 1e4;
   /* lengths measured from a centre: whole grid steps (diameters / widths in steps), otherwise 0.001 mm */
   const len = (v, two) => settings.gridSnap ? Math.max(settings.snap, Math.round((two ? 2 : 1) * v / settings.snap) * settings.snap) / (two ? 2 : 1) : Math.max(0.01, Math.round(v * 1000) / 1000);
@@ -1594,6 +1597,7 @@ function applyShapeHandle(o, k, p) {
   if (o.t === 'ellipse') {
     const a = (o.a || 0) * D2R, c = Math.cos(a), s = Math.sin(a), qx = p[0] - o.x, qy = p[1] - o.y;
     if (k === 'rx') e.rx = len(Math.abs(qx * c + qy * s), true); else e.ry = len(Math.abs(-qx * s + qy * c), true);
+    if (keep && o.rx > 1e-9 && o.ry > 1e-9) { if (k === 'rx') e.ry = r4(o.ry * e.rx / o.rx); else e.rx = r4(o.rx * e.ry / o.ry); } /* Ctrl: keep the proportions */
     return [e, `${fmtc(2 * e.rx, 2)} × ${fmtc(2 * e.ry, 2)} mm`];
   }
   if (o.t === 'rect') {
@@ -1601,6 +1605,13 @@ function applyShapeHandle(o, k, p) {
     let x0 = o.x, y0 = o.y, x1 = o.x + o.w, y1 = o.y + o.h;
     if (k[0] === 'c') { if (k[1] === '0') x0 = q[0]; else x1 = q[0]; if (k[2] === '0') y0 = q[1]; else y1 = q[1]; }
     else if (k === 'e0') y0 = q[1]; else if (k === 'e2') y1 = q[1]; else if (k === 'e1') x1 = q[0]; else if (k === 'e3') x0 = q[0];
+    /* Ctrl on a corner: keep the proportions (the opposite corner stays) */
+    if (keep && k[0] === 'c' && Math.abs(o.w) > 1e-9 && Math.abs(o.h) > 1e-9) {
+      const ax = k[1] === '0' ? o.x + o.w : o.x, ay = k[2] === '0' ? o.y + o.h : o.y, mx = k[1] === '0' ? o.x : o.x + o.w, my = k[2] === '0' ? o.y : o.y + o.h;
+      const fx = ((k[1] === '0' ? x0 : x1) - ax) / (mx - ax), fy = ((k[2] === '0' ? y0 : y1) - ay) / (my - ay), f = Math.abs(fx) > Math.abs(fy) ? fx : fy;
+      const nx = ax + (mx - ax) * f, ny = ay + (my - ay) * f;
+      if (k[1] === '0') x0 = nx; else x1 = nx; if (k[2] === '0') y0 = ny; else y1 = ny;
+    }
     if (Math.abs(x1 - x0) < 0.01) x1 = x0 + (x1 >= x0 ? 0.01 : -0.01);
     if (Math.abs(y1 - y0) < 0.01) y1 = y0 + (y1 >= y0 ? 0.01 : -0.01);
     Object.assign(e, { x: r4(x0), y: r4(y0), w: r4(x1 - x0), h: r4(y1 - y0) });
@@ -1644,9 +1655,10 @@ function sketchDrag(ev) {
     if (!down || !down.moved) return;
     const d = sk.drag, p = sketchRawPoint(ev); if (!p) return;
     let dx = snapV(p[0] - d.p0[0]), dy = snapV(p[1] - d.p0[1]);
+    if (ev.shiftKey) { if (Math.abs(dx) >= Math.abs(dy)) dy = 0; else dx = 0; } /* Shift: move along one axis only */
     /* the element's first key point (corner, centre or first point) is pulled onto a nearby grid crossing */
     const k0 = keyPoints([d.orig])[1];
-    if (k0) { const kp = [k0[0] + dx, k0[1] + dy], c = crossNear(kp); if (c) { dx += c[0] - kp[0]; dy += c[1] - kp[1]; sk.gridHot = c; } else sk.gridHot = onCross(kp) ? kp : null; }
+    if (k0 && !ev.shiftKey) { const kp = [k0[0] + dx, k0[1] + dy], c = crossNear(kp); if (c) { dx += c[0] - kp[0]; dy += c[1] - kp[1]; sk.gridHot = c; } else sk.gridHot = onCross(kp) ? kp : null; }
     sk.f.ents[d.ei] = translateEnt(d.orig, dx, dy);
     if (sk.f.ents[d.ei].pts) sk.f.ents[d.ei].pts = sk.f.ents[d.ei].pts.map(q => [Math.round(q[0] * 1e4) / 1e4, Math.round(q[1] * 1e4) / 1e4]);
     const el = $('#dim'), px = evPx(ev); el.textContent = `${EN() ? 'Move' : 'Posun'} X ${fmtc(dx, 2)} · Y ${fmtc(dy, 2)} mm`; el.hidden = false; el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px';
@@ -1656,7 +1668,7 @@ function sketchDrag(ev) {
   if (sk.drag.shape) {
     const p = sketchRawPoint(ev); if (!p) return;
     if (!sk.drag.orig) sk.drag.orig = clone(e);
-    const [ne, label] = applyShapeHandle(sk.drag.orig, sk.drag.shape, p);
+    const [ne, label] = applyShapeHandle(sk.drag.orig, sk.drag.shape, p, ev.ctrlKey || ev.metaKey);
     sk.f.ents[sk.drag.ei] = ne;
     if (ne.t !== 'rect') sk.gridHot = null;
     const el = $('#dim'), px = evPx(ev); el.textContent = label; el.hidden = !label || showSkDims(); /* with dimensions shown the new size is in them */ el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px';
@@ -1666,7 +1678,7 @@ function sketchDrag(ev) {
   const hit = ray.ray.intersectPlane(new THREE.Plane().setFromNormalAndCoplanarPoint(v3(P.n), v3(P.o)), new V3());
   if (!hit) return;
   const p = P2(P, hit);
-  if (sk.uniform && e.pts.length >= 2) {
+  if ((sk.uniform || ev.ctrlKey || ev.metaKey) && e.pts.length >= 2) {
     const d = sk.drag;
     if (!d.orig) { d.orig = e.pts.map(q => q.slice()); d.c = [0, 1].map(k => d.orig.reduce((t, q) => t + q[k], 0) / d.orig.length); }
     const c = d.c, o = d.orig[d.pi], ov = [o[0] - c[0], o[1] - c[1]], l2 = ov[0] * ov[0] + ov[1] * ov[1];
@@ -1678,7 +1690,13 @@ function sketchDrag(ev) {
     if (settings.gridSnap && big > 1e-6) { const st = settings.snap; fct = Math.max(st, Math.round(big * fct / st) * st) / big; }
     e.pts = d.orig.map(q => [r4(c[0] + (q[0] - c[0]) * fct), r4(c[1] + (q[1] - c[1]) * fct)]);
     const el = $('#dim'), px = evPx(ev); el.textContent = `Velikost ${fmtc(fct * 100, 0)} % · ${fmtc(w0 * fct, 2)} × ${fmtc(h0 * fct, 2)} mm`; el.hidden = false; el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px';
-  } else { const c = crossNear(p), q = c || [snapV(p[0]), snapV(p[1])]; sk.gridHot = c || (onCross(q) ? q : null); e.pts[sk.drag.pi] = q; }
+  } else {
+    const d = sk.drag; if (!d.p0pt) d.p0pt = e.pts[d.pi].slice();
+    const c = ev.shiftKey ? null : crossNear(p); let q = c || [snapV(p[0]), snapV(p[1])];
+    /* Shift: the point moves only horizontally or vertically from where it started */
+    if (ev.shiftKey) { if (Math.abs(q[0] - d.p0pt[0]) >= Math.abs(q[1] - d.p0pt[1])) q = [q[0], d.p0pt[1]]; else q = [d.p0pt[0], q[1]]; }
+    sk.gridHot = c || (onCross(q) ? q : null); e.pts[d.pi] = q;
+  }
   redrawSketch();
 }
 function sketchMove(ev) {
@@ -2640,7 +2658,7 @@ function startFastener(type, editIndex, f) {
 /* ================= hinge ================= */
 function startHinge(editIndex, f) {
   const pivot = new THREE.Object3D(); scene.add(pivot);
-  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_NUT, holes: 2, hd: 3, part: 'both', rot: 0, count: 2 };
+  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_HINGE, holes: 2, hd: 3, part: 'both', rot: 0, count: 2, side: '+y', join: 'print', pinKind: 'fil', gap: 1 };
   const c = {
     editIndex, tool: null, tools: null, gizmoDrag: false, timer: null,
     v: f ? { ...D0, style: 'out', ...f } : { ...D0 },
@@ -2650,8 +2668,12 @@ function startHinge(editIndex, f) {
       if (!f && sel.size === 2) { [this.box, this.lid] = [...sel]; }
       openDialog({
         title: 'Pant', icon: 'hinge',
-        fields: [{ k: 'seg', id: 'kind', label: 'Typ', options: [['print', 'Tištěný vcelku'], ['screw', 'Na šroub'], ['box', 'Krabička s víkem']], value: this.v.kind },
+        fields: [{ k: 'opt', id: 'kind', label: 'Typ', options: [['print', 'Samostatný, tištěný vcelku'], ['screw', 'Samostatný, na šroub'], ['closed', 'Krabička navržená zavřená'], ['box', 'Krabička a víko vedle sebe']], value: this.v.kind },
+          { k: 'seg', id: 'join', label: 'Spojení', options: [['print', 'Tisk vcelku'], ['pin', 'Kolík / šroub']], value: this.v.join },
+          { k: 'seg', id: 'pinKind', label: 'Kolík', options: [['fil', 'Filament 1,75'], ['m2', 'Šroub M2'], ['m3', 'Šroub M3']], value: this.v.pinKind },
+          { k: 'opt', id: 'side', label: 'Strana pantu', options: [['+y', 'Zadní (+Y)'], ['-y', 'Přední (−Y)'], ['+x', 'Pravá (+X)'], ['-x', 'Levá (−X)']], value: this.v.side },
           { k: 'seg', id: 'style', label: 'Umístění', options: [['flush', 'Zapuštěný'], ['out', 'Na stěně']], value: this.v.style },
+          { k: 'num', id: 'gap', label: 'Mezera mezi díly po rozložení', value: this.v.gap },
           { k: 'sel', id: 'box', label: 'Krabička' }, { k: 'sel', id: 'lid', label: 'Víko' },
           { k: 'num', id: 'len', label: 'Délka pantu', value: this.v.len },
           { k: 'opt', id: 'count', label: 'Počet pantů', options: [['1', '1'], ['2', '2'], ['3', '3']], value: String(this.v.count) },
@@ -2670,13 +2692,14 @@ function startHinge(editIndex, f) {
         onChange: id => {
           if (id === 'pos') this.pos = dlg.get('pos');
           else if (id === 'op') this.op = dlg.get('op');
-          else if (id === 'kind' || id === 'part' || id === 'style') this.v[id] = dlg.get(id);
+          else if (['kind', 'part', 'style', 'join', 'pinKind', 'side'].includes(id)) this.v[id] = dlg.get(id);
           else if (id === 'cnt') this.v.n = parseFloat(dlg.get('cnt'));
           else if (id === 'holes' || id === 'rot' || id === 'hd' || id === 'count') this.v[id] = parseFloat(dlg.get(id));
           else { const x = dlg.get(id); if (isFinite(x) && x >= 0) this.v[id] = x; }
+          if (id === 'join' || id === 'style') this.layout();
           if (id === 'kind') {
             const l = $('#dialog [data-row="pin"] label'); if (l) l.textContent = this.v.kind === 'screw' ? 'Průměr šroubu v ose' : 'Průměr čepu';
-            if (this.v.kind === 'box' && this.v.len > 25) { this.v.len = 20; dlg.set('len', 20); }
+            if (this.isBox() && this.v.len > 25) { this.v.len = 20; dlg.set('len', 20); }
             this.layout();
           }
           this.schedule();
@@ -2688,16 +2711,19 @@ function startHinge(editIndex, f) {
       this.layout();
       this.update();
     },
-    isBox() { return this.v.kind === 'box'; },
+    isBox() { return this.v.kind === 'box' || this.v.kind === 'closed'; },
+    isClosed() { return this.v.kind === 'closed'; },
     layout() {
-      const bx = this.isBox();
+      const bx = this.isBox(), cl = this.isClosed(), pin = cl && this.v.join === 'pin';
       for (const id of ['style', 'box', 'lid', 'count']) dlg.show(id, bx);
+      dlg.show('join', cl); dlg.show('side', cl); dlg.show('pinKind', pin); dlg.show('pin', !pin); dlg.show('gap', cl && !pin && this.v.style === 'flush');
       for (const id of ['w', 't', 'holes', 'hd', 'part', 'rot', 'pos', 'op']) dlg.show(id, !bx);
       if (bx) transform.detach(); else transform.attach(pivot);
       if (bx && !this.box) this.pick = 'box'; else if (bx && !this.lid) this.pick = 'lid';
     },
     feature() {
       const v = this.v;
+      if (this.isClosed()) return { id: f ? f.id : 'tmp', type: 'hinge', kind: 'closed', style: v.style, side: v.side, join: v.join, pinKind: v.pinKind, gap: v.gap, box: this.box, lid: this.lid, len: v.len, n: v.n, pin: v.pin, tol: v.tol, count: v.count };
       if (this.isBox()) return { id: f ? f.id : 'tmp', type: 'hinge', kind: 'box', style: v.style, box: this.box, lid: this.lid, len: v.len, n: v.n, pin: v.pin, tol: v.tol, count: v.count };
       return { id: f ? f.id : 'tmp', type: 'hinge', kind: v.kind, len: v.len, w: v.w, t: v.t, n: v.n, pin: v.pin, tol: v.tol, holes: v.holes, hd: v.hd, part: v.part, rot: v.rot, pos: this.pos.slice(), op: this.op };
     },
@@ -2710,12 +2736,22 @@ function startHinge(editIndex, f) {
         const bb = this.box && bodyById(this.box), lb = this.lid && bodyById(this.lid);
         dlg.set('box', { text: bb ? bodyName(bb) : 'Klepněte na krabičku', has: !!bb, active: this.pick === 'box' });
         dlg.set('lid', { text: lb ? bodyName(lb) : 'Klepněte na víko', has: !!lb, active: this.pick === 'lid' });
-        setPrompt(this.pick === 'box' ? 'Klepněte na krabičku. Krabička a víko mají stát vedle sebe otevřené nahoru, horní hrany ve stejné výšce.' : 'Klepněte na víko, které stojí vedle krabičky.');
+        if (this.isClosed()) setPrompt(this.pick === 'box' ? 'Klepněte na zadní stěnu krabičky, kde má být pant. Víko má ležet na krabičce (zavřená krabička).' : 'Klepněte na víko, které leží na krabičce.');
+        else setPrompt(this.pick === 'box' ? 'Klepněte na krabičku. Krabička a víko mají stát vedle sebe otevřené nahoru, horní hrany ve stejné výšce.' : 'Klepněte na víko, které stojí vedle krabičky.');
         if (!bb || !lb) { dlg.set('n', ''); dlg.set('n2', ''); dlg.set('n3', ''); dlg.okEnabled(false); requestRender(); return; }
       } else if (!this.gizmoDrag) pivot.position.set(this.pos[0], this.pos[1], this.pos[2]);
       try {
         const F = this.feature();
-        if (bx) {
+        this.hideBodies = null;
+        if (this.isClosed()) {
+          if (this.box === this.lid) throw new Error('Krabička a víko musí být dvě různá tělesa');
+          const Rz = Engine.closedHingeResult(F, bodyById(this.box).polys, bodyById(this.lid).polys), H = Rz.T.H;
+          this.tool = Rz.box.concat(Rz.lid); this.hideBodies = new Set([this.box, this.lid]); styleBodies();
+          G.preview.add(previewMesh(this.tool, 'new'));
+          dlg.set('n', `Kloub Ø ${fmtc(2 * H.R, 1)} mm, ${H.N} × ${fmtc(H.k, 1)} mm, vůle ${fmtc(H.c, 2)} mm`);
+          dlg.set('n2', Rz.pinMode ? `Do kloubů patří ${this.v.pinKind === 'fil' ? 'kus filamentu 1,75 mm' : 'šroub ' + this.v.pinKind.toUpperCase()} dlouhý ${Math.floor(H.L)} mm${this.v.pinKind === 'fil' ? '; konce zatavte nebo zaklepněte' : ''}.` : `Víko je odklopené o 180° vedle krabičky, mezera ${fmtc(Rz.T.G, 1)} mm.`);
+          dlg.set('n3', Rz.pinMode ? 'Krabička a víko se tisknou zvlášť (víko otočte otevřenou stranou nahoru). Pant je navržený pro zavřenou polohu, víko proto vždy dosedne.' : 'Tiskne se vcelku bez podpěr. Pant je navržený pro zavřenou polohu, víko proto po překlopení přesně dosedne.');
+        } else if (bx) {
           if (this.box === this.lid) throw new Error('Krabička a víko musí být dvě různá tělesa');
           const T = Engine.boxHingeTools(F, bodyById(this.box).polys, bodyById(this.lid).polys), H = T.H;
           this.tool = T.A.concat(T.B);
@@ -2733,7 +2769,7 @@ function startHinge(editIndex, f) {
           dlg.set('n3', this.op === 'new' ? '' : this.v.part === 'both' ? 'Pro připojení ke dvěma tělesům vytvořte zvlášť křídlo A a křídlo B ve stejné poloze.' : `Osu dejte alespoň ${fmtc(H.R + H.c + 0.1, 1)} mm za hranu tělesa, jinak se ho dotknou i klouby druhého křídla.`);
         }
         dlg.okEnabled(true);
-      } catch (e) { dlg.set('n', '!' + e.message); dlg.set('n2', ''); dlg.set('n3', ''); dlg.okEnabled(false); }
+      } catch (e) { this.hideBodies = null; styleBodies(); dlg.set('n', '!' + e.message); dlg.set('n2', ''); dlg.set('n3', ''); dlg.okEnabled(false); }
       requestRender();
     },
     onMove(ev) { if (this.isBox()) { const h = hitBodies(ev); dom.style.cursor = h ? 'pointer' : ''; } },
@@ -2742,6 +2778,11 @@ function startHinge(editIndex, f) {
       if (this.isBox()) {
         if (!h) return;
         const id = h.object.userData.bodyId;
+        /* closed box: the wall clicked on the box picks the hinge side */
+        if (this.isClosed() && this.pick === 'box' && h.face) {
+          const nn = h.face.normal.clone().transformDirection(h.object.matrixWorld);
+          if (Math.abs(nn.z) < 0.3) { const sd = Math.abs(nn.x) > Math.abs(nn.y) ? (nn.x > 0 ? '+x' : '-x') : (nn.y > 0 ? '+y' : '-y'); this.v.side = sd; dlg.set('side', sd); }
+        }
         if (this.pick === 'box') { this.box = id; if (this.lid === id) this.lid = null; this.pick = this.lid ? 'box' : 'lid'; }
         else { this.lid = id; if (this.box === id) this.box = null; this.pick = this.box ? 'lid' : 'box'; }
         this.schedule(); this.update(); return;
@@ -2758,7 +2799,7 @@ function startHinge(editIndex, f) {
       transform.removeEventListener('objectChange', this.onGizmo);
       transform.removeEventListener('dragging-changed', this.onDragChange);
       transform.detach(); transform.enabled = true; scene.remove(pivot); controls.enabled = true;
-      this.highlight = null; styleBodies();
+      this.highlight = null; this.hideBodies = null; styleBodies();
     }
   };
   c.onGizmo = () => { const p = pivot.position; c.pos = [snapV(p.x), snapV(p.y), snapV(p.z)]; dlg.set('pos', c.pos); };
@@ -3752,10 +3793,13 @@ function startSplitBody(editIndex, f) {
       const g = this.gdrag; if (!g) return;
       const b0 = this.base(), B = Engine.basisFromPlane(b0.n, b0.w), n0 = v3(b0.n), st = settings.gridSnap ? settings.snap : 0.01, snapL = v => Math.round(Math.round(v / st) * st * 1000) / 1000;
       if (g.mode === 'move') {
+        const tilted = this.tilt[0] || this.tilt[1];
         const P = this.piv.position.clone(), bb = this.bb(), cc = bb ? v3([0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2)) : new V3();
         const wb = P.dot(n0), Pc = cc.clone().addScaledVector(n0, wb - cc.dot(n0)), d = P.clone().sub(Pc);
-        this.off = snapL(wb - (this.mode === 'face' ? this.faceW : 0)); dlg.set('off', this.off);
-        if (this.plane().rect) { this.shift = [snapL(d.dot(v3(B.u))), snapL(d.dot(v3(B.v)))]; dlg.set('su', this.shift[0]); dlg.set('sv', this.shift[1]); }
+        this.off = tilted ? Math.round((wb - (this.mode === 'face' ? this.faceW : 0)) * 1000) / 1000 : snapL(wb - (this.mode === 'face' ? this.faceW : 0)); dlg.set('off', this.off);
+        /* the manipulator moves along the TILTED plane's axes; keep the in-plane part of the move too (not only with a limited
+           face), otherwise the pivot falls back onto the untilted centre line and the tilted plane moves by less than dragged */
+        this.shift = [d.dot(v3(B.u)), d.dot(v3(B.v))].map(x => (tilted ? Math.round(x * 1000) / 1000 : snapL(x))); dlg.set('su', this.shift[0]); dlg.set('sv', this.shift[1]);
         showDimAt(this.lastEv, `Posun roviny ${fmtc(this.off, 2)} mm`);
       } else if (g.mode === 'rot') {
         const n = new V3(0, 0, 1).applyQuaternion(this.piv.quaternion), u = n.dot(v3(B.u)), v = n.dot(v3(B.v)), w = n.dot(n0);
@@ -4210,6 +4254,7 @@ function cylinderAt(polys, pi) {
   return { c: cOut.map(r6), ax: aOut.map(r6), r: r6(r), len: r6(t1 - t0), internal, group };
 }
 /* default 3D-print clearances on the diameter, from print tests: bolt / pin 0.15 mm, nut / hole 0.35 mm */
+const TOL_HINGE = 0.4;
 const TOL_BOLT = 0.15, TOL_NUT = 0.35;
 const threadLabel = (d, p) => `M${fmtc(d, 1)} × ${fmtc(p, 2)}`;
 function startThread(editIndex, f) {
@@ -4991,7 +5036,7 @@ function startMeasure() {
       const h = hitBodies(ev);
       if (!h) return null;
       const { poly } = polyOfHit(h), polys = h.object.userData.polys;
-      return { p: h.point.clone(), kind: 'f', n: v3(poly.n).normalize(), flat: !smoothFor(polys)[polys.indexOf(poly)], polys, key: planeKey(poly) };
+      return { p: h.point.clone(), kind: 'f', n: v3(poly.n).normalize(), flat: !smoothFor(polys)[polys.indexOf(poly)], polys, key: planeKey(poly), pi: polys.indexOf(poly) };
     },
     update() {
       const f3 = q => `${MEASURE_KIND[q.kind]}: ${fmtc(q.p.x, 2)}; ${fmtc(q.p.y, 2)}; ${fmtc(q.p.z, 2)}`;
@@ -5017,7 +5062,10 @@ function startMeasure() {
         if (!el) { el = document.createElement('div'); el.className = 'mtip ' + cls; $('#skdims').parentNode.appendChild(el); }
         el.textContent = text; el._w = w.clone(); el._dy = dy; this.onFrame();
       };
-      tip('kind', hv ? MEASURE_KIND[hv.kind] : '', hv && hv.p, -18);
+      /* a circular edge or a cylindrical face gives its diameter straight away */
+      const dia = q => { if (!q) return null; if (q.chain && q.chain.circle) return q.chain.circle.r * 2; if (q.kind === 'f' && !q.flat && q.pi >= 0) { const cy = cylinderAt(q.polys, q.pi); return cy ? cy.r * 2 : null; } return null; };
+      const dq = this.pts.length === 1 && !(hv && this.pts.length === 1 && hv !== this.pts[0] && hv.p.distanceTo(this.pts[0].p) > 1e-6) ? this.pts[0] : this.pts.length === 0 ? hv : null, dv = dia(dq);
+      tip('kind', hv ? MEASURE_KIND[hv.kind] + (dia(hv) ? ` · Ø ${fmtc(dia(hv), 3)} mm` : '') : '', hv && hv.p, -18);
       const Q2 = this.pts.length === 2 ? this.pts[1] : this.pts.length === 1 && hv ? hv : null;
       const r = Q2 ? measureResult(this.pts[0], Q2) : null;
       const angTxt = r && r.angle !== null ? `Úhel ${fmtc(r.angle, 2)}°` : '';
@@ -5031,8 +5079,10 @@ function startMeasure() {
       }
       else if (hv && hv.chain) note = chainInfo(hv.chain);
       else if (hv) note = f3(hv);
+      if (!r && dv) note = `Průměr Ø ${fmtc(dv, 3)} mm (poloměr ${fmtc(dv / 2, 3)} mm) · ` + note;
+      else if (!r && !this.pts.length) note = 'Průměr změříte klepnutím na válcovou plochu nebo kruhovou hranu. ' + note;
       dlg.set('n', note);
-      setPrompt(this.pts.length === 1 ? 'Klepněte na druhý bod' : 'Klepněte na první bod');
+      setPrompt(this.pts.length === 1 ? (dv ? `Průměr Ø ${fmtc(dv, 3)} mm · klepněte na druhý bod pro vzdálenost` : 'Klepněte na druhý bod') : 'Klepněte na první bod (průměr: klepněte na válcovou plochu nebo kruhovou hranu)');
       dlg.okEnabled(true); requestRender();
     },
     onMove(ev) {
