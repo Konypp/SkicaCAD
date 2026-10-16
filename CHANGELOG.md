@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 1.10
+- Pant krabičky (tisk vcelku, provedení na stěně): opravena příčina mezery u pantu. Při ose nad okrajem (Rezerva při zavření) sahala část pantu, která drží ve stěně, až do výšky osy, tedy nad okraj. Zavřené víko si na ni u pantu sedlo a zůstalo pootevřené. Teď tato část končí v rovině okraje.
+- Rezerva při zavření má nově výchozí hodnotu **0,2 mm** (polovina vůle 0,4 mm). Víko při zavírání pořád dosedne nejdřív vpředu, ale ve vůli kloubů si pak sedne celé. Při 0,4 mm zůstane u pantu mezera asi 0,4 mm.
+- Simulace: zavřené víko si sedne ve vůli kloubů (simulace najde, kam až může klesnout, než do něčeho narazí) a dialog napíše, jestli dosedne celé, nebo jak velká mezera u pantu zůstane.
+
 ## Beta 1.09
 - Nový příkaz **Simulace** (skupina Kontrola): ukáže, jak se krabička otevírá a zavírá. Víko se otáčí na skutečné ose pantu krabičky (u osy nad okrajem se zavře o kousek přes 180°, až dosedne vpředu). Páčky a jazýčky západek na ose se nejdřív odklopí a pak jedou s víkem. Víko bez pantu se jen zvedne. Posuvník Průběh, tlačítka Otevřít, Zavřít a Dokola. Na pozadí se zkontrolují kolize v celém rozsahu (u zavřené polohy jemněji); tělesa, která do sebe narazí, zčervenají a dialog vypíše polohy. Zaskočení pružné západky těsně před zavřením se za kolizi nepočítá.
 - Opraveno: západka přidaná **po pantu** krabičky brala za rovinu dělení vrchol kloubů pantu místo okraje krabičky, takže lišta a háček vyšly o pár milimetrů výš (na to přišla simulace). Teď se použije okraj krabičky uložený pantem.

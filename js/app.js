@@ -2663,7 +2663,7 @@ function startFastener(type, editIndex, f) {
 /* ================= hinge ================= */
 function startHinge(editIndex, f) {
   const pivot = new THREE.Object3D(); scene.add(pivot);
-  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_HINGE, holes: 2, hd: 3, part: 'both', rot: 0, count: 2, side: '+y', join: 'print', pinKind: 'fil', gap: 1, shift: 0, out: 'join', lift: 0.4 };
+  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_HINGE, holes: 2, hd: 3, part: 'both', rot: 0, count: 2, side: '+y', join: 'print', pinKind: 'fil', gap: 1, shift: 0, out: 'join', lift: 0.2 };
   const c = {
     editIndex, tool: null, tools: null, gizmoDrag: false, timer: null,
     v: f ? { ...D0, style: 'out', ...f } : { ...D0 },
@@ -2927,7 +2927,7 @@ function startSimulate() {
       this.setup();
     },
     setup() {
-      this.stop(); this.reset();
+      this.stop(); this.reset(); this.settle = 0; this.gapHinge = 0; this.smax = 0; this.noted = false;
       const lb = this.lid && bodyById(this.lid);
       dlg.set('lid', { text: lb ? bodyName(lb) : 'Klepněte na víko', has: !!lb, active: true });
       if (!lb) { dlg.set('n', '!Klepněte na víko. Simulace potřebuje víko připojené pantem krabičky nebo víko se západkou na ose.'); dlg.set('n2', ''); this.info = null; requestRender(); return; }
@@ -2949,16 +2949,31 @@ function startSimulate() {
         /* with the axis above the rim the lid turns a little past 180° until its front edge reaches the rim */
         const ob = new THREE.Box3().setFromPoints(cs), rim = [];
         for (const x of [ob.min.x, ob.max.x]) for (const y of [ob.min.y, ob.max.y]) rim.push(new THREE.Vector3(x, y, lb.swing.zp));
-        Phi = 180;
-        const low = d => Math.min(...rim.map(v => v.clone().sub(pt).applyAxisAngle(axis, sg * (180 + d) * Math.PI / 180).z + pt.z)) - lb.swing.zp;
-        if ((lb.swing.lift || 0) > 1e-6 && low(10) < 0) { let d0 = 0, d1 = 10; for (let k = 0; k < 40; k++) { const m = (d0 + d1) / 2; if (low(m) > 0) d0 = m; else d1 = m; } Phi = 180 + d0; }
+        /* closed, the lid settles down in the play of the knuckles by s (found by the scan: as far as it goes without
+           running into the box, at most until it lies level on the rim), then tips a little past 180° until its front
+           edge reaches the rim; the gap left at the hinge is reported */
+        const lift = lb.swing.lift || 0, zp = lb.swing.zp;
+        this.solve = s => {
+          const at = (v, d) => v.clone().sub(pt).applyAxisAngle(axis, sg * (180 + d) * Math.PI / 180).z + pt.z - s;
+          const low = d => Math.min(...rim.map(v => at(v, d))) - zp;
+          let P = 180;
+          if (lift > 1e-6 && low(0) > 1e-6 && low(10) < 0) { let d0 = 0, d1 = 10; for (let k = 0; k < 40; k++) { const m = (d0 + d1) / 2; if (low(m) > 0) d0 = m; else d1 = m; } P = 180 + d0; }
+          return { Phi: P, gap: Math.max(0, Math.max(...rim.map(v => at(v, P - 180))) - zp) };
+        };
+        this.smax = lift > 1e-6 ? Math.min(lb.swing.play || 0, 2 * lift) : 0;
+        const r0 = this.solve(0); Phi = r0.Phi; this.gapHinge = r0.gap;
       }
       const other = cur.bodies.filter(b => b.id !== lb.id && b.rides !== lb.id && isVis(b.id));
       const spring = doc.features.some(f => f.type === 'latch' && f.lid === lb.id && (f.style === 'out' || f.style === 'flush'));
       this.info = { lb, riders, levers, O, U, axis, pt, sg, Phi, other, spring, tA: levers.length ? 30 : 0 };
       for (const b of [lb, ...riders]) this.moved.add(b.id);
-      dlg.set('n', (lb.swing ? 'Víko se otáčí na ose pantu' : 'Víko nemá pant krabičky, simulace ho jen zvedne') + (levers.length ? '; nejdřív se odklopí ' + (levers.length === 1 ? 'západka' : 'západky') + '.' : '.'));
+      this.note(false);
       this.pose(); this.startScan();
+    },
+    note(done) {
+      const S = this.info, lb = S.lb;
+      dlg.set('n', (lb.swing ? 'Víko se otáčí na ose pantu' : 'Víko nemá pant krabičky, simulace ho jen zvedne') + (S.levers.length ? '; nejdřív se odklopí ' + (S.levers.length === 1 ? 'západka' : 'západky') + '.' : '.')
+        + (lb.swing && (lb.swing.lift || 0) > 1e-6 && done ? ` Zavřené víko si ve vůli kloubů sedne o ${fmtc(this.settle, 2)} mm; ` + (this.gapHinge > 0.02 ? `u pantu zůstane mezera ${fmtc(this.gapHinge, 2)} mm (osa pantu je ${fmtc(lb.swing.lift, 2)} mm nad okrajem).` : 'dosedne celé.') : ''));
     },
     /* the pose at progress t (0–100): matrices for the lid, its riders and the levers */
     mats(t) {
@@ -2967,7 +2982,7 @@ function startSimulate() {
       let L, Uc = S.U;
       if (S.axis) {
         const a = S.sg * S.Phi * (1 - fb) * Math.PI / 180;
-        L = new THREE.Matrix4().makeTranslation(S.pt.x, S.pt.y, S.pt.z).multiply(new THREE.Matrix4().makeRotationAxis(S.axis, a)).multiply(new THREE.Matrix4().makeTranslation(-S.pt.x, -S.pt.y, -S.pt.z));
+        L = new THREE.Matrix4().makeTranslation(S.pt.x, S.pt.y, S.pt.z - (this.settle || 0) * (1 - fb)).multiply(new THREE.Matrix4().makeRotationAxis(S.axis, a)).multiply(new THREE.Matrix4().makeTranslation(-S.pt.x, -S.pt.y, -S.pt.z));
       } else L = new THREE.Matrix4().makeTranslation(0, 0, fb * LIFT);
       const out = new Map(); out.set(S.lb.id, L.clone().multiply(S.O));
       for (const r of S.riders) {
@@ -2985,7 +3000,7 @@ function startSimulate() {
       for (const [id, M] of out) { const e = meshes.get(id); if (!e) continue; e.mesh.matrixAutoUpdate = false; e.mesh.matrix.copy(M); e.mesh.matrixWorldNeedsUpdate = true; }
       dlg.set('prog', Math.round(this.prog));
       const lv = S.levers.length ? `západka ${Math.round(fa * 100)} % · ` : '';
-      dlg.set('n2', this.scan ? `${lv}víko ${S.axis ? Math.round(angle) + '°' : fmtc(angle, 1) + ' mm'} · kontroluji kolize… ${this.scan}` : this.clashText(lv, angle));
+      dlg.set('n2', this.scan ? `${lv}víko ${S.axis ? Math.round(angle) + '°' : fmtc(angle, 1) + ' mm'} · ${/%$/.test(this.scan) ? 'kontroluji kolize… ' + this.scan : 'počítám usazení víka…'}` : this.clashText(lv, angle));
       /* clashing bodies near this position turn red */
       const k = this.clash.find(q => Math.abs(q.t - this.prog) <= q.step / 2 + 0.01);
       this.clashIds = new Set(k ? k.ids : []);
@@ -3013,9 +3028,13 @@ function startSimulate() {
       const moving = [S.lb, ...S.riders], token = {}; this.scanTok = token;
       /* a clash is a real overlap: some volume and thicker than a rounding sliver in every direction */
       const vol = (a, b) => { if (!Engine.overlaps(a, b)) return 0; const i = K.boolean(a, b, 'intersect'); if (!i.length) return 0; const bb = K.bbox(i); return Math.min(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]) < 0.03 ? 0 : K.signedVolume(i); };
-      let i = 0;
+      let i = 0, lo = 0, hi = this.smax || 0, it = S.axis && hi > 0 ? 7 : 0;
+      const closedClash = s => { const r = this.solve(s); S.Phi = r.Phi; this.settle = s; const M = this.mats(S.tA).out.get(S.lb.id); const P = K.transform(S.lb.polys, M.elements); return S.other.some(o => vol(P, o.polys) > 0.05); };
+      if (it && !closedClash(hi)) { lo = hi; it = 0; }
       const next = () => {
         if (this.scanTok !== token || cmd !== this) return;
+        if (it > 0) { const m = (lo + hi) / 2; if (closedClash(m)) hi = m; else lo = m; it--; this.scan = 'usazení víka'; dlg && this.pose(); setTimeout(next, 0); return; }
+        if (!this.noted) { if (S.axis) { const r = this.solve(lo); S.Phi = r.Phi; this.settle = lo; this.gapHinge = r.gap; } this.note(true); this.noted = true; }
         if (i >= steps.length) { this.scan = null; this.done = true; this.pose(); return; }
         const st = steps[i++], { out, angle, fa } = this.mats(st.t), ids = new Set();
         const P = new Map(moving.map(b => [b.id, K.transform(b.polys, out.get(b.id).elements)]));

@@ -637,12 +637,15 @@ function pinParts(H, az) {
    in the middle of the gap, each leaf hangs down the facing wall on a 45° web so the whole thing prints in one piece.
    Local frame: axis along x (0..L), the box on -y with its wall face at y = -G/2, the lid on +y, rim at z = 0. */
 const BOXH_GRIP = 0.8; /* how far the leaf reaches into the wall */
-function boxHingeSection(H, G, side) {
-  const { R } = H, M = 36, gw = G / 2, pts = [];
+function boxHingeSection(H, G, side, lift) {
+  const { R } = H, M = 36, gw = G / 2, pts = [], lf = Math.max(0, lift || 0);
   const zj = -R * Math.SQRT2 - gw; /* where the 45° web (tangent to the knuckle at -45°) meets the wall */
   pts.push([-gw - BOXH_GRIP, zj - 1], [-gw, zj - 1], [-gw, zj]);
   for (let i = 0; i <= M; i++) { const a = -Math.PI / 4 + (Math.PI + Math.PI / 4) * i / M; pts.push([R * Math.cos(a), R * Math.sin(a)]); }
-  pts.push([-gw - BOXH_GRIP, 0]);
+  /* with the axis 'lift' above the rim, the part that grips the wall stops at the rim: above it the other part's wall
+     comes to rest when the lid is shut (otherwise the leaf would hold the lid up at the hinge) */
+  if (lf > 1e-6) pts.push([-gw, 0], [-gw, -lf], [-gw - BOXH_GRIP, -lf]);
+  else pts.push([-gw - BOXH_GRIP, 0]);
   return side < 0 ? pts : pts.map(([y, z]) => [-y, z]).reverse();
 }
 function boxHingeLocal(f, G) {
@@ -651,7 +654,7 @@ function boxHingeLocal(f, G) {
   if (G > 30) throw new Error('Krabička a víko jsou od sebe příliš daleko (nejvýš 30 mm)');
   let A = null, B = null;
   for (let i = 0; i < N; i++) {
-    const side = i % 2 ? 1 : -1, x0 = i * (k + c), pr = prismX(boxHingeSection(H, G, side), x0, x0 + k);
+    const side = i % 2 ? 1 : -1, x0 = i * (k + c), pr = prismX(boxHingeSection(H, G, side, f.pinHole ? 0 : f.liftEff), x0, x0 + k);
     if (side < 0) A = A ? KK.boolean(A, pr, 'union') : pr; else B = B ? KK.boolean(B, pr, 'union') : pr;
   }
   if (f.pinHole) { const hole = cylAlong([-1, 0, 0], [1, 0, 0], f.pinHole / 2, L + 2); return { H, A: KK.boolean(A, hole, 'subtract'), B: KK.boolean(B, hole, 'subtract') }; }
@@ -707,7 +710,8 @@ function boxHingeTools(f, boxPolys, lidPolys) {
   if (Math.abs(sh) > 1e-9 && (s0 + span * 0.5 / cnt + sh - L / 2 < s0 - 1e-6 || s0 + span * (cnt - 0.5) / cnt + sh + L / 2 > s1 + 1e-6)) throw new Error('Posunutý pant by přesahoval hranu');
   if (span < L * cnt + 2 * (cnt - 1)) throw new Error('Panty se nevejdou podél hrany (' + (Math.round(span * 10) / 10).toString().replace('.', ',') + ' mm)');
   const flush = f.style === 'flush';
-  const P = flush ? boxHingeFlushLocal(f, G) : boxHingeLocal(f, G), H = P.H;
+  const lift0 = f.pinHole ? 0 : Math.max(0, Math.min(2, f.lift === undefined ? 0 : Number(f.lift) || 0));
+  const P = flush ? boxHingeFlushLocal(f, G) : boxHingeLocal({ ...f, liftEff: lift0 }, G), H = P.H;
   /* how far below the rim the hinge reaches: the 45° web (R·√2 + G/2 + 1 mm grip), or the teardrop pocket; it must stay above the print bed */
   const need = flush ? P.depth + 1 : H.R * Math.SQRT2 + G / 2 + 1, low = Math.max(a.min[2], b.min[2]);
   if (a.max[2] - need < low - 1e-6) throw new Error('Krabička je na pant příliš nízká, potřebuje výšku alespoň ' + (Math.ceil(need * 10) / 10).toString().replace('.', ',') + ' mm');
@@ -988,10 +992,10 @@ function step(state, f) {
       if (bx === ld) throw new Error('Krabička a víko musí být dvě různá tělesa');
       let R, fold = null;
       let swing;
-      if (f.kind === 'closed') { R = closedHingeResult(f, bx.polys, ld.polys); if (!R.pinMode) fold = R.U; swing = { M: R.U, open: !R.pinMode, lift: R.T.lift, zp: KK.bbox(bx.polys).max[2] }; }
-      else { const T = boxHingeTools(f, bx.polys, ld.polys); R = applyBoxHinge(T, bx.polys, ld.polys, f.out === 'new'); fold = T.fold; swing = { M: T.fold, open: true, lift: T.lift, zp: KK.bbox(bx.polys).max[2] }; }
+      if (f.kind === 'closed') { R = closedHingeResult(f, bx.polys, ld.polys); if (!R.pinMode) fold = R.U; swing = { M: R.U, open: !R.pinMode, lift: R.T.lift, play: R.T.H.c, zp: KK.bbox(bx.polys).max[2] }; }
+      else { const T = boxHingeTools(f, bx.polys, ld.polys); R = applyBoxHinge(T, bx.polys, ld.polys, f.out === 'new'); fold = T.fold; swing = { M: T.fold, open: true, lift: T.lift, play: T.H.c, zp: KK.bbox(bx.polys).max[2] }; }
       /* fold: turns the open lid shut (a later latch is built on the closed box); swing: the hinge axis for the simulation
-         (M = the 180° turn on the rim plane, open = the lid is stored turned open; the real axis is lift above the rim) */
+         (M = the 180° turn on the rim plane, open = the lid is stored turned open; the real axis is lift above the rim; play = radial play of the knuckles, the lid settles by it) */
       out = bodies.map(b => (b === bx ? { ...b, polys: R.box } : b === ld ? { ...b, polys: R.lid, fold, swing } : b));
       if (R.partA) out = out.concat([{ id: f.id + 'a', name: 'Pant – díl krabičky', polys: R.partA, from: f.id }, { id: f.id + 'b', name: 'Pant – díl víka', polys: R.partB, from: f.id, rides: ld.id, openPose: swing.open }]);
       break;

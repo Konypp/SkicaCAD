@@ -307,6 +307,7 @@
     [/^Průměr změříte klepnutím na válcovou plochu nebo kruhovou hranu\. (.*)$/, (m, c) => 'Tap a cylindrical face or a circular edge to measure its diameter. ' + tr(c)],
     [/^Průměr Ø ([\d.,]+) mm · klepněte na druhý bod pro vzdálenost$/, 'Diameter Ø $1 mm · tap a second point for a distance'],
     [/^ · Ø ([\d.,]+) mm$/, ' · Ø $1 mm'],
+    [/^(.*?\.) Zavřené víko si ve vůli kloubů sedne o ([\d,.]+) mm; (?:dosedne celé\.|u pantu zůstane mezera ([\d,.]+) mm \(osa pantu je ([\d,.]+) mm nad okrajem\)\.)$/, (m, a, s, g, l) => tr(a) + ' Closed, the lid settles ' + s.replace(',', '.') + ' mm in the play of the knuckles; ' + (g ? 'a gap of ' + g.replace(',', '.') + ' mm stays at the hinge (the hinge axis is ' + l.replace(',', '.') + ' mm above the rim).' : 'it closes fully.')],
     [/^(?:západka (\d+) % · )?víko ([\d,.]+)(°| mm) · (.*)$/, (m, z, v, u, rest) => {
       const it = x => x.replace(/^západka (\d+) %$/, 'latch $1 %');
       const snap = ' Pružná západka těsně před zavřením zaskočí (tam se díly krátce překrývají, to je v pořádku).', snapEn = ' A spring latch snaps in just before closing (the parts overlap briefly there, which is fine).';
@@ -314,6 +315,7 @@
       const sn = r.endsWith(snap); if (sn) r = r.slice(0, -snap.length);
       let q;
       if ((q = r.match(/^kontroluji kolize… (\d+) %$/))) en = 'checking for clashes… ' + q[1] + ' %';
+      else if (r === 'počítám usazení víka…') en = 'working out how the lid settles…';
       else if (r === 'bez kolizí v celém rozsahu.') en = 'no clashes over the whole range.';
       else if ((q = r.match(/^kolize: (.*?)(…?)\.$/))) en = 'clashes: ' + q[1].split(', ').map(it).join(', ') + q[2] + '.';
       else en = tr(r);
