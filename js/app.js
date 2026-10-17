@@ -2664,7 +2664,7 @@ function startFastener(type, editIndex, f) {
 /* ================= hinge ================= */
 function startHinge(editIndex, f) {
   const pivot = new THREE.Object3D(); scene.add(pivot);
-  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_HINGE, holes: 2, hd: 3, part: 'both', rot: 0, count: 2, side: '+y', join: 'print', pinKind: 'fil', gap: 1, shift: 0, out: 'join', lift: 0.2 };
+  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_HINGE, holes: 2, hd: 3, part: 'both', rot: 0, count: 1, side: '+y', join: 'print', pinKind: 'fil', gap: 1, shift: 0, out: 'join', lift: 0.2 };
   const c = {
     editIndex, tool: null, tools: null, gizmoDrag: false, timer: null,
     v: f ? { ...D0, style: 'out', ...f } : { ...D0 },
