@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 1.13
+- Simulace: jazýček sklopné západky tištěné vcelku se při otevírání přiklopí až do polohy, ve které se tiskne (180°, nahoru ke stěně víka). Otevřená krabička na konci simulace tak vypadá přesně jako při tisku; dřív zůstal jazýček odklopený jen o 150° a trčel šikmo pod podložku.
+
 ## Beta 1.12
 - Sklopná západka na stěně: nová volba osy **Tisk vcelku**. Jazýček se tiskne s víkem (víko dnem dolů): je přiklopený nahoru ke stěně víka a stojí koncem na podložce, osu tvoří tištěné kuželové čepy 45° v očkách víka a kuželová lůžka v jazýčku (vůle jako u pantů). Jazýček se prodlouží tak, aby dosáhl na podložku; víko proto musí být vysoké aspoň asi 18 mm (dialog napíše přesnou hodnotu). Po tisku se jazýček sklopí dolů. U zapuštěné verze tisk vcelku není, jazýček by se při tisku nevešel do kapsy.
 - **Otočné západky (páčka) odebrány** z nabídky. Starší návrh, který je používá, se dál přepočítá a dá se upravit.

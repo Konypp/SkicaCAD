@@ -962,7 +962,7 @@ function latchApply(f, bx, ld) {
   if (T.box && !sep) pb = KK.boolean(pb, T.box, 'union');
   if (T.lid && !sep) pl = KK.boolean(pl, T.lid, 'union');
   if (T.cutLid) pl = KK.boolean(pl, T.cutLid, 'subtract'); /* after the boss, so the axle hole goes through it */
-  return { box: pb, lid: back(pl), partBox: sep ? T.box : null, partLid: sep ? back(T.lid) : null, lever: T.lever, levers: T.levers, T, fold, preview: [].concat(T.box || [], T.lid ? back(T.lid) : [], T.lever || []), previewCut: [].concat(T.cut || [], T.cutLid ? back(T.cutLid) : []) };
+  return { box: pb, lid: back(pl), partBox: sep ? T.box : null, partLid: sep ? back(T.lid) : null, lever: T.lever, levers: T.levers, T, fold, preview: [].concat(T.box || [], T.lid ? back(T.lid) : [], ...(T.levers || []).map(L => (L.pivot.rest ? back(L.polys) : L.polys))), previewCut: [].concat(T.cut || [], T.cutLid ? back(T.cutLid) : []) };
 }
 function toolForHinge(f) {
   const { A, B } = hingeParts(f), part = f.part || 'both';
@@ -1037,7 +1037,8 @@ function step(state, f) {
       if (R.partLid) out.push({ id: f.id + 'b', name: 'Západka – díl víka', polys: R.partLid, from: f.id, rides: ld.id, openPose: !!R.fold });
       const nm = f.style === 'flip' || f.style === 'flipflush' ? 'Západka – jazýček' : 'Západka – páčka';
       /* each lever is its own body; pivot (in the closed-lid position) lets the simulation turn it, rides: it moves with the lid */
-      (R.levers || []).forEach((L, i) => out.push({ id: f.id + 'p' + (i ? i + 1 : ''), name: nm + (R.levers.length > 1 ? ' ' + (i + 1) : ''), polys: L.polys, from: f.id, rides: ld.id, pivot: L.pivot }));
+      /* a flap printed in place belongs to the lid as printed: with a lid turned open by the hinge it is turned along (openPose) */
+      (R.levers || []).forEach((L, i) => { const op = !!(R.fold && L.pivot.rest); out.push({ id: f.id + 'p' + (i ? i + 1 : ''), name: nm + (R.levers.length > 1 ? ' ' + (i + 1) : ''), polys: op ? KK.transform(L.polys, R.fold) : L.polys, from: f.id, rides: ld.id, pivot: L.pivot, ...(op ? { openPose: true } : {}) }); });
       break;
     }
     case 'boxpose': {

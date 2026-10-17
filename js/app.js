@@ -3000,8 +3000,8 @@ function startSimulate(editIndex, ef) {
       for (const r of S.riders) {
         if (r.pivot) {
           const p = r.pivot, d = new THREE.Vector3(...p.d).normalize();
-          const P = new THREE.Matrix4().makeTranslation(p.p[0], p.p[1], p.p[2]).multiply(new THREE.Matrix4().makeRotationAxis(d, (fa * p.a - (p.rest || 0)) * Math.PI / 180)).multiply(new THREE.Matrix4().makeTranslation(-p.p[0], -p.p[1], -p.p[2]));
-          out.set(r.id, L.clone().multiply(Uc).multiply(P).multiply(base(r)));
+          const P = new THREE.Matrix4().makeTranslation(p.p[0], p.p[1], p.p[2]).multiply(new THREE.Matrix4().makeRotationAxis(d, (fa * (p.rest || p.a) - (p.rest || 0)) * Math.PI / 180)).multiply(new THREE.Matrix4().makeTranslation(-p.p[0], -p.p[1], -p.p[2]));
+          out.set(r.id, L.clone().multiply(Uc).multiply(P).multiply(r.openPose ? Uc : new THREE.Matrix4()).multiply(base(r)));
         } else out.set(r.id, (r.openPose ? L.clone().multiply(S.O) : L.clone().multiply(Uc)).multiply(base(r)));
       }
       return { out, angle: S.axis ? fb * S.Phi : fb * LIFT, fa, fb };
