@@ -860,25 +860,37 @@ function rotLatchLocal(f) {
    The flap is a separate body, printed lying on its outer face. Local frame as latchParts. */
 function flipLatchLocal(f) {
   const c = Math.max(0.1, Math.min(1, Number(f.tol) || 0.4)), flush = f.style === 'flipflush', wall = Math.max(0.8, Number(f.wall) || 2);
-  const W = Math.max(10, Number(f.width) || 14), screw = !flush && f.axle !== 'fil';
+  const W = Math.max(10, Number(f.width) || 14), inPlace = !flush && f.axle === 'print', screw = !flush && !inPlace && f.axle !== 'fil';
   const knH = flush ? 0.85 : screw ? 1.7 : 1.0;        /* hole in the flap: filament glued in / free on the screw or filament */
   const lugH = flush ? 0.875 + c / 2 : screw ? 1.25 : 0.9; /* hole in the lugs: free (snap slot) / M3 pilot / filament press fit */
-  const rk = Math.max(knH, lugH) + 1.2, lw = screw ? 3 : 2.5, h = 1.5, s = Math.tan(30 * Math.PI / 180);
+  const rk = inPlace ? 3 : Math.max(knH, lugH) + 1.2, lw = screw || inPlace ? 3 : 2.5, h = 1.5, s = Math.tan(30 * Math.PI / 180);
   const ui = h + c, uA = c + rk, uo = uA + rk, zA = rk + 0.4;
   /* ridge low enough that the arc of the hook is flatter than the undercut (self-locking) */
   const L = Math.max(8, (uA - (c + h) / 2) / (0.5 * s)), zr = zA + c - L;
-  const zh = zr - s * c - c, zbot = zh - 1.6 - (ui - c) - 2.5, xf = W / 2 - lw - c;
+  const zh = zr - s * c - c, xf = W / 2 - lw - c;
+  let zbot = zh - 1.6 - (ui - c) - 2.5;
   if (xf < 3) throw new Error('Západka je příliš úzká');
+  /* printed in place: the flap is printed turned up 180° along the lid wall (the lid prints upside down), standing on
+     the bed with its end, so it is lengthened to reach the lid's top exactly */
+  if (inPlace) {
+    const Hl = Number(f._hl) || 0, need = 2 * zA - zbot;
+    if (Hl < need - 1e-6) throw new Error('Víko je na tisk jazýčku vcelku příliš nízké, potřebuje výšku alespoň ' + (Math.ceil(need * 10) / 10).toString().replace('.', ',') + ' mm (jinak zvolte osu ze šroubu nebo filamentu)');
+    zbot = 2 * zA - Hl;
+  }
   let flap = KK.extrudeProfiles([{ pts: [[ui, zbot], [uo, zbot], [uo, zA], [ui, zA]], closed: true }, { t: 'circle', x: uA, y: zA, r: rk }], YZB, -xf, xf);
   flap = KK.boolean(flap, prismX([[ui + 0.02, zr - s * ui - c], [c, zh], [c, zh - 1.6], [ui + 0.02, zh - 1.6 - (ui - c)]], -xf, xf), 'union');
-  flap = KK.boolean(flap, KK.extrudeProfiles([{ t: 'circle', x: uA, y: zA, r: knH }], YZB, -xf - 1, xf + 1), 'subtract');
+  /* axle: printed cone pins (45°) on the lugs in cone sockets of the knuckle, or a through hole for a screw or filament */
+  const x0 = W / 2 - lw, rb = rk - 1.4, rt = 0.4, C2 = c * Math.SQRT2;
+  if (inPlace) for (const sgn of [1, -1]) flap = KK.boolean(flap, coneX([sgn * (x0 + 0.5), uA, zA], [-sgn, 0, 0], rb + C2 + 0.5, rt, rb + C2 + 0.5 - rt), 'subtract');
+  else flap = KK.boolean(flap, KK.extrudeProfiles([{ t: 'circle', x: uA, y: zA, r: knH }], YZB, -xf - 1, xf + 1), 'subtract');
   const ridge = prismX([[-0.8, zr + 0.8 * s], [h, zr - s * h], [h, zr + 0.4], [-0.8, zr + 0.4 + h + 0.8]], -xf, xf);
-  const hx = flush ? W / 2 : W / 2 + 0.5, hole = KK.extrudeProfiles([{ t: 'circle', x: uA, y: zA, r: lugH }], YZB, -hx, hx);
+  const hx = flush ? W / 2 : W / 2 + 0.5, hole = inPlace ? null : KK.extrudeProfiles([{ t: 'circle', x: uA, y: zA, r: lugH }], YZB, -hx, hx);
   let boxAdd = ridge, lidAdd = null, boxCut = null, lidCut = hole;
   const zTop = zA + rk + c;
   if (!flush) {
     const lug = KK.extrudeProfiles([{ pts: [[-0.8, zA - rk], [uA, zA - rk], [uo, zA], [-0.8, zA + uo + 0.8]], closed: true }, { t: 'circle', x: uA, y: zA, r: rk }], YZB, -W / 2, -W / 2 + lw);
     lidAdd = KK.boolean(lug, KK.translate(lug, [W - lw, 0, 0]), 'union');
+    if (inPlace) for (const sgn of [1, -1]) lidAdd = KK.boolean(lidAdd, coneX([sgn * (x0 + 0.3), uA, zA], [-sgn, 0, 0], rb + 0.3, rt, rb + 0.3 - rt), 'union');
   } else {
     /* the pocket ends act as lugs: a slot (narrower than the filament) lets the axle click in from outside */
     const pkB = prismX([[-0.01, zbot - c], [uo + 0.5, zbot - c], [uo + 0.5, 0.01], [-0.01, 0.01]], -(W / 2 - lw), W / 2 - lw);
@@ -895,6 +907,11 @@ function flipLatchLocal(f) {
     }
     return { lever: mv(flap), pivot: { p: [0, uA + d, zA], d: [1, 0, 0], a: 100 }, boxAdd, lidAdd, boxCut, lidCut, W: W + 2, depth: -zbot + c + 2 + Math.max(0, dep), ov: zTop + 1 + Math.max(0, dep) };
   }
+  if (inPlace) {
+    /* stored as printed: turned 180° about the axle (rest), lying along the lid wall */
+    const T = [1, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 0, 0, 2 * uA, 2 * zA, 1];
+    return { lever: KK.transform(flap, T), pivot: { p: [0, uA, zA], d: [1, 0, 0], a: 150, rest: 180 }, boxAdd, lidAdd, boxCut, lidCut, W, depth: -zbot + 1, ov: zA + uo + 1 };
+  }
   return { lever: flap, pivot: { p: [0, uA, zA], d: [1, 0, 0], a: 150 }, boxAdd, lidAdd, boxCut, lidCut, W, depth: -zbot + 1, ov: zA + uo + 1 };
 }
 function latchTools(f, boxPolys, lidPolys, zRim) {
@@ -905,7 +922,7 @@ function latchTools(f, boxPolys, lidPolys, zRim) {
   const face = sg > 0 ? a.max[k] : a.min[k];
   const s0 = Math.max(a.min[o], b.min[o]), s1 = Math.min(a.max[o], b.max[o]), cnt = Math.max(1, Math.min(3, Math.round(Number(f.count) || 1))), sh = Number(f.shift) || 0;
   const flip = f.style === 'flip' || f.style === 'flipflush', rot = flip || f.style === 'rot' || f.style === 'rotflush';
-  const P = flip ? flipLatchLocal(f) : rot ? rotLatchLocal(f) : latchParts(f);
+  const P = flip ? flipLatchLocal({ ...f, _hl: b.max[2] - zp }) : rot ? rotLatchLocal(f) : latchParts(f);
   const Wx = P.W;
   if (s1 - s0 < Wx * cnt + 2) throw new Error('Západka se nevejde podél hrany');
   if (zp - a.min[2] < P.depth + 1) throw new Error('Krabička je na západku příliš nízká');
@@ -923,7 +940,7 @@ function latchTools(f, boxPolys, lidPolys, zRim) {
       if (P.lidCut) put('cutLid', KK.transform(P.lidCut, m)); put('lever', KK.transform(P.lever, m));
       const tp = q => [m[0] * q[0] + m[4] * q[1] + m[8] * q[2] + m[12], m[1] * q[0] + m[5] * q[1] + m[9] * q[2] + m[13], m[2] * q[0] + m[6] * q[1] + m[10] * q[2] + m[14]];
       const pv = P.pivot, td = q => [m[0] * q[0] + m[4] * q[1] + m[8] * q[2], m[1] * q[0] + m[5] * q[1] + m[9] * q[2], m[2] * q[0] + m[6] * q[1] + m[10] * q[2]];
-      out.levers.push({ polys: KK.transform(P.lever, m), pivot: { p: tp(pv.p), d: td(pv.d), a: pv.a } });
+      out.levers.push({ polys: KK.transform(P.lever, m), pivot: { p: tp(pv.p), d: td(pv.d), a: pv.a, rest: pv.rest || 0 } });
     } else {
       for (const L of P.box) put('box', KK.transform(prismX(L, -P.W / 2, P.W / 2), m));
       for (const L of P.lid) put('lid', KK.transform(prismX(L, -P.W / 2, P.W / 2), m));

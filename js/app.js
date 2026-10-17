@@ -2826,12 +2826,14 @@ function startLatch(editIndex, f) {
       if (!f && sel.size === 2) [this.box, this.lid] = [...sel];
       openDialog({
         title: 'Západka', icon: 'latch',
-        fields: [{ k: 'opt', id: 'style', label: 'Provedení', options: [['out', 'Pružná na stěně'], ['flush', 'Pružná zasunutá'], ['rot', 'Otočná páčka na stěně'], ['rotflush', 'Otočná páčka zapuštěná'], ['flip', 'Sklopná na ose na stěně'], ['flipflush', 'Sklopná na ose zapuštěná']], value: this.v.style },
+        /* the swivel-lever latches were withdrawn; they stay only for editing an older document that uses them */
+        fields: [{ k: 'opt', id: 'style', label: 'Provedení', options: [['out', 'Pružná na stěně'], ['flush', 'Pružná zasunutá'], ['flip', 'Sklopná na ose na stěně'], ['flipflush', 'Sklopná na ose zapuštěná']].concat(f && (f.style === 'rot' || f.style === 'rotflush') ? [['rot', 'Otočná páčka na stěně'], ['rotflush', 'Otočná páčka zapuštěná']] : []), value: this.v.style },
           { k: 'sel', id: 'box', label: 'Krabička' }, { k: 'sel', id: 'lid', label: 'Víko' },
           { k: 'opt', id: 'side', label: 'Strana', options: [['-y', 'Přední (−Y)'], ['+y', 'Zadní (+Y)'], ['+x', 'Pravá (+X)'], ['-x', 'Levá (−X)']], value: this.v.side },
           { k: 'num', id: 'width', label: 'Šířka západky', value: this.v.width },
           { k: 'num', id: 'lever', label: 'Délka páčky', value: this.v.lever },
-          { k: 'seg', id: 'axle', label: 'Osa', options: [['screw', 'Šroub M3'], ['fil', 'Filament 1,75']], value: this.v.axle },
+          { k: 'seg', id: 'axle', label: 'Osa', options: [['screw', 'Šroub M3'], ['fil', 'Filament 1,75']], value: this.v.axle === 'print' ? 'screw' : this.v.axle },
+          { k: 'seg', id: 'axleF', label: 'Osa', options: [['screw', 'Šroub M3'], ['fil', 'Filament 1,75'], ['print', 'Tisk vcelku']], value: this.v.axle },
           { k: 'opt', id: 'count', label: 'Počet', options: [['1', '1'], ['2', '2'], ['3', '3']], value: String(this.v.count) },
           { k: 'num', id: 'shift', label: 'Posun podél hrany', value: this.v.shift, range: [-50, 50, 0.5] },
           { k: 'num', id: 'wall', label: 'Tloušťka stěny krabičky', value: this.v.wall },
@@ -2841,6 +2843,7 @@ function startLatch(editIndex, f) {
         onSel: id => { this.pick = id; this.update(); },
         onChange: id => {
           if (['style', 'side', 'out', 'axle'].includes(id)) this.v[id] = dlg.get(id);
+          else if (id === 'axleF') this.v.axle = dlg.get('axleF');
           else if (id === 'count') this.v.count = parseFloat(dlg.get('count'));
           else { const x = dlg.get(id); if (isFinite(x) && (x >= 0 || id === 'shift')) this.v[id] = x; }
           if (id === 'style') { const cat = this.isFlip() ? 'flip' : this.isRot() ? 'rot' : 'spring'; if (cat !== this.cat) { const w = { flip: 16, rot: 7, spring: 12 }[cat]; this.v.width = w; dlg.set('width', w); } this.cat = cat; this.layout(); }
@@ -2855,7 +2858,9 @@ function startLatch(editIndex, f) {
     isFlip() { return this.v.style === 'flip' || this.v.style === 'flipflush'; },
     layout() {
       const rot = this.isRot(), flip = this.isFlip();
-      dlg.show('wall', this.v.style !== 'out' && this.v.style !== 'flip'); dlg.show('lever', rot); dlg.show('axle', rot || this.v.style === 'flip'); dlg.show('out', !rot && !flip);
+      dlg.show('wall', this.v.style !== 'out' && this.v.style !== 'flip'); dlg.show('lever', rot); dlg.show('axle', rot); dlg.show('axleF', this.v.style === 'flip');
+      if (rot && this.v.axle === 'print') { this.v.axle = 'screw'; dlg.set('axle', 'screw'); }
+      dlg.set(rot ? 'axle' : 'axleF', this.v.axle); dlg.show('out', !rot && !flip);
       const l = $('#dialog [data-row="width"] label'); if (l) l.textContent = rot ? 'Šířka páčky' : 'Šířka západky';
     },
     feature() { const v = this.v; return { id: f ? f.id : 'tmp', type: 'latch', style: v.style, side: v.side, width: v.width, count: v.count, shift: v.shift, tol: v.tol, wall: v.wall, out: v.out, lever: v.lever, axle: v.axle, box: this.box, lid: this.lid }; },
@@ -2880,7 +2885,8 @@ function startLatch(editIndex, f) {
           : st === 'flip' || st === 'flipflush' ? 'Jazýček visí na ose v očkách víka, sklopí se shora dolů a jeho háček zajede pod lištu na krabičce. Spodní strana lišty je podříznutá, takže tah víka háček přitlačí ke stěně. Otevře se zatažením za spodní okraj jazýčku.' + (st === 'flipflush' ? ' Jazýček leží v kapse zarovnaný se stěnou.' : '')
           : 'Páčka se otáčí na ose ve stěně víka a visí dolů přes krabičku; výřezem na konci zachytí kolík na krabičce. Odklopením páčky stranou (o 90°) se víko uvolní.' + (st === 'rotflush' ? ' Páčka leží v kapse zarovnaná se stěnou.' : ''));
         const W = this.v.width;
-        dlg.set('n2', (st === 'flip' ? `Jazýček je samostatné těleso, tiskněte ho naležato na vnější ploše; osa: ${this.v.axle === 'fil' ? `kus filamentu 1,75 mm dlouhý ${W} mm (natlačit do oček)` : `šroub M3 × ${Math.max(6, W - 2)} mm (samořezný do vzdálenějšího očka)`}. `
+        dlg.set('n2', (st === 'flip' && this.v.axle === 'print' ? 'Jazýček se tiskne vcelku s víkem: je přiklopený nahoru ke stěně víka a stojí na podložce, osu tvoří tištěné kuželové čepy v očkách. Po tisku ho sklopte dolů. '
+          : st === 'flip' ? `Jazýček je samostatné těleso, tiskněte ho naležato na vnější ploše; osa: ${this.v.axle === 'fil' ? `kus filamentu 1,75 mm dlouhý ${W} mm (natlačit do oček)` : `šroub M3 × ${Math.max(6, W - 2)} mm (samořezný do vzdálenějšího očka)`}. `
           : st === 'flipflush' ? `Jazýček je samostatné těleso, tiskněte ho naležato na vnější ploše; do jeho očka vlepte kus filamentu 1,75 mm dlouhý ${W} mm a jazýček zacvakněte zvenku do zářezů na koncích kapsy. ` : '')
           + (st === 'rot' || st === 'rotflush' ? `Páčka je samostatné těleso, tiskněte ji naležato; osa: ${this.v.axle === 'fil' ? 'kus filamentu 1,75 mm (natlačit do díry ve víku)' : 'samořezný šroub M3 do díry ve víku'}. ` : st.startsWith('flip') ? '' : 'Všechny převisy jsou 45°, tiskne se bez podpěr. ') + (Rz.fold ? 'Víko je připojené pantem; západka se spočítala na zavřené krabičce a víko zůstalo odklopené.' : ''));
         dlg.okEnabled(true);
@@ -2994,7 +3000,7 @@ function startSimulate(editIndex, ef) {
       for (const r of S.riders) {
         if (r.pivot) {
           const p = r.pivot, d = new THREE.Vector3(...p.d).normalize();
-          const P = new THREE.Matrix4().makeTranslation(p.p[0], p.p[1], p.p[2]).multiply(new THREE.Matrix4().makeRotationAxis(d, fa * p.a * Math.PI / 180)).multiply(new THREE.Matrix4().makeTranslation(-p.p[0], -p.p[1], -p.p[2]));
+          const P = new THREE.Matrix4().makeTranslation(p.p[0], p.p[1], p.p[2]).multiply(new THREE.Matrix4().makeRotationAxis(d, (fa * p.a - (p.rest || 0)) * Math.PI / 180)).multiply(new THREE.Matrix4().makeTranslation(-p.p[0], -p.p[1], -p.p[2]));
           out.set(r.id, L.clone().multiply(Uc).multiply(P).multiply(base(r)));
         } else out.set(r.id, (r.openPose ? L.clone().multiply(S.O) : L.clone().multiply(Uc)).multiply(base(r)));
       }

@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 1.12
+- Sklopná západka na stěně: nová volba osy **Tisk vcelku**. Jazýček se tiskne s víkem (víko dnem dolů): je přiklopený nahoru ke stěně víka a stojí koncem na podložce, osu tvoří tištěné kuželové čepy 45° v očkách víka a kuželová lůžka v jazýčku (vůle jako u pantů). Jazýček se prodlouží tak, aby dosáhl na podložku; víko proto musí být vysoké aspoň asi 18 mm (dialog napíše přesnou hodnotu). Po tisku se jazýček sklopí dolů. U zapuštěné verze tisk vcelku není, jazýček by se při tisku nevešel do kapsy.
+- **Otočné západky (páčka) odebrány** z nabídky. Starší návrh, který je používá, se dál přepočítá a dá se upravit.
+
 ## Beta 1.11
 - Simulace: volba **Po zavření dialogu nechat krabičku zavřenou** (u víka odklopeného pantem pro tisk vcelku). Na časovou osu se přidá krok **Zavřená krabička**, který víko, jeho páčky a díly pantu otočí do zavřené polohy, jak ji ukázala simulace (i s usazením ve vůli kloubů). Další kroky (třeba západka) pak pracují se zavřenou krabičkou. Pro tisk krok stačí smazat nebo posunout značku na časové ose před něj; dvojklikem se znovu otevře simulace.
 
