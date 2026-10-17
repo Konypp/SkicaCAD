@@ -7,7 +7,7 @@ const PLANES = {
   XZ: { o: [0, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] },
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
-const FEATURE_LABEL = { latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
+const FEATURE_LABEL = { boxpose: 'Zavřená krabička', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
   fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
@@ -1021,6 +1021,20 @@ function step(state, f) {
       const nm = f.style === 'flip' || f.style === 'flipflush' ? 'Západka – jazýček' : 'Západka – páčka';
       /* each lever is its own body; pivot (in the closed-lid position) lets the simulation turn it, rides: it moves with the lid */
       (R.levers || []).forEach((L, i) => out.push({ id: f.id + 'p' + (i ? i + 1 : ''), name: nm + (R.levers.length > 1 ? ' ' + (i + 1) : ''), polys: L.polys, from: f.id, rides: ld.id, pivot: L.pivot }));
+      break;
+    }
+    case 'boxpose': {
+      /* the lid (and what rides on it) turned shut as the simulation found it; the lid then counts as closed */
+      /* unpose: the rigid inverse, so the simulation still knows the position the hinge and latches were made in */
+      const M = f.mats || {}, inv = m => { const t = [m[12], m[13], m[14]], r = [m[0], m[4], m[8], 0, m[1], m[5], m[9], 0, m[2], m[6], m[10], 0];
+        return r.concat([0, 1, 2].map(i => -(r[i] * t[0] + r[4 + i] * t[1] + r[8 + i] * t[2])), [1]); };
+      if (!bodies.some(b => b.id === f.lid)) throw new Error('Víko chybí');
+      out = bodies.map(b => {
+        const m = M[b.id]; if (!m) return b;
+        const x = xfBody(b, m); x.unpose = inv(m);
+        if (b.id === f.lid) delete x.fold;
+        return x;
+      });
       break;
     }
     case 'import':

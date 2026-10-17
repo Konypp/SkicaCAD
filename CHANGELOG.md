@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 1.11
+- Simulace: volba **Po zavření dialogu nechat krabičku zavřenou** (u víka odklopeného pantem pro tisk vcelku). Na časovou osu se přidá krok **Zavřená krabička**, který víko, jeho páčky a díly pantu otočí do zavřené polohy, jak ji ukázala simulace (i s usazením ve vůli kloubů). Další kroky (třeba západka) pak pracují se zavřenou krabičkou. Pro tisk krok stačí smazat nebo posunout značku na časové ose před něj; dvojklikem se znovu otevře simulace.
+
 ## Beta 1.10
 - Pant krabičky (tisk vcelku, provedení na stěně): opravena příčina mezery u pantu. Při ose nad okrajem (Rezerva při zavření) sahala část pantu, která drží ve stěně, až do výšky osy, tedy nad okraj. Zavřené víko si na ni u pantu sedlo a zůstalo pootevřené. Teď tato část končí v rovině okraje.
 - Rezerva při zavření má nově výchozí hodnotu **0,2 mm** (polovina vůle 0,4 mm). Víko při zavírání pořád dosedne nejdřív vpředu, ale ve vůli kloubů si pak sedne celé. Při 0,4 mm zůstane u pantu mezera asi 0,4 mm.

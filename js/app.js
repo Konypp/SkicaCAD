@@ -1035,7 +1035,7 @@ function featureTitle(i) {
   let n = 0; for (let j = 0; j <= i; j++) if (doc.features[j].type === f.type) n++;
   return Engine.FEATURE_LABEL[f.type] + ' ' + n;
 }
-const TL_ICON = { shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
+const TL_ICON = { shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
 function renderTimeline() {
   const tr = $('#tltrack'); tr.innerHTML = '';
   const m = viewMarker === null ? doc.marker : viewMarker;
@@ -1294,6 +1294,7 @@ function editFeature(i) {
     case 'bolt': case 'nut': startFastener(f.type, i, ef); break;
     case 'hinge': startHinge(i, ef); break;
     case 'latch': startLatch(i, ef); break;
+    case 'boxpose': startSimulate(i, ef); break;
     case 'fillet': case 'chamfer': startEdgeMod(f.type, i, ef); break;
     case 'combine': startCombine(i, ef); break;
     case 'move': startMove(i, ef); break;
@@ -2907,18 +2908,20 @@ function startLatch(editIndex, f) {
 /* ================= simulation: opening and closing a box =================
    The lid turns about its hinge axis (swing, stored by the box hinge); levers and flaps of latches (pivot) turn first
    and then ride on the lid. Without a hinge the lid lifts straight up. Clashes are checked on sampled positions. */
-function startSimulate() {
+function startSimulate(editIndex, ef) {
   const LIFT = 20;
   const c = {
+    editIndex,
     lid: null, prog: 0, anim: null, scan: null, clash: [], moved: new Set(), clashIds: new Set(), info: null,
     init() {
       const cands = cur.bodies.filter(b => b.swing || cur.bodies.some(r => r.rides === b.id) || doc.features.some(f => (f.type === 'latch' || f.type === 'hinge') && f.lid === b.id));
       const picked = [...sel].find(id => cands.some(b => b.id === id));
-      this.lid = picked || (cands[0] && cands[0].id) || null;
+      this.lid = (ef && ef.lid) || picked || (cands[0] && cands[0].id) || null;
       openDialog({ title: 'Simulace', icon: 'simulate', fields: [{ k: 'sel', id: 'lid', label: 'Víko' },
         { k: 'num', id: 'prog', label: 'Průběh', unit: '%', value: 0, range: [0, 100, 1] },
         { k: 'btns', id: 'go', label: 'Přehrát', options: [['open', 'Otevřít'], ['close', 'Zavřít'], ['loop', 'Dokola']] },
-        { k: 'note', id: 'n' }, { k: 'note', id: 'n2' }],
+        { k: 'note', id: 'n' }, { k: 'note', id: 'n2' },
+        { k: 'chk', id: 'keep', label: 'Po zavření dialogu nechat krabičku zavřenou', value: !!ef }],
         onSel: () => {},
         onBtn: (id, v) => this.play(v),
         onChange: id => { if (id === 'prog') { const x = dlg.get('prog'); if (isFinite(x)) { this.stop(); this.prog = Math.max(0, Math.min(100, x)); this.pose(); } } }
@@ -2942,7 +2945,8 @@ function startSimulate() {
         pt = new THREE.Vector3(e[12] / 2, e[13] / 2, e[14] / 2 + (lb.swing.lift || 0));
         /* the lid as printed (open, lying beside the box) and the way it swings up */
         const bb = K.bbox(lb.polys), cs = [];
-        for (const x of [bb.min[0], bb.max[0]]) for (const y of [bb.min[1], bb.max[1]]) for (const z of [bb.min[2], bb.max[2]]) cs.push(new THREE.Vector3(x, y, z).applyMatrix4(O));
+        const OB = O.clone(); if (lb.unpose) OB.multiply(new THREE.Matrix4().fromArray(lb.unpose));
+        for (const x of [bb.min[0], bb.max[0]]) for (const y of [bb.min[1], bb.max[1]]) for (const z of [bb.min[2], bb.max[2]]) cs.push(new THREE.Vector3(x, y, z).applyMatrix4(OB));
         const ctr = cs.reduce((acc, v) => acc.add(v), new THREE.Vector3()).multiplyScalar(1 / 8);
         const up = a => ctr.clone().sub(pt).applyAxisAngle(axis, a).z;
         sg = up(Math.PI / 2) >= up(-Math.PI / 2) ? 1 : -1;
@@ -2968,6 +2972,7 @@ function startSimulate() {
       this.info = { lb, riders, levers, O, U, axis, pt, sg, Phi, other, spring, tA: levers.length ? 30 : 0 };
       for (const b of [lb, ...riders]) this.moved.add(b.id);
       this.note(false);
+      dlg.show('keep', !!(lb.swing && lb.swing.open && !lb.unpose));
       this.pose(); this.startScan();
     },
     note(done) {
@@ -2984,13 +2989,14 @@ function startSimulate() {
         const a = S.sg * S.Phi * (1 - fb) * Math.PI / 180;
         L = new THREE.Matrix4().makeTranslation(S.pt.x, S.pt.y, S.pt.z - (this.settle || 0) * (1 - fb)).multiply(new THREE.Matrix4().makeRotationAxis(S.axis, a)).multiply(new THREE.Matrix4().makeTranslation(-S.pt.x, -S.pt.y, -S.pt.z));
       } else L = new THREE.Matrix4().makeTranslation(0, 0, fb * LIFT);
-      const out = new Map(); out.set(S.lb.id, L.clone().multiply(S.O));
+      const out = new Map(), base = b => (b.unpose ? new THREE.Matrix4().fromArray(b.unpose) : new THREE.Matrix4());
+      out.set(S.lb.id, L.clone().multiply(S.O).multiply(base(S.lb)));
       for (const r of S.riders) {
         if (r.pivot) {
           const p = r.pivot, d = new THREE.Vector3(...p.d).normalize();
           const P = new THREE.Matrix4().makeTranslation(p.p[0], p.p[1], p.p[2]).multiply(new THREE.Matrix4().makeRotationAxis(d, fa * p.a * Math.PI / 180)).multiply(new THREE.Matrix4().makeTranslation(-p.p[0], -p.p[1], -p.p[2]));
-          out.set(r.id, L.clone().multiply(Uc).multiply(P));
-        } else out.set(r.id, r.openPose ? L.clone().multiply(S.O) : L.clone().multiply(Uc));
+          out.set(r.id, L.clone().multiply(Uc).multiply(P).multiply(base(r)));
+        } else out.set(r.id, (r.openPose ? L.clone().multiply(S.O) : L.clone().multiply(Uc)).multiply(base(r)));
       }
       return { out, angle: S.axis ? fb * S.Phi : fb * LIFT, fa, fb };
     },
@@ -3072,7 +3078,15 @@ function startSimulate() {
     },
     onMove(ev) { const h = hitBodies(ev); dom.style.cursor = h ? 'pointer' : ''; },
     onClick(ev) { const h = hitBodies(ev); if (!h) return; const id = h.object.userData.bodyId, b = bodyById(id); this.lid = b && b.rides ? b.rides : id; this.prog = 0; this.setup(); },
-    ok() { endCmd(false); return null; },
+    /* keep closed: a feature that turns the lid (and its levers and parts) shut, as the simulation shows it */
+    ok() {
+      const S = this.info;
+      if (!S || !dlg.get('keep') || !S.lb.swing || !S.lb.swing.open || S.lb.unpose) { endCmd(false); return null; }
+      if (this.solve && !this.noted) { const r = this.solve(this.settle || 0); S.Phi = r.Phi; }
+      const { out } = this.mats(0), mats = {};
+      for (const [id, M] of out) mats[id] = Array.from(M.elements).map(x => Math.round(x * 1e9) / 1e9);
+      return { id: ef ? ef.id : newId(), type: 'boxpose', lid: S.lb.id, mats };
+    },
     cleanup() { this.stop(); this.scanTok = null; this.reset(); requestRender(); }
   };
   beginCmd(c); c.init();
