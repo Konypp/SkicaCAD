@@ -893,7 +893,10 @@ function flipLatchLocal(f) {
     if (inPlace) for (const sgn of [1, -1]) lidAdd = KK.boolean(lidAdd, coneX([sgn * (x0 + 0.3), uA, zA], [-sgn, 0, 0], rb + 0.3, rt, rb + 0.3 - rt), 'union');
   } else {
     /* the pocket ends act as lugs: a slot (narrower than the filament) lets the axle click in from outside */
-    const pkB = prismX([[-0.01, zbot - c], [uo + 0.5, zbot - c], [uo + 0.5, 0.01], [-0.01, 0.01]], -(W / 2 - lw), W / 2 - lw);
+    /* below the flap a finger recess (its floor falls 45° outwards, so it prints) to get behind the flap and lift it */
+    const F = uo + 0.5;
+    const pkB = KK.boolean(prismX([[-0.01, zbot - c], [uo + 0.5, zbot - c], [uo + 0.5, 0.01], [-0.01, 0.01]], -(W / 2 - lw), W / 2 - lw),
+      prismX([[-0.01, zbot - c + 0.01], [uo + 0.5, zbot - c - F], [uo + 0.5, zbot - c + 0.01]], -(W / 2 - lw), W / 2 - lw), 'union');
     const pkL = prismX([[-0.01, -0.5], [uo + 0.5, -0.5], [uo + 0.5, zTop], [-0.01, zTop]], -(W / 2 - lw), W / 2 - lw);
     const slotC = prismX([[uA, zA - 0.75], [uo + 0.5, zA - 0.75], [uo + 0.5, zA + 0.75], [uA, zA + 0.75]], -hx, hx);
     boxCut = pkB; lidCut = KK.boolean(KK.boolean(pkL, hole, 'union'), slotC, 'union');
@@ -903,9 +906,10 @@ function flipLatchLocal(f) {
     const fl = d - 1, wi = -wall + 0.3, dep = wi - fl;
     if (dep > 0) {
       boxAdd = KK.boolean(boxAdd, KK.boolean(prismX([[wi, 0], [fl, 0], [fl, zbot - c - 1], [wi, zbot - c - 1 - dep]], -W / 2 - 1, W / 2 + 1), boxCut, 'subtract'), 'union');
+      /* the recess goes deeper than the pocket floor only at its top, so the bulge above already backs it */
       lidAdd = prismX([[wi, 0], [fl, 0], [fl, zTop + 1], [wi, zTop + 1 + dep]], -W / 2 - 1, W / 2 + 1);
     }
-    return { lever: mv(flap), pivot: { p: [0, uA + d, zA], d: [1, 0, 0], a: 100 }, boxAdd, lidAdd, boxCut, lidCut, W: W + 2, depth: -zbot + c + 2 + Math.max(0, dep), ov: zTop + 1 + Math.max(0, dep) };
+    return { lever: mv(flap), pivot: { p: [0, uA + d, zA], d: [1, 0, 0], a: 100 }, boxAdd, lidAdd, boxCut, lidCut, W: W + 2, depth: -zbot + c + 2 + Math.max(0, dep) + 1, ov: zTop + 1 + Math.max(0, dep) };
   }
   if (inPlace) {
     /* stored as printed: turned 180° about the axle (rest), lying along the lid wall */
