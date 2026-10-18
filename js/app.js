@@ -1032,6 +1032,7 @@ function bodyClick(id, multi) {
 function featureTitle(i) {
   const f = doc.features[i];
   if (f.type === 'sketch') return f.name || 'Skica';
+  if (f.type === 'boxpose') return f.state === 'open' ? 'Otevřená krabička' : 'Zavřená krabička';
   let n = 0; for (let j = 0; j <= i; j++) if (doc.features[j].type === f.type) n++;
   return Engine.FEATURE_LABEL[f.type] + ' ' + n;
 }
@@ -2927,7 +2928,8 @@ function startSimulate(editIndex, ef) {
         { k: 'num', id: 'prog', label: 'Průběh', unit: '%', value: 0, range: [0, 100, 1] },
         { k: 'btns', id: 'go', label: 'Přehrát', options: [['open', 'Otevřít'], ['close', 'Zavřít'], ['loop', 'Dokola']] },
         { k: 'note', id: 'n' }, { k: 'note', id: 'n2' },
-        { k: 'chk', id: 'keep', label: 'Po zavření dialogu nechat krabičku zavřenou', value: !!ef }],
+        { k: 'chk', id: 'keep', label: 'Po zavření dialogu nechat krabičku zavřenou', value: !!ef && ef.state !== 'open' },
+        { k: 'chk', id: 'keepO', label: 'Po zavření dialogu nechat krabičku otevřenou', value: !!ef && ef.state === 'open' }],
         onSel: () => {},
         onBtn: (id, v) => this.play(v),
         onChange: id => { if (id === 'prog') { const x = dlg.get('prog'); if (isFinite(x)) { this.stop(); this.prog = Math.max(0, Math.min(100, x)); this.pose(); } } }
@@ -2978,7 +2980,10 @@ function startSimulate(editIndex, ef) {
       this.info = { lb, riders, levers, O, U, axis, pt, sg, Phi, other, spring, tA: levers.length ? 30 : 0 };
       for (const b of [lb, ...riders]) this.moved.add(b.id);
       this.note(false);
-      dlg.show('keep', !!(lb.swing && lb.swing.open && !lb.unpose));
+      /* the lid stands open (as printed, or opened by an earlier step) or closed: offer the other state */
+      const isOpen = lb.posed ? lb.posed === 'open' : !!(lb.swing && lb.swing.open);
+      this.isOpen = isOpen;
+      dlg.show('keep', !!lb.swing && isOpen); dlg.show('keepO', !!lb.swing && !isOpen);
       this.pose(); this.startScan();
     },
     note(done) {
@@ -3087,11 +3092,12 @@ function startSimulate(editIndex, ef) {
     /* keep closed: a feature that turns the lid (and its levers and parts) shut, as the simulation shows it */
     ok() {
       const S = this.info;
-      if (!S || !dlg.get('keep') || !S.lb.swing || !S.lb.swing.open || S.lb.unpose) { endCmd(false); return null; }
+      const want = !S || !S.lb.swing ? null : this.isOpen ? (dlg.get('keep') ? 'closed' : null) : (dlg.get('keepO') ? 'open' : null);
+      if (!want) { endCmd(false); return null; }
       if (this.solve && !this.noted) { const r = this.solve(this.settle || 0); S.Phi = r.Phi; }
-      const { out } = this.mats(0), mats = {};
+      const { out } = this.mats(want === 'closed' ? 0 : 100), mats = {};
       for (const [id, M] of out) mats[id] = Array.from(M.elements).map(x => Math.round(x * 1e9) / 1e9);
-      return { id: ef ? ef.id : newId(), type: 'boxpose', lid: S.lb.id, mats };
+      return { id: ef ? ef.id : newId(), type: 'boxpose', state: want, lid: S.lb.id, mats };
     },
     cleanup() { this.stop(); this.scanTok = null; this.reset(); requestRender(); }
   };

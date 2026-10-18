@@ -7,7 +7,7 @@ const PLANES = {
   XZ: { o: [0, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] },
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
-const FEATURE_LABEL = { boxpose: 'Zavřená krabička', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
+const FEATURE_LABEL = { boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
   fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
@@ -1042,15 +1042,21 @@ function step(state, f) {
       break;
     }
     case 'boxpose': {
-      /* the lid (and what rides on it) turned shut as the simulation found it; the lid then counts as closed */
-      /* unpose: the rigid inverse, so the simulation still knows the position the hinge and latches were made in */
+      /* the lid (and what rides on it) turned shut (state 'closed') or open ('open') as the simulation shows it.
+         unpose: back to the position the hinge and latches were made in (kept through several of these steps);
+         posed: whether the lid now stands open; fold: turns it shut for a later latch */
       const M = f.mats || {}, inv = m => { const t = [m[12], m[13], m[14]], r = [m[0], m[4], m[8], 0, m[1], m[5], m[9], 0, m[2], m[6], m[10], 0];
         return r.concat([0, 1, 2].map(i => -(r[i] * t[0] + r[4 + i] * t[1] + r[8 + i] * t[2])), [1]); };
+      const mul = (a, b) => { const o = new Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) o[c * 4 + r] = a[r] * b[c * 4] + a[4 + r] * b[c * 4 + 1] + a[8 + r] * b[c * 4 + 2] + a[12 + r] * b[c * 4 + 3]; return o; };
       if (!bodies.some(b => b.id === f.lid)) throw new Error('Víko chybí');
+      const open = f.state === 'open';
       out = bodies.map(b => {
         const m = M[b.id]; if (!m) return b;
-        const x = xfBody(b, m); x.unpose = inv(m);
-        if (b.id === f.lid) delete x.fold;
+        const x = xfBody(b, m); x.unpose = b.unpose ? mul(b.unpose, inv(m)) : inv(m);
+        if (b.id === f.lid) {
+          x.posed = open ? 'open' : 'closed';
+          if (open && x.swing) x.fold = x.swing.open ? mul(x.swing.M, x.unpose) : x.unpose; else delete x.fold;
+        }
         return x;
       });
       break;

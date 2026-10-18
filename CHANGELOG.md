@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 1.14
+- Simulace: vedle volby nechat krabičku zavřenou je i **Po zavření dialogu nechat krabičku otevřenou**. Nabízí se vždy ta poloha, ve které víko právě není: zavřené víko (pant na kolík nebo šroub, nebo po kroku Zavřená krabička) jde nechat otevřené, otevřené víko zavřené. Na časovou osu se přidá krok **Otevřená krabička** nebo **Zavřená krabička**; kroky jdou za sebou kombinovat a západka přidaná po nich se spočítá na zavřené krabičce.
+
 ## Beta 1.13
 - Simulace: jazýček sklopné západky tištěné vcelku se při otevírání přiklopí až do polohy, ve které se tiskne (180°, nahoru ke stěně víka). Otevřená krabička na konci simulace tak vypadá přesně jako při tisku; dřív zůstal jazýček odklopený jen o 150° a trčel šikmo pod podložku.
 
