@@ -879,6 +879,10 @@ function flipLatchLocal(f) {
   }
   let flap = KK.extrudeProfiles([{ pts: [[ui, zbot], [uo, zbot], [uo, zA], [ui, zA]], closed: true }, { t: 'circle', x: uA, y: zA, r: rk }], YZB, -xf, xf);
   flap = KK.boolean(flap, prismX([[ui + 0.02, zr - s * ui - c], [c, zh], [c, zh - 1.6], [ui + 0.02, zh - 1.6 - (ui - c)]], -xf, xf), 'union');
+  /* the end of the flap is thinned on its inner side (45°), so a fingertip gets behind it and flips it out easily;
+     not when it is printed in place, where the end is the foot it stands on */
+  if (!inPlace) { const tip = 1.2, e = Math.min(uo - ui - tip, zh - 1.6 - (ui - c) - zbot - 0.2);
+    if (e > 0.3) flap = KK.boolean(flap, prismX([[ui - 0.01, zbot - 0.01], [ui + e, zbot - 0.01], [ui - 0.01, zbot + e + 0.01]], -xf - 0.1, xf + 0.1), 'subtract'); }
   /* axle: printed cone pins (45°) on the lugs in cone sockets of the knuckle, or a through hole for a screw or filament */
   const x0 = W / 2 - lw, rb = rk - 1.4, rt = 0.4, C2 = c * Math.SQRT2;
   if (inPlace) for (const sgn of [1, -1]) flap = KK.boolean(flap, coneX([sgn * (x0 + 0.5), uA, zA], [-sgn, 0, 0], rb + C2 + 0.5, rt, rb + C2 + 0.5 - rt), 'subtract');

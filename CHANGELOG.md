@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 1.16
+- Sklopná západka (na stěně i zapuštěná): konec jazýčku je z vnitřní strany ztenčený pod 45° (na špičce 1,2 mm), takže se za něj dostane konec prstu nebo nehet a jazýček jde lehce odklopit. U jazýčku tištěného vcelku konec zůstává plný, protože na něm jazýček při tisku stojí.
+
 ## Beta 1.15
 - Sklopná zapuštěná západka: pod jazýčkem je **výhrabek pro prst** (prohloubení, jehož dno se svažuje pod 45° ven, takže se tiskne bez podpěr). Prst se dostane za spodní okraj jazýčku a jazýček jde vyklopit.
 
