@@ -600,7 +600,7 @@ function hingeParts(f0) {
     }
   }
   if (screw) {
-    let hole = cylAlong([-1, 0, zc], [1, 0, 0], pr + c, L + 2);
+    let hole = cylAlong([-1, 0, zc], [1, 0, 0], (H.pd + c + SCREW_FREE) / 2, L + 2); /* screw free: d + clearance − 0.1 (hole test) */
     if (rec) hole = KK.boolean(hole, screwRecessTool(rec, L, zc), 'union');
     A = KK.boolean(A, hole, 'subtract'); B = KK.boolean(B, hole, 'subtract');
   } else {
@@ -847,7 +847,8 @@ function prismU(profiles, u0, u1) { return KK.extrudeProfiles(profiles, { o: [0,
 function rotLatchLocal(f) {
   const c = Math.max(0.1, Math.min(1, Number(f.tol) || 0.4)), flush = f.style === 'rotflush', wall = Math.max(0.8, Number(f.wall) || 2);
   const Lv = Math.max(10, Number(f.lever) || 16), wv = Math.max(5, Math.min(Lv / 2, Number(f.width) || 7)), tv = flush ? 1.6 : 2;
-  const screw = f.axle !== 'fil', hole = screw ? 1.7 : 1.0, pilot = screw ? 1.25 : 0.9; /* M3 self-tapping / 1.75 mm filament (press fit) */
+  /* lever: free on the axle; wall: M3 self-tapping / 1.75 mm filament pressed in (sizes from the hole test print) */
+  const screw = f.axle !== 'fil', hole = screw ? (3 + c + SCREW_FREE) / 2 : (FIL_FREE + c) / 2, pilot = screw ? M3_TAP / 2 : FIL_PRESS / 2;
   const rs = 1.6, ec = rs + c + 1.6, L = Lv - wv, pz = L - ec, reach = L + wv / 2;
   if (flush && wall < tv + 0.3 + 0.8) throw new Error('Pro zapuštěnou otočnou západku musí mít stěna alespoň ' + (Math.ceil((tv + 1.1) * 10) / 10).toString().replace('.', ',') + ' mm (jinak zvolte otočnou na stěně)');
   if (pz < wv / 2 + 0.5) throw new Error('Páčka je příliš krátká');
@@ -891,14 +892,14 @@ function rotLatchLocal(f) {
    The flap is a separate body, printed lying on its outer face. Local frame as latchParts. */
 /* holes with a horizontal axis print slightly oval; from the user's test print (clearance 0.3): filament pressed in 2.0 mm,
    filament free 2.1 mm (1.8 + clearance), screw free d + clearance − 0.1 (M3: 3.2 mm) */
-const FIL_PRESS = 2.0, FIL_FREE = 1.8, SCREW_FREE = -0.1;
+const FIL_PRESS = 2.0, FIL_FREE = 1.8, SCREW_FREE = -0.1, M3_TAP = 2.8; /* M3 self-tapping: 2.5 too tight, 2.6 tight (lug could crack), 3.2 free */
 function flipLatchLocal(f) {
   const c = Math.max(0.1, Math.min(1, Number(f.tol) || 0.4)), flush = f.style === 'flipflush', wall = Math.max(0.8, Number(f.wall) || 2);
   const W = Math.max(10, Number(f.width) || 14), inPlace = !flush && f.axle === 'print', screw = !flush && !inPlace && f.axle !== 'fil';
   /* filament holes (horizontal axis): pressed in 2.0 mm, turning freely 1.8 mm + clearance */
   const pressR = FIL_PRESS / 2, freeR = (FIL_FREE + c) / 2;
   const knH = flush ? pressR : screw ? (3 + c + SCREW_FREE) / 2 : freeR;        /* hole in the flap: filament pressed or glued in / free on the screw or filament */
-  const lugH = flush ? freeR : screw ? 1.25 : pressR;      /* hole in the lugs: free (snap slot) / M3 pilot / filament press fit */
+  const lugH = flush ? freeR : screw ? M3_TAP / 2 : pressR;      /* hole in the lugs: free (snap slot) / M3 pilot / filament press fit */
   const rk = inPlace ? 3 : Math.max(knH, lugH) + 1.2, lw = screw || inPlace ? 3 : 2.5, h = 1.5, s = Math.tan(30 * Math.PI / 180);
   const ui = h + c, uA = c + rk, uo = uA + rk, zA = rk + 0.4;
   /* ridge low enough that the arc of the hook is flatter than the undercut (self-locking) */

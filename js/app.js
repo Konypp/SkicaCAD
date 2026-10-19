@@ -2796,7 +2796,7 @@ function startHinge(editIndex, f) {
           this.tool = Rz.box.concat(Rz.lid, Rz.partA || [], Rz.partB || []); this.hideBodies = new Set([this.box, this.lid]); styleBodies();
           G.preview.add(previewMesh(this.tool, 'new'));
           dlg.set('n', `Kloub Ø ${fmtc(2 * H.R, 1)} mm, ${H.N} × ${fmtc(H.k, 1)} mm, vůle ${fmtc(H.c, 2)} mm`);
-          dlg.set('n2', Rz.pinMode ? `Do kloubů patří ${this.v.pinKind === 'fil' ? 'kus filamentu 1,75 mm' : 'šroub ' + this.v.pinKind.toUpperCase()} dlouhý ${this.v.pinKind !== 'fil' && this.v.recess && H.k ? screwLen(H.L, this.v.pinKind === 'm2' ? 2 : 3) : Math.floor(H.L)} mm${this.v.pinKind === 'fil' ? (this.v.pinTight ? (H.N % 2 ? '; natlačte ho, v krajních kloubech drží napevno' : '; natlačte ho, v prvním kloubu drží napevno') : '; konce zatavte nebo zaklepněte') : (this.v.recess ? ' s válcovou nebo půlkulatou hlavou a maticí, obě se zapustí do krajních kloubů' : ' s maticí')}.` : `Víko je odklopené o 180° vedle krabičky, mezera ${fmtc(Rz.T.G, 1)} mm.`);
+          dlg.set('n2', Rz.pinMode ? `Do kloubů patří ${this.v.pinKind === 'fil' ? 'kus filamentu 1,75 mm' : 'klasický (strojní) šroub ' + this.v.pinKind.toUpperCase()} dlouhý ${this.v.pinKind !== 'fil' && this.v.recess && H.k ? screwLen(H.L, this.v.pinKind === 'm2' ? 2 : 3) : Math.floor(H.L)} mm${this.v.pinKind === 'fil' ? (this.v.pinTight ? (H.N % 2 ? '; natlačte ho, v krajních kloubech drží napevno' : '; natlačte ho, v prvním kloubu drží napevno') : '; konce zatavte nebo zaklepněte') : (this.v.recess ? ' s válcovou nebo půlkulatou hlavou a maticí, obě se zapustí do krajních kloubů' : ' s maticí')}.` : `Víko je odklopené o 180° vedle krabičky, mezera ${fmtc(Rz.T.G, 1)} mm.`);
           dlg.set('n3', Rz.pinMode ? 'Krabička a víko se tisknou zvlášť (víko otočte otevřenou stranou nahoru). Pant je navržený pro zavřenou polohu, víko proto vždy dosedne.' : 'Tiskne se vcelku bez podpěr. Pant je navržený pro zavřenou polohu, víko proto po překlopení přesně dosedne.');
         } else if (bx) {
           if (this.box === this.lid) throw new Error('Krabička a víko musí být dvě různá tělesa');
@@ -2812,7 +2812,7 @@ function startHinge(editIndex, f) {
           this.tool = Engine.toolForHinge(F);
           G.preview.add(previewMesh(this.tool, this.op));
           dlg.set('n', `Kloub Ø ${fmtc(2 * H.R, 1)} mm, ${H.N} × ${fmtc(H.k, 1)} mm, mezera ${fmtc(H.c, 2)} mm`);
-          dlg.set('n2', H.screw ? `Do osy šroub M${fmtc(H.pd, 1)} × ${this.v.recess && Engine.FASTENERS[H.pd] ? screwLen(H.L, H.pd) + ' mm s válcovou nebo půlkulatou hlavou a maticí, obě se zapustí do krajních kloubů' : Math.ceil(H.L + 2) + ' mm s maticí'}.` : 'Tiskne se vcelku bez podpěr; po tisku pant několikrát protočte, aby se uvolnil.');
+          dlg.set('n2', H.screw ? `Do osy klasický (strojní) šroub M${fmtc(H.pd, 1)} × ${this.v.recess && Engine.FASTENERS[H.pd] ? screwLen(H.L, H.pd) + ' mm s válcovou nebo půlkulatou hlavou a maticí, obě se zapustí do krajních kloubů' : Math.ceil(H.L + 2) + ' mm s maticí'}.` : 'Tiskne se vcelku bez podpěr; po tisku pant několikrát protočte, aby se uvolnil.');
           dlg.set('n3', this.op === 'new' ? '' : this.v.part === 'both' ? 'Pro připojení ke dvěma tělesům vytvořte zvlášť křídlo A a křídlo B ve stejné poloze.' : `Osu dejte alespoň ${fmtc(H.R + H.c + 0.1, 1)} mm za hranu tělesa, jinak se ho dotknou i klouby druhého křídla.`);
         }
         dlg.okEnabled(true);
@@ -2870,8 +2870,8 @@ function startLatch(editIndex, f) {
           { k: 'opt', id: 'side', label: 'Strana', options: [['-y', 'Přední (−Y)'], ['+y', 'Zadní (+Y)'], ['+x', 'Pravá (+X)'], ['-x', 'Levá (−X)']], value: this.v.side },
           { k: 'num', id: 'width', label: 'Šířka západky', value: this.v.width },
           { k: 'num', id: 'lever', label: 'Délka páčky', value: this.v.lever },
-          { k: 'seg', id: 'axle', label: 'Osa', options: [['screw', 'Šroub M3'], ['fil', 'Filament 1,75']], value: this.v.axle === 'print' ? 'screw' : this.v.axle },
-          { k: 'seg', id: 'axleF', label: 'Osa', options: [['screw', 'Šroub M3'], ['fil', 'Filament 1,75'], ['print', 'Tisk vcelku']], value: this.v.axle },
+          { k: 'seg', id: 'axle', label: 'Osa', options: [['screw', 'Samořezný M3'], ['fil', 'Filament 1,75']], value: this.v.axle === 'print' ? 'screw' : this.v.axle },
+          { k: 'seg', id: 'axleF', label: 'Osa', options: [['screw', 'Samořezný M3'], ['fil', 'Filament 1,75'], ['print', 'Tisk vcelku']], value: this.v.axle },
           { k: 'opt', id: 'count', label: 'Počet', options: [['1', '1'], ['2', '2'], ['3', '3']], value: String(this.v.count) },
           { k: 'num', id: 'shift', label: 'Posun podél hrany', value: this.v.shift, range: [-50, 50, 0.5] },
           { k: 'num', id: 'wall', label: 'Tloušťka stěny krabičky', value: this.v.wall },
@@ -2926,9 +2926,9 @@ function startLatch(editIndex, f) {
           : 'Páčka se otáčí na ose ve stěně víka a visí dolů přes krabičku; výřezem na konci zachytí kolík na krabičce. Odklopením páčky stranou (o 90°) se víko uvolní.' + (st === 'rotflush' ? ' Páčka leží v kapse zarovnaná se stěnou.' : ''));
         const W = this.v.width;
         dlg.set('n2', (st === 'flip' && this.v.axle === 'print' ? 'Jazýček se tiskne vcelku s víkem: je přiklopený nahoru ke stěně víka a stojí na podložce, osu tvoří tištěné kuželové čepy v očkách. Po tisku ho sklopte dolů. '
-          : st === 'flip' ? `Jazýček je samostatné těleso, tiskněte ho naležato na vnější ploše; osa: ${this.v.axle === 'fil' ? `kus filamentu 1,75 mm dlouhý ${W} mm (natlačit do oček)` : `šroub M3 × ${Math.max(6, W - 2)} mm (samořezný do vzdálenějšího očka)`}. `
+          : st === 'flip' ? `Jazýček je samostatné těleso, tiskněte ho naležato na vnější ploše; osa: ${this.v.axle === 'fil' ? `kus filamentu 1,75 mm dlouhý ${W} mm (natlačit do oček)` : `samořezný šroub M3 × ${Math.round(W)} mm (vyřízne si závit v obou očkách, matice není potřeba)`}. `
           : st === 'flipflush' ? `Jazýček je samostatné těleso, tiskněte ho naležato na vnější ploše; do jeho očka vlepte kus filamentu 1,75 mm dlouhý ${W} mm a jazýček zacvakněte zvenku do zářezů na koncích kapsy. ` : '')
-          + (st === 'rot' || st === 'rotflush' ? `Páčka je samostatné těleso, tiskněte ji naležato; osa: ${this.v.axle === 'fil' ? 'kus filamentu 1,75 mm (natlačit do díry ve víku)' : 'samořezný šroub M3 do díry ve víku'}. ` : st.startsWith('flip') ? '' : 'Všechny převisy jsou 45°, tiskne se bez podpěr. ') + (Rz.fold ? 'Víko je připojené pantem; západka se spočítala na zavřené krabičce a víko zůstalo odklopené.' : ''));
+          + (st === 'rot' || st === 'rotflush' ? `Páčka je samostatné těleso, tiskněte ji naležato; osa: ${this.v.axle === 'fil' ? 'kus filamentu 1,75 mm (natlačit do díry ve víku)' : 'samořezný šroub M3 do díry ve víku (vyřízne si závit, matice není potřeba)'}. ` : st.startsWith('flip') ? '' : 'Všechny převisy jsou 45°, tiskne se bez podpěr. ') + (Rz.fold ? 'Víko je připojené pantem; západka se spočítala na zavřené krabičce a víko zůstalo odklopené.' : ''));
         dlg.okEnabled(true);
       } catch (e) { dlg.set('n', '!' + e.message); dlg.set('n2', ''); dlg.okEnabled(false); }
       requestRender();
@@ -5695,6 +5695,13 @@ vp.addEventListener('dragover', e => { if (e.dataTransfer && Array.from(e.dataTr
 vp.addEventListener('drop', e => { e.preventDefault(); const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (file) importFile(file); });
 
 /* ================= delete ================= */
+/* centre the selected bodies (together) on the origin in X and Y; their height stays */
+function centerSelected() {
+  if (!sel.size) { toast('Vyberte těleso, které chcete vycentrovat.'); return; }
+  const f = { id: newId(), type: 'center', target: 'origin', all: false, bodies: Array.from(sel), x: true, y: true, z: 'keep', each: false };
+  doc.features.splice(doc.marker, 0, f); doc.marker++;
+  commit(); toast('Vycentrováno na střed (X a Y)');
+}
 function deleteSelected() {
   if (!sel.size) { toast('Vyberte těleso, které chcete odstranit.'); return; }
   const f = { id: newId(), type: 'del', bodies: Array.from(sel) };
@@ -5839,6 +5846,7 @@ function bodyContext(e, id) {
   showCtx(e.clientX, e.clientY + 4, [
     ['Vybrat vše (Ctrl+A)', () => selectAll()],
     ['Přesunout…', () => startMove()],
+    ['Vycentrovat na střed', () => centerSelected()],
     ['Kopírovat (Ctrl+C)', () => copySel()],
     ['Duplikovat (Ctrl+D)', () => duplicateSel()],
     ['Vložit kopii (Ctrl+V)', () => pasteClip(), !clip || clip.kind !== 'bodies'],

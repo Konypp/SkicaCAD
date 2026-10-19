@@ -1,5 +1,18 @@
 # Changelog
 
+## Beta 1.29
+- Dialogy rozlišují druh šroubu: u **pantů** (pant krabičky na kolík i samostatný pant) je to **klasický (strojní) šroub s maticí**, u **sklopné a otočné západky** **samořezný šroub M3**, který si vyřízne závit v očkách (matice není potřeba); volba osy západky se jmenuje Samořezný M3.
+- Sklopná západka: doporučená délka samořezného šroubu je rovna šířce západky (při 16 mm M3 × 16), takže závit drží v obou očkách (dřív o 2 mm kratší).
+
+## Beta 1.28
+- Otvor pro **samořezný šroub M3** v očkách sklopné západky (a ve stěně starší otočné západky): **2,8 mm** (dřív 2,5 mm). Podle testu byl 2,5 mm příliš těsný, 2,6 mm šel, ale očko by mohlo prasknout, a 3,2 mm už je volný.
+
+## Beta 1.27
+- Otvory podle testu průchodnosti doplněny i tam, kde zůstaly původní: **samostatný pant na šroub** (osa měla průměr šroubu + 2 × vůle, při M3 3,6 mm; nově průměr + vůle − 0,1 mm, tedy 3,2 mm) a starší **otočná západka** (páčka: filament 2,10 mm, šroub M3 3,20 mm; natlačený filament ve stěně 2,00 mm).
+
+## Beta 1.26
+- Nabídka po pravém kliknutí na těleso: **Vycentrovat na střed**. Vybraná tělesa (víc najednou jako celek) se posunou tak, aby jejich střed v osách X a Y ležel v počátku; výška se nemění. Na časovou osu se přidá krok Zarovnat, který jde upravit nebo smazat.
+
 ## Beta 1.25
 - Pant na šroub (pant krabičky s kolíkem Šroub M2 / M3 i samostatný pant na šroub): nová volba **Zapustit hlavu šroubu a matici**, u nového pantu zapnutá. Na začátku osy je válcové zahloubení pro válcovou nebo půlkulatou hlavu (průměr hlavy + vůle, hloubka d + 0,3 mm), na konci šestihranná kapsa pro matici (otvor + vůle, hloubka matice + 0,3 mm, rohem nahoru, takže strop se tiskne pod 60°). Klouby se zvětší tak, aby kolem zahloubení zůstal 1 mm materiálu; dialog napíše délku šroubu.
 
