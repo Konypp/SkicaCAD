@@ -1,5 +1,33 @@
 # Changelog
 
+## Beta 1.25
+- Pant na šroub (pant krabičky s kolíkem Šroub M2 / M3 i samostatný pant na šroub): nová volba **Zapustit hlavu šroubu a matici**, u nového pantu zapnutá. Na začátku osy je válcové zahloubení pro válcovou nebo půlkulatou hlavu (průměr hlavy + vůle, hloubka d + 0,3 mm), na konci šestihranná kapsa pro matici (otvor + vůle, hloubka matice + 0,3 mm, rohem nahoru, takže strop se tiskne pod 60°). Klouby se zvětší tak, aby kolem zahloubení zůstal 1 mm materiálu; dialog napíše délku šroubu.
+
+## Beta 1.24
+- Otvory pro osu podle zkušebního tisku průchodnosti (vodorovné otvory se tisknou mírně do oválu), při vůli 0,3 mm:
+  - filament, volně otočný: **2,10 mm** (1,8 mm + vůle; dřív 2,25 mm),
+  - filament natlačený: 2,00 mm (beze změny, ověřeno),
+  - šroub, volně otočný: **průměr + vůle − 0,1 mm** (M3: 3,20 mm, dřív 3,30 mm v pantu a 3,40 mm v jazýčku sklopné západky).
+- Volba **Filament natlačit do krajních kloubů** je u nového pantu ve výchozím stavu vypnutá (zúžení funguje, ale není výchozí).
+
+## Beta 1.23
+- Pant tištěný vcelku: výchozí **Rezerva při zavření je 0 mm** (dřív 0,2 mm). Na zkušebních tiscích s vůlí 0,3 mm zůstávalo víko u pantu lehce pootevřené, protože se vytištěné klouby ve vůli neusadily tolik, kolik počítala simulace. Osa teď leží přesně v rovině okraje a víko po překlopení o 180° dosedne celé. Rezervu jde dál nastavit ručně.
+
+## Beta 1.22
+- Sklopná západka (na stěně i zapuštěná), opraveno podle zkušebního tisku: **lišta na krabičce se tiskla do vzduchu.** Její spodní strana je podříznutá a krabička se tiskne nastojato, takže lišta začínala na vnější hraně bez opory. Na obou koncích lišty jsou teď opěry se spodní stranou pod 45° a podříznutá část se mezi nimi tiskne jako most. Háček jazýčku je proto o 1,5 mm na každé straně užší.
+- **Otvory pro osu z filamentu** (vodorovné otvory se tisknou trochu menší): natlačený filament 2,0 mm (dřív 1,8 mm, neprošel), volně otočný 1,95 mm + vůle (při 0,3 mm tedy 2,25 mm, dřív 2,0 mm, byl moc těsný). Platí pro očka a jazýček sklopné západky i pro pant na kolík z filamentu (volné klouby 1,95 mm + vůle, natlačené krajní klouby 2,0 mm).
+
+## Beta 1.21
+- **Ovládání myší vráceno na původní:** levé tlačítko otáčí, prostřední i pravé posouvá, kolečko přibližuje; klepnutí pravým bez tažení otevře místní nabídku. Výběrový rámeček se kreslí tažením levým tlačítkem se stisknutým **Shift** (zleva doprava tělesa celá uvnitř, zprava doleva všechna, kterých se rámeček dotkne) a přidává k výběru.
+
+## Beta 1.20
+- Pant krabičky na kolík z filamentu: nová volba **Filament natlačit do krajních kloubů (nevypadne)**, u nového pantu zapnutá. Krajní klouby mají otvor 1,8 mm, do kterého se filament 1,75 mm natlačí a drží; ostatní klouby mají volný otvor (1,75 mm + vůle), takže se pant točí. Při sudém počtu kloubů patří krajní klouby různým dílům, proto je těsný jen první. Konce už není potřeba zatavovat. Starší návrhy si volný otvor nechají.
+
+## Beta 1.19
+- **Výchozí vůle podle zkušebních tisků:** pant i západka mají nově výchozí vůli **0,3 mm** (dřív 0,4 mm).
+- Západka: nová volba **Víko bez vůle (háček víko přitáhne)**, u nové západky zapnutá. Háček (u pružné zasunuté západky výstupek) se posune tak, že jeho horní plocha leží na spodní ploše lišty (drážky) na krabičce, jen 0,05 mm od ní. Zavřené víko tak nejde nadzvednout, boční vůle zůstává podle nastavení. Starší návrhy si původní vůli nechají.
+- Sklopná zapuštěná západka: v simulaci se jazýček odklopí jen do vodorovné polohy (90°). Při 100° by jeho konec narazil do stěny víka nad kapsou; s vůlí 0,3 mm to simulace hlásila jako kolizi.
+
 ## Beta 1.18
 - **Kompaktnější lišta funkcí.** Méně používané nástroje jsou sbaleny do rozbalovacích nabídek (tlačítko se šipkou ukazuje naposledy použitý nástroj): Základní tělesa (krychle, válec, koule, kužel, torus), Součásti (šroub, matice, pant, západka), Tvar (zkosení, kombinovat, rozříznout), Uspořádat (měřítko, zarovnat, zrcadlit, pole). Ve skice: Další tvary (elipsa, mnohoúhelník, drážka) a Úpravy skici (zaoblit rohy, odsadit, kombinovat, spojit). Skupiny Výběr, Kontrola a Vložit jsou sloučené do skupiny Nástroje. Tlačítka jsou užší, lišta se vejde na šířku 1280 px bez posouvání. Klávesové zkratky se nezměnily.
 

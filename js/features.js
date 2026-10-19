@@ -550,13 +550,13 @@ function hingeDims(f) {
   if (![2, 3, 5, 7].includes(N)) throw new Error('Počet kloubů musí být 2, 3, 5 nebo 7');
   /* two knuckles: the pin ends in a bulb (double cone) caught in a cavity of knuckle A, so the leaves stay together both ways */
   const pr = pd / 2, bulb = N === 2 && !screw, be = c + 0.4, D0 = c * Math.SQRT2;
-  const R = bulb ? Math.max(pr + c + HINGE_WALL, pr + be + D0 + 0.9) : pr + c + HINGE_WALL, zc = 0.75 * R;
+  const R = Math.max(bulb ? Math.max(pr + c + HINGE_WALL, pr + be + D0 + 0.9) : pr + c + HINGE_WALL, Number(f.rMin) || 0), zc = 0.75 * R;
   if (!(t >= 0.8)) throw new Error('Tloušťka křídla musí být alespoň 0,8 mm');
   if (t > zc + R - 0.3) throw new Error('Křídlo je na tento čep příliš silné (nejvýš ' + (Math.floor((zc + R - 0.3) * 10) / 10).toString().replace('.', ',') + ' mm), zvětšete průměr čepu');
   if (!(W >= R + c + 2)) throw new Error('Křídlo musí být široké alespoň ' + (Math.ceil((R + c + 2) * 10) / 10).toString().replace('.', ',') + ' mm');
   const k = (L - (N - 1) * c) / N, rt = Math.max(0.4, pr * 0.35), ch = pr - rt, D = c * Math.SQRT2;
-  const kMin = screw ? 2 : bulb ? HINGE_WALL + D + (pr + be - rt) + be + 1.5 : HINGE_WALL + D + ch + 1.5;
-  if (k < kMin) throw new Error('Klouby jsou příliš krátké, prodlužte pant nebo zvolte méně kloubů');
+  const kMin = screw ? Math.max(2, (Number(f.recDepth) || 0) + 1.5) : bulb ? HINGE_WALL + D + (pr + be - rt) + be + 1.5 : HINGE_WALL + D + ch + 1.5;
+  if (k < kMin) throw new Error(f.recDepth ? 'Krajní klouby jsou na zapuštění hlavy šroubu a matice příliš krátké (potřebují alespoň ' + (Math.ceil(kMin * 10) / 10).toString().replace('.', ',') + ' mm), prodlužte pant' : 'Klouby jsou příliš krátké, prodlužte pant nebo zvolte méně kloubů');
   return { L, W, t, N, pd, pr, c, R, zc, k, rt, ch, D, screw, bulb, be };
 }
 const YZB = { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] };
@@ -572,7 +572,9 @@ function hingeSection(H, side) {
 }
 function prismX(pts, x0, x1) { return KK.extrudeProfiles([{ pts, closed: true }], YZB, x0, x1); }
 function coneX(o, dir, r0, r1, h) { return KK.transform(KK.translate(KK.primitive('cone', { r: r0, rt: r1, h }), [0, 0, h / 2]), frameMatrix(o, dir)); }
-function hingeParts(f) {
+function hingeParts(f0) {
+  const rec = f0.kind === 'screw' && f0.recess ? screwRecess(Number(f0.pin), Math.max(0, Math.min(1.5, Number(f0.tol) || 0))) : null;
+  const f = rec ? { ...f0, rMin: rec.rMin, recDepth: rec.depth } : f0;
   const H = hingeDims(f), { L, W, t, N, pr, c, R, zc, k, rt, ch, D, screw } = H;
   const leaf = side => {
     let acc = prismX(side < 0 ? [[-W, 0], [-(R + c), 0], [-(R + c), t], [-W, t]] : [[R + c, 0], [W, 0], [W, t], [R + c, t]], 0, L);
@@ -598,7 +600,8 @@ function hingeParts(f) {
     }
   }
   if (screw) {
-    const hole = cylAlong([-1, 0, zc], [1, 0, 0], pr + c, L + 2);
+    let hole = cylAlong([-1, 0, zc], [1, 0, 0], pr + c, L + 2);
+    if (rec) hole = KK.boolean(hole, screwRecessTool(rec, L, zc), 'union');
     A = KK.boolean(A, hole, 'subtract'); B = KK.boolean(B, hole, 'subtract');
   } else {
     ({ A, B } = hingePin(H, A, B, zc));
@@ -648,6 +651,28 @@ function boxHingeSection(H, G, side, lift) {
   else pts.push([-gw - BOXH_GRIP, 0]);
   return side < 0 ? pts : pts.map(([y, z]) => [-y, z]).reverse();
 }
+/* the axle hole of a hinge on a pin: free in every knuckle, or (pinTight, a piece of filament) tight in the outer
+   knuckle(s), so the filament is pressed in there and cannot fall out while the inner knuckles turn on it freely.
+   With an even number of knuckles the two outer ones belong to different parts, so only the first one is tight. */
+/* recesses for a screw axle (d = ISO metric size): a counterbore for a socket or pan head at the start of the axle and
+   a hex pocket for the nut at its end, so neither sticks out; the knuckles grow to keep 1 mm of wall around them */
+function screwRecess(d, c) {
+  const F = FASTENERS[d]; if (!F) return null;
+  const hr = (F[4] + c) / 2, hd = d + 0.3, nr = (F[1] + c) / Math.sqrt(3), nd = F[3] + 0.3;
+  return { d, hr, hd, nr, nd, rMin: Math.max(hr, nr) + 1.0, depth: Math.max(hd, nd) };
+}
+function screwRecessTool(rc, L, az) {
+  const head = cylAlong([-1, 0, az], [1, 0, 0], rc.hr, rc.hd + 1);
+  const nut = KK.translate(KK.extrudeProfiles([{ t: 'ngon', x: 0, y: 0, r: rc.nr, n: 6, a: 90 }], YZB, L - rc.nd, L + 1), [0, 0, az]); /* a corner up: the roof prints at 60° */
+  return KK.boolean(head, nut, 'union');
+}
+function pinHoleTool(f, H) {
+  if (f.recess && !f.pinTight) return KK.boolean(cylAlong([-1, 0, 0], [1, 0, 0], f.pinHole / 2, H.L + 2), screwRecessTool(f.recess, H.L, 0), 'union');
+  const { L, N, k, c } = H;
+  if (!f.pinTight) return cylAlong([-1, 0, 0], [1, 0, 0], f.pinHole / 2, L + 2);
+  const xs = k + c / 2, xe = N % 2 ? (N - 1) * (k + c) - c / 2 : L + 1;
+  return KK.boolean(cylAlong([-1, 0, 0], [1, 0, 0], f.pinTight / 2, L + 2), cylAlong([xs, 0, 0], [1, 0, 0], f.pinHole / 2, xe - xs), 'union');
+}
 function boxHingeLocal(f, G) {
   const H = hingeDims({ ...f, w: 1e3, t: 1, kind: f.pinHole ? 'screw' : 'print' }), { L, N, k, c, R } = H;
   if (G < 2 * (R + c) - 1e-6) throw new Error('Mezera mezi krabičkou a víkem musí být alespoň ' + (Math.ceil(2 * (R + c) * 10) / 10).toString().replace('.', ',') + ' mm (teď ' + (Math.round(G * 10) / 10).toString().replace('.', ',') + ' mm)');
@@ -657,7 +682,7 @@ function boxHingeLocal(f, G) {
     const side = i % 2 ? 1 : -1, x0 = i * (k + c), pr = prismX(boxHingeSection(H, G, side, f.pinHole ? 0 : f.liftEff), x0, x0 + k);
     if (side < 0) A = A ? KK.boolean(A, pr, 'union') : pr; else B = B ? KK.boolean(B, pr, 'union') : pr;
   }
-  if (f.pinHole) { const hole = cylAlong([-1, 0, 0], [1, 0, 0], f.pinHole / 2, L + 2); return { H, A: KK.boolean(A, hole, 'subtract'), B: KK.boolean(B, hole, 'subtract') }; }
+  if (f.pinHole) { const hole = pinHoleTool(f, H); return { H, A: KK.boolean(A, hole, 'subtract'), B: KK.boolean(B, hole, 'subtract') }; }
   return { H, ...hingePin(H, A, B, 0) };
 }
 /* ---------- flush box hinge: the knuckles sit on the rim, sunk into both walls, so nothing sticks out behind the box.
@@ -690,7 +715,7 @@ function boxHingeFlushLocal(f, G) {
   const rc = R + c, Wb = Math.max(rc + 1.2, gw + 0.8), zW = -rc * Math.SQRT2 + Wb - 1.7, z0 = zW - (Wb - gw);
   const rib = side => prismX([[gw, 0], [Wb, 0], [Wb, zW], [gw, z0]].map(([y, z]) => [side * y, z]), -c, L + c);
   const base = { H, A, cutA, cutB, addA: rib(-1), addB: rib(1), depth: -z0 };
-  if (f.pinHole) { const hole = cylAlong([-1, 0, 0], [1, 0, 0], f.pinHole / 2, L + 2); return { ...base, B, sock: hole, sockB: hole }; }
+  if (f.pinHole) { const hole = pinHoleTool(f, H); return { ...base, B, sock: hole, sockB: hole }; }
   const { pin, sock } = pinParts(H, 0);
   return { ...base, B: KK.boolean(B, pin, 'union'), sock };
 }
@@ -764,7 +789,11 @@ function closedHingeGeom(f, boxPolys, lidPolys) {
   if (Math.abs(face - lface) > 0.05) throw new Error('Zadní stěna víka musí lícovat se zadní stěnou krabičky');
   if (Math.min(a.max[o], b.max[o]) - Math.max(a.min[o], b.min[o]) <= 0) throw new Error('Víko neleží nad krabičkou');
   const pinMode = f.join === 'pin', pinD = pinMode ? (CLOSED_PINS[f.pinKind] || 1.75) : Number(f.pin) || 3;
-  const g = { ...f, pin: pinD, pinHole: pinMode ? pinD + Math.max(0.2, Number(f.tol) || 0.4) : 0 };
+  /* filament: free hole 1.8 mm + clearance, pressed into the outer knuckles 2.0 mm (as the flip latch's axle); screw: d + clearance − 0.1 */
+  const fil = pinMode && (f.pinKind || 'fil') === 'fil', tl = Math.max(0.2, Number(f.tol) || 0.4);
+  const g = { ...f, pin: pinD, pinHole: pinMode ? (fil ? FIL_FREE + tl : pinD + tl + SCREW_FREE) : 0, pinTight: fil && f.pinTight ? FIL_PRESS : 0 };
+  const rec = pinMode && !fil && f.recess ? screwRecess(pinD, tl) : null;
+  if (rec) { g.recess = rec; g.rMin = rec.rMin; g.recDepth = rec.depth; }
   const H = hingeDims({ ...g, w: 1e3, t: 1, kind: pinMode ? 'screw' : 'print' });
   const d = f.style === 'flush' ? Math.max(0.2, (Number(f.gap) || 1) / 2) : H.R + H.c;
   const axc = face + sg * d;
@@ -794,7 +823,8 @@ function latchParts(f) {
   const h = flush ? 0.6 : 1.0, t = flush ? 1.2 : 1.6, wall = Math.max(0.8, Number(f.wall) || 2);
   let box = [], lid = [], cut = [];
   if (!flush) {
-    const zr = -4, zh = zr - h - c * (Math.SQRT2 - 1), zb = zh - h - 1.5, ui = c + h, uo = ui + t;
+    /* snug: the hook's upper face lies on the ridge's lower face (0.05 mm apart, so the faces never touch in the model): the closed lid has no play */
+    const zr = -4, zh = f.snug ? zr - h + c - 0.05 : zr - h - c * (Math.SQRT2 - 1), zb = zh - h - 1.5, ui = c + h, uo = ui + t;
     box = [[[0, zr - h], [h, zr], [0, zr + h], [-0.8, zr + h + 0.8], [-0.8, zr - h - 0.8]]]; /* ridge (grips 0.8 into the wall) */
     lid = [[[ui, zb], [uo, zb], [uo, 0], [ui, 0]],                                              /* tab */
       [[ui + 0.01, zh - h], [ui + 0.01, zh + h], [c, zh]],                                      /* hook (apex c from the wall) */
@@ -805,7 +835,8 @@ function latchParts(f) {
   lid = [[[ui, -Hl], [uo, -Hl], [uo, 0], [ui, 0]],                                              /* lip inside the box */
     [[uo - 0.01, zg - h], [uo + h, zg], [uo - 0.01, zg + h]],                                    /* bump, 45° both ways */
     [[-wall + 0.8, 0], [ui, 0], [-wall + 0.8, (-wall + 0.8) - ui]]];                             /* 45° bracket to the lid's inner wall */
-  cut = [[[-wall - 0.01, zg - h - c], [-wall + h + c, zg], [-wall - 0.01, zg + h + c]]];          /* groove in the box wall */
+  const gz = f.snug ? 0.05 - 2 * c : 0; /* snug: the groove's upper face meets the bump's, no play upwards */
+  cut = [[[-wall - 0.01, zg - h - c + gz], [-wall + h + c, zg + gz], [-wall - 0.01, zg + h + c + gz]]];          /* groove in the box wall */
   return { W, box, lid, cut, depth: Hl };
 }
 /* rotary latch: a lever turning on an axle (screw or a piece of filament) in the LID wall hangs down over the box;
@@ -858,16 +889,22 @@ function rotLatchLocal(f) {
    'flip' sits on the wall (axle: M3 screw or filament pushed through the lugs); 'flipflush' sits in a pocket level with
    the wall (filament fixed in the flap clicks into slots in the pocket ends; a bulge inside backs the pocket).
    The flap is a separate body, printed lying on its outer face. Local frame as latchParts. */
+/* holes with a horizontal axis print slightly oval; from the user's test print (clearance 0.3): filament pressed in 2.0 mm,
+   filament free 2.1 mm (1.8 + clearance), screw free d + clearance − 0.1 (M3: 3.2 mm) */
+const FIL_PRESS = 2.0, FIL_FREE = 1.8, SCREW_FREE = -0.1;
 function flipLatchLocal(f) {
   const c = Math.max(0.1, Math.min(1, Number(f.tol) || 0.4)), flush = f.style === 'flipflush', wall = Math.max(0.8, Number(f.wall) || 2);
   const W = Math.max(10, Number(f.width) || 14), inPlace = !flush && f.axle === 'print', screw = !flush && !inPlace && f.axle !== 'fil';
-  const knH = flush ? 0.85 : screw ? 1.7 : 1.0;        /* hole in the flap: filament glued in / free on the screw or filament */
-  const lugH = flush ? 0.875 + c / 2 : screw ? 1.25 : 0.9; /* hole in the lugs: free (snap slot) / M3 pilot / filament press fit */
+  /* filament holes (horizontal axis): pressed in 2.0 mm, turning freely 1.8 mm + clearance */
+  const pressR = FIL_PRESS / 2, freeR = (FIL_FREE + c) / 2;
+  const knH = flush ? pressR : screw ? (3 + c + SCREW_FREE) / 2 : freeR;        /* hole in the flap: filament pressed or glued in / free on the screw or filament */
+  const lugH = flush ? freeR : screw ? 1.25 : pressR;      /* hole in the lugs: free (snap slot) / M3 pilot / filament press fit */
   const rk = inPlace ? 3 : Math.max(knH, lugH) + 1.2, lw = screw || inPlace ? 3 : 2.5, h = 1.5, s = Math.tan(30 * Math.PI / 180);
   const ui = h + c, uA = c + rk, uo = uA + rk, zA = rk + 0.4;
   /* ridge low enough that the arc of the hook is flatter than the undercut (self-locking) */
   const L = Math.max(8, (uA - (c + h) / 2) / (0.5 * s)), zr = zA + c - L;
-  const zh = zr - s * c - c, xf = W / 2 - lw - c;
+  /* snug: the hook's top lies on the ridge's undercut (the arc is flatter, so it slides in and touches only at the end) */
+  const gv = f.snug ? 0.05 : c, zh = zr - s * c - gv, xf = W / 2 - lw - c;
   let zbot = zh - 1.6 - (ui - c) - 2.5;
   if (xf < 3) throw new Error('Západka je příliš úzká');
   /* printed in place: the flap is printed turned up 180° along the lid wall (the lid prints upside down), standing on
@@ -878,7 +915,11 @@ function flipLatchLocal(f) {
     zbot = 2 * zA - Hl;
   }
   let flap = KK.extrudeProfiles([{ pts: [[ui, zbot], [uo, zbot], [uo, zA], [ui, zA]], closed: true }, { t: 'circle', x: uA, y: zA, r: rk }], YZB, -xf, xf);
-  flap = KK.boolean(flap, prismX([[ui + 0.02, zr - s * ui - c], [c, zh], [c, zh - 1.6], [ui + 0.02, zh - 1.6 - (ui - c)]], -xf, xf), 'union');
+  /* the hook is narrower than the ridge: at both ends of the ridge a 45° gusset carries its undercut while printing
+     (the box prints standing, so the undercut alone would start in the air), and the layers bridge between the gussets */
+  const gw = 1.2, xh = xf - gw - c;
+  if (xh < 2) throw new Error('Západka je příliš úzká');
+  flap = KK.boolean(flap, prismX([[ui + 0.02, zr - s * ui - gv], [c, zh], [c, zh - 1.6], [ui + 0.02, zh - 1.6 - (ui - c)]], -xh, xh), 'union');
   /* the end of the flap is thinned on its inner side (45°), so a fingertip gets behind it and flips it out easily;
      not when it is printed in place, where the end is the foot it stands on */
   if (!inPlace) { const tip = 1.2, e = Math.min(uo - ui - tip, zh - 1.6 - (ui - c) - zbot - 0.2);
@@ -887,7 +928,9 @@ function flipLatchLocal(f) {
   const x0 = W / 2 - lw, rb = rk - 1.4, rt = 0.4, C2 = c * Math.SQRT2;
   if (inPlace) for (const sgn of [1, -1]) flap = KK.boolean(flap, coneX([sgn * (x0 + 0.5), uA, zA], [-sgn, 0, 0], rb + C2 + 0.5, rt, rb + C2 + 0.5 - rt), 'subtract');
   else flap = KK.boolean(flap, KK.extrudeProfiles([{ t: 'circle', x: uA, y: zA, r: knH }], YZB, -xf - 1, xf + 1), 'subtract');
-  const ridge = prismX([[-0.8, zr + 0.8 * s], [h, zr - s * h], [h, zr + 0.4], [-0.8, zr + 0.4 + h + 0.8]], -xf, xf);
+  let ridge = prismX([[-0.8, zr + 0.8 * s], [h, zr - s * h], [h, zr + 0.4], [-0.8, zr + 0.4 + h + 0.8]], -xf, xf);
+  const zlow = zr - s * h, gus = [[-0.8, zlow - h - 0.8], [h, zlow], [h, zlow + 0.01], [-0.8, zr + 0.8 * s]];
+  for (const sg of [1, -1]) ridge = KK.boolean(ridge, prismX(gus, sg > 0 ? xf - gw : -xf, sg > 0 ? xf : -xf + gw), 'union');
   const hx = flush ? W / 2 : W / 2 + 0.5, hole = inPlace ? null : KK.extrudeProfiles([{ t: 'circle', x: uA, y: zA, r: lugH }], YZB, -hx, hx);
   let boxAdd = ridge, lidAdd = null, boxCut = null, lidCut = hole;
   const zTop = zA + rk + c;
@@ -913,7 +956,7 @@ function flipLatchLocal(f) {
       /* the recess goes deeper than the pocket floor only at its top, so the bulge above already backs it */
       lidAdd = prismX([[wi, 0], [fl, 0], [fl, zTop + 1], [wi, zTop + 1 + dep]], -W / 2 - 1, W / 2 + 1);
     }
-    return { lever: mv(flap), pivot: { p: [0, uA + d, zA], d: [1, 0, 0], a: 100 }, boxAdd, lidAdd, boxCut, lidCut, W: W + 2, depth: -zbot + c + 2 + Math.max(0, dep) + 1, ov: zTop + 1 + Math.max(0, dep) };
+    return { lever: mv(flap), pivot: { p: [0, uA + d, zA], d: [1, 0, 0], a: 90 } /* swung out level; further its end meets the lid wall above the pocket */, boxAdd, lidAdd, boxCut, lidCut, W: W + 2, depth: -zbot + c + 2 + Math.max(0, dep) + 1, ov: zTop + 1 + Math.max(0, dep) };
   }
   if (inPlace) {
     /* stored as printed: turned 180° about the axle (rest), lying along the lid wall */

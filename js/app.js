@@ -126,8 +126,8 @@ const sun = new THREE.DirectionalLight(0xffffff, 0.8); scene.add(sun, sun.target
 
 const controls = new THREE.OrbitControls(persp, dom);
 controls.screenSpacePanning = true;
-/* mouse: left drag selects (rubber band), middle button pans and the wheel zooms, right drag rotates; touch is unchanged */
-controls.mouseButtons = { LEFT: -1, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
+/* mouse: left drag rotates, middle or right drag pans, the wheel zooms; Shift + left drag selects with a rubber band */
+controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN };
 controls.minDistance = 1; controls.maxDistance = 6000; controls.minZoom = 0.02; controls.maxZoom = 80;
 controls.rotateSpeed = 0.8; controls.zoomSpeed = 1.1;
 controls.target.set(0, 0, 10);
@@ -2694,12 +2694,14 @@ function startFastener(type, editIndex, f) {
 }
 
 /* ================= hinge ================= */
+/* screw length for a hinge with a recessed head and nut: from the counterbore floor (d + 0.3 deep) through the nut */
+function screwLen(L, d) { const F = Engine.FASTENERS[d]; return F ? Math.floor(L - (d + 0.3) - 0.3) : Math.floor(L); }
 function startHinge(editIndex, f) {
   const pivot = new THREE.Object3D(); scene.add(pivot);
-  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_HINGE, holes: 2, hd: 3, part: 'both', rot: 0, count: 1, side: '+y', join: 'print', pinKind: 'fil', gap: 1, shift: 0, out: 'join', lift: 0.2 };
+  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_HINGE, holes: 2, hd: 3, part: 'both', rot: 0, count: 1, side: '+y', join: 'print', pinKind: 'fil', pinTight: false, recess: true, gap: 1, shift: 0, out: 'join', lift: 0 }; /* lift 0: test prints with 0.2 mm stayed ajar at the hinge */
   const c = {
     editIndex, tool: null, tools: null, gizmoDrag: false, timer: null,
-    v: f ? { ...D0, style: 'out', ...f } : { ...D0 },
+    v: f ? { ...D0, style: 'out', pinTight: false, recess: false, ...f } : { ...D0 }, /* an older hinge keeps its free axle hole */
     pos: f && f.pos ? f.pos.slice() : [0, 0, 0], op: f && f.op ? f.op : 'new',
     box: f ? f.box || null : null, lid: f ? f.lid || null : null, pick: 'box', highlight: new Set(),
     init() {
@@ -2709,6 +2711,8 @@ function startHinge(editIndex, f) {
         fields: [{ k: 'opt', id: 'kind', label: 'Typ', options: [['print', 'Samostatný, tištěný vcelku'], ['screw', 'Samostatný, na šroub'], ['closed', 'Krabička navržená zavřená'], ['box', 'Krabička a víko vedle sebe']], value: this.v.kind },
           { k: 'seg', id: 'join', label: 'Spojení', options: [['print', 'Tisk vcelku'], ['pin', 'Kolík / šroub']], value: this.v.join },
           { k: 'seg', id: 'pinKind', label: 'Kolík', options: [['fil', 'Filament 1,75'], ['m2', 'Šroub M2'], ['m3', 'Šroub M3']], value: this.v.pinKind },
+          { k: 'chk', id: 'recess', label: 'Zapustit hlavu šroubu a matici', value: this.v.recess },
+          { k: 'chk', id: 'pinTight', label: 'Filament natlačit do krajních kloubů (nevypadne)', value: this.v.pinTight },
           { k: 'opt', id: 'side', label: 'Strana pantu', options: [['+y', 'Zadní (+Y)'], ['-y', 'Přední (−Y)'], ['+x', 'Pravá (+X)'], ['-x', 'Levá (−X)']], value: this.v.side },
           { k: 'seg', id: 'style', label: 'Umístění', options: [['flush', 'Zapuštěný'], ['out', 'Na stěně']], value: this.v.style },
           { k: 'num', id: 'gap', label: 'Mezera mezi díly po rozložení', value: this.v.gap },
@@ -2734,10 +2738,12 @@ function startHinge(editIndex, f) {
           if (id === 'pos') this.pos = dlg.get('pos');
           else if (id === 'op') this.op = dlg.get('op');
           else if (['kind', 'part', 'style', 'join', 'pinKind', 'side', 'out'].includes(id)) this.v[id] = dlg.get(id);
+          else if (id === 'pinTight') this.v.pinTight = !!dlg.get('pinTight');
+          else if (id === 'recess') this.v.recess = !!dlg.get('recess');
           else if (id === 'cnt') this.v.n = parseFloat(dlg.get('cnt'));
           else if (id === 'holes' || id === 'rot' || id === 'hd' || id === 'count') this.v[id] = parseFloat(dlg.get(id));
           else { const x = dlg.get(id); if (isFinite(x) && (x >= 0 || id === 'shift')) this.v[id] = x; }
-          if (id === 'join' || id === 'style') this.layout();
+          if (id === 'join' || id === 'style' || id === 'pinKind' || id === 'kind') this.layout();
           if (id === 'kind') {
             const l = $('#dialog [data-row="pin"] label'); if (l) l.textContent = this.v.kind === 'screw' ? 'Průměr šroubu v ose' : 'Průměr čepu';
             if (this.isBox() && this.v.len > 25) { this.v.len = 20; dlg.set('len', 20); }
@@ -2757,16 +2763,16 @@ function startHinge(editIndex, f) {
     layout() {
       const bx = this.isBox(), cl = this.isClosed(), pin = cl && this.v.join === 'pin';
       for (const id of ['style', 'box', 'lid', 'count', 'shift', 'out']) dlg.show(id, bx);
-      dlg.show('join', cl); dlg.show('side', cl); dlg.show('lift', bx && !pin); dlg.show('pinKind', pin); dlg.show('pin', !pin); dlg.show('gap', cl && !pin && this.v.style === 'flush');
+      dlg.show('join', cl); dlg.show('side', cl); dlg.show('lift', bx && !pin); dlg.show('pinKind', pin); dlg.show('pinTight', pin && this.v.pinKind === 'fil'); dlg.show('recess', (pin && this.v.pinKind !== 'fil') || (!bx && this.v.kind === 'screw')); dlg.show('pin', !pin); dlg.show('gap', cl && !pin && this.v.style === 'flush');
       for (const id of ['w', 't', 'holes', 'hd', 'part', 'rot', 'pos', 'op']) dlg.show(id, !bx);
       if (bx) transform.detach(); else transform.attach(pivot);
       if (bx && !this.box) this.pick = 'box'; else if (bx && !this.lid) this.pick = 'lid';
     },
     feature() {
       const v = this.v;
-      if (this.isClosed()) return { id: f ? f.id : 'tmp', type: 'hinge', kind: 'closed', style: v.style, side: v.side, join: v.join, pinKind: v.pinKind, gap: v.gap, box: this.box, lid: this.lid, len: v.len, n: v.n, pin: v.pin, tol: v.tol, count: v.count, shift: v.shift, out: v.out, lift: v.lift };
+      if (this.isClosed()) return { id: f ? f.id : 'tmp', type: 'hinge', kind: 'closed', style: v.style, side: v.side, join: v.join, pinKind: v.pinKind, pinTight: !!v.pinTight, recess: !!v.recess, gap: v.gap, box: this.box, lid: this.lid, len: v.len, n: v.n, pin: v.pin, tol: v.tol, count: v.count, shift: v.shift, out: v.out, lift: v.lift };
       if (this.isBox()) return { id: f ? f.id : 'tmp', type: 'hinge', kind: 'box', style: v.style, box: this.box, lid: this.lid, len: v.len, n: v.n, pin: v.pin, tol: v.tol, count: v.count, shift: v.shift, out: v.out, lift: v.lift };
-      return { id: f ? f.id : 'tmp', type: 'hinge', kind: v.kind, len: v.len, w: v.w, t: v.t, n: v.n, pin: v.pin, tol: v.tol, holes: v.holes, hd: v.hd, part: v.part, rot: v.rot, pos: this.pos.slice(), op: this.op };
+      return { id: f ? f.id : 'tmp', type: 'hinge', kind: v.kind, len: v.len, w: v.w, t: v.t, n: v.n, pin: v.pin, tol: v.tol, holes: v.holes, hd: v.hd, part: v.part, rot: v.rot, recess: !!v.recess, pos: this.pos.slice(), op: this.op };
     },
     schedule() { clearTimeout(this.timer); dlg.set('n', 'Počítám…'); this.timer = setTimeout(() => this.update(), 150); },
     update() {
@@ -2790,7 +2796,7 @@ function startHinge(editIndex, f) {
           this.tool = Rz.box.concat(Rz.lid, Rz.partA || [], Rz.partB || []); this.hideBodies = new Set([this.box, this.lid]); styleBodies();
           G.preview.add(previewMesh(this.tool, 'new'));
           dlg.set('n', `Kloub Ø ${fmtc(2 * H.R, 1)} mm, ${H.N} × ${fmtc(H.k, 1)} mm, vůle ${fmtc(H.c, 2)} mm`);
-          dlg.set('n2', Rz.pinMode ? `Do kloubů patří ${this.v.pinKind === 'fil' ? 'kus filamentu 1,75 mm' : 'šroub ' + this.v.pinKind.toUpperCase()} dlouhý ${Math.floor(H.L)} mm${this.v.pinKind === 'fil' ? '; konce zatavte nebo zaklepněte' : ''}.` : `Víko je odklopené o 180° vedle krabičky, mezera ${fmtc(Rz.T.G, 1)} mm.`);
+          dlg.set('n2', Rz.pinMode ? `Do kloubů patří ${this.v.pinKind === 'fil' ? 'kus filamentu 1,75 mm' : 'šroub ' + this.v.pinKind.toUpperCase()} dlouhý ${this.v.pinKind !== 'fil' && this.v.recess && H.k ? screwLen(H.L, this.v.pinKind === 'm2' ? 2 : 3) : Math.floor(H.L)} mm${this.v.pinKind === 'fil' ? (this.v.pinTight ? (H.N % 2 ? '; natlačte ho, v krajních kloubech drží napevno' : '; natlačte ho, v prvním kloubu drží napevno') : '; konce zatavte nebo zaklepněte') : (this.v.recess ? ' s válcovou nebo půlkulatou hlavou a maticí, obě se zapustí do krajních kloubů' : ' s maticí')}.` : `Víko je odklopené o 180° vedle krabičky, mezera ${fmtc(Rz.T.G, 1)} mm.`);
           dlg.set('n3', Rz.pinMode ? 'Krabička a víko se tisknou zvlášť (víko otočte otevřenou stranou nahoru). Pant je navržený pro zavřenou polohu, víko proto vždy dosedne.' : 'Tiskne se vcelku bez podpěr. Pant je navržený pro zavřenou polohu, víko proto po překlopení přesně dosedne.');
         } else if (bx) {
           if (this.box === this.lid) throw new Error('Krabička a víko musí být dvě různá tělesa');
@@ -2806,7 +2812,7 @@ function startHinge(editIndex, f) {
           this.tool = Engine.toolForHinge(F);
           G.preview.add(previewMesh(this.tool, this.op));
           dlg.set('n', `Kloub Ø ${fmtc(2 * H.R, 1)} mm, ${H.N} × ${fmtc(H.k, 1)} mm, mezera ${fmtc(H.c, 2)} mm`);
-          dlg.set('n2', H.screw ? `Do osy šroub M${fmtc(H.pd, 1)} × ${Math.ceil(H.L + 2)} mm s maticí.` : 'Tiskne se vcelku bez podpěr; po tisku pant několikrát protočte, aby se uvolnil.');
+          dlg.set('n2', H.screw ? `Do osy šroub M${fmtc(H.pd, 1)} × ${this.v.recess && Engine.FASTENERS[H.pd] ? screwLen(H.L, H.pd) + ' mm s válcovou nebo půlkulatou hlavou a maticí, obě se zapustí do krajních kloubů' : Math.ceil(H.L + 2) + ' mm s maticí'}.` : 'Tiskne se vcelku bez podpěr; po tisku pant několikrát protočte, aby se uvolnil.');
           dlg.set('n3', this.op === 'new' ? '' : this.v.part === 'both' ? 'Pro připojení ke dvěma tělesům vytvořte zvlášť křídlo A a křídlo B ve stejné poloze.' : `Osu dejte alespoň ${fmtc(H.R + H.c + 0.1, 1)} mm za hranu tělesa, jinak se ho dotknou i klouby druhého křídla.`);
         }
         dlg.okEnabled(true);
@@ -2850,9 +2856,9 @@ function startHinge(editIndex, f) {
 
 /* ================= latch (box designed closed) ================= */
 function startLatch(editIndex, f) {
-  const D0 = { style: 'out', side: '-y', width: 12, count: 1, shift: 0, tol: TOL_HINGE, wall: 2, out: 'join', lever: 16, axle: 'screw' };
+  const D0 = { style: 'out', side: '-y', width: 12, count: 1, shift: 0, tol: TOL_HINGE, wall: 2, out: 'join', lever: 16, axle: 'screw', snug: true };
   const c = {
-    editIndex, tool: null, timer: null, v: f ? { ...D0, ...f } : { ...D0 },
+    editIndex, tool: null, timer: null, v: f ? { ...D0, snug: false, ...f } : { ...D0 }, /* an older latch keeps its play */
     box: f ? f.box : null, lid: f ? f.lid : null, pick: 'box', highlight: new Set(),
     init() {
       if (!f && sel.size === 2) [this.box, this.lid] = [...sel];
@@ -2870,12 +2876,14 @@ function startLatch(editIndex, f) {
           { k: 'num', id: 'shift', label: 'Posun podél hrany', value: this.v.shift, range: [-50, 50, 0.5] },
           { k: 'num', id: 'wall', label: 'Tloušťka stěny krabičky', value: this.v.wall },
           { k: 'num', id: 'tol', label: 'Vůle pro 3D tisk', value: this.v.tol },
+          { k: 'chk', id: 'snug', label: 'Víko bez vůle (háček víko přitáhne)', value: this.v.snug },
           { k: 'seg', id: 'out', label: 'Výsledek', options: [['join', 'Přidat k tělesům'], ['new', 'Nová tělesa']], value: this.v.out },
           { k: 'note', id: 'n' }, { k: 'note', id: 'n2' }],
         onSel: id => { this.pick = id; this.update(); },
         onChange: id => {
           if (['style', 'side', 'out', 'axle'].includes(id)) this.v[id] = dlg.get(id);
           else if (id === 'axleF') this.v.axle = dlg.get('axleF');
+          else if (id === 'snug') this.v.snug = !!dlg.get('snug');
           else if (id === 'count') this.v.count = parseFloat(dlg.get('count'));
           else { const x = dlg.get(id); if (isFinite(x) && (x >= 0 || id === 'shift')) this.v[id] = x; }
           if (id === 'style') { const cat = this.isFlip() ? 'flip' : this.isRot() ? 'rot' : 'spring'; if (cat !== this.cat) { const w = { flip: 16, rot: 7, spring: 12 }[cat]; this.v.width = w; dlg.set('width', w); } this.cat = cat; this.layout(); }
@@ -2890,12 +2898,12 @@ function startLatch(editIndex, f) {
     isFlip() { return this.v.style === 'flip' || this.v.style === 'flipflush'; },
     layout() {
       const rot = this.isRot(), flip = this.isFlip();
-      dlg.show('wall', this.v.style !== 'out' && this.v.style !== 'flip'); dlg.show('lever', rot); dlg.show('axle', rot); dlg.show('axleF', this.v.style === 'flip');
+      dlg.show('wall', this.v.style !== 'out' && this.v.style !== 'flip'); dlg.show('snug', !rot); dlg.show('lever', rot); dlg.show('axle', rot); dlg.show('axleF', this.v.style === 'flip');
       if (rot && this.v.axle === 'print') { this.v.axle = 'screw'; dlg.set('axle', 'screw'); }
       dlg.set(rot ? 'axle' : 'axleF', this.v.axle); dlg.show('out', !rot && !flip);
       const l = $('#dialog [data-row="width"] label'); if (l) l.textContent = rot ? 'Šířka páčky' : 'Šířka západky';
     },
-    feature() { const v = this.v; return { id: f ? f.id : 'tmp', type: 'latch', style: v.style, side: v.side, width: v.width, count: v.count, shift: v.shift, tol: v.tol, wall: v.wall, out: v.out, lever: v.lever, axle: v.axle, box: this.box, lid: this.lid }; },
+    feature() { const v = this.v; return { id: f ? f.id : 'tmp', type: 'latch', style: v.style, side: v.side, width: v.width, count: v.count, shift: v.shift, tol: v.tol, snug: !!v.snug, wall: v.wall, out: v.out, lever: v.lever, axle: v.axle, box: this.box, lid: this.lid }; },
     schedule() { clearTimeout(this.timer); dlg.set('n', 'Počítám…'); this.timer = setTimeout(() => this.update(), 150); },
     update() {
       clearGroup(G.preview); this.tool = null;
@@ -4582,7 +4590,7 @@ function cylinderAt(polys, pi) {
   return { c: cOut.map(r6), ax: aOut.map(r6), r: r6(r), len: r6(t1 - t0), internal, group };
 }
 /* default 3D-print clearances on the diameter, from print tests: bolt / pin 0.15 mm, nut / hole 0.35 mm */
-const TOL_HINGE = 0.4;
+const TOL_HINGE = 0.3; /* hinges and latches, from the user's test prints */
 const TOL_BOLT = 0.15, TOL_NUT = 0.35;
 const threadLabel = (d, p) => `M${fmtc(d, 1)} × ${fmtc(p, 2)}`;
 function startThread(editIndex, f) {
@@ -5716,7 +5724,7 @@ dom.addEventListener('pointerdown', e => {
     }, 550);
   }
   if (e.button === 0 && cmd && cmd.onDown && cmd.onDown(e)) { down.special = true; try { dom.setPointerCapture(e.pointerId); } catch (er) {} }
-  else if (e.pointerType !== 'touch' && e.button === 0 && !sk && !cmd && !faceMode && !down.gizmo) { down.marquee = true; try { dom.setPointerCapture(e.pointerId); } catch (er) {} }
+  else if (e.pointerType !== 'touch' && e.button === 0 && e.shiftKey && !sk && !cmd && !faceMode && !down.gizmo) { down.marquee = true; controls.enabled = false; try { dom.setPointerCapture(e.pointerId); } catch (er) {} }
   else if (sk && isDrawTool(sk.tool) && (drawDrag || e.button === 0)) {
     if (drawDrag) { cancelDrawDrag(); down.moved = true; }
     else { drawDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, ev0: e, started: false }; controls.enabled = false; }
@@ -5754,7 +5762,7 @@ dom.addEventListener('pointermove', e => {
   if (!hoverQueued) { hoverQueued = true; requestAnimationFrame(() => { hoverQueued = false; handleHover(lastMoveEv); }); }
 });
 dom.addEventListener('pointerleave', () => { if (sk && (sk.hoverMid || sk.gridHot)) { sk.hoverMid = null; sk.gridHot = null; redrawSketch(); } if (cmd && cmd.onLeave) cmd.onLeave(); if (hoverBody) { hoverBody = null; styleBodies(); } $('#dim').hidden = true; });
-dom.addEventListener('pointercancel', e => { if (drawDrag && e.pointerId === drawDrag.id) cancelDrawDrag(); });
+dom.addEventListener('pointercancel', e => { if (drawDrag && e.pointerId === drawDrag.id) cancelDrawDrag(); if (down && down.marquee) { controls.enabled = true; marqueeHide(); down = null; } });
 dom.addEventListener('pointerup', e => {
   if (drawDrag && e.pointerId === drawDrag.id) {
     const dd = drawDrag; drawDrag = null; controls.enabled = true; if (sk && e.pointerType === 'touch') sk.gridHot = null;
@@ -5766,7 +5774,7 @@ dom.addEventListener('pointerup', e => {
   if (d.longpress) return;
   if (d.special) { if (sk && sk.drag) { sk.drag = null; sk.gridHot = null; controls.enabled = true; $('#dim').hidden = true; renderPalette(); redrawSketch(); return; } if (cmd && cmd.onUp) cmd.onUp(e); return; }
   const moved = Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5;
-  if (d.marquee) { const was = marqueeEl && !marqueeEl.hidden; marqueeHide(); if (was && moved) { marqueeSelect(d, e); return; } }
+  if (d.marquee) { controls.enabled = true; const was = marqueeEl && !marqueeEl.hidden; marqueeHide(); if (was && moved) { marqueeSelect(d, e); return; } }
   if (d.gizmo || moved) { if (cmd && cmd.onLeave && moved) cmd.onLeave(); return; }
   if (d.btn === 2 && sk && isPolyTool(sk.tool) && sk.draft) { finishPolyline(false); return; }
   if (d.btn === 2 && !sk && !cmd && faceMode) { faceContext(e); return; }
@@ -5780,7 +5788,7 @@ dom.addEventListener('pointerup', e => {
   } else lastTap = { t: performance.now(), x: e.clientX, y: e.clientY };
   handleClick(e);
 });
-/* rubber-band selection: dragging right takes bodies fully inside the frame, dragging left every body the frame touches; Shift or Ctrl adds */
+/* rubber-band selection (Shift + left drag): dragging right takes bodies fully inside the frame, dragging left every body the frame touches; adds to the selection */
 let marqueeEl = null;
 function marqueeDraw(e) {
   if (!marqueeEl) {
@@ -5803,7 +5811,7 @@ function marqueeSelect(d, e) {
     const ok = cross ? (bx1 >= x0 && bx0 <= x1 && by1 >= y0 && by0 <= y1) : (bx0 >= x0 && bx1 <= x1 && by0 >= y0 && by1 <= y1);
     if (ok && m.userData.bodyId != null) hit.push(m.userData.bodyId);
   }
-  sel = (e.shiftKey || e.ctrlKey || e.metaKey) ? new Set([...sel, ...hit]) : new Set(hit);
+  sel = new Set([...sel, ...hit]);
   tlSel = null; styleBodies(); renderBrowser(); renderTimeline(); updateInfo();
   if (hit.length) toast(`Vybráno: ${plural(sel.size, 'těleso', 'tělesa', 'těles')}`);
 }
