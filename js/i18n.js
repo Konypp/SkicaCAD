@@ -19,7 +19,7 @@
     'Časová osa je prázdná. Začněte příkazem Vytvořit skicu.': 'The timeline is empty. Start with Create sketch.',
     'Na začátek': 'To start', 'O krok zpět': 'Step back', 'O krok vpřed': 'Step forward', 'Na konec': 'To end', 'Značka historie': 'History marker',
     // ribbon
-    'TĚLESO': 'SOLID', 'SKICA': 'SKETCH', 'Vytvořit': 'Create', 'Upravit': 'Modify', 'Výběr': 'Select', 'Kontrola': 'Inspect', 'Vložit': 'Insert', 'Dokončit': 'Finish',
+    'TĚLESO': 'SOLID', 'SKICA': 'SKETCH', 'Základní tělesa': 'Primitives', 'Součásti': 'Parts', 'Tvar': 'Shape', 'Uspořádat': 'Arrange', 'Další tvary': 'More shapes', 'Úpravy skici': 'Sketch edits', 'Vytvořit': 'Create', 'Upravit': 'Modify', 'Výběr': 'Select', 'Kontrola': 'Inspect', 'Vložit': 'Insert', 'Dokončit': 'Finish',
     'Vytvořit skicu': 'Create sketch', 'Vysunutí': 'Extrude', 'Rotace': 'Revolve', 'Závit': 'Thread', 'Krychle': 'Cube', 'Válec': 'Cylinder', 'Koule': 'Sphere',
     'Kužel': 'Cone', 'Torus': 'Torus', 'Zaoblení': 'Fillet', 'Zkosení': 'Chamfer', 'Kombinovat': 'Combine', 'Přesunout': 'Move', 'Otočit': 'Rotate',
     'Měřítko': 'Scale', 'Vycentrovat': 'Center', 'Plochy': 'Faces', 'Zrcadlit': 'Mirror', 'Pole': 'Pattern', 'Odstranit': 'Delete', 'Vybrat vše': 'Select all',

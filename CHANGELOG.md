@@ -1,5 +1,11 @@
 # Changelog
 
+## Beta 1.18
+- **Kompaktnější lišta funkcí.** Méně používané nástroje jsou sbaleny do rozbalovacích nabídek (tlačítko se šipkou ukazuje naposledy použitý nástroj): Základní tělesa (krychle, válec, koule, kužel, torus), Součásti (šroub, matice, pant, západka), Tvar (zkosení, kombinovat, rozříznout), Uspořádat (měřítko, zarovnat, zrcadlit, pole). Ve skice: Další tvary (elipsa, mnohoúhelník, drážka) a Úpravy skici (zaoblit rohy, odsadit, kombinovat, spojit). Skupiny Výběr, Kontrola a Vložit jsou sloučené do skupiny Nástroje. Tlačítka jsou užší, lišta se vejde na šířku 1280 px bez posouvání. Klávesové zkratky se nezměnily.
+
+## Beta 1.17
+- **Nové ovládání myší:** levé tlačítko označuje (tažením se kreslí výběrový rámeček; zleva doprava se vyberou tělesa celá uvnitř rámečku, zprava doleva všechna, kterých se rámeček dotkne; Shift nebo Ctrl přidává k výběru), kolečko přibližuje, prostřední tlačítko posouvá pohled a pravé tlačítko otáčí. Klepnutí pravým tlačítkem bez tažení dál otevře místní nabídku. Dotyk (prst) funguje jako dřív.
+
 ## Beta 1.16
 - Sklopná západka (na stěně i zapuštěná): konec jazýčku je z vnitřní strany ztenčený pod 45° (na špičce 1,2 mm), takže se za něj dostane konec prstu nebo nehet a jazýček jde lehce odklopit. U jazýčku tištěného vcelku konec zůstává plný, protože na něm jazýček při tisku stojí.
 

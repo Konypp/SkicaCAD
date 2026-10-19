@@ -104,10 +104,18 @@ button { cursor: pointer; }
 .rgroup:last-child { border-right: 0; }
 .rtools { display: flex; gap: 1px; }
 .rlabel { text-align: center; font-size: 10px; font-weight: 600; letter-spacing: .08em; color: var(--muted); padding: 2px 0 4px; text-transform: uppercase; }
-.tool { width: 60px; height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 1px solid transparent; border-radius: 4px; background: transparent; font-size: 11px; line-height: 1.1; text-align: center; padding: 2px; }
+.tool { width: 57px; height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 1px solid transparent; border-radius: 4px; background: transparent; font-size: 11px; line-height: 1.1; text-align: center; padding: 2px; }
 .tool:hover:not(:disabled) { background: var(--panel-2); border-color: var(--line); }
 .tool[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
 .tool:disabled { opacity: .35; cursor: default; }
+.tool .caret { display: inline-block; width: 0; height: 0; margin-left: 3px; vertical-align: middle; border: 3px solid transparent; border-top-color: currentColor; border-bottom-width: 0; opacity: .7; }
+.tool.tmenu[aria-expanded="true"] { background: var(--panel-2); border-color: var(--line); }
+.ribmenu { position: fixed; z-index: 60; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,.22); padding: 4px; min-width: 170px; display: flex; flex-direction: column; }
+.ribmenu button { display: flex; align-items: center; gap: 10px; border: 1px solid transparent; border-radius: 4px; background: transparent; padding: 5px 8px; font-size: 12.5px; text-align: left; color: var(--ink); }
+.ribmenu button:hover { background: var(--panel-2); border-color: var(--line); }
+.ribmenu button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.ribmenu .lbl { flex: 1; }
+.ribmenu kbd { font: inherit; font-size: 11px; color: var(--muted); }
 .tool.finish { width: 74px; color: var(--ok); font-weight: 600; }
 
 /* ---------- viewport and overlays ---------- */
@@ -241,7 +249,7 @@ button { cursor: pointer; }
 @media (max-width: 760px) {
   .brand > span:not(.beta), .appbar .lbltxt { display: none; }
   .docname { flex: 1 1 auto; }
-  .tool { width: 54px; }
+  .tool { width: 50px; }
   .browser { width: min(236px, calc(100% - 140px)); }
   .browser:not(.open-m) .tree { display: none; }
   .browser:not(.open-m) .phead { border-bottom: 0; }

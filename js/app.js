@@ -126,7 +126,8 @@ const sun = new THREE.DirectionalLight(0xffffff, 0.8); scene.add(sun, sun.target
 
 const controls = new THREE.OrbitControls(persp, dom);
 controls.screenSpacePanning = true;
-controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN };
+/* mouse: left drag selects (rubber band), middle button pans and the wheel zooms, right drag rotates; touch is unchanged */
+controls.mouseButtons = { LEFT: -1, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.ROTATE };
 controls.minDistance = 1; controls.maxDistance = 6000; controls.minZoom = 0.02; controls.maxZoom = 80;
 controls.rotateSpeed = 0.8; controls.zoomSpeed = 1.1;
 controls.target.set(0, 0, 10);
@@ -1106,30 +1107,60 @@ function showCtx(x, y, items) {
 document.addEventListener('pointerdown', e => { const m = $('#ctxmenu'); if (!m.hidden && !m.contains(e.target)) m.hidden = true; });
 
 /* ================= ribbon ================= */
+/* compact ribbon: a plain item is [id, label, key]; a menu is { menu, label, items } and opens a drop-down list of items
+   (rarely used or related tools); its button shows the tool used last */
 const RIBBON = {
   solid: [
-    ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'], ['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus'], ['bolt', 'Šroub'], ['nut', 'Matice'], ['hinge', 'Pant'], ['latch', 'Západka']]],
-    ['Upravit', [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení'], ['hole', 'Díra', 'H'], ['shell', 'Skořepina'], ['combine', 'Kombinovat'], ['splitbody', 'Rozříznout'], ['move', 'Přesunout', 'M'], ['rotate', 'Otočit', 'R'], ['scale', 'Měřítko'], ['center', 'Zarovnat'], ['facemode', 'Plochy', 'G'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole'], ['del', 'Odstranit', 'Del']]],
-    ['Výběr', [['selall', 'Vybrat vše', 'Ctrl+A']]],
-    ['Kontrola', [['measure', 'Měřit', 'I'], ['simulate', 'Simulace']]],
-    ['Vložit', [['import', 'Importovat']]]
+    ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'],
+      { menu: 'prim', label: 'Základní tělesa', items: [['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus']] },
+      { menu: 'parts', label: 'Součásti', items: [['bolt', 'Šroub'], ['nut', 'Matice'], ['hinge', 'Pant'], ['latch', 'Západka']] }]],
+    ['Upravit', [['fillet', 'Zaoblení', 'F'], ['hole', 'Díra', 'H'], ['shell', 'Skořepina'], ['move', 'Přesunout', 'M'], ['rotate', 'Otočit', 'R'], ['facemode', 'Plochy', 'G'],
+      { menu: 'shape', label: 'Tvar', items: [['chamfer', 'Zkosení'], ['combine', 'Kombinovat'], ['splitbody', 'Rozříznout']] },
+      { menu: 'xform', label: 'Uspořádat', items: [['scale', 'Měřítko'], ['center', 'Zarovnat'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole']] },
+      ['del', 'Odstranit', 'Del']]],
+    ['Nástroje', [['selall', 'Vybrat vše', 'Ctrl+A'], ['measure', 'Měřit', 'I'], ['simulate', 'Simulace'], ['import', 'Importovat']]]
   ],
   sketch: [
-    ['Vytvořit', [['line', 'Čára', 'L'], ['spline', 'Křivka', 'K'], ['rect', 'Obdélník', 'R'], ['circle', 'Kružnice', 'C'], ['ellipse', 'Elipsa', 'E'], ['ngon', 'Mnohoúhelník', 'P'], ['slot', 'Drážka', 'D'], ['sktext', 'Text']]],
-    ['Upravit', [['skfillet', 'Zaoblit rohy'], ['skoffset', 'Odsadit', 'O'], ['sktrim', 'Kombinovat', 'X'], ['sksegtrim', 'Oříznout', 'T'], ['skjoin', 'Spojit', 'J'], ['skcons', 'Pomocná', 'Q'], ['skdel', 'Smazat', 'Del']]],
-    ['Vložit', [['skimport', 'DXF / SVG']]],
-    ['Dokončit', [['finish', 'Dokončit skicu', 'Enter']]]
+    ['Vytvořit', [['line', 'Čára', 'L'], ['spline', 'Křivka', 'K'], ['rect', 'Obdélník', 'R'], ['circle', 'Kružnice', 'C'], ['sktext', 'Text'],
+      { menu: 'skshape', label: 'Další tvary', items: [['ellipse', 'Elipsa', 'E'], ['ngon', 'Mnohoúhelník', 'P'], ['slot', 'Drážka', 'D']] }]],
+    ['Upravit', [['sksegtrim', 'Oříznout', 'T'], ['skcons', 'Pomocná', 'Q'], ['skdel', 'Smazat', 'Del'],
+      { menu: 'skedit', label: 'Úpravy skici', items: [['skfillet', 'Zaoblit rohy'], ['skoffset', 'Odsadit', 'O'], ['sktrim', 'Kombinovat', 'X'], ['skjoin', 'Spojit', 'J']] }]],
+    ['Dokončit', [['skimport', 'DXF / SVG'], ['finish', 'Dokončit skicu', 'Enter']]]
   ]
 };
+const ribMem = {};
+const itemPressed = id => sk ? (SK_TOOLS.includes(id) ? sk.tool === id : id === 'skcons' ? !!sk.consMode : null) : id === 'facemode' ? faceMode : null;
 function renderRibbon() {
   const mode = sk ? 'sketch' : 'solid', body = $('#rbody');
+  closeRibMenu();
   $('#tab-sketch').hidden = !sk;
   $('#tab-solid').setAttribute('aria-selected', String(!sk));
   $('#tab-sketch').setAttribute('aria-selected', String(!!sk));
   $('#tab-solid').disabled = !!sk;
-  body.innerHTML = RIBBON[mode].map(([g, items]) => `<div class="rgroup"><div class="rtools">${items.map(([id, label, key]) =>
-    `<button class="tool${id === 'finish' ? ' finish' : ''}" data-cmd="${id}" title="${label}${key ? ' (' + key + ')' : ''}"${sk && SK_TOOLS.includes(id) ? ` aria-pressed="${sk.tool === id}"` : ''}${sk && id === 'skcons' ? ` aria-pressed="${!!sk.consMode}"` : ''}${!sk && id === 'facemode' ? ` aria-pressed="${faceMode}"` : ''}><span class="ico">${svg(id, 26)}</span><span>${label}</span></button>`).join('')}</div><div class="rlabel">${g}</div></div>`).join('');
+  const btn = ([id, label, key]) => { const pr = itemPressed(id); return `<button class="tool${id === 'finish' ? ' finish' : ''}" data-cmd="${id}" title="${label}${key ? ' (' + key + ')' : ''}"${pr === null ? '' : ` aria-pressed="${pr}"`}><span class="ico">${svg(id, 24)}</span><span>${label}</span></button>`; };
+  body.innerHTML = RIBBON[mode].map(([g, items]) => `<div class="rgroup"><div class="rtools">${items.map(it => {
+    if (!it.menu) return btn(it);
+    const on = it.items.find(x => itemPressed(x[0])), shown = on || it.items.find(x => x[0] === ribMem[it.menu]) || it.items[0];
+    return `<button class="tool tmenu" data-menu="${it.menu}" aria-haspopup="true" aria-expanded="false" title="${it.label}"${on ? ' aria-pressed="true"' : ''}><span class="ico">${svg(shown[0], 24)}</span><span>${it.label}<i class="caret" aria-hidden="true"></i></span></button>`;
+  }).join('')}</div><div class="rlabel">${g}</div></div>`).join('');
 }
+function closeRibMenu() { const m = document.getElementById('ribmenu'); if (m) m.remove(); document.querySelectorAll('#rbody [data-menu][aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false')); }
+function openRibMenu(btn) {
+  const was = btn.getAttribute('aria-expanded') === 'true';
+  closeRibMenu(); if (was) return;
+  const def = RIBBON[sk ? 'sketch' : 'solid'].flatMap(g => g[1]).find(x => x.menu === btn.dataset.menu); if (!def) return;
+  const m = document.createElement('div'); m.id = 'ribmenu'; m.className = 'ribmenu'; m.setAttribute('role', 'menu');
+  m.innerHTML = def.items.map(([id, label, key]) => { const pr = itemPressed(id); return `<button role="menuitem" data-cmd="${id}"${pr ? ' aria-pressed="true"' : ''}><span class="ico">${svg(id, 22)}</span><span class="lbl">${label}</span>${key ? `<kbd>${key}</kbd>` : ''}</button>`; }).join('');
+  m.addEventListener('click', e => { const b = e.target.closest('[data-cmd]'); if (!b) return; ribMem[def.menu] = b.dataset.cmd; closeRibMenu(); runCommand(b.dataset.cmd); renderRibbon(); });
+  document.body.append(m);
+  const r = btn.getBoundingClientRect();
+  m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - m.offsetWidth - 8)) + 'px';
+  m.style.top = r.bottom + 2 + 'px';
+  btn.setAttribute('aria-expanded', 'true');
+}
+document.addEventListener('pointerdown', e => { if (!e.target.closest || e.target.closest('#ribmenu, [data-menu]')) return; closeRibMenu(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeRibMenu(); });
+$('#rbody').addEventListener('click', e => { const mb = e.target.closest('[data-menu]'); if (mb) { openRibMenu(mb); return; } });
 $('#rbody').addEventListener('click', e => { const b = e.target.closest('[data-cmd]'); if (b) runCommand(b.dataset.cmd); });
 const SK_TOOLS = ['line', 'spline', 'rect', 'circle', 'ellipse', 'ngon', 'slot', 'skfillet', 'skoffset', 'sktext', 'sktrim', 'sksegtrim', 'skjoin'];
 function runCommand(id) {
@@ -5685,6 +5716,7 @@ dom.addEventListener('pointerdown', e => {
     }, 550);
   }
   if (e.button === 0 && cmd && cmd.onDown && cmd.onDown(e)) { down.special = true; try { dom.setPointerCapture(e.pointerId); } catch (er) {} }
+  else if (e.pointerType !== 'touch' && e.button === 0 && !sk && !cmd && !faceMode && !down.gizmo) { down.marquee = true; try { dom.setPointerCapture(e.pointerId); } catch (er) {} }
   else if (sk && isDrawTool(sk.tool) && (drawDrag || e.button === 0)) {
     if (drawDrag) { cancelDrawDrag(); down.moved = true; }
     else { drawDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, ev0: e, started: false }; controls.enabled = false; }
@@ -5714,6 +5746,7 @@ dom.addEventListener('pointermove', e => {
     }
     return;
   }
+  if (down && down.marquee && down.moved) { marqueeDraw(e); return; }
   if (down && down.special && sk && sk.drag) { sketchDrag(e); return; }
   if (down && down.special && cmd && cmd.onDrag) { cmd.onDrag(e); return; }
   if (e.buttons) return;
@@ -5733,6 +5766,7 @@ dom.addEventListener('pointerup', e => {
   if (d.longpress) return;
   if (d.special) { if (sk && sk.drag) { sk.drag = null; sk.gridHot = null; controls.enabled = true; $('#dim').hidden = true; renderPalette(); redrawSketch(); return; } if (cmd && cmd.onUp) cmd.onUp(e); return; }
   const moved = Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5;
+  if (d.marquee) { const was = marqueeEl && !marqueeEl.hidden; marqueeHide(); if (was && moved) { marqueeSelect(d, e); return; } }
   if (d.gizmo || moved) { if (cmd && cmd.onLeave && moved) cmd.onLeave(); return; }
   if (d.btn === 2 && sk && isPolyTool(sk.tool) && sk.draft) { finishPolyline(false); return; }
   if (d.btn === 2 && !sk && !cmd && faceMode) { faceContext(e); return; }
@@ -5746,6 +5780,33 @@ dom.addEventListener('pointerup', e => {
   } else lastTap = { t: performance.now(), x: e.clientX, y: e.clientY };
   handleClick(e);
 });
+/* rubber-band selection: dragging right takes bodies fully inside the frame, dragging left every body the frame touches; Shift or Ctrl adds */
+let marqueeEl = null;
+function marqueeDraw(e) {
+  if (!marqueeEl) {
+    marqueeEl = document.createElement('div');
+    marqueeEl.style.cssText = 'position:fixed;z-index:30;pointer-events:none;border:1px solid var(--accent);background:var(--accent-soft);opacity:.55';
+    document.body.append(marqueeEl);
+  }
+  const l = Math.min(down.x, e.clientX), t = Math.min(down.y, e.clientY);
+  marqueeEl.hidden = false; marqueeEl.style.borderStyle = e.clientX < down.x ? 'dashed' : 'solid';
+  Object.assign(marqueeEl.style, { left: l + 'px', top: t + 'px', width: Math.abs(e.clientX - down.x) + 'px', height: Math.abs(e.clientY - down.y) + 'px' });
+}
+function marqueeHide() { if (marqueeEl) marqueeEl.hidden = true; }
+function marqueeSelect(d, e) {
+  const r = dom.getBoundingClientRect(), x0 = Math.min(d.x, e.clientX) - r.left, x1 = Math.max(d.x, e.clientX) - r.left, y0 = Math.min(d.y, e.clientY) - r.top, y1 = Math.max(d.y, e.clientY) - r.top;
+  const cross = e.clientX < d.x, hit = [];
+  for (const m of visibleMeshes()) {
+    const bb = new THREE.Box3().setFromObject(m), c = [];
+    for (let i = 0; i < 8; i++) c.push(toPx(new THREE.Vector3(i & 1 ? bb.max.x : bb.min.x, i & 2 ? bb.max.y : bb.min.y, i & 4 ? bb.max.z : bb.min.z)));
+    const bx0 = Math.min(...c.map(p => p[0])), bx1 = Math.max(...c.map(p => p[0])), by0 = Math.min(...c.map(p => p[1])), by1 = Math.max(...c.map(p => p[1]));
+    const ok = cross ? (bx1 >= x0 && bx0 <= x1 && by1 >= y0 && by0 <= y1) : (bx0 >= x0 && bx1 <= x1 && by0 >= y0 && by1 <= y1);
+    if (ok && m.userData.bodyId != null) hit.push(m.userData.bodyId);
+  }
+  sel = (e.shiftKey || e.ctrlKey || e.metaKey) ? new Set([...sel, ...hit]) : new Set(hit);
+  tlSel = null; styleBodies(); renderBrowser(); renderTimeline(); updateInfo();
+  if (hit.length) toast(`Vybráno: ${plural(sel.size, 'těleso', 'tělesa', 'těles')}`);
+}
 dom.addEventListener('dblclick', e => { if (sk && isPolyTool(sk.tool) && sk.draft) finishPolyline(false); });
 function handleHover(e) {
   if (!e) return;
