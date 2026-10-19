@@ -703,7 +703,9 @@ function boxHingeFlushLocal(f, G) {
     for (let i = 0; i <= 40; i++) { const a = -Math.PI / 4 + (1.25 * Math.PI) * i / 40; pts.push([R * Math.cos(a), R * Math.sin(a)]); }
     pts.push([-R, zj], [-gw, zj]);
     return side < 0 ? pts : pts.map(([y, z]) => [-y, z]).reverse(); };
-  const pocket = teardrop(R + c);
+  /* the pocket prints tighter than drawn (a concave curve) and the knuckle a little fuller: 0.2 mm more room, otherwise the
+     closed lid springs open at the front (test print) */
+  const pc = c + 0.2, pocket = teardrop(R + pc);
   let A = null, B = null, cutA = null, cutB = null;
   const add = (acc, p) => (acc ? KK.boolean(acc, p, 'union') : p);
   for (let i = 0; i < N; i++) {
@@ -712,7 +714,7 @@ function boxHingeFlushLocal(f, G) {
   }
   /* a rib on the inside of each back wall along the hinge, so the pocket does not cut through a thin wall;
      its underside slopes at 45° towards the wall, parallel to the pocket's point, so it prints without supports */
-  const rc = R + c, Wb = Math.max(rc + 1.2, gw + 0.8), zW = -rc * Math.SQRT2 + Wb - 1.7, z0 = zW - (Wb - gw);
+  const rc = R + pc, Wb = Math.max(rc + 1.2, gw + 0.8), zW = -rc * Math.SQRT2 + Wb - 1.7, z0 = zW - (Wb - gw);
   const rib = side => prismX([[gw, 0], [Wb, 0], [Wb, zW], [gw, z0]].map(([y, z]) => [side * y, z]), -c, L + c);
   const base = { H, A, cutA, cutB, addA: rib(-1), addB: rib(1), depth: -z0 };
   if (f.pinHole) { const hole = pinHoleTool(f, H); return { ...base, B, sock: hole, sockB: hole }; }
@@ -824,7 +826,7 @@ function latchParts(f) {
   let box = [], lid = [], cut = [];
   if (!flush) {
     /* snug: the hook's upper face lies on the ridge's lower face (0.05 mm apart, so the faces never touch in the model): the closed lid has no play */
-    const zr = -4, zh = f.snug ? zr - h + c - 0.05 : zr - h - c * (Math.SQRT2 - 1), zb = zh - h - 1.5, ui = c + h, uo = ui + t;
+    const zr = -4, zh = f.snug ? zr - h + c - SNUG_GAP : zr - h - c * (Math.SQRT2 - 1), zb = zh - h - 1.5, ui = c + h, uo = ui + t;
     box = [[[0, zr - h], [h, zr], [0, zr + h], [-0.8, zr + h + 0.8], [-0.8, zr - h - 0.8]]]; /* ridge (grips 0.8 into the wall) */
     lid = [[[ui, zb], [uo, zb], [uo, 0], [ui, 0]],                                              /* tab */
       [[ui + 0.01, zh - h], [ui + 0.01, zh + h], [c, zh]],                                      /* hook (apex c from the wall) */
@@ -835,7 +837,7 @@ function latchParts(f) {
   lid = [[[ui, -Hl], [uo, -Hl], [uo, 0], [ui, 0]],                                              /* lip inside the box */
     [[uo - 0.01, zg - h], [uo + h, zg], [uo - 0.01, zg + h]],                                    /* bump, 45° both ways */
     [[-wall + 0.8, 0], [ui, 0], [-wall + 0.8, (-wall + 0.8) - ui]]];                             /* 45° bracket to the lid's inner wall */
-  const gz = f.snug ? 0.05 - 2 * c : 0; /* snug: the groove's upper face meets the bump's, no play upwards */
+  const gz = f.snug ? SNUG_GAP - 2 * c : 0; /* snug: the groove's upper face meets the bump's, no play upwards */
   cut = [[[-wall - 0.01, zg - h - c + gz], [-wall + h + c, zg + gz], [-wall - 0.01, zg + h + c + gz]]];          /* groove in the box wall */
   return { W, box, lid, cut, depth: Hl };
 }
@@ -892,12 +894,18 @@ function rotLatchLocal(f) {
    The flap is a separate body, printed lying on its outer face. Local frame as latchParts. */
 /* holes with a horizontal axis print slightly oval; from the user's test print (clearance 0.3): filament pressed in 2.0 mm,
    filament free 2.1 mm (1.8 + clearance), screw free d + clearance − 0.1 (M3: 3.2 mm) */
-const FIL_PRESS = 2.0, FIL_FREE = 1.8, SCREW_FREE = -0.1, M3_TAP = 2.8; /* M3 self-tapping: 2.5 too tight, 2.6 tight (lug could crack), 3.2 free */
+const FIL_PRESS = 2.0, FIL_FREE = 1.8, SCREW_FREE = -0.1, M3_TAP = 2.8;
+/* the small lugs and the flap's knuckle print tighter than the test blocks (in the test boxes filament passed none of
+   them), so the latch's filament holes get more: pressed in 2.15 mm, free 2.0 mm + clearance (2.3 mm) */
+const LATCH_FIL_PRESS = 2.15, LATCH_FIL_FREE = 2.0;
+/* snug latch (lid without play): the hook stays 0.05 mm below the ridge, so the faces never touch in the model
+   (0.2 mm was tried, but the lid held open at the front in the test print was caused by the hinge, not by the latch) */
+const SNUG_GAP = 0.05; /* M3 self-tapping: 2.5 too tight, 2.6 tight (lug could crack), 3.2 free */
 function flipLatchLocal(f) {
   const c = Math.max(0.1, Math.min(1, Number(f.tol) || 0.4)), flush = f.style === 'flipflush', wall = Math.max(0.8, Number(f.wall) || 2);
   const W = Math.max(10, Number(f.width) || 14), inPlace = !flush && f.axle === 'print', screw = !flush && !inPlace && f.axle !== 'fil';
   /* filament holes (horizontal axis): pressed in 2.0 mm, turning freely 1.8 mm + clearance */
-  const pressR = FIL_PRESS / 2, freeR = (FIL_FREE + c) / 2;
+  const pressR = LATCH_FIL_PRESS / 2, freeR = (LATCH_FIL_FREE + c) / 2;
   const knH = flush ? pressR : screw ? (3 + c + SCREW_FREE) / 2 : freeR;        /* hole in the flap: filament pressed or glued in / free on the screw or filament */
   const lugH = flush ? freeR : screw ? M3_TAP / 2 : pressR;      /* hole in the lugs: free (snap slot) / M3 pilot / filament press fit */
   const rk = inPlace ? 3 : Math.max(knH, lugH) + 1.2, lw = screw || inPlace ? 3 : 2.5, h = 1.5, s = Math.tan(30 * Math.PI / 180);
@@ -905,7 +913,7 @@ function flipLatchLocal(f) {
   /* ridge low enough that the arc of the hook is flatter than the undercut (self-locking) */
   const L = Math.max(8, (uA - (c + h) / 2) / (0.5 * s)), zr = zA + c - L;
   /* snug: the hook's top lies on the ridge's undercut (the arc is flatter, so it slides in and touches only at the end) */
-  const gv = f.snug ? 0.05 : c, zh = zr - s * c - gv, xf = W / 2 - lw - c;
+  const gv = f.snug ? SNUG_GAP : c, zh = zr - s * c - gv, xf = W / 2 - lw - c - (flush ? 0.2 : 0); /* flush: 0.2 mm more room in the pocket ends (the flap prints lying, its edges spread a little) */
   let zbot = zh - 1.6 - (ui - c) - 2.5;
   if (xf < 3) throw new Error('Západka je příliš úzká');
   /* printed in place: the flap is printed turned up 180° along the lid wall (the lid prints upside down), standing on
@@ -946,7 +954,7 @@ function flipLatchLocal(f) {
     const pkB = KK.boolean(prismX([[-0.01, zbot - c], [uo + 0.5, zbot - c], [uo + 0.5, 0.01], [-0.01, 0.01]], -(W / 2 - lw), W / 2 - lw),
       prismX([[-0.01, zbot - c + 0.01], [uo + 0.5, zbot - c - F], [uo + 0.5, zbot - c + 0.01]], -(W / 2 - lw), W / 2 - lw), 'union');
     const pkL = prismX([[-0.01, -0.5], [uo + 0.5, -0.5], [uo + 0.5, zTop], [-0.01, zTop]], -(W / 2 - lw), W / 2 - lw);
-    const slotC = prismX([[uA, zA - 0.75], [uo + 0.5, zA - 0.75], [uo + 0.5, zA + 0.75], [uA, zA + 0.75]], -hx, hx);
+    const slotC = prismX([[uA, zA - 0.8], [uo + 0.5, zA - 0.8], [uo + 0.5, zA + 0.8], [uA, zA + 0.8]], -hx, hx); /* 1.6 mm: the 1.75 filament clicks through */
     boxCut = pkB; lidCut = KK.boolean(KK.boolean(pkL, hole, 'union'), slotC, 'union');
     const d = -uo, mv = p => (p ? KK.translate(p, [0, d, 0]) : p);
     boxAdd = mv(boxAdd); boxCut = mv(boxCut); lidCut = mv(lidCut);

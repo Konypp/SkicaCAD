@@ -1,5 +1,17 @@
 # Changelog
 
+## Beta 1.32
+- **Víko bez vůle** vráceno na mezeru **0,05 mm** mezi háčkem a lištou (v 1.30 zvětšeno na 0,2 mm). Zkušební tisk ukázal, že víko vpředu nedrželo nahoře západka, ale pruživě ho zvedal zapuštěný pant (opraveno v 1.31), takže původní nastavení západky bylo v pořádku.
+
+## Beta 1.31
+- **Zapuštěný pant:** kapsa ve stěně, kterou prochází kloub druhého dílu, má o 0,2 mm víc místa (vůle + 0,2 mm). Na zkušebním tisku se zavřené víko po zmáčknutí vpředu zase zvedalo: kapsa se tiskne užší a kloub plnější, takže se o sebe opíraly.
+
+## Beta 1.30
+- Podle zkušebních krabiček:
+  - **Víko bez vůle** nechává mezi háčkem a lištou svislou mezeru **0,2 mm** (dřív 0,05 mm). Při 0,05 mm háček kvůli nepřesnosti tisku držel víko vpředu nad okrajem.
+  - **Otvory pro filament v západkách** (malá očka a očko jazýčku se tisknou těsněji než zkušební kostičky): natlačený 2,15 mm (dřív 2,00), volný 2,0 mm + vůle, tedy 2,3 mm (dřív 2,1). Zářez v kapse zapuštěné západky 1,6 mm (dřív 1,5). Panty mají otvory beze změny.
+  - **Zapuštěná sklopná západka:** jazýček má v kapse o 0,2 mm víc místa na každé straně.
+
 ## Beta 1.29
 - Dialogy rozlišují druh šroubu: u **pantů** (pant krabičky na kolík i samostatný pant) je to **klasický (strojní) šroub s maticí**, u **sklopné a otočné západky** **samořezný šroub M3**, který si vyřízne závit v očkách (matice není potřeba); volba osy západky se jmenuje Samořezný M3.
 - Sklopná západka: doporučená délka samořezného šroubu je rovna šířce západky (při 16 mm M3 × 16), takže závit drží v obou očkách (dřív o 2 mm kratší).
