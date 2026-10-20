@@ -159,22 +159,25 @@ button { cursor: pointer; }
 .fnum input { flex: 1; min-width: 0; width: 100%; border: 0; background: transparent; padding: 0 6px; text-align: right; font: 12.5px var(--mono); font-variant-numeric: tabular-nums; }
 .fnum input:focus-visible { outline: none; }
 .fnum .u { padding: 0 7px 0 2px; color: var(--muted); font: 11px var(--mono); }
-.fnum .ax { width: 18px; text-align: center; font: 600 11px var(--mono); }
+.fnum .ax { min-width: 18px; padding: 0 3px; text-align: center; font: 600 11px var(--mono); }
 .fnum.ftext { flex: 1; margin-bottom: 6px; }
 .fnum.ftext input { text-align: left; font-family: var(--sans, inherit); }
 .ax-x { color: #e5484d; } .ax-y { color: #2f9e6a; } .ax-z { color: #4f7ae0; }
 .xyz { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
 .fsel { height: 28px; border: 1px solid var(--line); border-radius: 4px; background: var(--field); padding: 0 6px; width: 100%; }
-.selbtn { height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--field); text-align: left; min-width: 0; }
+.selbtn { min-height: 28px; display: flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--field); text-align: left; min-width: 0; }
 .selbtn .dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--muted); flex: none; }
 .selbtn.has .dot { background: var(--accent); border-color: var(--accent); }
 .selbtn.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
-.selbtn .tx { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.selbtn .tx { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.25; }
 .seg { display: flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; height: 28px; }
-.seg button { flex: 1; border: 0; background: var(--field); font-size: 12px; padding: 0 4px; }
+.seg button { flex: 1; border: 0; background: var(--field); font-size: 12px; padding: 0 4px; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.frow.wide { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+.seg.wrap { height: auto; min-height: 28px; }
+.seg.wrap button { white-space: normal; line-height: 1.2; padding: 3px 4px; overflow-wrap: anywhere; }
 .seg button + button { border-left: 1px solid var(--line); }
 .seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--ink); font-weight: 500; }
-.btnrow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+.btnrow { display: grid; min-width: 0; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
 .btnrow.one { grid-template-columns: 1fr; }
 .btn.sm { height: 26px; padding: 0 4px; font-size: 12px; font-weight: 500; white-space: nowrap; }
 .btn.sm[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }

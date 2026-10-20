@@ -1205,6 +1205,31 @@ function runCommand(id) {
 }
 
 /* ================= dialog framework ================= */
+/* a choice row whose labels do not fit beside the field label gets the whole width (label above it); segmented buttons
+   that still do not fit wrap their text onto two lines. Measured from the shown (possibly translated) text. */
+let fitCanvas = null;
+function fitDialogRows(el) {
+  if (!el || el.hidden) return;
+  const body = $('.dbody', el); if (!body) return;
+  const cs = getComputedStyle(body), full = body.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+  if (!(full > 0)) return;
+  const ctx = (fitCanvas = fitCanvas || document.createElement('canvas')).getContext('2d');
+  const tw = (node, txt) => { const st = getComputedStyle(node); ctx.font = `${st.fontWeight} ${st.fontSize} ${st.fontFamily}`; return ctx.measureText(txt).width; };
+  for (const row of $$('.frow', body)) {
+    const seg = $('.seg', row) || $('.btnrow', row), sel = $('.fsel', row); if (!seg && !sel) continue;
+    if (!$('.fl, label', row)) { if (seg && seg.classList.contains('seg')) { const bs = $$('button', seg); seg.classList.toggle('wrap', bs.length * Math.max(...bs.map(b => tw(b, b.textContent) + 10)) > full); } continue; }
+    row.classList.remove('wide'); if (seg) seg.classList.remove('wrap');
+    const side = full - 100 - 8;
+    let need;
+    if (seg) { const bs = $$('button', seg), gap = seg.classList.contains('btnrow') ? 4 : 1; need = bs.length * Math.max(...bs.map(b => tw(b, b.textContent) + 18)) + bs.length * gap; }
+    else need = Math.max(...[...sel.options].map(o => tw(sel, o.textContent))) + 34;
+    if (need <= side) continue;
+    row.classList.add('wide');
+    if (seg && need > full) seg.classList.add('wrap');
+  }
+}
+window.addEventListener('resize', () => fitDialogRows($('#dialog')));
+if (window.I18N) I18N.onChange(() => requestAnimationFrame(() => fitDialogRows($('#dialog'))));
 let dlg = null;
 function openDialog(spec) {
   const el = $('#dialog'); el.hidden = false;
@@ -1227,6 +1252,7 @@ function openDialog(spec) {
     <div class="dbody">${rows}</div>
     <div class="dfoot"><button class="btn" data-act="cancel">Zrušit</button><button class="btn primary" data-act="ok">OK</button></div>`;
   $('.phead .t', el).textContent = spec.title;
+  requestAnimationFrame(() => fitDialogRows(el));
   dlg = {
     spec,
     get(id) {
@@ -2149,13 +2175,14 @@ function renderPalette() {
       tb.dataset.kind = want;
       const opts = sk.tool === 'spline' ? [['points', 'Bod po bodu'], ['free', 'Od ruky']] : [['corner', 'Z rohu'], ['center', sk.tool === 'slot' ? 'Od konce ke konci' : 'Ze středu']];
       const modeRow = hasMode ? `<div class="frow"><span class="fl">Kreslit</span><div class="seg">${opts.map(([v, l]) => `<button data-rmode="${v}" aria-pressed="${drawMode(sk.tool) === v}">${l}</button>`).join('')}</div></div>` : '';
-      const combRow = sk.tool === 'sktrim' ? `<div class="frow"><div class="seg">${COMB_OPS.map(([v, l]) => `<button data-cmode="${v}" aria-pressed="${combOp() === v}">${l}</button>`).join('')}</div></div>` : '';
-      const offRow = sk.tool === 'skoffset' ? `<div class="frow"><label for="pal-offd">Vzdálenost</label><span class="fnum"><input id="pal-offd" value="${fmtc(sk.offD, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div><div class="frow"><div class="seg"><button data-offdir="out" aria-pressed="${!sk.offIn}">Ven</button><button data-offdir="in" aria-pressed="${sk.offIn}">Dovnitř</button></div></div>` : '';
+      const combRow = sk.tool === 'sktrim' ? `<div class="frow wide"><div class="seg">${COMB_OPS.map(([v, l]) => `<button data-cmode="${v}" aria-pressed="${combOp() === v}">${l}</button>`).join('')}</div></div>` : '';
+      const offRow = sk.tool === 'skoffset' ? `<div class="frow"><label for="pal-offd">Vzdálenost</label><span class="fnum"><input id="pal-offd" value="${fmtc(sk.offD, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div><div class="frow wide"><div class="seg"><button data-offdir="out" aria-pressed="${!sk.offIn}">Ven</button><button data-offdir="in" aria-pressed="${sk.offIn}">Dovnitř</button></div></div>` : '';
       const esc = t => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
       const txtRow = sk.tool === 'sktext' ? `<div class="frow"><label for="pal-txt">Text</label><span class="fnum ftext"><input id="pal-txt" value="${esc(sk.txt.s)}" autocomplete="off"></span></div><div class="frow"><label for="pal-txth">Výška písmen</label><span class="fnum"><input id="pal-txth" value="${fmtc(sk.txt.h, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div><label class="chk"><input type="checkbox" id="pal-txtb"${sk.txt.bold ? ' checked' : ''}><span>Tučné písmo</span></label>` : '';
       tb.innerHTML = modeRow + combRow + offRow + txtRow + (sk.tool === 'ngon' ? `<div class="frow"><label for="pal-ngon">Počet stran</label><span class="fnum"><input id="pal-ngon" value="${sk.ngonN}" inputmode="numeric" autocomplete="off"><span class="u">ks</span></span></div>`
         : want === 'fr' ? `<div class="frow"><label for="pal-fr">Poloměr rohů</label><span class="fnum"><input id="pal-fr" value="${fmtc(sk.frR, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div>`
         : '');
+      tb.hidden = !want; fitDialogRows($('#dialog'));
     }
     tb.hidden = !want;
   }
@@ -2494,11 +2521,25 @@ function startPrimitive(type, editIndex, f) {
         fields: [...defs.map(([k, l]) => ({ k: 'num', id: k, label: l, value: this.vals[k] })), { k: 'xyz', id: 'pos', label: 'Poloha základny', value: this.pos },
           { k: 'chk', id: 'uni', label: 'Zachovat poměr stran', value: this.uniform },
           { k: 'opt', id: 'op', label: 'Operace', options: OPS, value: this.op }, { k: 'note', id: 'n' }],
-        onChange: id => {
+        onChange: (id, live) => {
+          if (!live && this.ub && this.ub.id === id) setTimeout(() => { this.ub = null; }, 0); /* the edit of this field is finished */
+          if (id !== this.ub?.id) this.ub = null;
           if (id === 'uni') { this.uniform = dlg.get('uni'); return; }
           if (id === 'pos') this.pos = dlg.get('pos');
           else if (id === 'op') { this.op = dlg.get('op'); this.autoOp = false; }
-          else { const v = dlg.get(id); if (isFinite(v) && (v > 0 || (id === 'Dt' && v >= 0))) this.vals[id] = v; }
+          else {
+            const v = dlg.get(id);
+            if (isFinite(v) && (v > 0 || (id === 'Dt' && v >= 0))) {
+              /* keep the proportions: a size typed into one field scales all the others by the same factor, always from
+                 the sizes before this field was edited (so the keystrokes in between do not add up rounding errors) */
+              if (this.uniform && v > 0) {
+                if (!this.ub || this.ub.id !== id) this.ub = { id, v: { ...this.vals } };
+                const b0 = this.ub.v[id];
+                if (b0 > 0) for (const k in this.vals) if (k !== id) { this.vals[k] = Math.round(this.ub.v[k] * v / b0 * 1000) / 1000; dlg.set(k, this.vals[k]); }
+              }
+              this.vals[id] = v;
+            }
+          }
           this.update();
         }
       });
@@ -2630,7 +2671,7 @@ function startFastener(type, editIndex, f) {
         title: Engine.FEATURE_LABEL[type], icon: type,
         fields: [{ k: 'opt', id: 'size', label: 'Velikost závitu', options: sizes, value: String(this.v.size) },
           ...(bolt ? [{ k: 'num', id: 'len', label: 'Délka dříku', value: this.v.len },
-            { k: 'opt', id: 'head', label: 'Hlava', options: [['hex', 'Šestihranná (ISO 4017)'], ['socket', 'Válcová s imbusem (ISO 4762)'], ['slotted', 'Válcová s drážkou – plochý šroubovák (ISO 1207)'], ['phillips', 'Půlkulatá s křížem – křížový šroubovák (ISO 7045)'], ['hexslot', 'Šestihranná s drážkou (klíč i plochý šroubovák)'], ['hexcross', 'Šestihranná s křížem (klíč i křížový šroubovák)']], value: this.v.head }] : []),
+            { k: 'opt', id: 'head', label: 'Hlava', options: [['hex', 'Šestihranná (ISO 4017)'], ['socket', 'Válcová s imbusem (ISO 4762)'], ['slotted', 'Válcová s drážkou (ISO 1207)'], ['phillips', 'Půlkulatá s křížem (ISO 7045)'], ['hexslot', 'Šestihranná s drážkou'], ['hexcross', 'Šestihranná s křížem']], value: this.v.head }] : []),
           ...(bolt ? [] : [{ k: 'seg', id: 'low', label: 'Výška', options: [['n', 'Normální (ISO 4032)'], ['l', 'Nízká (ISO 4035)']], value: this.v.low ? 'l' : 'n' }]),
           { k: 'chk', id: 'thread', label: 'Modelovat závit', value: this.v.thread },
           { k: 'chk', id: 'chamfer', label: bolt ? 'Zkosená špička (snazší našroubování)' : 'Zkosený náběh díry z obou stran', value: this.v.chamfer },
@@ -2696,11 +2737,14 @@ function startFastener(type, editIndex, f) {
 /* ================= hinge ================= */
 /* screw length for a hinge with a recessed head and nut: from the counterbore floor (d + 0.3 deep) through the nut */
 function screwLen(L, d) { const F = Engine.FASTENERS[d]; return F ? Math.floor(L - (d + 0.3) - 0.3) : Math.floor(L); }
+/* default closing allowance (axis above the rim) of a box hinge printed in one piece, per placement, from test prints:
+   without it the lid stayed slightly open at the hinge */
+const HINGE_LIFT = { out: 0.15, flush: 0.15 };
 function startHinge(editIndex, f) {
   const pivot = new THREE.Object3D(); scene.add(pivot);
-  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_HINGE, holes: 2, hd: 3, part: 'both', rot: 0, count: 1, side: '+y', join: 'print', pinKind: 'fil', pinTight: false, recess: true, gap: 1, shift: 0, out: 'join', lift: 0 }; /* lift 0: test prints with 0.2 mm stayed ajar at the hinge */
+  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_HINGE, holes: 2, hd: 3, part: 'both', rot: 0, count: 1, side: '+y', join: 'print', pinKind: 'fil', pinTight: false, recess: true, gap: 1, shift: 0, out: 'join', lift: HINGE_LIFT.flush };
   const c = {
-    editIndex, tool: null, tools: null, gizmoDrag: false, timer: null,
+    editIndex, tool: null, tools: null, gizmoDrag: false, timer: null, liftSet: !!f,
     v: f ? { ...D0, style: 'out', pinTight: false, recess: false, ...f } : { ...D0 }, /* an older hinge keeps its free axle hole */
     pos: f && f.pos ? f.pos.slice() : [0, 0, 0], op: f && f.op ? f.op : 'new',
     box: f ? f.box || null : null, lid: f ? f.lid || null : null, pick: 'box', highlight: new Set(),
@@ -2714,7 +2758,7 @@ function startHinge(editIndex, f) {
           { k: 'chk', id: 'recess', label: 'Zapustit hlavu šroubu a matici', value: this.v.recess },
           { k: 'chk', id: 'pinTight', label: 'Filament natlačit do krajních kloubů (nevypadne)', value: this.v.pinTight },
           { k: 'opt', id: 'side', label: 'Strana pantu', options: [['+y', 'Zadní (+Y)'], ['-y', 'Přední (−Y)'], ['+x', 'Pravá (+X)'], ['-x', 'Levá (−X)']], value: this.v.side },
-          { k: 'seg', id: 'style', label: 'Umístění', options: [['flush', 'Zapuštěný'], ['out', 'Na stěně']], value: this.v.style },
+          { k: 'seg', id: 'style', label: 'Umístění', options: [['flush', 'Zapuštěný'], ['hidden', 'Skrytý'], ['out', 'Na stěně']], value: this.v.style },
           { k: 'num', id: 'gap', label: 'Mezera mezi díly po rozložení', value: this.v.gap },
           { k: 'sel', id: 'box', label: 'Krabička' }, { k: 'sel', id: 'lid', label: 'Víko' },
           { k: 'num', id: 'len', label: 'Délka pantu', value: this.v.len },
@@ -2741,8 +2785,11 @@ function startHinge(editIndex, f) {
           else if (id === 'pinTight') this.v.pinTight = !!dlg.get('pinTight');
           else if (id === 'recess') this.v.recess = !!dlg.get('recess');
           else if (id === 'cnt') this.v.n = parseFloat(dlg.get('cnt'));
+          else if (id === 'lift') { const x = dlg.get('lift'); if (isFinite(x) && x >= 0) { this.v.lift = x; this.liftSet = true; } }
           else if (id === 'holes' || id === 'rot' || id === 'hd' || id === 'count') this.v[id] = parseFloat(dlg.get(id));
           else { const x = dlg.get(id); if (isFinite(x) && (x >= 0 || id === 'shift')) this.v[id] = x; }
+          /* a new hinge takes the allowance of its placement until the user sets one */
+          if (id === 'style' && !this.liftSet && HINGE_LIFT[this.v.style] !== undefined) { this.v.lift = HINGE_LIFT[this.v.style]; dlg.set('lift', this.v.lift); }
           if (id === 'join' || id === 'style' || id === 'pinKind' || id === 'kind') this.layout();
           if (id === 'kind') {
             const l = $('#dialog [data-row="pin"] label'); if (l) l.textContent = this.v.kind === 'screw' ? 'Průměr šroubu v ose' : 'Průměr čepu';
@@ -2761,9 +2808,10 @@ function startHinge(editIndex, f) {
     isBox() { return this.v.kind === 'box' || this.v.kind === 'closed'; },
     isClosed() { return this.v.kind === 'closed'; },
     layout() {
-      const bx = this.isBox(), cl = this.isClosed(), pin = cl && this.v.join === 'pin';
+      const bx = this.isBox(), cl = this.isClosed(), hid = cl && this.v.style === 'hidden', pin = cl && (this.v.join === 'pin' || hid);
       for (const id of ['style', 'box', 'lid', 'count', 'shift', 'out']) dlg.show(id, bx);
-      dlg.show('join', cl); dlg.show('side', cl); dlg.show('lift', bx && !pin); dlg.show('pinKind', pin); dlg.show('pinTight', pin && this.v.pinKind === 'fil'); dlg.show('recess', (pin && this.v.pinKind !== 'fil') || (!bx && this.v.kind === 'screw')); dlg.show('pin', !pin); dlg.show('gap', cl && !pin && this.v.style === 'flush');
+      /* hidden: always a filament axle (the lid opens only about 100°, so it cannot be printed in one piece) */
+      dlg.show('join', cl && !hid); dlg.show('side', cl); dlg.show('lift', bx && !pin); dlg.show('pinKind', pin && !hid); dlg.show('pinTight', pin && (hid || this.v.pinKind === 'fil')); dlg.show('recess', (pin && !hid && this.v.pinKind !== 'fil') || (!bx && this.v.kind === 'screw')); dlg.show('pin', !pin); dlg.show('gap', cl && !pin && this.v.style === 'flush');
       for (const id of ['w', 't', 'holes', 'hd', 'part', 'rot', 'pos', 'op']) dlg.show(id, !bx);
       if (bx) transform.detach(); else transform.attach(pivot);
       if (bx && !this.box) this.pick = 'box'; else if (bx && !this.lid) this.pick = 'lid';
@@ -2796,8 +2844,13 @@ function startHinge(editIndex, f) {
           this.tool = Rz.box.concat(Rz.lid, Rz.partA || [], Rz.partB || []); this.hideBodies = new Set([this.box, this.lid]); styleBodies();
           G.preview.add(previewMesh(this.tool, 'new'));
           dlg.set('n', `Kloub Ø ${fmtc(2 * H.R, 1)} mm, ${H.N} × ${fmtc(H.k, 1)} mm, vůle ${fmtc(H.c, 2)} mm`);
+          if (Rz.hidden) {
+            dlg.set('n2', `Do kloubů patří kus filamentu 1,75 mm dlouhý ${Rz.filLen} mm, zasune se bočním otvorem a projde celou zadní hranou${this.v.pinTight ? (H.N % 2 ? '; v krajních kloubech krabičky drží napevno' : '; v prvním kloubu drží napevno') : '; konce zatavte nebo zaklepněte'}.`);
+            dlg.set('n3', `Nic nevyčnívá: osa je uvnitř zadní stěny a zadní hrany krabičky i víka jsou zkosené. Víko se otevře o ${Rz.maxAngle}° a opře se. Krabička a víko se tisknou zvlášť (víko otočte otevřenou stranou nahoru).`);
+          } else {
           dlg.set('n2', Rz.pinMode ? `Do kloubů patří ${this.v.pinKind === 'fil' ? 'kus filamentu 1,75 mm' : 'klasický (strojní) šroub ' + this.v.pinKind.toUpperCase()} dlouhý ${this.v.pinKind !== 'fil' && this.v.recess && H.k ? screwLen(H.L, this.v.pinKind === 'm2' ? 2 : 3) : Math.floor(H.L)} mm${this.v.pinKind === 'fil' ? (this.v.pinTight ? (H.N % 2 ? '; natlačte ho, v krajních kloubech drží napevno' : '; natlačte ho, v prvním kloubu drží napevno') : '; konce zatavte nebo zaklepněte') : (this.v.recess ? ' s válcovou nebo půlkulatou hlavou a maticí, obě se zapustí do krajních kloubů' : ' s maticí')}.` : `Víko je odklopené o 180° vedle krabičky, mezera ${fmtc(Rz.T.G, 1)} mm.`);
           dlg.set('n3', Rz.pinMode ? 'Krabička a víko se tisknou zvlášť (víko otočte otevřenou stranou nahoru). Pant je navržený pro zavřenou polohu, víko proto vždy dosedne.' : 'Tiskne se vcelku bez podpěr. Pant je navržený pro zavřenou polohu, víko proto po překlopení přesně dosedne.');
+          }
         } else if (bx) {
           if (this.box === this.lid) throw new Error('Krabička a víko musí být dvě různá tělesa');
           const T = Engine.boxHingeTools(F, bodyById(this.box).polys, bodyById(this.lid).polys), H = T.H;
@@ -2856,7 +2909,7 @@ function startHinge(editIndex, f) {
 
 /* ================= latch (box designed closed) ================= */
 function startLatch(editIndex, f) {
-  const D0 = { style: 'out', side: '-y', width: 12, count: 1, shift: 0, tol: TOL_HINGE, wall: 2, out: 'join', lever: 16, axle: 'screw', snug: true };
+  const D0 = { style: 'out', side: '-y', width: 12, count: 1, shift: 0, tol: TOL_LATCH, wall: 2, out: 'join', lever: 16, axle: 'screw', snug: true };
   const c = {
     editIndex, tool: null, timer: null, v: f ? { ...D0, snug: false, ...f } : { ...D0 }, /* an older latch keeps its play */
     box: f ? f.box : null, lid: f ? f.lid : null, pick: 'box', highlight: new Set(),
@@ -2870,6 +2923,7 @@ function startLatch(editIndex, f) {
           { k: 'opt', id: 'side', label: 'Strana', options: [['-y', 'Přední (−Y)'], ['+y', 'Zadní (+Y)'], ['+x', 'Pravá (+X)'], ['-x', 'Levá (−X)']], value: this.v.side },
           { k: 'num', id: 'width', label: 'Šířka západky', value: this.v.width },
           { k: 'num', id: 'lever', label: 'Délka páčky', value: this.v.lever },
+          { k: 'num', id: 'len', label: 'Délka západky (pod okrajem)', value: '' },
           { k: 'seg', id: 'axle', label: 'Osa', options: [['screw', 'Samořezný M3'], ['fil', 'Filament 1,75']], value: this.v.axle === 'print' ? 'screw' : this.v.axle },
           { k: 'seg', id: 'axleF', label: 'Osa', options: [['screw', 'Samořezný M3'], ['fil', 'Filament 1,75'], ['print', 'Tisk vcelku']], value: this.v.axle },
           { k: 'opt', id: 'count', label: 'Počet', options: [['1', '1'], ['2', '2'], ['3', '3']], value: String(this.v.count) },
@@ -2878,21 +2932,30 @@ function startLatch(editIndex, f) {
           { k: 'num', id: 'tol', label: 'Vůle pro 3D tisk', value: this.v.tol },
           { k: 'chk', id: 'snug', label: 'Víko bez vůle (háček víko přitáhne)', value: this.v.snug },
           { k: 'seg', id: 'out', label: 'Výsledek', options: [['join', 'Přidat k tělesům'], ['new', 'Nová tělesa']], value: this.v.out },
-          { k: 'note', id: 'n' }, { k: 'note', id: 'n2' }],
+          { k: 'note', id: 'n' }, { k: 'note', id: 'n2' }, { k: 'note', id: 'n3' }],
         onSel: id => { this.pick = id; this.update(); },
         onChange: id => {
           if (['style', 'side', 'out', 'axle'].includes(id)) this.v[id] = dlg.get(id);
           else if (id === 'axleF') this.v.axle = dlg.get('axleF');
           else if (id === 'snug') this.v.snug = !!dlg.get('snug');
           else if (id === 'count') this.v.count = parseFloat(dlg.get('count'));
+          else if (id === 'len') { const x = dlg.get('len'); this.v.len = isFinite(x) && x > 0 ? x : null; }
           else { const x = dlg.get(id); if (isFinite(x) && (x >= 0 || id === 'shift')) this.v[id] = x; }
           if (id === 'style') { const cat = this.isFlip() ? 'flip' : this.isRot() ? 'rot' : 'spring'; if (cat !== this.cat) { const w = { flip: 16, rot: 7, spring: 12 }[cat]; this.v.width = w; dlg.set('width', w); } this.cat = cat; this.layout(); }
+          if (id === 'style') this.v.len = null; /* each type has its own default length */
+          if (id !== 'len') this.showLen();
           this.schedule();
         }
       });
       this.cat = this.isFlip() ? 'flip' : this.isRot() ? 'rot' : 'spring';
-      this.layout();
+      this.layout(); this.showLen();
       this.update();
+    },
+    /* the length field: the value set, or the type's default (shown, but not stored until changed) */
+    showLen() {
+      let L = null; try { L = Engine.latchLen(this.feature()); } catch (e) { L = null; }
+      dlg.show('len', !!L);
+      if (L) dlg.set('len', Math.round(L.len * 10) / 10);
     },
     isRot() { return this.v.style === 'rot' || this.v.style === 'rotflush'; },
     isFlip() { return this.v.style === 'flip' || this.v.style === 'flipflush'; },
@@ -2903,7 +2966,7 @@ function startLatch(editIndex, f) {
       dlg.set(rot ? 'axle' : 'axleF', this.v.axle); dlg.show('out', !rot && !flip);
       const l = $('#dialog [data-row="width"] label'); if (l) l.textContent = rot ? 'Šířka páčky' : 'Šířka západky';
     },
-    feature() { const v = this.v; return { id: f ? f.id : 'tmp', type: 'latch', style: v.style, side: v.side, width: v.width, count: v.count, shift: v.shift, tol: v.tol, snug: !!v.snug, wall: v.wall, out: v.out, lever: v.lever, axle: v.axle, box: this.box, lid: this.lid }; },
+    feature() { const v = this.v; return { id: f ? f.id : 'tmp', type: 'latch', style: v.style, side: v.side, width: v.width, count: v.count, shift: v.shift, tol: v.tol, snug: !!v.snug, wall: v.wall, out: v.out, lever: v.lever, axle: v.axle, len: v.len || null, box: this.box, lid: this.lid }; },
     schedule() { clearTimeout(this.timer); dlg.set('n', 'Počítám…'); this.timer = setTimeout(() => this.update(), 150); },
     update() {
       clearGroup(G.preview); this.tool = null;
@@ -2912,7 +2975,7 @@ function startLatch(editIndex, f) {
       dlg.set('box', { text: bb ? bodyName(bb) : 'Klepněte na krabičku', has: !!bb, active: this.pick === 'box' });
       dlg.set('lid', { text: lb ? bodyName(lb) : 'Klepněte na víko', has: !!lb, active: this.pick === 'lid' });
       setPrompt(this.pick === 'box' ? 'Klepněte na stěnu krabičky, kde má být západka. Víko leží na krabičce, nebo je připojené pantem krabičky.' : 'Klepněte na víko.');
-      if (!bb || !lb) { dlg.set('n', ''); dlg.set('n2', ''); dlg.okEnabled(false); requestRender(); return; }
+      if (!bb || !lb) { dlg.set('n', ''); dlg.set('n2', ''); dlg.set('n3', ''); dlg.okEnabled(false); requestRender(); return; }
       try {
         if (this.box === this.lid) throw new Error('Krabička a víko musí být dvě různá tělesa');
         const Rz = Engine.latchApply(this.feature(), bb, lb);
@@ -2928,9 +2991,11 @@ function startLatch(editIndex, f) {
         dlg.set('n2', (st === 'flip' && this.v.axle === 'print' ? 'Jazýček se tiskne vcelku s víkem: je přiklopený nahoru ke stěně víka a stojí na podložce, osu tvoří tištěné kuželové čepy v očkách. Po tisku ho sklopte dolů. '
           : st === 'flip' ? `Jazýček je samostatné těleso, tiskněte ho naležato na vnější ploše; osa: ${this.v.axle === 'fil' ? `kus filamentu 1,75 mm dlouhý ${W} mm (natlačit do oček)` : `samořezný šroub M3 × ${Math.round(W)} mm (vyřízne si závit v obou očkách, matice není potřeba)`}. `
           : st === 'flipflush' ? `Jazýček je samostatné těleso, tiskněte ho naležato na vnější ploše; do jeho očka vlepte kus filamentu 1,75 mm dlouhý ${W} mm a jazýček zacvakněte zvenku do zářezů na koncích kapsy. ` : '')
-          + (st === 'rot' || st === 'rotflush' ? `Páčka je samostatné těleso, tiskněte ji naležato; osa: ${this.v.axle === 'fil' ? 'kus filamentu 1,75 mm (natlačit do díry ve víku)' : 'samořezný šroub M3 do díry ve víku (vyřízne si závit, matice není potřeba)'}. ` : st.startsWith('flip') ? '' : 'Všechny převisy jsou 45°, tiskne se bez podpěr. ') + (Rz.fold ? 'Víko je připojené pantem; západka se spočítala na zavřené krabičce a víko zůstalo odklopené.' : ''));
+          + (st === 'rot' || st === 'rotflush' ? `Páčka je samostatné těleso, tiskněte ji naležato; osa: ${this.v.axle === 'fil' ? 'kus filamentu 1,75 mm (natlačit do díry ve víku)' : 'samořezný šroub M3 do díry ve víku (vyřízne si závit, matice není potřeba)'}. ` : st.startsWith('flip') ? '' : 'Všechny převisy jsou 45°, tiskne se bez podpěr. ') + (Rz.fold ? 'Víko je připojené pantem; západka se spočítala na zavřené krabičce a víko zůstalo odklopené.' : '')
+);
+        { const L = Engine.latchLen(this.feature()); dlg.set('n3', L ? `Západka sahá ${fmtc(L.len, 1)} mm pod horní hranu krabičky (${L.set ? 'nastaveno' : 'výchozí'}; nejméně ${fmtc(L.lenMin, 1)} mm).` : ''); }
         dlg.okEnabled(true);
-      } catch (e) { dlg.set('n', '!' + e.message); dlg.set('n2', ''); dlg.okEnabled(false); }
+      } catch (e) { dlg.set('n', '!' + e.message); dlg.set('n2', ''); dlg.set('n3', ''); dlg.okEnabled(false); }
       requestRender();
     },
     onMove(ev) { const h = hitBodies(ev); dom.style.cursor = h ? 'pointer' : ''; },
@@ -3016,7 +3081,9 @@ function startSimulate(editIndex, ef) {
       }
       const other = cur.bodies.filter(b => b.id !== lb.id && b.rides !== lb.id && isVis(b.id));
       const spring = doc.features.some(f => f.type === 'latch' && f.lid === lb.id && (f.style === 'out' || f.style === 'flush'));
-      this.info = { lb, riders, levers, O, U, axis, pt, sg, Phi, other, spring, tA: levers.length ? 30 : 0 };
+      this.info = { lb, riders, levers, O, U, axis, pt, sg, Phi, amax: (lb.swing && lb.swing.max) || 180, other, spring, tA: levers.length ? 30 : 0 };
+      /* how far the lid turns: to 180° (lying open beside the box), or a hidden hinge's stop */
+      this.info.span = () => this.info.Phi - (180 - this.info.amax);
       for (const b of [lb, ...riders]) this.moved.add(b.id);
       this.note(false);
       /* the lid stands open (as printed, or opened by an earlier step) or closed: offer the other state */
@@ -3036,7 +3103,7 @@ function startSimulate(editIndex, ef) {
       const fa = S.tA ? Math.min(1, t / S.tA) : 1, fb = Math.max(0, (t - S.tA) / (100 - S.tA));
       let L, Uc = S.U;
       if (S.axis) {
-        const a = S.sg * S.Phi * (1 - fb) * Math.PI / 180;
+        const a = S.sg * (S.Phi - fb * S.span()) * Math.PI / 180;
         L = new THREE.Matrix4().makeTranslation(S.pt.x, S.pt.y, S.pt.z - (this.settle || 0) * (1 - fb)).multiply(new THREE.Matrix4().makeRotationAxis(S.axis, a)).multiply(new THREE.Matrix4().makeTranslation(-S.pt.x, -S.pt.y, -S.pt.z));
       } else L = new THREE.Matrix4().makeTranslation(0, 0, fb * LIFT);
       const out = new Map(), base = b => (b.unpose ? new THREE.Matrix4().fromArray(b.unpose) : new THREE.Matrix4());
@@ -3048,7 +3115,7 @@ function startSimulate(editIndex, ef) {
           out.set(r.id, L.clone().multiply(Uc).multiply(P).multiply(r.openPose ? Uc : new THREE.Matrix4()).multiply(base(r)));
         } else out.set(r.id, (r.openPose ? L.clone().multiply(S.O) : L.clone().multiply(Uc)).multiply(base(r)));
       }
-      return { out, angle: S.axis ? fb * S.Phi : fb * LIFT, fa, fb };
+      return { out, angle: S.axis ? fb * S.span() : fb * LIFT, fa, fb };
     },
     pose() {
       const S = this.info; if (!S) return;
@@ -3077,8 +3144,8 @@ function startSimulate(editIndex, ef) {
       const steps = [];
       if (S.tA) for (let i = 1; i <= 8; i++) steps.push({ t: S.tA * i / 8, step: S.tA / 8 });
       /* the lid: finely near the closed position (snapping latches, the hinge), then every 5° */
-      const fbs = S.axis ? [0, 1, 2, 3, 4, 6, 8, 10].map(a => a / S.Phi) : [0, 0.05, 0.1, 0.25, 0.5, 0.75, 1];
-      if (S.axis) for (let a = 15; a < S.Phi; a += 5) fbs.push(a / S.Phi);
+      const fbs = S.axis ? [0, 1, 2, 3, 4, 6, 8, 10].map(a => a / S.span()) : [0, 0.05, 0.1, 0.25, 0.5, 0.75, 1];
+      if (S.axis) for (let a = 15; a < S.span(); a += 5) fbs.push(a / S.span());
       if (S.axis) fbs.push(1);
       fbs.forEach((fb, i) => { const t = S.tA + (100 - S.tA) * fb, nb = fbs[i + 1] !== undefined ? fbs[i + 1] : fb, pb = i ? fbs[i - 1] : fb; steps.push({ t, step: Math.max(0.5, (100 - S.tA) * (nb - pb)) }); });
       const moving = [S.lb, ...S.riders], token = {}; this.scanTok = token;
@@ -4590,7 +4657,7 @@ function cylinderAt(polys, pi) {
   return { c: cOut.map(r6), ax: aOut.map(r6), r: r6(r), len: r6(t1 - t0), internal, group };
 }
 /* default 3D-print clearances on the diameter, from print tests: bolt / pin 0.15 mm, nut / hole 0.35 mm */
-const TOL_HINGE = 0.3; /* hinges and latches, from the user's test prints */
+const TOL_HINGE = 0.35, TOL_LATCH = 0.3; /* from the user's test prints: hinges 0.35 (0.3 held the lid ajar at the hinge), latches 0.3 */
 const TOL_BOLT = 0.15, TOL_NUT = 0.35;
 const threadLabel = (d, p) => `M${fmtc(d, 1)} × ${fmtc(p, 2)}`;
 function startThread(editIndex, f) {

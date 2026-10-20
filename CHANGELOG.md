@@ -1,5 +1,29 @@
 # Changelog
 
+## Beta 1.42
+- **Výchozí rezerva pantu na stěně 0,15 mm** (dosud 0,125 mm) podle zkušebního tisku s vůlí 0,35 mm (0,13 / 0,14 / 0,15 mm, nejlépe vyšla 0,15). Zapuštěný pant má dál 0,15 mm.
+## Beta 1.41
+- **Sklopná západka tištěná vcelku** má háček (zobáček) zase dole u konce jazýčku jako ostatní a zkosení pod 45° na něj navazuje. Jazýček sahá na podložku (je dlouhý podle výšky víka), takže lišta na krabičce se posune níž; krabička proto musí být aspoň tak hluboká, jak dlouhý je jazýček (jinak dialog ohlásí, že je krabička na západku příliš nízká).
+## Beta 1.40
+- **Sklopná západka – konec jazýčku bez výstupku:** zkosení pod háčkem vede rovnou čarou od špičky háčku až k plochému konci jazýčku, krátký svislý výstupek na konci zmizel. U tištěné vcelku je zkosení strmější (jazýček sahá až na podložku) a spodek háčku je doplněný do stejné roviny; stačí víko vysoké asi 17,3 mm.
+## Beta 1.39
+- **Sklopná západka na ose – nový tvar konce jazýčku:** vnitřní strana jazýčku pod háčkem (zobáčkem) je zkosená pod 45° v jedné linii se spodní stranou háčku, až ke konci jazýčku; za konec se tak snadno dostane prst. Platí pro všechny sklopné západky, nově i pro **tištěnou vcelku** (ta dosud zkosení neměla, protože koncem stojí na podložce; její konec zůstává silný 2 mm, ostatní 1,2 mm). Jazýček je o několik desetin milimetru delší; tištěná vcelku potřebuje víko vysoké aspoň asi 18,1 mm.
+## Beta 1.38
+- **Základní tělesa – Zachovat poměr stran:** když je volba zaškrtnutá, přepsání jednoho rozměru v dialogu změní ve stejném poměru i ostatní (dosud to platilo jen při tažení šipkami). Např. krychle 30 mm → zadáte šířku 40 a hloubka i výška budou 40.
+## Beta 1.37
+- **Výchozí vůle pantů 0,35 mm** (dosud 0,3 mm) podle zkušebních tisků; západky mají dál výchozí vůli 0,3 mm. Vůle se týká nově vytvořených pantů, uložené panty si svou hodnotu nechají.
+## Beta 1.36
+- **Rezerva při zavření** (osa pantu nad okrajem) má podle zkušebních tisků nové výchozí hodnoty pro pant krabičky tištěný vcelku: **0,125 mm** u pantu na stěně a **0,15 mm** u zapuštěného (dosud 0 mm, víko u pantu lehce nedovíralo). Při změně umístění se výchozí rezerva přepne, dokud ji ručně nezměníte; uložené panty si svou hodnotu nechají.
+## Beta 1.35
+- **Délka západky:** nové pole „Délka západky (pod okrajem)“ u pružné na stěně, pružné zasunuté a sklopných západek na ose (kromě sklopné tištěné vcelku, kde délku určuje výška víka). Prázdné pole = výchozí délka daného provedení; dialog ukazuje, kolik západka sahá pod horní hranu krabičky a jaká je nejmenší možná délka. Delší západka posune lištu (u zasunuté drážku) níž.
+## Beta 1.34
+- **Dialogy a paleta skici:** volby, které se nevejdou vedle popisku, se zobrazí přes celou šířku (popisek nad nimi); tlačítka voleb, která se nevejdou ani tak, zalomí text na dva řádky místo oříznutí. Týká se např. osy sklopné západky (Samořezný M3 / Filament 1,75 / Tisk vcelku), provedení západky, umístění pantu, rychlých tlačítek Měřítka a voleb Odečíst/Sjednotit/Průnik/Rozdělit a Ven/Dovnitř ve skice.
+- Výzvy v polích pro výběr tělesa (např. „Klepněte na krabičku“) se zalomí, místo aby se ořízly.
+- Kratší názvy hlav šroubů (Válcová s drážkou (ISO 1207), Půlkulatá s křížem (ISO 7045), Šestihranná s drážkou, Šestihranná s křížem); políčko „Mez.“ u textu ve skice se už neořezává; v angličtině přeložen popisek „Poloha“.
+## Beta 1.33
+- **Skrytý pant** (Pant → Krabička navržená zavřená → Umístění **Skrytý**): u zavřené krabičky nic nevyčnívá. Osa leží v dělicí rovině uvnitř zadní stěny, klouby jsou celé za lícem stěny. Zadní horní hrana krabičky a zadní spodní hrana víka jsou zkosené o 50°, zkosení na sebe při otevření dosednou, takže se víko otevře o **100°** a opře se. Zevnitř je podél zadní stěny žebro s klouby a s kanálkem pro osu.
+  - Osa je vždy **filament 1,75 mm** (víko se neotevře o 180°, proto se nedá tisknout vcelku). Filament se zasune otvorem v boční stěně a projde celou zadní hranou; volitelně se natlačí do krajních kloubů krabičky.
+  - Krabička a víko se tisknou zvlášť bez podpěr (víko otevřenou stranou nahoru). Simulace otevírá víko jen do 100°.
 ## Beta 1.32
 - **Víko bez vůle** vráceno na mezeru **0,05 mm** mezi háčkem a lištou (v 1.30 zvětšeno na 0,2 mm). Zkušební tisk ukázal, že víko vpředu nedrželo nahoře západka, ale pruživě ho zvedal zapuštěný pant (opraveno v 1.31), takže původní nastavení západky bylo v pořádku.
 

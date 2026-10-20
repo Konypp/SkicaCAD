@@ -736,6 +736,7 @@ function boxHingeTools(f, boxPolys, lidPolys) {
   const sh = Number(f.shift) || 0;
   if (Math.abs(sh) > 1e-9 && (s0 + span * 0.5 / cnt + sh - L / 2 < s0 - 1e-6 || s0 + span * (cnt - 0.5) / cnt + sh + L / 2 > s1 + 1e-6)) throw new Error('Posunutý pant by přesahoval hranu');
   if (span < L * cnt + 2 * (cnt - 1)) throw new Error('Panty se nevejdou podél hrany (' + (Math.round(span * 10) / 10).toString().replace('.', ',') + ' mm)');
+  if (f.style === 'hidden') throw new Error('Skrytý pant je jen pro krabičku navrženou zavřenou');
   const flush = f.style === 'flush';
   const lift0 = f.pinHole ? 0 : Math.max(0, Math.min(2, f.lift === undefined ? 0 : Number(f.lift) || 0));
   const P = flush ? boxHingeFlushLocal(f, G) : boxHingeLocal({ ...f, liftEff: lift0 }, G), H = P.H;
@@ -810,36 +811,123 @@ function closedHingeTools(f, boxPolys, lidPolys) {
   return { T: boxHingeTools({ ...g, kind: 'box', zRim: zp }, boxPolys, open), U, open, pinMode };
 }
 function closedHingeResult(f, boxPolys, lidPolys) {
+  if (f.style === 'hidden') return hiddenHingeResult(f, boxPolys, lidPolys);
   const { T, U, open, pinMode } = closedHingeTools(f, boxPolys, lidPolys);
   const r = applyBoxHinge(T, boxPolys, open, f.out === 'new');
   const back = p => (p && pinMode ? KK.transform(p, U) : p);
   return { box: r.box, lid: back(r.lid), partA: r.partA, partB: back(r.partB), T, U, pinMode };
+}
+/* ---------- hidden box hinge (closed box, filament axle): the axis lies on the parting plane inside the back wall, far
+   enough in that no knuckle reaches past the back face, so nothing sticks out of the closed box. Behind the axis the
+   box's top edge and the lid's bottom edge are bevelled at HIDDEN_BEVEL° from the parting plane: the bevels close
+   onto each other at 2 × HIDDEN_BEVEL° (the lid stops there and stays open). Knuckles alternate as usual (teardrops
+   pointing into their own part, pockets in the other part); inside the back walls a rib carries the knuckles and,
+   along the whole edge, the channel for the filament, which goes in through a side wall.
+   Local frame: x along the edge, y = outward normal of the back wall (face at y = 0), z up, parting plane z = 0. */
+const HIDDEN_BEVEL = 50;
+function hiddenHingeResult(f, boxPolys, lidPolys) {
+  const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys), zp = a.max[2];
+  if (b.min[2] > zp + 0.05 || b.max[2] < zp + 0.5) throw new Error('Víko musí ležet na krabičce (navrhněte krabičku zavřenou)');
+  const side = f.side || '+y', k = side[1] === 'x' ? 0 : 1, sg = side[0] === '-' ? -1 : 1, o = 1 - k;
+  const face = sg > 0 ? a.max[k] : a.min[k], lface = sg > 0 ? b.max[k] : b.min[k];
+  if (Math.abs(face - lface) > 0.05) throw new Error('Zadní stěna víka musí lícovat se zadní stěnou krabičky');
+  const s0 = Math.max(a.min[o], b.min[o]), s1 = Math.min(a.max[o], b.max[o]), span = s1 - s0;
+  if (span <= 0) throw new Error('Víko neleží nad krabičkou');
+  const tl = Math.max(0.2, Number(f.tol) || 0.4), hole = FIL_FREE + tl;
+  const g = { ...f, pin: CLOSED_PINS.fil, pinHole: hole, pinTight: f.pinTight ? FIL_PRESS : 0 };
+  const H = hingeDims({ ...g, w: 1e3, t: 1, kind: 'screw' }), { L, N, k: kl, c, R } = H;
+  const pc = c + 0.2, rc = R + pc, e = rc, tb = Math.tan(HIDDEN_BEVEL * Math.PI / 180), rh = hole / 2;
+  const cnt = Math.max(1, Math.min(4, Math.round(Number(f.count) || 1))), sh = Number(f.shift) || 0;
+  if (Math.abs(sh) > 1e-9 && (s0 + span * 0.5 / cnt + sh - L / 2 < s0 - 1e-6 || s0 + span * (cnt - 0.5) / cnt + sh + L / 2 > s1 + 1e-6)) throw new Error('Posunutý pant by přesahoval hranu');
+  if (span < L * cnt + 2 * (cnt - 1)) throw new Error('Panty se nevejdou podél hrany (' + (Math.round(span * 10) / 10).toString().replace('.', ',') + ' mm)');
+  /* rib under the knuckles: 1.2 mm round the pocket and the knuckle's point, the underside at 45° down to the back face */
+  const yI = -e - rc - 1.2, zV = -Math.max(rc, R * Math.SQRT2) - 1.2, yC = -e - rh - 1.2, zC = -rh - 1.2;
+  const fmt = v => (Math.ceil(v * 10) / 10).toString().replace('.', ',');
+  if (zp - a.min[2] < -zV + 0.8) throw new Error('Krabička je na skrytý pant příliš nízká, potřebuje výšku alespoň ' + fmt(-zV + 0.8) + ' mm');
+  if (b.max[2] - zp < -zV + 0.8) throw new Error('Víko je na skrytý pant příliš nízké, potřebuje výšku alespoň ' + fmt(-zV + 0.8) + ' mm');
+  const ccw = pts => { let A = 0; for (let i = 0; i < pts.length; i++) { const p = pts[i], q = pts[(i + 1) % pts.length]; A += p[0] * q[1] - q[0] * p[1]; } return A < 0 ? pts.slice().reverse() : pts; };
+  const flipZ = pts => ccw(pts.map(([y, z]) => [y, -z]));
+  const at = pts => pts.map(([y, z]) => [y - e, z]); /* centred on the axis */
+  const circle = r => { const p = []; for (let i = 0; i < 48; i++) { const t = 2 * Math.PI * i / 48; p.push([r * Math.cos(t), r * Math.sin(t)]); } return p; };
+  const pr = (pts, x0, x1) => prismX(ccw(pts), x0, x1);
+  const add = (acc, p) => (acc && acc.length ? KK.boolean(acc, p, 'union') : p);
+  /* x along the edge: world coordinate along o times ex[o] */
+  const ey = [0, 0, 0]; ey[k] = sg; const ex = [ey[1], -ey[0], 0], xs = ex[o];
+  const xa = Math.min(a.min[o] * xs, a.max[o] * xs), xb = Math.max(a.min[o] * xs, a.max[o] * xs);
+  const ribH = [[0, 0], [yI, 0], [yI, zV], [0, zV + yI]], ribC = [[0, 0], [yC, 0], [yC, zC], [0, zC + yC]];
+  const bevel = [[-e, 0], [1, -(e + 1) * tb], [1, 0.5], [-e, 0.5]];
+  let boxAdd = pr(ribC, xa, xb), lidAdd = pr(flipZ(ribC), xa, xb), boxCut = pr(bevel, xa - 1, xb + 1), lidCut = pr(flipZ(bevel), xa - 1, xb + 1);
+  let kA = null, kB = null, holes = null;
+  const spans = [];
+  for (let j = 0; j < cnt; j++) {
+    const x0h = (s0 + span * (j + 0.5) / cnt + sh) * xs - L / 2;
+    spans.push([x0h, x0h + L]);
+    boxAdd = add(boxAdd, pr(ribH, x0h - c, x0h + L + c)); lidAdd = add(lidAdd, pr(flipZ(ribH), x0h - c, x0h + L + c));
+    for (let i = 0; i < N; i++) {
+      const x0 = x0h + i * (kl + c), pk = pr(at(circle(rc)), x0 - c, x0 + kl + c);
+      if (i % 2) { kB = add(kB, pr(flipZ(at(teardrop(R))), x0, x0 + kl)); boxCut = add(boxCut, pk); }
+      else { kA = add(kA, pr(at(teardrop(R)), x0, x0 + kl)); lidCut = add(lidCut, pk); }
+    }
+    holes = add(holes, KK.translate(pinHoleTool(g, H), [x0h, -e, 0]));
+  }
+  /* the filament channel between the hinges and out through both side walls */
+  spans.sort((p, q) => p[0] - q[0]);
+  let x = xa - 1;
+  for (const [p0, p1] of spans) { if (p0 > x + 1e-6) holes = add(holes, cylAlong([x, -e, 0], [1, 0, 0], rh, p0 - x)); x = p1; }
+  holes = add(holes, cylAlong([x, -e, 0], [1, 0, 0], rh, xb + 1 - x));
+  const org = [0, 0, zp]; org[k] = face;
+  const M = [ex[0], ex[1], ex[2], 0, ey[0], ey[1], ey[2], 0, 0, 0, 1, 0, org[0], org[1], org[2], 1], W = p => KK.transform(p, M);
+  /* the ribs stay within the parts' height */
+  const blk = (z0, z1) => KK.translate(KK.primitive('box', { w: a.max[0] - a.min[0] + 40, d: a.max[1] - a.min[1] + 40, h: z1 - z0 }), [(a.min[0] + a.max[0]) / 2, (a.min[1] + a.max[1]) / 2, (z0 + z1) / 2]);
+  let box = KK.boolean(boxPolys, KK.boolean(W(boxAdd), blk(a.min[2], zp), 'intersect'), 'union');
+  let lid = KK.boolean(lidPolys, KK.boolean(W(lidAdd), blk(zp, b.max[2]), 'intersect'), 'union');
+  box = KK.boolean(box, W(boxCut), 'subtract'); lid = KK.boolean(lid, W(lidCut), 'subtract');
+  const hw = W(holes);
+  let pA = KK.boolean(W(kA), hw, 'subtract'), pB = KK.boolean(W(kB), hw, 'subtract');
+  box = KK.boolean(box, hw, 'subtract'); lid = KK.boolean(lid, hw, 'subtract');
+  const sep = f.out === 'new';
+  if (!sep) { box = KK.boolean(box, pA, 'union'); lid = KK.boolean(lid, pB, 'union'); }
+  /* the lid's turn about the axis (for the simulation): 180° on the parting plane */
+  const axc = face - sg * e;
+  const U = k === 1 ? [1, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 0, 0, 2 * axc, 2 * zp, 1] : [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 2 * axc, 0, 2 * zp, 1];
+  return { box, lid, partA: sep ? pA : undefined, partB: sep ? pB : undefined, T: { H, G: 0, lift: 0 }, U, pinMode: true, hidden: true, maxAngle: 2 * HIDDEN_BEVEL, filLen: Math.round(xb - xa) };
 }
 /* ---------- latch for a box designed closed (lid lying on the box). Local frame: u = outward normal of the chosen wall
    (wall face at u = 0), x along the edge, z up with the parting plane at z = 0 (box below, lid above).
    'out'  (on the wall): a springy tab hangs from the lid over the box wall; its hook snaps under a ridge on the box.
    'flush' (hidden): a springy lip hangs from the lid inside the box; its bump snaps into a groove in the box wall.
    Every overhang is 45° both for the box (printed upright) and for the lid (printed upside down). */
+/* the latch's length below the parting plane: f.len when set (not below the shortest that works), else the default */
+function latchLenOf(f, def, min) {
+  const v = Number(f.len);
+  if (!(f.len !== undefined && f.len !== null && f.len !== '' && v > 0)) return def;
+  if (v < min - 1e-6) throw new Error('Západka je příliš krátká, nejméně ' + (Math.ceil(min * 10) / 10).toString().replace('.', ',') + ' mm');
+  if (v > 200) throw new Error('Západka je příliš dlouhá (nejvýš 200 mm)');
+  return v;
+}
 function latchParts(f) {
   const c = Math.max(0.1, Math.min(1, Number(f.tol) || 0.4)), W = Math.max(4, Number(f.width) || 12), flush = f.style === 'flush';
   const h = flush ? 0.6 : 1.0, t = flush ? 1.2 : 1.6, wall = Math.max(0.8, Number(f.wall) || 2);
   let box = [], lid = [], cut = [];
   if (!flush) {
     /* snug: the hook's upper face lies on the ridge's lower face (0.05 mm apart, so the faces never touch in the model): the closed lid has no play */
-    const zr = -4, zh = f.snug ? zr - h + c - SNUG_GAP : zr - h - c * (Math.SQRT2 - 1), zb = zh - h - 1.5, ui = c + h, uo = ui + t;
+    /* length (parting plane to the tab's end): by default the ridge 4 mm below the rim; f.len moves the ridge with it */
+    const dh = f.snug ? -h + c - SNUG_GAP : -h - c * (Math.SQRT2 - 1), dlt = dh - h - 1.5, lenDef = 4 - dlt, lenMin = 2.4 - dlt;
+    const len = latchLenOf(f, lenDef, lenMin);
+    const zr = -len - dlt, zh = zr + dh, zb = zh - h - 1.5, ui = c + h, uo = ui + t;
     box = [[[0, zr - h], [h, zr], [0, zr + h], [-0.8, zr + h + 0.8], [-0.8, zr - h - 0.8]]]; /* ridge (grips 0.8 into the wall) */
     lid = [[[ui, zb], [uo, zb], [uo, 0], [ui, 0]],                                              /* tab */
       [[ui + 0.01, zh - h], [ui + 0.01, zh + h], [c, zh]],                                      /* hook (apex c from the wall) */
       [[-0.8, 0], [uo, 0], [-0.8, uo + 0.8]]];                                                  /* 45° bracket into the lid wall */
-    return { W, box, lid, cut, depth: -zb, zb };
+    return { W, box, lid, cut, depth: -zb, zb, len: -zb, lenDef, lenMin };
   }
-  const Hl = 5, ui = -(wall + c + t), uo = -(wall + c), zg = -Hl + 1.8;
+  const Hl = latchLenOf(f, 5, 3.5), ui = -(wall + c + t), uo = -(wall + c), zg = -Hl + 1.8;
   lid = [[[ui, -Hl], [uo, -Hl], [uo, 0], [ui, 0]],                                              /* lip inside the box */
     [[uo - 0.01, zg - h], [uo + h, zg], [uo - 0.01, zg + h]],                                    /* bump, 45° both ways */
     [[-wall + 0.8, 0], [ui, 0], [-wall + 0.8, (-wall + 0.8) - ui]]];                             /* 45° bracket to the lid's inner wall */
   const gz = f.snug ? SNUG_GAP - 2 * c : 0; /* snug: the groove's upper face meets the bump's, no play upwards */
   cut = [[[-wall - 0.01, zg - h - c + gz], [-wall + h + c, zg + gz], [-wall - 0.01, zg + h + c + gz]]];          /* groove in the box wall */
-  return { W, box, lid, cut, depth: Hl };
+  return { W, box, lid, cut, depth: Hl, len: Hl, lenDef: 5, lenMin: 3.5 };
 }
 /* rotary latch: a lever turning on an axle (screw or a piece of filament) in the LID wall hangs down over the box;
    a notch at its lower end hooks under a stud on the box, so the lid cannot lift. Swung aside (90°) it lies on the lid
@@ -911,10 +999,20 @@ function flipLatchLocal(f) {
   const rk = inPlace ? 3 : Math.max(knH, lugH) + 1.2, lw = screw || inPlace ? 3 : 2.5, h = 1.5, s = Math.tan(30 * Math.PI / 180);
   const ui = h + c, uA = c + rk, uo = uA + rk, zA = rk + 0.4;
   /* ridge low enough that the arc of the hook is flatter than the undercut (self-locking) */
-  const L = Math.max(8, (uA - (c + h) / 2) / (0.5 * s)), zr = zA + c - L;
+  const Lmin = Math.max(8, (uA - (c + h) / 2) / (0.5 * s));
   /* snug: the hook's top lies on the ridge's undercut (the arc is flatter, so it slides in and touches only at the end) */
-  const gv = f.snug ? SNUG_GAP : c, zh = zr - s * c - gv, xf = W / 2 - lw - c - (flush ? 0.2 : 0); /* flush: 0.2 mm more room in the pocket ends (the flap prints lying, its edges spread a little) */
-  let zbot = zh - 1.6 - (ui - c) - 2.5;
+  const gv = f.snug ? SNUG_GAP : c;
+  /* length below the parting plane = L + K (L = axle to ridge); a longer flap only moves the ridge down (not printed in place,
+     where the lid's height sets it) */
+  const tip = inPlace ? 2.0 : 1.2, K = -zA - c + s * c + gv + 1.6 + (uo - tip - c), lenDef = Lmin + K;
+  /* printed in place the flap reaches down to the bed (the lid's top): the ridge and the hook move down with it, so the hook
+     stays at the flap's lower end like on the other flip latches */
+  const L = inPlace ? Math.max(Lmin, (Number(f._hl) || 0) - 2 * zA - K) : latchLenOf(f, lenDef, lenDef) - K, zr = zA + c - L;
+  const zh = zr - s * c - gv, xf = W / 2 - lw - c - (flush ? 0.2 : 0); /* flush: 0.2 mm more room in the pocket ends (the flap prints lying, its edges spread a little) */
+  /* below the hook the flap's inner face runs on along the hook's 45° underside straight to the end of the flap, which is
+     a flat tip (thicker when the flap is printed in place, where the tip is the foot it stands on): a fingertip gets behind
+     it, and the hook and the bevel are one line */
+  let zbot = zh - 1.6 - (uo - tip - c);
   if (xf < 3) throw new Error('Západka je příliš úzká');
   /* printed in place: the flap is printed turned up 180° along the lid wall (the lid prints upside down), standing on
      the bed with its end, so it is lengthened to reach the lid's top exactly */
@@ -929,10 +1027,11 @@ function flipLatchLocal(f) {
   const gw = 1.2, xh = xf - gw - c;
   if (xh < 2) throw new Error('Západka je příliš úzká');
   flap = KK.boolean(flap, prismX([[ui + 0.02, zr - s * ui - gv], [c, zh], [c, zh - 1.6], [ui + 0.02, zh - 1.6 - (ui - c)]], -xh, xh), 'union');
-  /* the end of the flap is thinned on its inner side (45°), so a fingertip gets behind it and flips it out easily;
-     not when it is printed in place, where the end is the foot it stands on */
-  if (!inPlace) { const tip = 1.2, e = Math.min(uo - ui - tip, zh - 1.6 - (ui - c) - zbot - 0.2);
-    if (e > 0.3) flap = KK.boolean(flap, prismX([[ui - 0.01, zbot - 0.01], [ui + e, zbot - 0.01], [ui - 0.01, zbot + e + 0.01]], -xf - 0.1, xf + 0.1), 'subtract'); }
+  /* the line from the hook's tip to the inner edge of the flat end: 45° (printed in place it is steeper, the flap reaching
+     down to the bed; the hook's underside is then filled out to the same line, so it stays one straight face) */
+  const m = (zh - 1.6 - zbot) / (uo - tip - c), zl = u => zh - 1.6 - (u - c) * m;
+  if (m > 1 + 1e-9) flap = KK.boolean(flap, prismX([[c, zh - 1.6], [ui + 0.02, zh - 1.6 - (ui - c)], [ui + 0.02, zl(ui + 0.02)]], -xh, xh), 'union');
+  flap = KK.boolean(flap, prismX([[ui - 0.01, zl(ui - 0.01)], [ui - 0.01, zbot - 0.01], [uo - tip, zbot - 0.01], [uo - tip, zbot]], -xf - 0.1, xf + 0.1), 'subtract');
   /* axle: printed cone pins (45°) on the lugs in cone sockets of the knuckle, or a through hole for a screw or filament */
   const x0 = W / 2 - lw, rb = rk - 1.4, rt = 0.4, C2 = c * Math.SQRT2;
   if (inPlace) for (const sgn of [1, -1]) flap = KK.boolean(flap, coneX([sgn * (x0 + 0.5), uA, zA], [-sgn, 0, 0], rb + C2 + 0.5, rt, rb + C2 + 0.5 - rt), 'subtract');
@@ -965,14 +1064,14 @@ function flipLatchLocal(f) {
       /* the recess goes deeper than the pocket floor only at its top, so the bulge above already backs it */
       lidAdd = prismX([[wi, 0], [fl, 0], [fl, zTop + 1], [wi, zTop + 1 + dep]], -W / 2 - 1, W / 2 + 1);
     }
-    return { lever: mv(flap), pivot: { p: [0, uA + d, zA], d: [1, 0, 0], a: 90 } /* swung out level; further its end meets the lid wall above the pocket */, boxAdd, lidAdd, boxCut, lidCut, W: W + 2, depth: -zbot + c + 2 + Math.max(0, dep) + 1, ov: zTop + 1 + Math.max(0, dep) };
+    return { lever: mv(flap), pivot: { p: [0, uA + d, zA], d: [1, 0, 0], a: 90 } /* swung out level; further its end meets the lid wall above the pocket */, boxAdd, lidAdd, boxCut, lidCut, W: W + 2, depth: -zbot + c + 2 + Math.max(0, dep) + 1, ov: zTop + 1 + Math.max(0, dep), len: -zbot, lenDef, lenMin: lenDef };
   }
   if (inPlace) {
     /* stored as printed: turned 180° about the axle (rest), lying along the lid wall */
     const T = [1, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 0, 0, 2 * uA, 2 * zA, 1];
-    return { lever: KK.transform(flap, T), pivot: { p: [0, uA, zA], d: [1, 0, 0], a: 150, rest: 180 }, boxAdd, lidAdd, boxCut, lidCut, W, depth: -zbot + 1, ov: zA + uo + 1 };
+    return { lever: KK.transform(flap, T), pivot: { p: [0, uA, zA], d: [1, 0, 0], a: 150, rest: 180 }, boxAdd, lidAdd, boxCut, lidCut, W, depth: -zbot + 1, ov: zA + uo + 1, len: -zbot, lenDef, lenMin: lenDef };
   }
-  return { lever: flap, pivot: { p: [0, uA, zA], d: [1, 0, 0], a: 150 }, boxAdd, lidAdd, boxCut, lidCut, W, depth: -zbot + 1, ov: zA + uo + 1 };
+  return { lever: flap, pivot: { p: [0, uA, zA], d: [1, 0, 0], a: 150 }, boxAdd, lidAdd, boxCut, lidCut, W, depth: -zbot + 1, ov: zA + uo + 1, len: -zbot, lenDef, lenMin: lenDef };
 }
 function latchTools(f, boxPolys, lidPolys, zRim) {
   /* the parting plane: the box rim (hinge knuckles of a box hinge may stand above it, so the hinge passes it on) */
@@ -1008,6 +1107,14 @@ function latchTools(f, boxPolys, lidPolys, zRim) {
     }
   }
   return out;
+}
+/* length of the latch below the parting plane: the value used, the default and the shortest allowed (none for a lever
+   or a flap printed in place, whose length the lever setting or the lid's height decides) */
+function latchLen(f) {
+  if (f.style === 'rot' || f.style === 'rotflush' || (f.style === 'flip' && f.axle === 'print')) return null;
+  const P = f.style === 'flip' || f.style === 'flipflush' ? flipLatchLocal({ ...f, len: null }) : latchParts({ ...f, len: null });
+  const v = Number(f.len), set = f.len !== undefined && f.len !== null && f.len !== '' && v > 0;
+  return { len: set ? v : P.lenDef, lenDef: P.lenDef, lenMin: P.lenMin, set };
 }
 /* the latch on a box and lid; when the lid lies open beside the box (a hinge printed in one piece turned it over), the
    lid is folded shut for the latch and opened again afterwards */
@@ -1069,7 +1176,7 @@ function step(state, f) {
       if (bx === ld) throw new Error('Krabička a víko musí být dvě různá tělesa');
       let R, fold = null;
       let swing;
-      if (f.kind === 'closed') { R = closedHingeResult(f, bx.polys, ld.polys); if (!R.pinMode) fold = R.U; swing = { M: R.U, open: !R.pinMode, lift: R.T.lift, play: R.T.H.c, zp: KK.bbox(bx.polys).max[2] }; }
+      if (f.kind === 'closed') { R = closedHingeResult(f, bx.polys, ld.polys); if (!R.pinMode) fold = R.U; swing = { M: R.U, open: !R.pinMode, lift: R.T.lift, play: R.T.H.c, zp: KK.bbox(bx.polys).max[2], max: R.maxAngle || 180 }; }
       else { const T = boxHingeTools(f, bx.polys, ld.polys); R = applyBoxHinge(T, bx.polys, ld.polys, f.out === 'new'); fold = T.fold; swing = { M: T.fold, open: true, lift: T.lift, play: T.H.c, zp: KK.bbox(bx.polys).max[2] }; }
       /* fold: turns the open lid shut (a later latch is built on the closed box); swing: the hinge axis for the simulation
          (M = the 180° turn on the rim plane, open = the lid is stored turned open; the real axis is lift above the rim; play = radial play of the knuckles, the lid settles by it) */
@@ -1347,7 +1454,7 @@ function makeRebuilder() {
   };
 }
 
-return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, latchTools, latchApply, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 
