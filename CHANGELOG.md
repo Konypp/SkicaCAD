@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 1.46
+- **Výběr více ploch:** v režimu Plochy přidáte klepnutím s klávesou **Ctrl** (na Macu Cmd) další plochu do výběru, opětovným klepnutím ji vyjmete. Lišta dole i informační řádek ukáží počet a celkovou plochu.
+- Pro více rovných ploch jednoho tělesa: **Posunout plochy** (všechny o stejnou vzdálenost, v časové ose jako samostatné kroky) a **Skořepina s otevřenými plochami** (otevře rovnou vybrané plochy). Totéž nabízí pravé tlačítko.
 ## Beta 1.45
 - **Nový nástroj Text** (Základní tělesa → Text): text rovnou jako těleso. Umístění vodorovně (XY), svisle zepředu (XZ), svisle zboku (YZ), nebo klepnutím **na rovnou plochu tělesa** (text se na ni položí a operace se přepne na Spojit). Výška písmen, výška textu (vysunutí) nebo hloubka vyrytí, zarovnání, rozestup a šířka písmen, natočení, sklon (kurzíva), řádkování, oblouk, tučné písmo, zrcadlově, poloha bodu ukotvení (i manipulátorem) a operace Nové těleso / Spojit (vystouplý text) / Vyříznout (vyrytý text). Text se dá kdykoli upravit z časové osy.
 - Nástroj Text je odebraný z lišty skici; texty ve starších skicách zůstávají a dají se dál upravovat v paletě.
