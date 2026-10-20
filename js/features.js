@@ -7,7 +7,7 @@ const PLANES = {
   XZ: { o: [0, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] },
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
-const FEATURE_LABEL = { text3d: 'Text', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
+const FEATURE_LABEL = { text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
   fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
@@ -394,6 +394,69 @@ function shellBody(polys, f) {
   if (!(Vi > V0 * 1e-4) || Vi >= V0) throw new Error('Stěna je na toto těleso příliš silná');
   const out = KK.boolean(polys, inner, 'subtract'), V1 = KK.signedVolume(out);
   if (!out.length || !(V1 > 0) || V1 >= V0 - 1e-6) throw new Error('Skořepinu se nepodařilo vytvořit');
+  return out;
+}
+/* ---------- move several faces (flat and rounded) by the same small distance along their normals, keeping the shape's
+   layout: every vertex moves to the point that lies on the moved planes of its selected faces and on the planes of its other
+   faces (least squares, as the shell does). Rounded faces (whole or partial cylinders) move facet by facet, so a rounded
+   corner keeps its centre and its radius grows or shrinks with the distance. For clearances: the distance must stay smaller
+   than the features next to the faces. f: { body, faces: [{ kind: 'plane', n, w, p } | { kind: 'cyl', c, ax, r, len }], d } */
+function movedFacesPolys(polys, faces) {
+  const sel = new Set();
+  for (const fd of faces || []) {
+    if (fd.kind === 'cyl') {
+      const ax = KK.vnorm(fd.ax), c = fd.c, r = Number(fd.r), len = Number(fd.len), tol = Math.max(0.01, 0.03 * r);
+      let hit = 0;
+      polys.forEach((q, i) => {
+        if (Math.abs(KK.vdot(q.n, ax)) > 0.02) return;
+        if (!q.v.every(v => { const d = KK.vsub(v, c), t = KK.vdot(d, ax), pr = KK.vsub(d, KK.vmul(ax, t)); return t > -1e-3 && t < len + 1e-3 && Math.abs(Math.hypot(pr[0], pr[1], pr[2]) - r) < tol; })) return;
+        sel.add(i); hit++;
+      });
+      if (!hit) throw new Error('Zaoblená plocha nebyla nalezena');
+    } else {
+      const g = KK.planarFace(polys, fd.n, fd.w, fd.p);
+      if (!g || !g.length) throw new Error('Plocha nebyla nalezena');
+      g.forEach(i => sel.add(i));
+    }
+  }
+  /* faces running on smoothly (a flat side into a rounded corner, a corner into the next side) move with them: a face cannot
+     move away from a neighbour it meets at a tangent without tearing, so the tangent chain goes along */
+  const byV = new Map();
+  polys.forEach((q, i) => { for (const v of q.v) { const k = KK.qk(v); let l = byV.get(k); if (!l) byV.set(k, l = []); l.push(i); } });
+  const lim = Math.cos(25 * Math.PI / 180), st = [...sel];
+  while (st.length) {
+    const i = st.pop(), q = polys[i];
+    for (const v of q.v) for (const j of byV.get(KK.qk(v))) if (!sel.has(j) && KK.vdot(polys[j].n, q.n) > lim) { sel.add(j); st.push(j); }
+  }
+  return sel;
+}
+function moveFaces(polys, f) {
+  const d = Number(f.d);
+  if (!(Math.abs(d) > 1e-4)) throw new Error('Zadejte posunutí různé od nuly');
+  const sel = movedFacesPolys(polys, f.faces);
+  const vm = new Map();
+  polys.forEach((p, i) => {
+    const w = KK.vdot(p.n, p.v[0]) + (sel.has(i) ? d : 0);
+    for (const v of p.v) {
+      const k = KK.qk(v); let e = vm.get(k); if (!e) vm.set(k, e = { v, pl: [], moved: false });
+      if (sel.has(i)) e.moved = true;
+      const q = e.pl.find(x => KK.vdot(x.n, p.n) > 1 - 1e-7);
+      if (!q) e.pl.push({ n: p.n, d: w, s: sel.has(i) }); else if (sel.has(i) && !q.s) { q.d = w; q.s = true; }
+    }
+  });
+  const eps = 1e-6, det = M => M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
+  let far = 0;
+  for (const e of vm.values()) {
+    if (!e.moved) { e.x = e.v; continue; }
+    const A = [[eps, 0, 0], [0, eps, 0], [0, 0, eps]], b = [eps * e.v[0], eps * e.v[1], eps * e.v[2]];
+    for (const { n, d: w } of e.pl) for (let r = 0; r < 3; r++) { for (let c = 0; c < 3; c++) A[r][c] += n[r] * n[c]; b[r] += n[r] * w; }
+    const D = det(A); if (Math.abs(D) < 1e-18) { e.x = e.v; continue; }
+    e.x = [0, 1, 2].map(c => det(A.map((row, r) => row.map((x, j) => (j === c ? b[r] : x)))) / D);
+    far = Math.max(far, Math.hypot(e.x[0] - e.v[0], e.x[1] - e.v[1], e.x[2] - e.v[2]));
+  }
+  if (far > Math.abs(d) * 6 + 1e-3) throw new Error('Posunutí je pro tvar kolem ploch příliš velké');
+  const out = polys.map(p => KK.mkPoly(p.v.map(v => vm.get(KK.qk(v)).x))).filter(Boolean);
+  if (!(KK.signedVolume(out) > 0)) throw new Error('Posunutí je pro tvar kolem ploch příliš velké');
   return out;
 }
 function offsetFace(polys, f) {
@@ -1329,6 +1392,12 @@ function step(state, f) {
       out = bodies.map(x => (x === b ? { ...x, polys: shellBody(b.polys, f) } : x));
       break;
     }
+    case 'movefaces': {
+      const b = bodies.find(x => x.id === f.body);
+      if (!b) throw new Error('Těleso neexistuje');
+      out = bodies.map(x => (x === b ? { ...x, polys: moveFaces(b.polys, f) } : x));
+      break;
+    }
     case 'offsetface': {
       const b = bodies.find(x => x.id === f.body);
       if (!b) throw new Error('Těleso neexistuje');
@@ -1474,7 +1543,7 @@ function makeRebuilder() {
   };
 }
 
-return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

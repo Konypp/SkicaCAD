@@ -1175,8 +1175,17 @@ function removal(polys, ch, mode, k) {
   if (ch.kind === 'line') {
     const { p0, p1 } = ch.line, L = vlen(vsub(p1, p0)), t = vnorm(vsub(p1, p0)), sM = vdot(vsub(fr.M, p0), t);
     if (k * Math.max(1, 1 / Math.tan(fr.alpha / 2)) > L * 4 + 50) return { err: 'Poloměr je pro tuto hranu příliš velký.' };
-    const loop = section(fr.M, fr.f1, fr.f2, fr.alpha, k, mode), ext = add ? -0.0 : 0.05;
-    const A = loop.map(p => vadd(p, vmul(t, -ext - sM))), B = loop.map(p => vadd(p, vmul(t, L + ext - sM)));
+    const loop = section(fr.M, fr.f1, fr.f2, fr.alpha, k, mode);
+    /* the cut runs 0.05 mm past an end where the edge ends in the open (a corner of the body), but stops exactly at an end
+       where the body goes on beyond it (an edge standing on a ledge): running on would notch the ledge */
+    let ext0 = 0, ext1 = 0;
+    if (!add) {
+      const bvh = buildBVH(polys), lc = vmul(loop.reduce((acc, p) => vadd(acc, p), [0, 0, 0]), 1 / loop.length);
+      const past = s => vadd(lc, vmul(t, s - sM));
+      ext0 = insideSolid(past(-0.03), polys, bvh) ? 0 : 0.05;
+      ext1 = insideSolid(past(L + 0.03), polys, bvh) ? 0 : 0.05;
+    }
+    const A = loop.map(p => vadd(p, vmul(t, -ext0 - sM))), B = loop.map(p => vadd(p, vmul(t, L + ext1 - sM)));
     return { polys: fixOrientation(prism(A, B)), add };
   }
   if (ch.kind === 'circle' || ch.kind === 'arc') {

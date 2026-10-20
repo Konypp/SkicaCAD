@@ -1039,7 +1039,7 @@ function featureTitle(i) {
   let n = 0; for (let j = 0; j <= i; j++) if (doc.features[j].type === f.type) n++;
   return Engine.FEATURE_LABEL[f.type] + ' ' + n;
 }
-const TL_ICON = { text3d: 'sktext', shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
+const TL_ICON = { text3d: 'sktext', movefaces: 'pressface', shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
 function renderTimeline() {
   const tr = $('#tltrack'); tr.innerHTML = '';
   const m = viewMarker === null ? doc.marker : viewMarker;
@@ -1368,7 +1368,7 @@ function editFeature(i) {
     case 'thread': startThread(i, ef); break;
     case 'scale': startScale(i, ef); break;
     case 'center': startCenter(i, ef); break;
-    case 'offsetface': startPressFace(i, ef); break;
+    case 'offsetface': case 'movefaces': startPressFace(i, ef); break;
     case 'hole': startHole(i, ef); break;
     case 'shell': startShell(i, ef); break;
     case 'splitface': startSplitFace(i, ef); break;
@@ -3600,10 +3600,11 @@ const faceList = () => (selFaces.length ? selFaces : selFace ? [selFace] : []);
 /* describe the face under a hit: whole cylinder (hole or boss) or a connected planar patch */
 function faceAtHit(h) {
   const { pi, poly } = polyOfHit(h), polys = h.object.userData.polys, bodyId = h.object.userData.bodyId;
-  if (smoothFor(polys)[pi]) {
+  const smooth = !!smoothFor(polys)[pi];
+  if (smooth) {
     const cyl = cylinderAt(polys, pi);
     if (cyl) return { bodyId, polys, kind: 'cyl', group: [...cyl.group], cyl };
-    return null;
+    /* a flat side running on into a rounded corner is marked smooth too: take it as a flat face */
   }
   const cen = [0, 0, 0]; for (const v of poly.v) { cen[0] += v[0] / poly.v.length; cen[1] += v[1] / poly.v.length; cen[2] += v[2] / poly.v.length; }
   const group = K.planarFace(polys, poly.n, poly.w, cen);
@@ -3614,7 +3615,7 @@ function faceAtHit(h) {
   const cpolys = clip.length ? Engine.clipRegion(polys, group, clip) : null;
   const area = cpolys ? K.surfaceArea(cpolys) : group.reduce((s, i) => s + K.surfaceArea([polys[i]]), 0);
   const r6 = x => Math.round(x * 1e6) / 1e6;
-  return { bodyId, polys, kind: 'plane', group, n: poly.n.slice(), w: poly.w, p: cen, area,
+  return { bodyId, polys, kind: 'plane', group, n: poly.n.slice(), w: poly.w, p: cen, area, ...(smooth ? { smooth: true } : {}),
     ...(cpolys ? { clip: clip.map(q => ({ m: q.m.map(r6), d: r6(q.d) })), cpolys, ck: clip.map(q => (q.d > 0 ? '+' : '-') + q.m.map(v => v.toFixed(3)).join()).join('|') } : {}) };
 }
 /* polygons of a selected face (only its part when the face is split) */
@@ -3640,7 +3641,7 @@ function syncFaceBar() {
   const key = show ? list.map(faceKey).join('|') : '';
   if (key === faceBarKey) return;
   faceBarKey = key; bar.hidden = !show; document.body.classList.toggle('has-facebar', !!show); if (!show) { bar.innerHTML = ''; return; }
-  const pl = selFace.kind === 'plane', acts = list.length > 1 ? multiFaceActs(list) : pl
+  const pl = selFace.kind === 'plane', acts = list.length > 1 ? multiFaceActs(list) : !pl && selFace.cyl.partial ? [['pressm', 'Posunout plochu', 'pressface']] : pl
     ? [['ext', 'Vysunout', 'extrude'], ['press', 'Posunout plochu', 'pressface'], ['split', 'Rozdělit plochu', 'splitface'], ['bend', 'Ohnout', 'bendface'], ['al', 'Zarovnat k…', 'center'], ['sk', 'Skica z plochy', 'sketchi'], ['esk', 'Prázdná skica', 'sketch']]
     : [['press', selFace.cyl.internal ? 'Průměr otvoru' : 'Změnit průměr', 'pressface'], ['al', 'Zarovnat k…', 'center'], ['thr', 'Závit', 'thread']];
   bar.innerHTML = `<span class="fb-t"></span><div class="fb-a">${acts.map(([k, l, ic]) => `<button class="fb-b" data-fb="${k}"><span class="ico">${svg(ic, 18)}</span>${l}</button>`).join('')}<button class="ibtn" data-fb="x" aria-label="Zrušit výběr plochy" title="Zrušit výběr plochy">${svg('close', 16)}</button></div>`;
@@ -3648,13 +3649,13 @@ function syncFaceBar() {
 }
 /* actions for several selected faces: move them all by the same distance, or open them in a shell (one body, flat faces) */
 function multiFaceActs(list) {
-  const flat = list.every(f => f.kind === 'plane'), one = list.every(f => f.bodyId === list[0].bodyId);
-  return flat && one ? [['pressm', 'Posunout plochy', 'pressface'], ['shellm', 'Skořepina s otevřenými plochami', 'shell']] : [];
+  const flat = list.every(f => f.kind === 'plane' && !f.smooth), one = list.every(f => f.bodyId === list[0].bodyId);
+  return !one ? [] : flat ? [['pressm', 'Posunout plochy', 'pressface'], ['shellm', 'Skořepina s otevřenými plochami', 'shell']] : [['pressm', 'Posunout plochy', 'pressface']];
 }
 function multiFaceText(list) {
   const n = list.length, word = n < 5 ? 'plochy' : 'ploch', area = list.reduce((t, f) => t + (f.kind === 'plane' ? f.area : 0), 0);
   const flat = list.every(f => f.kind === 'plane'), one = list.every(f => f.bodyId === list[0].bodyId);
-  return `Vybrány ${n} ${word}` + (flat ? ` · celkem ${fmtc(area, 2)} mm²` : '') + (flat && one ? '' : ' · společné úpravy jen pro rovné plochy jednoho tělesa');
+  return `Vybrány ${n} ${word}` + (flat ? ` · celkem ${fmtc(area, 2)} mm²` : '') + (one ? '' : ' · společné úpravy jen pro plochy jednoho tělesa');
 }
 function startShellWith(list) {
   const r6 = x => Math.round(x * 1e6) / 1e6, r4 = x => Math.round(x * 1e4) / 1e4;
@@ -3680,6 +3681,7 @@ document.addEventListener('click', e => {
   syncFaceBar();
 });
 function faceText(f) {
+  if (f.kind === 'cyl' && f.cyl.partial) return `Zaoblená plocha (část válce) · R ${fmtc(f.cyl.r, 2)} mm · délka ${fmtc(f.cyl.len, 2)} mm`;
   if (f.kind === 'cyl') return `${f.cyl.internal ? 'Vnitřní válcová plocha (otvor)' : 'Vnější válcová plocha'} · Ø ${fmtc(f.cyl.r * 2, 2)} mm · délka ${fmtc(f.cyl.len, 2)} mm`;
   return `Rovinná plocha · ${fmtc(f.area, 2)} mm² · normála ${f.n.map(v => fmtc(v, 2)).join('; ')}`;
 }
@@ -3713,6 +3715,11 @@ function faceContext(e) {
   if (list.length > 1) {
     showCtx(e.clientX, e.clientY + 4, multiFaceActs(list).map(([k, l]) => [l + '…', () => (k === 'pressm' ? startPressFace(undefined, undefined, list.slice()) : startShellWith(list.slice()))])
       .concat([null, ['Zrušit výběr ploch', () => { selFace = null; selFaces = []; drawFaces(); updateInfo(); }]]));
+    return;
+  }
+  if (selFace.kind === 'cyl' && selFace.cyl.partial) {
+    const one = selFace;
+    showCtx(e.clientX, e.clientY + 4, [['Posunout plochu…', () => startPressFace(undefined, undefined, [one])], null, ['Zrušit výběr plochy', () => { selFace = null; selFaces = []; drawFaces(); updateInfo(); }]]);
     return;
   }
   showCtx(e.clientX, e.clientY + 4, [
@@ -3769,26 +3776,31 @@ function faceToSketch() {
 }
 function startPressFace(editIndex, f, faces) {
   const c = {
-    editIndex, face: null, body: f ? f.body : null, d: f && f.kind === 'plane' ? f.d : 2, dia: f && f.kind === 'cyl' ? f.newR * 2 : null,
-    timer: null, hideBody: null, result: null, desc: f ? clone(f) : null, multi: null,
+    editIndex, face: null, body: f ? f.body : null, d: f && (f.kind === 'plane' || f.type === 'movefaces') ? f.d : 2, dia: f && f.kind === 'cyl' ? f.newR * 2 : null,
+    timer: null, hideBody: null, result: null, desc: f && f.type !== 'movefaces' ? clone(f) : null, multi: null, move: false,
     init() {
       if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
       openDialog({ title: 'Upravit plochu', icon: 'pressface', fields: [{ k: 'sel', id: 'face', label: 'Plocha' }, { k: 'note', id: 'kind' },
         { k: 'num', id: 'dia', label: 'Nový průměr' }, { k: 'num', id: 'd', label: 'Posunutí', value: this.d }, { k: 'note', id: 'n' }],
         onChange: id => { if (id === 'dia') { const v = dlg.get('dia'); if (v > 0) this.dia = v; } if (id === 'd') { const v = dlg.get('d'); if (isFinite(v)) this.d = v; } this.schedule(); } });
-      if (!f && faces && faces.length > 1) this.useFaces(faces);
+      if (f && f.type === 'movefaces') { this.multi = clone(f.faces); this.move = true; this.desc = this.multi[0]; this.update(); this.schedule(); }
+      else if (!f && faces && (faces.length > 1 || faces.some(fc => fc.kind === 'cyl' || fc.smooth))) this.useFaces(faces);
       else if (!f && selFace) this.useFace(selFace); else this.update();
     },
-    /* several flat faces of one body: all move by the same distance (one feature each, applied in turn) */
+    /* several faces of one body: all move by the same distance. Only flat faces: one feature each, applied in turn (any
+       distance); with rounded faces (cylinders or rounded corners) one 'movefaces' feature that moves them together (small
+       distances such as a clearance) */
     useFaces(list) {
       const r6 = v => Math.round(v * 1e6) / 1e6, r4 = v => Math.round(v * 1e4) / 1e4;
-      this.face = null; this.body = list[0].bodyId;
-      this.multi = list.map(fc => ({ kind: 'plane', n: fc.n.map(r6), w: Math.round(fc.w * 1e5) / 1e5, p: fc.p.map(r4), ...(fc.clip ? { clip: fc.clip } : {}) }));
+      this.face = null; this.body = list[0].bodyId; this.move = list.some(fc => fc.kind === 'cyl' || fc.smooth);
+      if (this.move && Math.abs(this.d) > 1) { this.d = -0.2; dlg.set('d', this.d); }
+      this.multi = list.map(fc => (fc.kind === 'cyl' ? { kind: 'cyl', c: fc.cyl.c, ax: fc.cyl.ax, r: fc.cyl.r, len: fc.cyl.len } : { kind: 'plane', n: fc.n.map(r6), w: Math.round(fc.w * 1e5) / 1e5, p: fc.p.map(r4), ...(fc.clip ? { clip: fc.clip } : {}) }));
       this.desc = this.multi[0];
       this.update(); this.schedule();
     },
     useFace(face) {
-      this.multi = null;
+      if ((face.kind === 'cyl' && face.cyl.partial) || face.smooth) { this.useFaces([face]); return; }
+      this.multi = null; this.move = false;
       this.face = face; this.body = face.bodyId;
       if (face.kind === 'cyl') { const y = face.cyl; this.desc = { kind: 'cyl', c: y.c, ax: y.ax, r: y.r, len: y.len, internal: y.internal }; if (!(this.dia > 0)) this.dia = Math.round(y.r * 2 * 100) / 100; dlg.set('dia', this.dia); }
       else this.desc = { kind: 'plane', n: face.n.map(v => Math.round(v * 1e6) / 1e6), w: Math.round(face.w * 1e5) / 1e5, p: face.p.map(v => Math.round(v * 1e4) / 1e4), ...(face.clip ? { clip: face.clip } : {}) };
@@ -3797,9 +3809,9 @@ function startPressFace(editIndex, f, faces) {
     feature() { const o = { id: f ? f.id : 'tmp', type: 'offsetface', body: this.body, ...this.desc }; if (o.kind === 'cyl') o.newR = this.dia / 2; else o.d = this.d; return o; },
     update() {
       const d = this.desc;
-      dlg.set('face', { text: this.multi ? `${this.multi.length} ${this.multi.length < 5 ? 'rovinné plochy' : 'rovinných ploch'}` : d ? (d.kind === 'cyl' ? `Válcová plocha Ø${fmtc(d.r * 2, 2)}` : 'Rovinná plocha') : 'Klepněte na stěnu tělesa', has: !!d, active: true });
-      dlg.set('kind', !d ? 'Vyberte vnitřní stěnu otvoru, válec nebo rovnou stěnu.' : d.kind === 'cyl' ? (d.internal ? 'Otvor: zadejte nový průměr, otvor se zvětší nebo zmenší.' : 'Válec: zadejte nový průměr.') : 'Kladné posunutí přidá materiál ve směru plochy, záporné ho odebere (zapustí plochu).');
-      dlg.show('dia', !!d && d.kind === 'cyl'); dlg.show('d', !!d && d.kind === 'plane');
+      dlg.set('face', { text: this.multi ? (this.move ? `${this.multi.length} ${this.multi.length === 1 ? 'plocha' : this.multi.length < 5 ? 'plochy' : 'ploch'} s navazujícími zaobleními` : `${this.multi.length} ${this.multi.length < 5 ? 'rovinné plochy' : 'rovinných ploch'}`) : d ? (d.kind === 'cyl' ? `Válcová plocha Ø${fmtc(d.r * 2, 2)}` : 'Rovinná plocha') : 'Klepněte na stěnu tělesa', has: !!d, active: true });
+      dlg.set('kind', !d ? 'Vyberte vnitřní stěnu otvoru, válec nebo rovnou stěnu.' : this.move ? 'Rovné i zaoblené plochy se posunou spolu o stejnou vzdálenost (zaoblení si nechá střed). Kladné posunutí přidá materiál, záporné ubere; hodí se pro malé posunutí, např. vůli.' : d.kind === 'cyl' ? (d.internal ? 'Otvor: zadejte nový průměr, otvor se zvětší nebo zmenší.' : 'Válec: zadejte nový průměr.') : 'Kladné posunutí přidá materiál ve směru plochy, záporné ho odebere (zapustí plochu).');
+      dlg.show('dia', !!d && !this.move && d.kind === 'cyl'); dlg.show('d', !!d && (this.move || d.kind === 'plane'));
       setPrompt(d ? 'Klepnutím na jinou stěnu výběr změníte' : 'Klepněte na stěnu tělesa');
       if (!d) dlg.okEnabled(false);
     },
@@ -3812,7 +3824,8 @@ function startPressFace(editIndex, f, faces) {
         const b = bodyById(this.body);
         try {
           if (!b) throw new Error('Těleso neexistuje');
-          if (this.multi) { let acc = b.polys; for (const q of this.multi) acc = Engine.offsetFace(acc, { type: 'offsetface', body: this.body, ...q, d: this.d }); this.result = acc; }
+          if (this.move) this.result = Engine.moveFaces(b.polys, { faces: this.multi, d: this.d });
+          else if (this.multi) { let acc = b.polys; for (const q of this.multi) acc = Engine.offsetFace(acc, { type: 'offsetface', body: this.body, ...q, d: this.d }); this.result = acc; }
           else this.result = Engine.offsetFace(b.polys, this.feature());
           const m = meshFromPolys(this.result, bodyMaterial()); noRay(m); m.material.color.copy(tok.body).lerp(tok.accent, 0.25);
           const eg = new THREE.BufferGeometry(); eg.setAttribute('position', new THREE.BufferAttribute(K.edgeSegments(this.result), 3));
@@ -3828,6 +3841,7 @@ function startPressFace(editIndex, f, faces) {
     onClick(ev) { const h = hitBodies(ev); if (!h) return; const fc = faceAtHit(h); if (!fc) { toast('Vyberte rovnou stěnu nebo válcovou plochu.'); return; } this.dia = null; this.useFace(fc); },
     ok() {
       if (!this.result) return null;
+      if (this.move) return { id: f ? f.id : newId(), type: 'movefaces', body: this.body, faces: this.multi, d: this.d };
       if (this.multi) return this.multi.map(q => ({ id: newId(), type: 'offsetface', body: this.body, ...q, d: this.d }));
       const o = this.feature(); o.id = f ? f.id : newId(); return o;
     },
@@ -4787,10 +4801,10 @@ function polyAdjacency(polys) {
 /* find the full cylindrical face that polygon pi belongs to */
 function cylinderAt(polys, pi) {
   const adj = polyAdjacency(polys), p0 = polys[pi], lim = Math.cos(25 * D2R);
-  let axis = null;
+  let axis = null, nbA = -1;
   for (const nb of adj[pi]) {
     const d = K.vdot(p0.n, polys[nb].n);
-    if (d < 0.99999 && d > lim) { const c = K.cross(p0.n, polys[nb].n); if (Math.hypot(c[0], c[1], c[2]) > 1e-6) { axis = K.vnorm(c); break; } }
+    if (d < 0.99999 && d > lim) { const c = K.cross(p0.n, polys[nb].n); if (Math.hypot(c[0], c[1], c[2]) > 1e-6) { axis = K.vnorm(c); nbA = nb; break; } }
   }
   if (!axis) return null;
   /* grow over neighbours whose normal is perpendicular to the axis (breadth first, nearest first) */
@@ -4818,7 +4832,16 @@ function cylinderAt(polys, pi) {
      nearest to the tapped one, keep only polygons lying on that cylinder and regrow from the tapped polygon through them */
   const first = grow(() => true);
   if (first.g.size < 6) return null;
-  const f0 = fit(first.order.slice(0, Math.min(first.order.length, 40)));
+  /* the axis lies where the normals of the tapped facet and its neighbour meet (seen along the axis): this finds the circle
+     even when flat faces carry on from it (a rounded corner between flat sides), where fitting all the grown points would not */
+  const f0 = (() => {
+    const P2 = v => [K.vdot(v, e1), K.vdot(v, e2)], cen = q => { const c = [0, 0]; for (const v of q.v) { const t = P2(v); c[0] += t[0] / q.v.length; c[1] += t[1] / q.v.length; } return c; };
+    const q1 = polys[nbA], c0 = cen(p0), c1 = cen(q1), n0 = [K.vdot(p0.n, e1), K.vdot(p0.n, e2)], n1 = [K.vdot(q1.n, e1), K.vdot(q1.n, e2)];
+    const det = -n0[0] * n1[1] + n1[0] * n0[1]; if (Math.abs(det) < 1e-9) return fit(first.order.slice(0, Math.min(first.order.length, 40)));
+    const bx = c1[0] - c0[0], by = c1[1] - c0[1], t = (-bx * n1[1] + n1[0] * by) / det;
+    const cx = c0[0] + n0[0] * t, cy = c0[1] + n0[1] * t, v0 = P2(p0.v[0]);
+    return { cx, cy, r: Math.hypot(v0[0] - cx, v0[1] - cy) };
+  })();
   if (!f0) return null;
   const Q = K.vadd(K.vmul(e1, f0.cx), K.vmul(e2, f0.cy)), planeDist = P => Math.abs(K.vdot(P.n, Q) - P.w), d0 = planeDist(p0);
   const onCyl = i => {
@@ -4838,7 +4861,7 @@ function cylinderAt(polys, pi) {
   angs.sort((x, y) => x - y);
   let gap = angs[0] + 2 * Math.PI - angs[angs.length - 1];
   for (let i = 1; i < angs.length; i++) gap = Math.max(gap, angs[i] - angs[i - 1]);
-  if (gap > 1.2) return null;
+  const partial = gap > 1.2; /* only part of a cylinder (a rounded corner) */
   let t0 = Infinity, t1 = -Infinity; for (const v of pts) { const t = K.vdot(v, axis); if (t < t0) t0 = t; if (t > t1) t1 = t; }
   const base = K.vadd(K.vadd(K.vmul(e1, cx), K.vmul(e2, cy)), K.vmul(axis, t0));
   const cen = (() => { const q = [0, 0, 0]; for (const v of p0.v) { q[0] += v[0] / p0.v.length; q[1] += v[1] / p0.v.length; q[2] += v[2] / p0.v.length; } return q; })();
@@ -4849,7 +4872,7 @@ function cylinderAt(polys, pi) {
   const dom3 = [0, 1, 2].reduce((m, k) => (Math.abs(axis[k]) > Math.abs(axis[m]) ? k : m), 2);
   let cOut = base, aOut = axis;
   if (axis[dom3] < 0) { cOut = K.vadd(base, K.vmul(axis, t1 - t0)); aOut = K.vmul(axis, -1); }
-  return { c: cOut.map(r6), ax: aOut.map(r6), r: r6(r), len: r6(t1 - t0), internal, group };
+  return { c: cOut.map(r6), ax: aOut.map(r6), r: r6(r), len: r6(t1 - t0), internal, group, partial };
 }
 /* default 3D-print clearances on the diameter, from print tests: bolt / pin 0.15 mm, nut / hole 0.35 mm */
 const TOL_HINGE = 0.35, TOL_LATCH = 0.3; /* from the user's test prints: hinges 0.35 (0.3 held the lid ajar at the hinge), latches 0.3 */
@@ -5004,7 +5027,7 @@ function startThread(editIndex, f) {
       const h = hitBodies(ev); if (!h) return null;
       const { pi } = polyOfHit(h), polys = h.object.userData.polys, id = h.object.userData.bodyId;
       if (this.hover && this.hover.polys === polys && this.hover.cyl && this.hover.cyl.group.has(pi)) return this.hover;
-      return { id, polys, cyl: cylinderAt(polys, pi) };
+      const cy = cylinderAt(polys, pi); return { id, polys, cyl: cy && !cy.partial ? cy : null }; /* a thread needs a whole cylinder */
     },
     onMove(ev) {
       const hi = this.handleAt(ev), hv = hi >= 0 ? hi : null;

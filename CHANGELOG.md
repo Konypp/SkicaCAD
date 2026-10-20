@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 1.47
+- **Zaoblení a zkosení hrany na lemu:** hrana, která končí na ploše pokračující dál (např. svislá hrana lemu stojícího na okraji krabičky), se už u své paty nezařízne 0,05 mm pod plochu. Dřív tam vznikal malý schod.
+- **Plochy se zaoblením:** v režimu Plochy jde vybrat i zaoblenou plochu, která je jen částí válce (zaoblený roh), a rovnou stěnu, která do zaoblení plynule přechází. **Posunout plochu** u nich posune celý plynule navazující pás (rovné stěny i zaoblené rohy) o stejnou vzdálenost; zaoblení si nechá střed a jeho poloměr se změní o posunutí. Hodí se pro vůli, např. lem zmenšený o 0,2 mm (výchozí −0,2 mm). V časové ose jako krok „Posunout plochy“, dá se upravit.
+- Výběr více ploch s Ctrl nabízí Posunout plochy i u zaoblených ploch.
 ## Beta 1.46
 - **Výběr více ploch:** v režimu Plochy přidáte klepnutím s klávesou **Ctrl** (na Macu Cmd) další plochu do výběru, opětovným klepnutím ji vyjmete. Lišta dole i informační řádek ukáží počet a celkovou plochu.
 - Pro více rovných ploch jednoho tělesa: **Posunout plochy** (všechny o stejnou vzdálenost, v časové ose jako samostatné kroky) a **Skořepina s otevřenými plochami** (otevře rovnou vybrané plochy). Totéž nabízí pravé tlačítko.
