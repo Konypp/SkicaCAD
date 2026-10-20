@@ -54,6 +54,7 @@ const ICONS = {
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   sktrim: '<circle cx="9" cy="12" r="6"/><circle cx="15" cy="12" r="6"/><path class="o" d="M12 7.2a6 6 0 0 1 0 9.6" style="stroke:var(--orange)"/>',
   sktext: '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>',
+  text3d: '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>',
   skoffset: '<rect x="7" y="7" width="10" height="10" rx="1"/><rect x="3" y="3" width="18" height="18" rx="3" style="stroke:var(--orange)" stroke-dasharray="3 2"/>',
   sksegtrim: '<circle cx="10" cy="13" r="6"/><path d="M12 4h9v9h-5"/><path class="o" d="M13.5 7.5 16 10" stroke-dasharray="2 2" style="stroke:var(--orange)"/><path d="M3 21 8 16M8 21 3 16" style="stroke:var(--orange)"/>',
   skjoin: '<path d="M4 6c3-2 6 2 9 0"/><path d="M4 18c3 2 6-2 9 0"/><path d="M13 6 18 12 13 18M4 6v12" stroke-dasharray="2 2" style="stroke:var(--orange)"/>',
@@ -1037,7 +1038,7 @@ function featureTitle(i) {
   let n = 0; for (let j = 0; j <= i; j++) if (doc.features[j].type === f.type) n++;
   return Engine.FEATURE_LABEL[f.type] + ' ' + n;
 }
-const TL_ICON = { shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
+const TL_ICON = { text3d: 'sktext', shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
 function renderTimeline() {
   const tr = $('#tltrack'); tr.innerHTML = '';
   const m = viewMarker === null ? doc.marker : viewMarker;
@@ -1112,16 +1113,16 @@ document.addEventListener('pointerdown', e => { const m = $('#ctxmenu'); if (!m.
 const RIBBON = {
   solid: [
     ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'],
-      { menu: 'prim', label: 'Základní tělesa', items: [['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus']] },
+      { menu: 'prim', label: 'Základní tělesa', items: [['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus'], ['text3d', 'Text']] },
       { menu: 'parts', label: 'Součásti', items: [['bolt', 'Šroub'], ['nut', 'Matice'], ['hinge', 'Pant'], ['latch', 'Západka']] }]],
-    ['Upravit', [['fillet', 'Zaoblení', 'F'], ['hole', 'Díra', 'H'], ['shell', 'Skořepina'], ['move', 'Přesunout', 'M'], ['rotate', 'Otočit', 'R'], ['facemode', 'Plochy', 'G'],
-      { menu: 'shape', label: 'Tvar', items: [['chamfer', 'Zkosení'], ['combine', 'Kombinovat'], ['splitbody', 'Rozříznout']] },
+    ['Upravit', [{ menu: 'edge', label: 'Hrany', items: [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení']] }, ['hole', 'Díra', 'H'], ['shell', 'Skořepina'], ['move', 'Přesunout', 'M'], ['rotate', 'Otočit', 'R'], ['facemode', 'Plochy', 'G'],
+      { menu: 'shape', label: 'Tvar', items: [['combine', 'Kombinovat'], ['splitbody', 'Rozříznout']] },
       { menu: 'xform', label: 'Uspořádat', items: [['scale', 'Měřítko'], ['center', 'Zarovnat'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole']] },
       ['del', 'Odstranit', 'Del']]],
     ['Nástroje', [['selall', 'Vybrat vše', 'Ctrl+A'], ['measure', 'Měřit', 'I'], ['simulate', 'Simulace'], ['import', 'Importovat']]]
   ],
   sketch: [
-    ['Vytvořit', [['line', 'Čára', 'L'], ['spline', 'Křivka', 'K'], ['rect', 'Obdélník', 'R'], ['circle', 'Kružnice', 'C'], ['sktext', 'Text'],
+    ['Vytvořit', [['line', 'Čára', 'L'], ['spline', 'Křivka', 'K'], ['rect', 'Obdélník', 'R'], ['circle', 'Kružnice', 'C'],
       { menu: 'skshape', label: 'Další tvary', items: [['ellipse', 'Elipsa', 'E'], ['ngon', 'Mnohoúhelník', 'P'], ['slot', 'Drážka', 'D']] }]],
     ['Upravit', [['sksegtrim', 'Oříznout', 'T'], ['skcons', 'Pomocná', 'Q'], ['skdel', 'Smazat', 'Del'],
       { menu: 'skedit', label: 'Úpravy skici', items: [['skfillet', 'Zaoblit rohy'], ['skoffset', 'Odsadit', 'O'], ['sktrim', 'Kombinovat', 'X'], ['skjoin', 'Spojit', 'J']] }]],
@@ -1178,6 +1179,7 @@ function runCommand(id) {
     case 'sketch': startSketchCmd(); break;
     case 'extrude': startExtrude(); break;
     case 'box': case 'cylinder': case 'sphere': case 'cone': case 'torus': startPrimitive(id); break;
+    case 'text3d': startText(); break;
     case 'bolt': case 'nut': startFastener(id); break;
     case 'hinge': startHinge(); break;
     case 'latch': startLatch(); break;
@@ -1243,6 +1245,7 @@ function openDialog(spec) {
       case 'opt': return `<div class="frow" data-row="${f.id}"><label for="${id}">${f.label}</label><select class="fsel" id="${id}" data-f="${f.id}">${f.options.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></div>`;
       case 'seg': return `<div class="frow" data-row="${f.id}"><span class="fl">${f.label}</span><div class="seg" id="${id}" data-seg="${f.id}">${f.options.map(([v, l]) => `<button data-v="${v}" aria-pressed="false">${l}</button>`).join('')}</div></div>`;
       case 'btns': return `<div class="frow" data-row="${f.id}"><span class="fl">${f.label}</span><div class="btnrow${f.options.length === 1 ? ' one' : ''}">${f.options.map(([v, l]) => `<button class="btn sm" data-btn="${f.id}" data-v="${v}" aria-pressed="false">${l}</button>`).join('')}</div></div>`;
+      case 'area': return `<div class="frow wide" data-row="${f.id}">${f.label ? `<label for="${id}">${f.label}</label>` : ''}<textarea class="ftextarea" id="${id}" data-f="${f.id}" rows="${f.rows || 2}"></textarea></div>`;
       case 'chk': return `<label class="chk" data-row="${f.id}"><input type="checkbox" id="${id}" data-f="${f.id}"><span>${f.label}</span></label>`;
       case 'note': return `<div class="note" id="${id}"></div>`;
     }
@@ -1261,6 +1264,7 @@ function openDialog(spec) {
       if (f.k === 'xyz') return [0, 1, 2].map(j => parseNum($(`#dlg-${id}-${j}`).value) || 0);
       if (f.k === 'opt') return $('#dlg-' + id).value;
       if (f.k === 'chk') return $('#dlg-' + id).checked;
+      if (f.k === 'area') return $('#dlg-' + id).value;
       if (f.k === 'seg') { const b = $(`#dlg-${id} [aria-pressed="true"]`); return b ? b.dataset.v : null; }
       return undefined;
     },
@@ -1270,6 +1274,7 @@ function openDialog(spec) {
       else if (f.k === 'xyz') v.forEach((x, j) => { const el2 = $(`#dlg-${id}-${j}`); if (document.activeElement !== el2) el2.value = fmtc(x, 3); });
       else if (f.k === 'opt') $('#dlg-' + id).value = v;
       else if (f.k === 'chk') $('#dlg-' + id).checked = !!v;
+      else if (f.k === 'area') { const el2 = $('#dlg-' + id); if (document.activeElement !== el2) el2.value = v; }
       else if (f.k === 'seg') $$(`#dlg-${id} button`).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
       else if (f.k === 'note') { const n = $('#dlg-' + id); n.textContent = v || ''; n.classList.toggle('err', !!(v && v.startsWith('!'))); if (v && v.startsWith('!')) n.textContent = v.slice(1); }
       else if (f.k === 'sel') { const b = $('#dlg-' + id); $('.tx', b).textContent = v.text; b.classList.toggle('has', !!v.has); b.classList.toggle('active', !!v.active); }
@@ -1349,6 +1354,7 @@ function editFeature(i) {
     case 'sketch': viewMarker = i; refresh(); enterSketch(ef, i); break;
     case 'extrude': startExtrude(i, ef); break;
     case 'box': case 'cylinder': case 'sphere': case 'cone': case 'torus': startPrimitive(f.type, i, ef); break;
+    case 'text3d': startText(i, ef); break;
     case 'bolt': case 'nut': startFastener(f.type, i, ef); break;
     case 'hinge': startHinge(i, ef); break;
     case 'latch': startLatch(i, ef); break;
@@ -2196,7 +2202,24 @@ function renderPalette() {
     else if (e.t === 'ngon') body = `<div class="grid2">${num(i, 'x', 'X', e.x)}${num(i, 'y', 'Y', e.y)}${num(i, 'r', 'R', e.r)}${num(i, 'n', 'n', e.n)}${num(i, 'a', '∠', e.a || 0)}${num(i, 'fr', 'Rz', e.fr || 0)}</div>`;
     else if (e.t === 'ellipse') body = `<div class="grid2">${num(i, 'x', 'X', e.x)}${num(i, 'y', 'Y', e.y)}${num(i, 'rx', 'a', e.rx)}${num(i, 'ry', 'b', e.ry)}${num(i, 'a', '∠', e.a || 0)}</div>`;
     else if (e.t === 'slot') { const g = slotGeom(e); body = `<div class="grid2">${num(i, 'scx', 'X', g.cx)}${num(i, 'scy', 'Y', g.cy)}${num(i, 'slen', 'L', g.len)}${num(i, 'sd', 'R', g.d)}${num(i, 'w', 'Š', e.w)}${num(i, 'sang', '∠', g.ang)}</div><div class="note">X, Y střed · L celková délka · R rozteč středů zaoblení · Š šířka · ∠ natočení</div>`; }
-    else if (e.t === 'text') body = `<label class="fnum ftext" title="Text"><span class="ax">T</span><input id="ent-${i}-s" data-ent="${i}" data-k="s" value="${String(e.s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;')}" autocomplete="off" aria-label="Text"></label><div class="grid2">${num(i, 'x', 'X', e.x)}${num(i, 'y', 'Y', e.y)}${num(i, 'h', 'V', e.h)}${num(i, 'a', '∠', e.a || 0)}${num(i, 'sp', 'Mez.', e.sp || 0)}</div><label class="chk"><input type="checkbox" id="ent-${i}-bold" data-ent="${i}" data-k="bold"${e.bold !== false ? ' checked' : ''}><span>Tučné písmo</span></label><div class="note">V výška velkých písmen · Mez. mezera mezi písmeny (mm)</div>`;
+    else if (e.t === 'text') {
+      /* text editor: every setting with its own label, numbers stored as entered */
+      const fld = (k, label, unit, val, hint) => `<div class="frow"><label for="ent-${i}-${k}"${hint ? ` title="${hint}"` : ''}>${label}</label><span class="fnum"><input id="ent-${i}-${k}" data-ent="${i}" data-k="${k}" value="${fmtc(val, 3)}" inputmode="decimal" autocomplete="off"><span class="u">${unit}</span></span></div>`;
+      const al = e.al === 'c' || e.al === 'r' ? e.al : 'l';
+      body = `<textarea class="ftextarea" id="ent-${i}-s" data-ent="${i}" data-k="s" rows="${Math.min(4, String(e.s).split('\n').length + 1)}" aria-label="Text">${String(e.s).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</textarea>`
+        + `<div class="grid2">${num(i, 'x', 'X', e.x)}${num(i, 'y', 'Y', e.y)}</div>`
+        + `<div class="frow wide"><div class="seg">${[['l', 'Vlevo'], ['c', 'Na střed'], ['r', 'Vpravo']].map(([v, l]) => `<button data-tal="${v}" data-ent="${i}" aria-pressed="${al === v}">${l}</button>`).join('')}</div></div>`
+        + fld('h', 'Výška písmen', 'mm', e.h, 'Výška velkých písmen')
+        + fld('sp', 'Rozestup písmen', 'mm', e.sp || 0, 'Mezera mezi písmeny navíc (záporná je stáhne k sobě)')
+        + fld('ws', 'Šířka písmen', '%', Number(e.ws) > 0 ? e.ws : 100, 'Méně než 100 % = užší písmo')
+        + fld('a', 'Natočení', '°', e.a || 0, 'Otočení textu kolem bodu ukotvení')
+        + fld('sl', 'Sklon (kurzíva)', '°', e.sl || 0, 'Šikmé písmo, −45° až 45°')
+        + fld('lh', 'Řádkování', '×', Number(e.lh) > 0 ? e.lh : 1.5, 'Vzdálenost řádků jako násobek výšky písmen')
+        + fld('arc', 'Oblouk (poloměr)', 'mm', e.arc || 0, '0 = rovně; kladný ohne text přes horní stranu kružnice, záporný přes spodní')
+        + `<label class="chk"><input type="checkbox" id="ent-${i}-bold" data-ent="${i}" data-k="bold"${e.bold !== false ? ' checked' : ''}><span>Tučné písmo</span></label>`
+        + `<label class="chk"><input type="checkbox" id="ent-${i}-mir" data-ent="${i}" data-k="mir"${e.mir ? ' checked' : ''}><span>Zrcadlově (čitelné z druhé strany)</span></label>`
+        + `<div class="note">X, Y je bod ukotvení na účaří prvního řádku. Nový řádek: Enter v poli textu.</div>`;
+    }
     else if (e.t === 'spline') body = `<div class="note">${e.pts.length} bodů · body přesunete tažením ve skice</div><label class="chk"><input type="checkbox" id="ent-${i}-closed" data-ent="${i}" data-k="closed"${e.closed ? ' checked' : ''}${e.pts.length < 3 ? ' disabled' : ''}><span>Uzavřená křivka</span></label>${uniChk(i)}`;
     else {
       const n = e.pts.length, segs = e.closed ? n : n - 1, rows = [];
@@ -2213,12 +2236,13 @@ function renderPalette() {
 }
 $('#dialog').addEventListener('click', e => {
   if (!sk) return;
+  const ta = e.target.closest('[data-tal]'); if (ta) { const t = sk.f.ents[+ta.dataset.ent]; if (t && t.t === 'text') { if (ta.dataset.tal === 'l') delete t.al; else t.al = ta.dataset.tal; renderPalette(); redrawSketch(); } return; }
   const od = e.target.closest('[data-offdir]'); if (od && sk && sk.tool === 'skoffset') { sk.offIn = od.dataset.offdir === 'in'; renderPalette(); return; }
   const cm = e.target.closest('[data-cmode]'); if (cm && sk.tool === 'sktrim') { sk.combOp = cm.dataset.cmode; sk.cut = null; setSketchTool('sktrim'); return; }
   const rm = e.target.closest('[data-rmode]'); if (rm && DRAW_DEFAULT[sk.tool]) { settings.drawModes = { ...(settings.drawModes || {}), [sk.tool]: rm.dataset.rmode }; saveSettings(); sk.draft = null; setSketchTool(sk.tool); return; }
   const du = e.target.closest('[data-entdup]'); if (du) { sk.selEnt = +du.dataset.entdup; duplicateSel(); return; }
   const d = e.target.closest('[data-entdel]'); if (d) { sk.f.ents.splice(+d.dataset.entdel, 1); sk.selEnt = -1; renderPalette(); redrawSketch(); return; }
-  const r = e.target.closest('[data-ent-row]'); if (r && !e.target.closest('input')) { sk.selEnt = +r.dataset.entRow; renderPalette(); redrawSketch(); }
+  const r = e.target.closest('[data-ent-row]'); if (r && !e.target.closest('input, textarea')) { sk.selEnt = +r.dataset.entRow; renderPalette(); redrawSketch(); }
 });
 /* slot shown as centre, overall length, width and angle; stored as the two arc centres and the width */
 function slotGeom(e) {
@@ -2234,7 +2258,19 @@ function onPaletteChange(inp) {
   const i = +inp.dataset.ent, k = inp.dataset.k, e = sk.f.ents[i];
   if (k === 'uni') { sk.uniform = inp.checked; renderPalette(); return; }
   if (e && k === 'cons') { if (inp.checked) e.cons = true; else delete e.cons; renderPalette(); redrawSketch(); return; }
-  if (e && e.t === 'text' && k === 's') { const t = inp.value.trim(); if (t) e.s = t.slice(0, 200); renderPalette(); redrawSketch(); return; }
+  if (e && e.t === 'text' && k === 's') { const t = inp.value.replace(/\r/g, '').replace(/^\n+|\s+$/g, ''); if (t.trim()) e.s = t.slice(0, 400); renderPalette(); redrawSketch(); return; }
+  if (e && e.t === 'text' && k === 'mir') { if (inp.checked) e.mir = true; else delete e.mir; renderPalette(); redrawSketch(); return; }
+  if (e && e.t === 'text' && ['sp', 'ws', 'sl', 'lh', 'arc'].includes(k)) {
+    const v = parseNum(inp.value);
+    if (isFinite(v)) {
+      if (k === 'sp') e.sp = Math.max(-e.h, Math.min(100, v));
+      else if (k === 'ws') { if (v > 0) e.ws = Math.max(10, Math.min(400, v)); if (e.ws === 100) delete e.ws; }
+      else if (k === 'sl') { e.sl = Math.max(-45, Math.min(45, v)); if (!e.sl) delete e.sl; }
+      else if (k === 'lh') { if (v > 0) e.lh = Math.max(0.5, Math.min(10, v)); if (e.lh === 1.5) delete e.lh; }
+      else if (k === 'arc') { if (Math.abs(v) < 1e-6) delete e.arc; else e.arc = Math.sign(v) * Math.max(Math.abs(v), e.h); }
+    }
+    renderPalette(); redrawSketch(); return;
+  }
   if (e && e.t === 'text' && k === 'bold') { e.bold = inp.checked; renderPalette(); redrawSketch(); return; }
   if (e && e.t === 'text' && k === 'h') { const v = parseNum(inp.value); if (v > 0) e.h = Math.min(1000, v); renderPalette(); redrawSketch(); return; }
   if (e && k === 'closed') { e.closed = inp.checked && e.pts.length >= 3; renderPalette(); redrawSketch(); return; }
@@ -2654,6 +2690,116 @@ function startPrimitive(type, editIndex, f) {
     dlg.set('pos', c.pos); c.update();
   };
   c.onDragChange = e => { controls.enabled = !e.value; c.gizmoDrag = e.value; if (!e.value) { pivot.position.set(c.pos[0], c.pos[1], c.pos[2]); requestRender(); } };
+  beginCmd(c); c.init();
+}
+
+/* ================= text as a solid ================= */
+/* the planes a text can lie on (normal), or a planar face of a body clicked in the view */
+const TEXT_PLANES = { xy: [0, 0, 1], xz: [0, -1, 0], yz: [1, 0, 0] };
+function startText(editIndex, f) {
+  const pivot = new THREE.Object3D(); scene.add(pivot);
+  const r4 = x => Math.round(x * 1e4) / 1e4;
+  const D0 = { s: 'SkicaCAD', h: 8, depth: 2, bold: true, sp: 0, ws: 100, a: 0, sl: 0, lh: 1.5, arc: 0, al: 'l', mir: false, place: 'xy', n: [0, 0, 1], p: [0, 0, 0], op: 'new', onFace: false };
+  const v0 = f ? { ...D0, ...f, place: f.place || 'xy', ws: f.ws || 100, lh: f.lh || 1.5, al: f.al || 'l' } : { ...D0 };
+  const c = {
+    editIndex, v: v0, tool: null, gizmoDrag: false, timer: null,
+    init() {
+      openDialog({
+        title: 'Text', icon: 'text3d',
+        fields: [{ k: 'area', id: 's', label: 'Text (nový řádek Enterem)', value: this.v.s },
+          { k: 'opt', id: 'place', label: 'Umístění', options: [['xy', 'Vodorovně (rovina XY)'], ['xz', 'Svisle zepředu (rovina XZ)'], ['yz', 'Svisle zboku (rovina YZ)'], ['face', 'Na plochu tělesa']], value: this.v.place },
+          { k: 'num', id: 'h', label: 'Výška písmen', value: this.v.h },
+          { k: 'num', id: 'depth', label: 'Výška textu (vysunutí)', value: this.v.depth },
+          { k: 'seg', id: 'al', label: 'Zarovnání', options: [['l', 'Vlevo'], ['c', 'Na střed'], ['r', 'Vpravo']], value: this.v.al },
+          { k: 'num', id: 'sp', label: 'Rozestup písmen', value: this.v.sp },
+          { k: 'num', id: 'ws', label: 'Šířka písmen', unit: '%', value: this.v.ws },
+          { k: 'num', id: 'a', label: 'Natočení', unit: '°', value: this.v.a, range: [-180, 180, 1] },
+          { k: 'num', id: 'sl', label: 'Sklon (kurzíva)', unit: '°', value: this.v.sl },
+          { k: 'num', id: 'lh', label: 'Řádkování', unit: '×', value: this.v.lh },
+          { k: 'num', id: 'arc', label: 'Oblouk (poloměr, 0 = rovně)', value: this.v.arc },
+          { k: 'chk', id: 'bold', label: 'Tučné písmo', value: this.v.bold },
+          { k: 'chk', id: 'mir', label: 'Zrcadlově (čitelné z druhé strany)', value: this.v.mir },
+          { k: 'xyz', id: 'p', label: 'Poloha (bod ukotvení)', value: this.v.p },
+          { k: 'opt', id: 'op', label: 'Operace', options: [['new', 'Nové těleso'], ['join', 'Spojit (vystouplý text)'], ['cut', 'Vyříznout (vyrytý text)']], value: this.v.op },
+          { k: 'note', id: 'n' }],
+        onChange: (id, live) => {
+          const v = this.v;
+          if (id === 's') { const t = dlg.get('s').replace(/\r/g, ''); if (t.trim()) v.s = t.slice(0, 400); }
+          else if (id === 'place') { v.place = dlg.get('place'); if (v.place !== 'face') { v.n = TEXT_PLANES[v.place]; v.onFace = false; } this.layout(); }
+          else if (id === 'al') v.al = dlg.get('al');
+          else if (id === 'bold' || id === 'mir') v[id] = !!dlg.get(id);
+          else if (id === 'p') { const q = dlg.get('p'); if (q.every(isFinite)) v.p = q; }
+          else if (id === 'op') { v.op = dlg.get('op'); this.layout(); }
+          else {
+            const x = dlg.get(id); if (!isFinite(x)) return;
+            if (id === 'h' || id === 'depth') { if (x > 0) v[id] = Math.min(1000, x); }
+            else if (id === 'ws') { if (x > 0) v.ws = Math.max(10, Math.min(400, x)); }
+            else if (id === 'sl') v.sl = Math.max(-45, Math.min(45, x));
+            else if (id === 'lh') { if (x > 0) v.lh = Math.max(0.5, Math.min(10, x)); }
+            else if (id === 'arc') v.arc = Math.abs(x) < 1e-6 ? 0 : Math.sign(x) * Math.max(Math.abs(x), v.h);
+            else v[id] = x;
+          }
+          if (live && id === 's') { this.schedule(); return; }
+          this.schedule();
+        }
+      });
+      transform.setMode('translate'); transform.setSpace('world');
+      transform.addEventListener('objectChange', this.onGizmo);
+      transform.addEventListener('dragging-changed', this.onDragChange);
+      transform.attach(pivot);
+      this.layout(); this.update();
+    },
+    layout() {
+      const l = $('#dialog [data-row="depth"] label'); if (l) l.textContent = this.v.op === 'cut' ? 'Hloubka vyrytí' : 'Výška textu (vysunutí)';
+      setPrompt(this.v.place === 'face' && !this.v.onFace ? 'Klepněte na rovnou plochu tělesa, kam má text přijít' : 'Klepnutím na rovnou plochu tělesa text na ni položíte, manipulátorem ho posunete; ostatní nastavení jsou v dialogu');
+    },
+    feature() {
+      const v = this.v, out = { id: f ? f.id : 'tmp', type: 'text3d', s: v.s, h: v.h, depth: v.depth, bold: !!v.bold, al: v.al, place: v.place, n: v.n.slice(), p: v.p.slice(), op: v.op, onFace: !!v.onFace };
+      if (v.sp) out.sp = v.sp; if (v.ws !== 100) out.ws = v.ws; if (v.a) out.a = v.a; if (v.sl) out.sl = v.sl; if (v.lh !== 1.5) out.lh = v.lh; if (v.arc) out.arc = v.arc; if (v.mir) out.mir = true;
+      return out;
+    },
+    schedule() { clearTimeout(this.timer); dlg.set('n', 'Počítám…'); this.timer = setTimeout(() => this.update(), 120); },
+    update() {
+      clearGroup(G.preview); this.tool = null;
+      if (!this.gizmoDrag) pivot.position.set(this.v.p[0], this.v.p[1], this.v.p[2]);
+      try {
+        if (this.v.place === 'face' && !this.v.onFace) throw new Error('Klepněte na rovnou plochu tělesa');
+        this.tool = Engine.toolForText(this.feature());
+        G.preview.add(previewMesh(this.tool, this.v.op));
+        const bb = K.bbox(this.tool);
+        dlg.set('n', `Text ${fmtc(bb.max[0] - bb.min[0], 1)} × ${fmtc(bb.max[1] - bb.min[1], 1)} × ${fmtc(bb.max[2] - bb.min[2], 1)} mm`);
+        dlg.okEnabled(true);
+      } catch (e) { dlg.set('n', '!' + e.message); dlg.okEnabled(false); }
+      requestRender();
+    },
+    onMove(ev) { const h = hitBodies(ev); dom.style.cursor = h ? 'crosshair' : ''; },
+    onClick(ev) {
+      const h = hitBodies(ev);
+      if (!h) {
+        if (this.v.onFace) return;
+        /* on a plane: the click moves the anchor there */
+        ray.setFromCamera(evNdc(ev), cam());
+        const n = this.v.n, pl = new THREE.Plane(new V3(n[0], n[1], n[2]), -(n[0] * this.v.p[0] + n[1] * this.v.p[1] + n[2] * this.v.p[2]));
+        const q = ray.ray.intersectPlane(pl, new V3()); if (!q) return;
+        this.v.p = [snapV(q.x), snapV(q.y), snapV(q.z)]; dlg.set('p', this.v.p); this.update(); return;
+      }
+      const fc = faceAtHit(h); if (!fc || fc.kind !== 'plane') { toast('Text položte na rovnou plochu.'); return; }
+      this.v.n = fc.n.map(r4); this.v.p = h.point.toArray().map(r4); this.v.onFace = true; this.v.place = 'face';
+      if (this.v.op === 'new') this.v.op = 'join';
+      dlg.set('place', 'face'); dlg.set('op', this.v.op); dlg.set('p', this.v.p); this.layout(); this.update();
+    },
+    onGizmo: null, onDragChange: null,
+    ok() { if (!this.tool) return null; const out = this.feature(); out.id = f ? f.id : newId(); return out; },
+    cleanup() {
+      clearTimeout(this.timer);
+      transform.removeEventListener('objectChange', this.onGizmo);
+      transform.removeEventListener('dragging-changed', this.onDragChange);
+      transform.detach(); transform.enabled = true; scene.remove(pivot);
+      controls.enabled = true;
+    }
+  };
+  c.onGizmo = () => { const p = pivot.position; c.v.p = [snapV(p.x), snapV(p.y), snapV(p.z)]; dlg.set('p', c.v.p); c.update(); };
+  c.onDragChange = e => { controls.enabled = !e.value; c.gizmoDrag = e.value; if (!e.value) { pivot.position.set(c.v.p[0], c.v.p[1], c.v.p[2]); requestRender(); } };
   beginCmd(c); c.init();
 }
 

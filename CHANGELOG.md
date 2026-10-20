@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta 1.45
+- **Nový nástroj Text** (Základní tělesa → Text): text rovnou jako těleso. Umístění vodorovně (XY), svisle zepředu (XZ), svisle zboku (YZ), nebo klepnutím **na rovnou plochu tělesa** (text se na ni položí a operace se přepne na Spojit). Výška písmen, výška textu (vysunutí) nebo hloubka vyrytí, zarovnání, rozestup a šířka písmen, natočení, sklon (kurzíva), řádkování, oblouk, tučné písmo, zrcadlově, poloha bodu ukotvení (i manipulátorem) a operace Nové těleso / Spojit (vystouplý text) / Vyříznout (vyrytý text). Text se dá kdykoli upravit z časové osy.
+- Nástroj Text je odebraný z lišty skici; texty ve starších skicách zůstávají a dají se dál upravovat v paletě.
+## Beta 1.44
+- **Úpravy textu ve skice:** vložený text má v paletě skici vlastní editor s popsanými poli: víceřádkový text (nový řádek Enterem), poloha X/Y, **zarovnání** vlevo / na střed / vpravo k bodu ukotvení, výška písmen, **rozestup písmen**, **šířka písmen** (%), **natočení** kolem bodu ukotvení, **sklon (kurzíva)**, **řádkování**, **oblouk** (text po kružnici daného poloměru; kladný přes horní, záporný přes spodní stranu), tučné písmo a **zrcadlově** (např. pro text vyrytý do spodní plochy). Text se dá kdykoli opravit otevřením skici.
+## Beta 1.43
+- **Lišta:** Zaoblení a Zkosení jsou spolu v nové nabídce **Hrany** (na místě dřívějšího tlačítka Zaoblení, zkratka F zůstává); v nabídce Tvar zůstalo Kombinovat a Rozříznout.
 ## Beta 1.42
 - **Výchozí rezerva pantu na stěně 0,15 mm** (dosud 0,125 mm) podle zkušebního tisku s vůlí 0,35 mm (0,13 / 0,14 / 0,15 mm, nejlépe vyšla 0,15). Zapuštěný pant má dál 0,15 mm.
 ## Beta 1.41

@@ -7,7 +7,7 @@ const PLANES = {
   XZ: { o: [0, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] },
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
-const FEATURE_LABEL = { boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
+const FEATURE_LABEL = { text3d: 'Text', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
   fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
@@ -1138,6 +1138,24 @@ function toolForHinge(f) {
   const L = Number(f.len), pos = (f.pos || [0, 0, 0]).map(Number), rz = Number(f.rot) || 0;
   return KK.transform(KK.translate(polys, [-L / 2, 0, 0]), eulerMatrix([0, 0, 0], pos, [0, 0, rz]));
 }
+/* ---------- text as a solid: the letters of a text (all the sketch text settings) extruded on a plane or a planar face.
+   f: { s, h, bold, sp, ws, sl, lh, arc, al, mir, a, depth, n (plane normal), p (anchor on the first line's baseline),
+        onFace (on a body's face: embossed slightly into it / engraved from it), op } */
+function toolForText(f) {
+  if (!String(f.s || '').trim()) throw new Error('Napište text');
+  if (!(Number(f.h) > 0)) throw new Error('Výška písmen musí být kladná');
+  const depth = Number(f.depth); if (!(depth > 0)) throw new Error((f.op === 'cut' ? 'Hloubka' : 'Výška') + ' textu musí být kladná');
+  const n = KK.vnorm(f.n || [0, 0, 1]), p = f.p || [0, 0, 0], B0 = basisFromPlane(n, KK.vdot(n, p)), B = { o: p, u: B0.u, v: B0.v, n };
+  const e = { t: 'text', s: String(f.s), x: 0, y: 0, h: Number(f.h), a: Number(f.a) || 0, bold: f.bold !== false, sp: f.sp, ws: f.ws, sl: f.sl, lh: f.lh, arc: f.arc, al: f.al, mir: f.mir };
+  const cut = f.op === 'cut', z0 = cut ? -depth : (f.onFace ? -0.02 : 0), z1 = cut ? 0.05 : depth;
+  let tool = null;
+  for (const r of regions({ ents: [e] })) {
+    const so = KK.extrudeProfiles([{ t: 'poly', pts: r.pts }, ...r.holes.map(q => ({ t: 'poly', pts: q.pts }))], B, z0, z1);
+    tool = tool ? KK.boolean(tool, so, 'union') : so;
+  }
+  if (!tool || !tool.length) throw new Error('Text nemá žádná písmena');
+  return tool;
+}
 function applyTool(bodies, f, tool, newBody) {
   const op = f.op || 'new';
   if (op === 'new') return bodies.concat([newBody(tool)]);
@@ -1303,6 +1321,8 @@ function step(state, f) {
     }
     case 'hole':
       out = applyTool(bodies, { ...f, op: 'cut' }, toolForHole(f, bodies), newBody); break;
+    case 'text3d':
+      out = applyTool(bodies, f, toolForText(f), polys => ({ id: f.id, name: 'Text ' + (++n), polys, from: f.id })); break;
     case 'shell': {
       const b = bodies.find(x => x.id === f.body);
       if (!b) throw new Error('Těleso neexistuje');
@@ -1454,7 +1474,7 @@ function makeRebuilder() {
   };
 }
 
-return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

@@ -161,6 +161,8 @@ button { cursor: pointer; }
 .fnum .u { padding: 0 7px 0 2px; color: var(--muted); font: 11px var(--mono); }
 .fnum .ax { min-width: 18px; padding: 0 3px; text-align: center; font: 600 11px var(--mono); }
 .fnum.ftext { flex: 1; margin-bottom: 6px; }
+.ftextarea { box-sizing: border-box; width: 100%; min-height: 28px; resize: vertical; border: 1px solid var(--line); border-radius: 4px; background: var(--field); padding: 5px 6px; font: 13px var(--sans, inherit); line-height: 1.35; }
+.ftextarea:focus-visible { outline: none; border-color: var(--accent); }
 .fnum.ftext input { text-align: left; font-family: var(--sans, inherit); }
 .ax-x { color: #e5484d; } .ax-y { color: #2f9e6a; } .ax-z { color: #4f7ae0; }
 .xyz { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
