@@ -135,6 +135,7 @@ controls.target.set(0, 0, 10);
 controls.update();
 
 const transform = new THREE.TransformControls(persp, dom);
+transform.addEventListener('dragging-changed', e => { if (!e.value && typeof cmdTick === 'function' && cmd) cmdTick(); });
 transform.setSize(0.9);
 transform.freeXY = true; /* the centre handle moves bodies in X and Y only (patched TransformControls) */
 scene.add(transform);
@@ -313,11 +314,49 @@ function pushHist() {
 }
 function updateUndo() {
   if (sk) { $('#undo').disabled = !(sk.hist && sk.hist.length) && !sk.draft; $('#redo').disabled = !(sk.fut && sk.fut.length); return; }
-  $('#undo').disabled = hi <= 0 || !!cmd; $('#redo').disabled = hi >= hist.length - 1 || !!cmd;
+  if (cmd) { $('#undo').disabled = !(cmd._hist && cmd._hist.length); $('#redo').disabled = !(cmd._fut && cmd._fut.length); return; }
+  $('#undo').disabled = hi <= 0; $('#redo').disabled = hi >= hist.length - 1;
 }
 function commit() { pushHist(); saveDoc(); refreshBusy(); }
-function undo() { if (sk) { skUndo(); return; } if (hi > 0 && !cmd) { hi--; doc = JSON.parse(hist[hi]); afterDocSwap(); } }
-function redo() { if (sk) { skRedo(); return; } if (hi < hist.length - 1 && !cmd) { hi++; doc = JSON.parse(hist[hi]); afterDocSwap(); } }
+function undo() { if (sk) { skUndo(); return; } if (cmd) { cmdUndo(); return; } if (hi > 0) { hi--; doc = JSON.parse(hist[hi]); afterDocSwap(); } }
+function redo() { if (sk) { skRedo(); return; } if (cmd) { cmdRedo(); return; } if (hi < hist.length - 1) { hi++; doc = JSON.parse(hist[hi]); afterDocSwap(); } }
+/* undo inside an open command (dialog): every finished change (a field, a choice, a click in the view, a manipulator drag)
+   is a step. A step is the command's own plain settings plus the dialog values; heavy or live things (meshes, results,
+   timers, the faces' polygons) are left out and recomputed after a step back. */
+const CMD_SKIP = new Set(['tool', 'tools', 'result', 'timer', 'hideBody', 'info', 'highlight', 'scan', 'anim', 'clash', 'hgrp', 'handles', 'drag', 'hover', 'gizmoDrag', 'err', 'editIndex', 'prog', 'moved', 'clashIds', 'openMeshes', 'scanTok']);
+function cmdSnap(c) {
+  const o = {};
+  for (const k of Object.keys(c)) {
+    if (k[0] === '_' || CMD_SKIP.has(k)) continue;
+    const v = c[k];
+    if (typeof v === 'function' || v === undefined) continue;
+    if (v && typeof v === 'object' && !Array.isArray(v) && Object.getPrototypeOf(v) !== Object.prototype) continue;
+    let j; try { j = JSON.stringify(v); } catch (e) { continue; }
+    if (j === undefined || j.length > 60000) continue;
+    o[k] = j;
+  }
+  const fv = {};
+  if (dlg) for (const f of dlg.spec.fields) if (['num', 'xyz', 'opt', 'chk', 'seg', 'area'].includes(f.k)) { try { fv[f.id] = dlg.get(f.id); } catch (e) { /* skip */ } }
+  return JSON.stringify({ o, fv });
+}
+function cmdCheckpoint() {
+  const c = cmd; if (!c || sk || c._last === undefined) return;
+  const s0 = cmdSnap(c);
+  if (s0 !== c._last) { c._hist.push(c._last); if (c._hist.length > 100) c._hist.shift(); c._fut = []; c._last = s0; }
+  updateUndo();
+}
+function cmdApply(c, snap) {
+  const { o, fv } = JSON.parse(snap);
+  for (const k in o) c[k] = JSON.parse(o[k]);
+  if (dlg) for (const id in fv) { const f = dlg.spec.fields.find(x => x.id === id); if (!f) continue; const v = fv[id]; if (f.k === 'num' && !isFinite(v)) continue; dlg.set(id, v); }
+  c._last = snap;
+  for (const fn of ['layout', 'showLen', 'update', 'schedule']) if (typeof c[fn] === 'function') { try { c[fn](); } catch (e) { /* the next step shows it */ } }
+  if (typeof c.pose === 'function') try { c.pose(); } catch (e) { /* skip */ }
+  requestRender(); updateUndo();
+}
+function cmdUndo() { const c = cmd; if (!c || !c._hist || !c._hist.length) return; cmdCheckpoint(); if (!c._hist.length) return; c._fut.push(c._last); cmdApply(c, c._hist.pop()); }
+function cmdRedo() { const c = cmd; if (!c || !c._fut || !c._fut.length) return; c._hist.push(c._last); cmdApply(c, c._fut.pop()); }
+const cmdTick = () => setTimeout(cmdCheckpoint, 0);
 /* sketch history: its own undo stack while the sketch is open (whole sketch closes as one step in the model history).
    A snapshot is taken whenever the palette refreshes after a change; undo first takes back the point or shape being drawn. */
 /* elements drawn while helper drawing is on become construction elements (same undo step as the drawing) */
@@ -1290,6 +1329,7 @@ function openDialog(spec) {
 }
 function closeDialog() { const el = $('#dialog'); el.hidden = true; el.innerHTML = ''; dlg = null; }
 $('#dialog').addEventListener('click', e => {
+  if (cmd && !sk && !e.target.closest('input, textarea, select')) cmdTick(); /* fields make their step on 'change' */
   const a = e.target.closest('[data-act]');
   if (a) { if (a.dataset.act === 'ok') { if (sk) finishSketch(true); else okCmd(); } else { if (sk) finishSketch(false); else endCmd(false); } return; }
   const sb = e.target.closest('[data-sel]'); if (sb && dlg && dlg.spec.onSel) { dlg.spec.onSel(sb.dataset.sel); return; }
@@ -1301,6 +1341,7 @@ $('#dialog').addEventListener('click', e => {
 const syncRange = t => { if (t && t.dataset && t.dataset.range) { const n = $('#dlg-' + t.dataset.f); if (n) n.value = fmtc(parseFloat(t.value), 3); } };
 $('#dialog').addEventListener('input', e => { syncRange(e.target); const f = e.target.dataset && e.target.dataset.f; if (f && dlg && dlg.spec.onChange && e.target.type !== 'checkbox' && e.target.tagName !== 'SELECT') dlg.spec.onChange(f, true); });
 $('#dialog').addEventListener('change', e => {
+  if (cmd && !sk) cmdTick();
   syncRange(e.target);
   const f = e.target.dataset && e.target.dataset.f; if (f && dlg && dlg.spec.onChange) dlg.spec.onChange(f);
   if (sk && e.target.dataset.ent) onPaletteChange(e.target);
@@ -1321,6 +1362,9 @@ $('#dialog').addEventListener('keydown', e => {
 let cmd = null;
 function beginCmd(c) {
   cmd = c; tlSel = null;
+  c._hist = []; c._fut = [];
+  /* the first step is the state right after the command opened its dialog (init runs straight after beginCmd) */
+  queueMicrotask(() => { if (cmd === c) { c._last = cmdSnap(c); updateUndo(); } });
   if (c.editIndex !== undefined && c.editIndex !== null) { viewMarker = c.editIndex; refresh(); }
   renderTimeline(); updateUndo();
 }
@@ -4239,6 +4283,9 @@ function startSplitBody(editIndex, f) {
     editIndex, bodies: new Set(f ? (f.bodies || []) : [...sel]), mode: f ? (f.mode || 'XY') : 'XY', off: f ? (Number(f.offset) || 0) : null,
     faceN: f && f.mode === 'face' ? (f.fn || f.n).slice() : null, faceW: f && f.mode === 'face' ? (f.fw !== undefined ? Number(f.fw) : Number(f.w) - (Number(f.offset) || 0)) : 0,
     tilt: f && f.tilt ? f.tilt.slice() : [0, 0], shift: f && f.shift ? f.shift.slice() : [0, 0], size: f && f.size ? Number(f.size) : null,
+    /* P: the cutting plane's pivot point (it lies on the plane; tilting turns the plane about it, the sliders move it along the
+       plane's own normal and axes). Not stored in older documents: worked out from the offset and shift the first time. */
+    P: f && f.pp ? f.pp.slice() : null,
     keep: f ? (f.keep || 'both') : 'both', pick: 'bodies', timer: null, ok_: false, hideBodies: new Set(), highlight: new Set(), piv: null, gdrag: null, hmode: 'move',
     ids() { return [...this.bodies].filter(id => meshes.has(id)); },
     /* bounding box of the selection, cached (the handles ask for it every frame) */
@@ -4278,13 +4325,16 @@ function startSplitBody(editIndex, f) {
         onSel: id => { this.pick = id; this.update(); },
         onChange: id => {
           const num = (k, fn) => { const v = dlg.get(k); if (isFinite(v)) fn(v); };
-          if (id === 'mode') { this.mode = dlg.get('mode'); if (this.mode === 'face') { if (!this.faceN) this.pick = 'plane'; this.off = 0; } else this.off = this.centerOff(); dlg.set('off', this.off); this.ranges(); }
-          if (id === 'off') num('off', v => { this.off = v; });
-          if (id === 'ta') num('ta', v => { this.tilt[0] = Math.max(-90, Math.min(90, v)); });
-          if (id === 'tb') num('tb', v => { this.tilt[1] = Math.max(-90, Math.min(90, v)); });
+          if (id === 'mode') { this.mode = dlg.get('mode'); if (this.mode === 'face') { if (!this.faceN) this.pick = 'plane'; this.off = 0; } else this.off = this.centerOff(); dlg.set('off', this.off); this.P = null; this.ranges(); }
+          /* the sliders work in the plane as it is now (also after turning it with the manipulator): the offset moves it along its
+             own normal, the shifts along its own axes */
+          if (id === 'off') num('off', v => { const pl = this.plane(); if (pl) this.P = K.vadd(pl.P, K.vmul(pl.n, v - this.offOf(pl))); this.off = v; });
+          if (id === 'ta') num('ta', v => { this.pin(); this.tilt[0] = Math.max(-90, Math.min(90, v)); });
+          if (id === 'tb') num('tb', v => { this.pin(); this.tilt[1] = Math.max(-90, Math.min(90, v)); });
           if (id === 'size') num('size', v => { if (v > 0) this.size = v; });
-          if (id === 'su') num('su', v => { this.shift[0] = v; });
-          if (id === 'sv') num('sv', v => { this.shift[1] = v; });
+          if (id === 'su') num('su', v => { const pl = this.plane(); if (pl) this.P = K.vadd(pl.P, K.vmul(pl.U, v - this.shift[0])); this.shift[0] = v; });
+          if (id === 'sv') num('sv', v => { const pl = this.plane(); if (pl) this.P = K.vadd(pl.P, K.vmul(pl.V, v - this.shift[1])); this.shift[1] = v; });
+          if (id === 'ta' || id === 'tb') { const pl = this.plane(); if (pl) { this.off = Math.round(this.offOf(pl) * 1000) / 1000; dlg.set('off', this.off); } this.ranges(); }
           if (id === 'keep') this.keep = dlg.get('keep');
           if (id === 'hmode') { this.hmode = dlg.get('hmode'); this.syncPiv(); return; }
           this.update();
@@ -4305,7 +4355,7 @@ function startSplitBody(editIndex, f) {
       const lbl = (id, t) => { const l = $(`#dialog label[for="dlg-${id}"]`); if (l) l.textContent = t; };
       if (bb && b0) {
         let lo = Infinity, hi = -Infinity;
-        for (const x of [bb.min[0], bb.max[0]]) for (const y of [bb.min[1], bb.max[1]]) for (const z of [bb.min[2], bb.max[2]]) { const t = K.vdot(b0.n, [x, y, z]) - (this.mode === 'face' ? this.faceW : 0); lo = Math.min(lo, t); hi = Math.max(hi, t); }
+        const nn = (this.plane() || b0).n; for (const x of [bb.min[0], bb.max[0]]) for (const y of [bb.min[1], bb.max[1]]) for (const z of [bb.min[2], bb.max[2]]) { const t = K.vdot(nn, [x, y, z]) - (this.mode === 'face' ? this.faceW : 0); lo = Math.min(lo, t); hi = Math.max(hi, t); }
         set('off', Math.floor(lo - 1), Math.ceil(hi + 1));
         const F = this.fullSize(); set('size', 1, F); set('su', -Math.ceil(F / 2), Math.ceil(F / 2)); set('sv', -Math.ceil(F / 2), Math.ceil(F / 2));
         const B = Engine.basisFromPlane(b0.n, b0.w);
@@ -4313,6 +4363,16 @@ function startSplitBody(editIndex, f) {
         lbl('su', 'Posun plochy ' + this.axisName(B.u)); lbl('sv', 'Posun plochy ' + this.axisName(B.v));
       }
     },
+    /* the pivot from the offset and the shift (how older documents stored the plane): the selection's centre dropped onto the
+       base plane, then shifted along the base plane's axes */
+    oldP() {
+      const b0 = this.base(), bb = this.bb(); if (!b0) return [0, 0, 0];
+      const B = Engine.basisFromPlane(b0.n, b0.w), cc = bb ? [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2) : B.o;
+      return K.vadd(K.vsub(cc, K.vmul(b0.n, K.vdot(b0.n, cc) - b0.w)), K.vadd(K.vmul(B.u, this.shift[0]), K.vmul(B.v, this.shift[1])));
+    },
+    pin() { if (!this.P) this.P = this.oldP(); },
+    /* the offset shown: the plane's distance along its own normal (from the picked face's plane in face mode) */
+    offOf(pl) { return K.vdot(pl.n, pl.P) - (this.mode === 'face' ? this.faceW : 0); },
     centerOff() {
       const n = SPLIT_PLANES[this.mode] || [0, 0, 1], bb = this.bb(); if (!bb) return 0;
       const k = n.indexOf(1);
@@ -4320,10 +4380,8 @@ function startSplitBody(editIndex, f) {
     },
     /* final cutting plane: base plane through the selection centre (+ shift in the plane), tilted about its two in-plane axes */
     plane() {
-      const b0 = this.base(), bb = this.bb(); if (!b0) return null;
-      const B = Engine.basisFromPlane(b0.n, b0.w), cc = bb ? [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2) : B.o;
-      let P = K.vsub(cc, K.vmul(b0.n, K.vdot(b0.n, cc) - b0.w));
-      P = K.vadd(P, K.vadd(K.vmul(B.u, this.shift[0]), K.vmul(B.v, this.shift[1])));
+      const b0 = this.base(); if (!b0) return null;
+      const B = Engine.basisFromPlane(b0.n, b0.w), P = this.P || this.oldP();
       const rot = (v, ax, a) => { const c2 = Math.cos(a), s2 = Math.sin(a); return K.vadd(K.vadd(K.vmul(v, c2), K.vmul(K.cross(ax, v), s2)), K.vmul(ax, K.vdot(ax, v) * (1 - c2))); };
       const ta = this.tilt[0] * D2R, tb = this.tilt[1] * D2R;
       let n = rot(b0.n, B.u, ta), U = B.u, V = rot(B.v, B.u, ta);
@@ -4405,18 +4463,19 @@ function startSplitBody(editIndex, f) {
       const g = this.gdrag; if (!g) return;
       const b0 = this.base(), B = Engine.basisFromPlane(b0.n, b0.w), n0 = v3(b0.n), st = settings.gridSnap ? settings.snap : 0.01, snapL = v => Math.round(Math.round(v / st) * st * 1000) / 1000;
       if (g.mode === 'move') {
-        const tilted = this.tilt[0] || this.tilt[1];
-        const P = this.piv.position.clone(), bb = this.bb(), cc = bb ? v3([0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2)) : new V3();
-        const wb = P.dot(n0), Pc = cc.clone().addScaledVector(n0, wb - cc.dot(n0)), d = P.clone().sub(Pc);
-        this.off = tilted ? Math.round((wb - (this.mode === 'face' ? this.faceW : 0)) * 1000) / 1000 : snapL(wb - (this.mode === 'face' ? this.faceW : 0)); dlg.set('off', this.off);
-        /* the manipulator moves along the TILTED plane's axes; keep the in-plane part of the move too (not only with a limited
-           face), otherwise the pivot falls back onto the untilted centre line and the tilted plane moves by less than dragged */
-        this.shift = [d.dot(v3(B.u)), d.dot(v3(B.v))].map(x => (tilted ? Math.round(x * 1000) / 1000 : snapL(x))); dlg.set('su', this.shift[0]); dlg.set('sv', this.shift[1]);
+        /* the pivot goes where the manipulator is; offset and shifts are read back along the plane's own normal and axes */
+        this.P = this.piv.position.toArray().map(x => Math.round(x * 1000) / 1000);
+        const pl = this.plane(), bb = this.bb(), cc = bb ? [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2) : pl.P;
+        if (!(this.tilt[0] || this.tilt[1])) { const o = snapL(this.offOf(pl)); this.P = K.vadd(this.P, K.vmul(pl.n, o - this.offOf(pl))); }
+        const pl2 = this.plane(); this.off = Math.round(this.offOf(pl2) * 1000) / 1000; dlg.set('off', this.off);
+        const d = K.vsub(pl2.P, cc); this.shift = [K.vdot(d, pl2.U), K.vdot(d, pl2.V)].map(x => Math.round(x * 1000) / 1000); dlg.set('su', this.shift[0]); dlg.set('sv', this.shift[1]);
         showDimAt(this.lastEv, `Posun roviny ${fmtc(this.off, 2)} mm`);
       } else if (g.mode === 'rot') {
+        this.pin();
         const n = new V3(0, 0, 1).applyQuaternion(this.piv.quaternion), u = n.dot(v3(B.u)), v = n.dot(v3(B.v)), w = n.dot(n0);
         this.tilt = [Math.max(-90, Math.min(90, Math.round(Math.atan2(-v, w) / D2R))), Math.max(-90, Math.min(90, Math.round(Math.asin(Math.max(-1, Math.min(1, u))) / D2R)))];
         dlg.set('ta', this.tilt[0]); dlg.set('tb', this.tilt[1]);
+        { const pl = this.plane(); if (pl) { this.off = Math.round(this.offOf(pl) * 1000) / 1000; dlg.set('off', this.off); } }
         showDimAt(this.lastEv, `Natočení ${fmtc(this.tilt[0], 0)}° · ${fmtc(this.tilt[1], 0)}°`);
       } else {
         const k = Math.max(Math.abs(this.piv.scale.x), Math.abs(this.piv.scale.y), 1e-3);
@@ -4435,12 +4494,13 @@ function startSplitBody(editIndex, f) {
         if (!fc || fc.kind !== 'plane') { toast('Vyberte rovinnou plochu.'); return; }
         this.faceN = fc.n.map(r6); this.faceW = Math.round(fc.w * 1e5) / 1e5;
         if (!this.ids().length) this.bodies.add(fc.bodyId);
-        this.pick = 'bodies'; this.ranges(); this.update(); return;
+        this.P = null; this.pick = 'bodies'; this.ranges(); this.update(); return;
       }
       const id = h.object.userData.bodyId, first = !this.ids().length;
       if (this.bodies.has(id)) this.bodies.delete(id); else this.bodies.add(id);
       if (first && this.ids().length) {
         if (this.mode !== 'face') { this.off = this.centerOff(); dlg.set('off', this.off); }
+        this.P = null;
         this.size = this.fullSize(); dlg.set('size', this.size);
       }
       if (this.mode === 'face' && !this.faceN) this.pick = 'plane';
@@ -4450,7 +4510,7 @@ function startSplitBody(editIndex, f) {
       if (!this.ok_ && !this.compute()) return null;
       const pl = this.plane();
       return { id: f ? f.id : newId(), type: 'splitbody', bodies: this.ids(), mode: this.mode, offset: this.off, n: pl.n.map(r6), w: r6(pl.w), keep: this.keep,
-        tilt: this.tilt.slice(), shift: this.shift.slice(), size: this.size, ...(pl.rect ? { rect: pl.rect } : {}), ...(this.mode === 'face' ? { fn: this.faceN, fw: this.faceW } : {}) };
+        tilt: this.tilt.slice(), shift: this.shift.slice(), pp: pl.P.map(r6), size: this.size, ...(pl.rect ? { rect: pl.rect } : {}), ...(this.mode === 'face' ? { fn: this.faceN, fw: this.faceW } : {}) };
     },
     cleanup() {
       clearTimeout(this.timer); this.hideBodies = new Set(); this.highlight = null;
@@ -6056,6 +6116,7 @@ dom.addEventListener('pointermove', e => {
 dom.addEventListener('pointerleave', () => { if (sk && (sk.hoverMid || sk.gridHot)) { sk.hoverMid = null; sk.gridHot = null; redrawSketch(); } if (cmd && cmd.onLeave) cmd.onLeave(); if (hoverBody) { hoverBody = null; styleBodies(); } $('#dim').hidden = true; });
 dom.addEventListener('pointercancel', e => { if (drawDrag && e.pointerId === drawDrag.id) cancelDrawDrag(); if (down && down.marquee) { controls.enabled = true; marqueeHide(); down = null; } });
 dom.addEventListener('pointerup', e => {
+  if (cmd && !sk) cmdTick(); /* a drag of a handle or of the manipulator ended */
   if (drawDrag && e.pointerId === drawDrag.id) {
     const dd = drawDrag; drawDrag = null; controls.enabled = true; if (sk && e.pointerType === 'touch') sk.gridHot = null;
     if (dd.started) { down = null; lastTap = null; if (dd.free) finishFreehand(); else sketchClick(e); return; }
@@ -6119,7 +6180,7 @@ function handleHover(e) {
 }
 function handleClick(e) {
   if (sk) { sketchClick(e); return; }
-  if (cmd) { if (cmd.onClick) cmd.onClick(e); return; }
+  if (cmd) { if (cmd.onClick) cmd.onClick(e); cmdTick(); return; }
   if (faceMode) { faceClick(e); return; }
   const h = hitBodies(e);
   if (h) bodyClick(h.object.userData.bodyId, e.ctrlKey || e.metaKey || e.shiftKey);

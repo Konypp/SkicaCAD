@@ -784,10 +784,16 @@ function boxHingeFlushLocal(f, G) {
   const { pin, sock } = pinParts(H, 0);
   return { ...base, B: KK.boolean(B, pin, 'union'), sock };
 }
+/* height of a box's rim at one wall: the top of the wall's outer face (the plane where coordinate k = val). A lip standing on
+   the rim inside the wall, or anything else higher up inside, does not count. */
+function rimTop(polys, k, val) {
+  let m = -Infinity;
+  for (const q of polys) for (const v of q.v) if (Math.abs(v[k] - val) < 1e-3 && v[2] > m) m = v[2];
+  return m > -Infinity ? m : KK.bbox(polys).max[2];
+}
 /* place the box hinge(s) from the two bodies: returns world-space tools for the box and for the lid */
 function boxHingeTools(f, boxPolys, lidPolys) {
   const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys);
-  if (f.zRim === undefined && Math.abs(a.max[2] - b.max[2]) > 0.05) throw new Error('Krabička a víko musí mít horní hranu ve stejné výšce');
   let ax = -1, G = -1, dir = 0;
   for (const k of [0, 1]) {
     const g1 = b.min[k] - a.max[k], g2 = a.min[k] - b.max[k];
@@ -795,6 +801,9 @@ function boxHingeTools(f, boxPolys, lidPolys) {
     if (g2 > G) { G = g2; ax = k; dir = -1; }
   }
   if (G <= 0) throw new Error('Krabička a víko se překrývají, postavte je vedle sebe s mezerou');
+  /* the rims are compared at the facing walls (a lip on the box or a recess in the lid may stand higher elsewhere) */
+  const zR = f.zRim !== undefined ? f.zRim : rimTop(boxPolys, ax, dir > 0 ? a.max[ax] : a.min[ax]);
+  if (f.zRim === undefined && Math.abs(zR - rimTop(lidPolys, ax, dir > 0 ? b.min[ax] : b.max[ax])) > 0.05) throw new Error('Krabička a víko musí mít horní hranu ve stejné výšce');
   const o = 1 - ax, s0 = Math.max(a.min[o], b.min[o]), s1 = Math.min(a.max[o], b.max[o]), span = s1 - s0, L = Number(f.len), cnt = Math.max(1, Math.min(4, Math.round(Number(f.count) || 1)));
   const sh = Number(f.shift) || 0;
   if (Math.abs(sh) > 1e-9 && (s0 + span * 0.5 / cnt + sh - L / 2 < s0 - 1e-6 || s0 + span * (cnt - 0.5) / cnt + sh + L / 2 > s1 + 1e-6)) throw new Error('Posunutý pant by přesahoval hranu');
@@ -805,14 +814,14 @@ function boxHingeTools(f, boxPolys, lidPolys) {
   const P = flush ? boxHingeFlushLocal(f, G) : boxHingeLocal({ ...f, liftEff: lift0 }, G), H = P.H;
   /* how far below the rim the hinge reaches: the 45° web (R·√2 + G/2 + 1 mm grip), or the teardrop pocket; it must stay above the print bed */
   const need = flush ? P.depth + 1 : H.R * Math.SQRT2 + G / 2 + 1, low = Math.max(a.min[2], b.min[2]);
-  if (a.max[2] - need < low - 1e-6) throw new Error('Krabička je na pant příliš nízká, potřebuje výšku alespoň ' + (Math.ceil(need * 10) / 10).toString().replace('.', ',') + ' mm');
+  if (zR - need < low - 1e-6) throw new Error('Krabička je na pant příliš nízká, potřebuje výšku alespoň ' + (Math.ceil(need * 10) / 10).toString().replace('.', ',') + ' mm');
   /* local y points from the box to the lid, local x along the edge, z up; keep it right-handed */
-  const ey = [0, 0, 0]; ey[ax] = dir; const ex = [ey[1], -ey[0], 0], zA = f.zRim !== undefined ? f.zRim : a.max[2];
+  const ey = [0, 0, 0]; ey[ax] = dir; const ex = [ey[1], -ey[0], 0], zA = zR;
   const mid = (dir > 0 ? a.max[ax] + b.min[ax] : b.max[ax] + a.min[ax]) / 2;
   const lift = f.pinHole ? 0 : Math.max(0, Math.min(2, f.lift === undefined ? 0 : Number(f.lift) || 0));
-  const zA0 = f.zRim !== undefined ? f.zRim : a.max[2], midA = (dir > 0 ? a.max[ax] + b.min[ax] : b.max[ax] + a.min[ax]) / 2;
+  const zA0 = zR, midA = (dir > 0 ? a.max[ax] + b.min[ax] : b.max[ax] + a.min[ax]) / 2;
   const fold = ax === 1 ? [1, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 0, 0, 2 * midA, 2 * zA0, 1] : [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 2 * midA, 0, 2 * zA0, 1];
-  const out = { H, G, flush, lift, fold };
+  const out = { H, G, flush, lift, fold, zRim: zR };
   for (let j = 0; j < cnt; j++) {
     const cAlong = s0 + span * (j + 0.5) / cnt + sh, org = [0, 0, zA]; org[ax] = mid; org[o] = cAlong - ex[o] * L / 2;
     const m = [ex[0], ex[1], ex[2], 0, ey[0], ey[1], ey[2], 0, 0, 0, 1, 0, org[0], org[1], org[2], 1];
@@ -847,11 +856,13 @@ function applyBoxHinge(T, pb, pl, sep) {
    made by turning the closed lid, the lid always closes onto the box exactly as it was designed. */
 const CLOSED_PINS = { fil: 1.75, m2: 2, m3: 3 };
 function closedHingeGeom(f, boxPolys, lidPolys) {
-  const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys), zp = a.max[2];
-  /* the lid rests on the box rim (a latch tab may hang below the rim, so only its top half is checked) */
-  if (b.min[2] > zp + 0.05 || b.max[2] < zp + 0.5) throw new Error('Víko musí ležet na krabičce (navrhněte krabičku zavřenou)');
+  const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys);
   const side = f.side || '+y', k = side[1] === 'x' ? 0 : 1, sg = side[0] === '-' ? -1 : 1, o = 1 - k;
   const face = sg > 0 ? a.max[k] : a.min[k], lface = sg > 0 ? b.max[k] : b.min[k];
+  /* the parting plane: the top of the box's back wall (a lip on the rim reaches up into the lid) */
+  const zp = rimTop(boxPolys, k, face);
+  /* the lid rests on the box rim (a latch tab may hang below the rim, so only its top half is checked) */
+  if (b.min[2] > zp + 0.05 || b.max[2] < zp + 0.5) throw new Error('Víko musí ležet na krabičce (navrhněte krabičku zavřenou)');
   if (Math.abs(face - lface) > 0.05) throw new Error('Zadní stěna víka musí lícovat se zadní stěnou krabičky');
   if (Math.min(a.max[o], b.max[o]) - Math.max(a.min[o], b.min[o]) <= 0) throw new Error('Víko neleží nad krabičkou');
   const pinMode = f.join === 'pin', pinD = pinMode ? (CLOSED_PINS[f.pinKind] || 1.75) : Number(f.pin) || 3;
@@ -889,10 +900,10 @@ function closedHingeResult(f, boxPolys, lidPolys) {
    Local frame: x along the edge, y = outward normal of the back wall (face at y = 0), z up, parting plane z = 0. */
 const HIDDEN_BEVEL = 50;
 function hiddenHingeResult(f, boxPolys, lidPolys) {
-  const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys), zp = a.max[2];
-  if (b.min[2] > zp + 0.05 || b.max[2] < zp + 0.5) throw new Error('Víko musí ležet na krabičce (navrhněte krabičku zavřenou)');
+  const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys);
   const side = f.side || '+y', k = side[1] === 'x' ? 0 : 1, sg = side[0] === '-' ? -1 : 1, o = 1 - k;
-  const face = sg > 0 ? a.max[k] : a.min[k], lface = sg > 0 ? b.max[k] : b.min[k];
+  const face = sg > 0 ? a.max[k] : a.min[k], lface = sg > 0 ? b.max[k] : b.min[k], zp = rimTop(boxPolys, k, face);
+  if (b.min[2] > zp + 0.05 || b.max[2] < zp + 0.5) throw new Error('Víko musí ležet na krabičce (navrhněte krabičku zavřenou)');
   if (Math.abs(face - lface) > 0.05) throw new Error('Zadní stěna víka musí lícovat se zadní stěnou krabičky');
   const s0 = Math.max(a.min[o], b.min[o]), s1 = Math.min(a.max[o], b.max[o]), span = s1 - s0;
   if (span <= 0) throw new Error('Víko neleží nad krabičkou');
@@ -953,7 +964,7 @@ function hiddenHingeResult(f, boxPolys, lidPolys) {
   /* the lid's turn about the axis (for the simulation): 180° on the parting plane */
   const axc = face - sg * e;
   const U = k === 1 ? [1, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 0, 0, 2 * axc, 2 * zp, 1] : [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 2 * axc, 0, 2 * zp, 1];
-  return { box, lid, partA: sep ? pA : undefined, partB: sep ? pB : undefined, T: { H, G: 0, lift: 0 }, U, pinMode: true, hidden: true, maxAngle: 2 * HIDDEN_BEVEL, filLen: Math.round(xb - xa) };
+  return { box, lid, partA: sep ? pA : undefined, partB: sep ? pB : undefined, T: { H, G: 0, lift: 0, zRim: zp }, U, pinMode: true, hidden: true, maxAngle: 2 * HIDDEN_BEVEL, filLen: Math.round(xb - xa) };
 }
 /* ---------- latch for a box designed closed (lid lying on the box). Local frame: u = outward normal of the chosen wall
    (wall face at u = 0), x along the edge, z up with the parting plane at z = 0 (box below, lid above).
@@ -1138,10 +1149,10 @@ function flipLatchLocal(f) {
 }
 function latchTools(f, boxPolys, lidPolys, zRim) {
   /* the parting plane: the box rim (hinge knuckles of a box hinge may stand above it, so the hinge passes it on) */
-  const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys), zp = zRim !== undefined ? zRim : a.max[2];
-  if (b.min[2] > zp + 0.05 || b.max[2] < zp + 0.5) throw new Error('Víko musí ležet na krabičce (zavřená krabička)');
+  const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys);
   const side = f.side || '-y', k = side[1] === 'x' ? 0 : 1, sg = side[0] === '-' ? -1 : 1, o = 1 - k;
-  const face = sg > 0 ? a.max[k] : a.min[k];
+  const face = sg > 0 ? a.max[k] : a.min[k], zp = zRim !== undefined ? zRim : rimTop(boxPolys, k, face);
+  if (b.min[2] > zp + 0.05 || b.max[2] < zp + 0.5) throw new Error('Víko musí ležet na krabičce (zavřená krabička)');
   const s0 = Math.max(a.min[o], b.min[o]), s1 = Math.min(a.max[o], b.max[o]), cnt = Math.max(1, Math.min(3, Math.round(Number(f.count) || 1))), sh = Number(f.shift) || 0;
   const flip = f.style === 'flip' || f.style === 'flipflush', rot = flip || f.style === 'rot' || f.style === 'rotflush';
   const P = flip ? flipLatchLocal({ ...f, _hl: b.max[2] - zp }) : rot ? rotLatchLocal(f) : latchParts(f);
@@ -1182,7 +1193,8 @@ function latchLen(f) {
 /* the latch on a box and lid; when the lid lies open beside the box (a hinge printed in one piece turned it over), the
    lid is folded shut for the latch and opened again afterwards */
 function latchApply(f, bx, ld) {
-  const zp = ld.swing ? ld.swing.zp : KK.bbox(bx.polys).max[2], lb = KK.bbox(ld.polys), onBox = lb.min[2] <= zp + 0.05 && lb.max[2] >= zp + 0.5;
+  const sd = f.side || '-y', sk0 = sd[1] === 'x' ? 0 : 1, bbB = KK.bbox(bx.polys);
+  const zp = ld.swing ? ld.swing.zp : rimTop(bx.polys, sk0, sd[0] === '-' ? bbB.min[sk0] : bbB.max[sk0]), lb = KK.bbox(ld.polys), onBox = lb.min[2] <= zp + 0.05 && lb.max[2] >= zp + 0.5;
   const fold = ld.fold || null; /* a lid with fold is stored open (turned over by a box hinge) */
   const lidP = fold ? KK.transform(ld.polys, fold) : ld.polys;
   if (!fold && !onBox) throw new Error('Víko musí ležet na krabičce, nebo být připojené pantem krabičky (tisk vcelku)');
@@ -1257,8 +1269,8 @@ function step(state, f) {
       if (bx === ld) throw new Error('Krabička a víko musí být dvě různá tělesa');
       let R, fold = null;
       let swing;
-      if (f.kind === 'closed') { R = closedHingeResult(f, bx.polys, ld.polys); if (!R.pinMode) fold = R.U; swing = { M: R.U, open: !R.pinMode, lift: R.T.lift, play: R.T.H.c, zp: KK.bbox(bx.polys).max[2], max: R.maxAngle || 180 }; }
-      else { const T = boxHingeTools(f, bx.polys, ld.polys); R = applyBoxHinge(T, bx.polys, ld.polys, f.out === 'new'); fold = T.fold; swing = { M: T.fold, open: true, lift: T.lift, play: T.H.c, zp: KK.bbox(bx.polys).max[2] }; }
+      if (f.kind === 'closed') { R = closedHingeResult(f, bx.polys, ld.polys); if (!R.pinMode) fold = R.U; swing = { M: R.U, open: !R.pinMode, lift: R.T.lift, play: R.T.H.c, zp: R.T.zRim !== undefined ? R.T.zRim : KK.bbox(bx.polys).max[2], max: R.maxAngle || 180 }; }
+      else { const T = boxHingeTools(f, bx.polys, ld.polys); R = applyBoxHinge(T, bx.polys, ld.polys, f.out === 'new'); fold = T.fold; swing = { M: T.fold, open: true, lift: T.lift, play: T.H.c, zp: T.zRim }; }
       /* fold: turns the open lid shut (a later latch is built on the closed box); swing: the hinge axis for the simulation
          (M = the 180° turn on the rim plane, open = the lid is stored turned open; the real axis is lift above the rim; play = radial play of the knuckles, the lid settles by it) */
       out = bodies.map(b => (b === bx ? { ...b, polys: R.box } : b === ld ? { ...b, polys: R.lid, fold, swing } : b));

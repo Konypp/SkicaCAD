@@ -1,5 +1,11 @@
 # Changelog
 
+## Beta 1.50
+- **Panty a západky na krabičce s lemem:** výška okraje se nově měří na vnější stěně, kde pant nebo západka je (horní hrana té stěny), ne podle nejvyššího bodu tělesa. Pant (krabička a víko vedle sebe, krabička navržená zavřená i skrytý pant) a západku tak jde přidat i po vytvoření lemu na krabičce nebo drážky ve víku; dřív hlásily, že krabička a víko nemají horní hranu ve stejné výšce, nebo počítaly s osou na horní hraně lemu.
+## Beta 1.49
+- **Rozříznout – natočená řezná rovina:** po natočení roviny manipulátorem (nebo posuvníky natočení) posouvá posuvník **Posun roviny** rovinu podél její vlastní (natočené) normály a posuvníky Posun plochy podél jejích vlastních os; dřív se pohybovala pořád podél původní osy (X, Y nebo Z). Natočení se otáčí kolem bodu na rovině, kde právě je, a Posun roviny ukazuje vzdálenost natočené roviny. Rovina se ukládá i s tímto bodem, takže se při úpravě kroku neposune.
+## Beta 1.48
+- **Zpět a Znovu i během úprav:** tlačítka Zpět / Znovu (a Ctrl+Z / Ctrl+Shift+Z) fungují i při otevřeném dialogu příkazu. Krokem je každá dokončená změna: hodnota v poli (po potvrzení nebo opuštění pole), volba v nabídce či přepínači, zaškrtnutí, klepnutí do modelu (výběr plochy, tělesa, umístění) a dokončené tažení šipkou nebo manipulátorem. Po zavření dialogu jde celý příkaz vrátit jako dřív jedním krokem. Ve skice zůstává její vlastní historie.
 ## Beta 1.47
 - **Zaoblení a zkosení hrany na lemu:** hrana, která končí na ploše pokračující dál (např. svislá hrana lemu stojícího na okraji krabičky), se už u své paty nezařízne 0,05 mm pod plochu. Dřív tam vznikal malý schod.
 - **Plochy se zaoblením:** v režimu Plochy jde vybrat i zaoblenou plochu, která je jen částí válce (zaoblený roh), a rovnou stěnu, která do zaoblení plynule přechází. **Posunout plochu** u nich posune celý plynule navazující pás (rovné stěny i zaoblené rohy) o stejnou vzdálenost; zaoblení si nechá střed a jeho poloměr se změní o posunutí. Hodí se pro vůli, např. lem zmenšený o 0,2 mm (výchozí −0,2 mm). V časové ose jako krok „Posunout plochy“, dá se upravit.
