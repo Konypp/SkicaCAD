@@ -162,6 +162,14 @@ button { cursor: pointer; }
 .fnum .ax { min-width: 18px; padding: 0 3px; text-align: center; font: 600 11px var(--mono); }
 .fnum.ftext { flex: 1; margin-bottom: 6px; }
 .ftextarea { box-sizing: border-box; width: 100%; min-height: 28px; resize: vertical; border: 1px solid var(--line); border-radius: 4px; background: var(--field); padding: 5px 6px; font: 13px var(--sans, inherit); line-height: 1.35; }
+.fpick { position: relative; }
+.fpick-cur { width: 100%; min-height: 32px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--field); padding: 4px 8px; color: var(--ink); }
+.fpick-list { display: grid; gap: 1px; margin-top: 4px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); max-height: 260px; overflow-y: auto; padding: 2px; }
+.fpick-list button { display: flex; align-items: center; min-height: 32px; padding: 4px 8px; border: 0; border-radius: 3px; background: transparent; color: var(--ink); text-align: left; }
+.fpick-list button:hover { background: var(--field); }
+.fpick-list button[aria-pressed="true"] { background: var(--accent-soft); }
+.fpick .caret { display: inline-block; width: 0; height: 0; border: 4px solid transparent; border-top-color: currentColor; border-bottom-width: 0; opacity: .7; flex: none; }
+.fsample { display: block; height: 20px; width: auto; max-width: 100%; fill: currentColor; }
 .ftextarea:focus-visible { outline: none; border-color: var(--accent); }
 .fnum.ftext input { text-align: left; font-family: var(--sans, inherit); }
 .ax-x { color: #e5484d; } .ax-y { color: #2f9e6a; } .ax-z { color: #4f7ae0; }

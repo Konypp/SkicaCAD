@@ -1221,8 +1221,14 @@ function toolForText(f) {
   if (!(Number(f.h) > 0)) throw new Error('Výška písmen musí být kladná');
   const depth = Number(f.depth); if (!(depth > 0)) throw new Error((f.op === 'cut' ? 'Hloubka' : 'Výška') + ' textu musí být kladná');
   const n = KK.vnorm(f.n || [0, 0, 1]), p = f.p || [0, 0, 0], B0 = basisFromPlane(n, KK.vdot(n, p)), B = { o: p, u: B0.u, v: B0.v, n };
-  const e = { t: 'text', s: String(f.s), x: 0, y: 0, h: Number(f.h), a: Number(f.a) || 0, bold: f.bold !== false, sp: f.sp, ws: f.ws, sl: f.sl, lh: f.lh, arc: f.arc, al: f.al, mir: f.mir };
-  const cut = f.op === 'cut', z0 = cut ? -depth : (f.onFace ? -0.02 : 0), z1 = cut ? 0.05 : depth;
+  const e = { t: 'text', s: String(f.s), x: 0, y: 0, h: Number(f.h), a: Number(f.a) || 0, bold: f.bold !== false, font: f.font, sp: f.sp, ws: f.ws, sl: f.sl, lh: f.lh, arc: f.arc, al: f.al, mir: f.mir };
+  const cut = f.op === 'cut', z0 = cut ? -depth : (f.onFace && f.op === 'join' ? -0.02 : 0), z1 = cut ? 0.05 : depth;
+  /* cf: the anchor is the middle of the text (of its letters' outline), e.g. the centre of the face it was put on */
+  if (f.cf) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const l of skicaTextLoops(e)) for (const [x, y] of l) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    if (x1 > x0) { e.x = -(x0 + x1) / 2; e.y = -(y0 + y1) / 2; }
+  }
   let tool = null;
   for (const r of regions({ ents: [e] })) {
     const so = KK.extrudeProfiles([{ t: 'poly', pts: r.pts }, ...r.holes.map(q => ({ t: 'poly', pts: q.pts }))], B, z0, z1);
@@ -1230,6 +1236,22 @@ function toolForText(f) {
   }
   if (!tool || !tool.length) throw new Error('Text nemá žádná písmena');
   return tool;
+}
+/* the matrix a Přesunout / Otočit / Měřítko step applies to the given polygons (null for a copying move or another step);
+   used to show an earlier step (a text being edited) where the later steps have put it */
+function xformMatrix(f, polys) {
+  const bb = KK.bbox(polys), mid = [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2);
+  if (f.type === 'move') { if (f.copy) return null; return eulerMatrix(f.pc ? f.pc.map(Number) : mid, (f.t || [0, 0, 0]).map(Number), (f.r || [0, 0, 0]).map(Number)); }
+  if (f.type === 'rotate') {
+    const c = f.pc ? f.pc.map(Number) : f.pivot === 'origin' ? [0, 0, 0] : mid, m = eulerMatrix(c, [0, 0, 0], (f.r || [0, 0, 0]).map(Number));
+    if (f.ground) { const mz = KK.bbox(KK.transform(polys, m)).min[2]; m[14] -= mz; }
+    return m;
+  }
+  if (f.type === 'scale') {
+    const s = (f.s || [1, 1, 1]).map(Number), c = f.pc ? f.pc.map(Number) : f.pivot === 'origin' ? [0, 0, 0] : f.pivot === 'base' ? [mid[0], mid[1], bb.min[2]] : mid;
+    return [s[0], 0, 0, 0, 0, s[1], 0, 0, 0, 0, s[2], 0, c[0] * (1 - s[0]), c[1] * (1 - s[1]), c[2] * (1 - s[2]), 1];
+  }
+  return null;
 }
 function applyTool(bodies, f, tool, newBody) {
   const op = f.op || 'new';
@@ -1388,7 +1410,9 @@ function step(state, f) {
       const s = (f.s || [1, 1, 1]).map(Number);
       if (s.some(v => !(v > 1e-4) || v > 1e4)) throw new Error('Měřítko musí být kladné číslo');
       const bb = KK.bbox(sel.flatMap(x => x.polys)), mid = [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2);
-      const c = f.pivot === 'origin' ? [0, 0, 0] : f.pivot === 'base' ? [mid[0], mid[1], bb.min[2]] : mid;
+      /* pc: the scaling centre as it was when the step was made, so a later edit of an earlier step (a longer text) does not
+         move the scaled bodies; older documents work it out from the bodies again */
+      const c = f.pc ? f.pc.map(Number) : f.pivot === 'origin' ? [0, 0, 0] : f.pivot === 'base' ? [mid[0], mid[1], bb.min[2]] : mid;
       const m = [s[0], 0, 0, 0, 0, s[1], 0, 0, 0, 0, s[2], 0, c[0] * (1 - s[0]), c[1] * (1 - s[1]), c[2] * (1 - s[2]), 1];
       const map = new Map(sel.map(x => [x.id, xfBody(x, m)]));
       out = bodies.map(x => map.get(x.id) || x);
@@ -1456,7 +1480,8 @@ function step(state, f) {
       const sel = f.all ? bodies.slice() : bodies.filter(x => (f.bodies || []).includes(x.id));
       if (!sel.length) throw new Error('Vyberte tělesa');
       const bb = KK.bbox(sel.flatMap(x => x.polys));
-      const c = f.pivot === 'origin' ? [0, 0, 0] : [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2);
+      /* pc: the pivot as it was when the step was made (older documents: worked out from the bodies again) */
+      const c = f.pc ? f.pc.map(Number) : f.pivot === 'origin' ? [0, 0, 0] : [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2);
       const m = eulerMatrix(c, [0, 0, 0], (f.r || [0, 0, 0]).map(Number));
       let moved = sel.map(x => xfBody(x, m));
       if (f.ground) {
@@ -1470,7 +1495,7 @@ function step(state, f) {
     case 'move': {
       const sel = bodies.filter(x => (f.bodies || []).includes(x.id));
       if (!sel.length) throw new Error('Vyberte tělesa');
-      const all = sel.flatMap(x => x.polys), bb = KK.bbox(all), c = [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2);
+      const all = sel.flatMap(x => x.polys), bb = KK.bbox(all), c = f.pc ? f.pc.map(Number) : [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2);
       const m = eulerMatrix(c, (f.t || [0, 0, 0]).map(Number), (f.r || [0, 0, 0]).map(Number));
       if (f.copy) {
         const cnt = Math.max(1, Math.min(100, Math.round(Number(f.count) || 1))), added = [];
@@ -1555,7 +1580,7 @@ function makeRebuilder() {
   };
 }
 
-return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

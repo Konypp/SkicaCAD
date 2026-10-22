@@ -1,5 +1,25 @@
 # Changelog
 
+## Beta 1.58
+- **Vysunutí už nenabízí zbytek dřív vysunuté skici:** když ze skici vysunete jen část (např. jen 2mm okraj odsazeného obrysu), zbylý profil se při dalším Vysunutí neukazuje a skica se nevybírá. Vysunout ho jde dál: vyberte skicu na časové ose, nebo ji zvolte v poli Skica v dialogu.
+## Beta 1.57
+- **Text je vždy nové těleso:** z dialogu Text zmizela volba Operace (Spojit / Vyříznout). Text vznikne jako samostatné těleso; na ploše tělesa na ní přesně sedí, nezasahuje do něj. Spojit nebo vyříznout ho můžete pak nástrojem Tvar → Kombinovat. Dříve vytvořené texty se spojením nebo vyříznutím fungují dál beze změny.
+## Beta 1.56
+- **Úprava textu na místě, kde je:** když text po vytvoření přesunete, otočíte nebo změníte jeho měřítko, úprava kroku Text (písmo, rozestup, natočení, text…) ho ukazuje tam a tak velký, jak je teď; zbytek modelu je zobrazený v aktuálním stavu. Manipulátor i klepnutí na plochu pracují v této poloze. Po potvrzení zůstane text na svém místě.
+- **Text na ploše tělesa se vystředí:** po klepnutí na rovnou plochu se text postaví doprostřed plochy a zůstane vystředěný i po změně textu nebo písma (volba „Střed textu v bodě ukotvení“, jde použít i mimo plochu).
+- Vráceno upozornění při úpravě dřívějšího kroku (pro ostatní kroky, které se upravují ve stavu své doby).
+## Beta 1.55
+- Odebráno upozornění při úpravě dřívějšího kroku (zakrývalo dialog, hlavně na telefonu); stav úprav ukazuje časová osa.
+## Beta 1.54
+- **Více písem a výběr s náhledem:** 10 písem – DejaVu Sans, DejaVu Serif, DejaVu Sans Mono, Inter, Poppins, Liberation Sans (jako Arial), Carlito (jako Calibri), Lora, Caladea (jako Cambria) a Liberation Serif (jako Times New Roman), každé obyčejné i tučné, s českou diakritikou. Ve výběru (nástroj Text i text ve skice) je název každého písma napsaný přímo tím písmem.
+- **Přesunout, Otočit a Měřítko si pamatují svůj střed:** krok uloží bod, kolem kterého otáčí nebo mění velikost, takže pozdější úprava dřívějšího kroku (např. jiný text) už těleso neposune; text zarovnaný na střed zůstane na místě. Starší kroky bez uloženého středu fungují jako dřív.
+## Beta 1.53
+- **Písma na výběr** u nástroje Text i u textu ve skice: DejaVu Sans (bezpatkové, dosavadní), DejaVu Serif (patkové), DejaVu Sans Mono (strojopis), Poppins (geometrické) a Carlito (jako Calibri), každé obyčejné i tučné, s českou diakritikou. Písma jsou volně šiřitelná (licence Bitstream Vera / DejaVu a SIL Open Font License) a jsou v aplikaci přímo (soubor js/fonts-extra.js).
+- **Úprava dřívějšího kroku:** při otevření kroku, za kterým následují další (např. text, potom měřítko a posun), aplikace upozorní, že model je zobrazený ve stavu tohoto kroku a pozdější kroky se po potvrzení znovu použijí. Opravena chyba, která se mohla objevit po potvrzení úpravy textu.
+## Beta 1.52
+- **Lišta:** Měřítko je znovu samostatné tlačítko mezi Přesunout a Otočit; v nabídce Uspořádat zůstalo Zarovnat, Zrcadlit a Pole.
+## Beta 1.51
+- **Zpět během úprav – opravy:** v příkazech Přesunout, Otočit a Měřítko se po kroku zpět vrátí i tělesa v pohledu a manipulátor (dřív se změnily jen hodnoty, nebo se nevrátilo nic). Výběr těles se vrací také. Kroky už nevznikají z hodnot, které si příkaz dopočítá sám až po chvíli (náhled, pomocné výpočty), takže jedno Zpět vrátí právě jednu změnu (dřív např. u Krychle se zachovaným poměrem stran nebo u Rozříznout zdánlivě nefungovalo). Ověřeno u 17 příkazů.
 ## Beta 1.50
 - **Panty a západky na krabičce s lemem:** výška okraje se nově měří na vnější stěně, kde pant nebo západka je (horní hrana té stěny), ne podle nejvyššího bodu tělesa. Pant (krabička a víko vedle sebe, krabička navržená zavřená i skrytý pant) a západku tak jde přidat i po vytvoření lemu na krabičce nebo drážky ve víku; dřív hlásily, že krabička a víko nemají horní hranu ve stejné výšce, nebo počítaly s osou na horní hraně lemu.
 ## Beta 1.49

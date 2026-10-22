@@ -323,20 +323,24 @@ function redo() { if (sk) { skRedo(); return; } if (cmd) { cmdRedo(); return; } 
 /* undo inside an open command (dialog): every finished change (a field, a choice, a click in the view, a manipulator drag)
    is a step. A step is the command's own plain settings plus the dialog values; heavy or live things (meshes, results,
    timers, the faces' polygons) are left out and recomputed after a step back. */
-const CMD_SKIP = new Set(['tool', 'tools', 'result', 'timer', 'hideBody', 'info', 'highlight', 'scan', 'anim', 'clash', 'hgrp', 'handles', 'drag', 'hover', 'gizmoDrag', 'err', 'editIndex', 'prog', 'moved', 'clashIds', 'openMeshes', 'scanTok']);
+/* left out of the steps: results and other things the command works out by itself (often a moment later), which would
+   otherwise count as a change of their own */
+const CMD_SKIP = new Set(['tool', 'tools', 'result', 'timer', 'hideBody', 'hideBodies', 'info', 'highlight', 'scan', 'anim', 'clash', 'hgrp', 'handles', 'drag', 'hover', 'gizmoDrag', 'gdrag', 'err', 'editIndex',
+  'prog', 'moved', 'clashIds', 'openMeshes', 'scanTok', 'ub', 'ok_', 'lastEv', 'downEv', 'startEv', 'dragging', 's0', 'settle', 'gapHinge', 'noted', 'done', 'isOpen', 'solve', 'valid']);
 function cmdSnap(c) {
   const o = {};
   for (const k of Object.keys(c)) {
     if (k[0] === '_' || CMD_SKIP.has(k)) continue;
     const v = c[k];
     if (typeof v === 'function' || v === undefined) continue;
+    if (v instanceof Set) { const arr = [...v]; if (arr.every(x => x === null || ['string', 'number', 'boolean'].includes(typeof x))) o[k] = JSON.stringify({ __set: arr }); continue; }
     if (v && typeof v === 'object' && !Array.isArray(v) && Object.getPrototypeOf(v) !== Object.prototype) continue;
     let j; try { j = JSON.stringify(v); } catch (e) { continue; }
     if (j === undefined || j.length > 60000) continue;
     o[k] = j;
   }
   const fv = {};
-  if (dlg) for (const f of dlg.spec.fields) if (['num', 'xyz', 'opt', 'chk', 'seg', 'area'].includes(f.k)) { try { fv[f.id] = dlg.get(f.id); } catch (e) { /* skip */ } }
+  if (dlg) for (const f of dlg.spec.fields) if (['num', 'xyz', 'opt', 'chk', 'seg', 'area', 'font'].includes(f.k)) { try { fv[f.id] = dlg.get(f.id); } catch (e) { /* skip */ } }
   return JSON.stringify({ o, fv });
 }
 function cmdCheckpoint() {
@@ -347,10 +351,17 @@ function cmdCheckpoint() {
 }
 function cmdApply(c, snap) {
   const { o, fv } = JSON.parse(snap);
-  for (const k in o) c[k] = JSON.parse(o[k]);
+  for (const k in o) {
+    const v = JSON.parse(o[k]), old = c[k];
+    if (v && typeof v === 'object' && Array.isArray(v.__set)) { c[k] = new Set(v.__set); if (c.highlight === old) c.highlight = c[k]; }
+    else c[k] = v;
+  }
   if (dlg) for (const id in fv) { const f = dlg.spec.fields.find(x => x.id === id); if (!f) continue; const v = fv[id]; if (f.k === 'num' && !isFinite(v)) continue; dlg.set(id, v); }
   c._last = snap;
-  for (const fn of ['layout', 'showLen', 'update', 'schedule']) if (typeof c[fn] === 'function') { try { c[fn](); } catch (e) { /* the next step shows it */ } }
+  /* let the command redraw from its restored settings: commands that keep a selection and a manipulator rebuild with recenter
+     (Přesunout, Otočit, Měřítko), the others with their usual refresh */
+  const fns = typeof c.recenter === 'function' ? ['recenter'] : ['layout', 'showLen', 'update', 'schedule'];
+  for (const fn of fns) if (typeof c[fn] === 'function') { try { c[fn](); } catch (e) { /* the next step shows it */ } }
   if (typeof c.pose === 'function') try { c.pose(); } catch (e) { /* skip */ }
   requestRender(); updateUndo();
 }
@@ -1155,9 +1166,9 @@ const RIBBON = {
     ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'],
       { menu: 'prim', label: 'Základní tělesa', items: [['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus'], ['text3d', 'Text']] },
       { menu: 'parts', label: 'Součásti', items: [['bolt', 'Šroub'], ['nut', 'Matice'], ['hinge', 'Pant'], ['latch', 'Západka']] }]],
-    ['Upravit', [{ menu: 'edge', label: 'Hrany', items: [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení']] }, ['hole', 'Díra', 'H'], ['shell', 'Skořepina'], ['move', 'Přesunout', 'M'], ['rotate', 'Otočit', 'R'], ['facemode', 'Plochy', 'G'],
+    ['Upravit', [{ menu: 'edge', label: 'Hrany', items: [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení']] }, ['hole', 'Díra', 'H'], ['shell', 'Skořepina'], ['move', 'Přesunout', 'M'], ['scale', 'Měřítko'], ['rotate', 'Otočit', 'R'], ['facemode', 'Plochy', 'G'],
       { menu: 'shape', label: 'Tvar', items: [['combine', 'Kombinovat'], ['splitbody', 'Rozříznout']] },
-      { menu: 'xform', label: 'Uspořádat', items: [['scale', 'Měřítko'], ['center', 'Zarovnat'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole']] },
+      { menu: 'xform', label: 'Uspořádat', items: [['center', 'Zarovnat'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole']] },
       ['del', 'Odstranit', 'Del']]],
     ['Nástroje', [['selall', 'Vybrat vše', 'Ctrl+A'], ['measure', 'Měřit', 'I'], ['simulate', 'Simulace'], ['import', 'Importovat']]]
   ],
@@ -1246,6 +1257,30 @@ function runCommand(id) {
   }
 }
 
+/* ================= font picker: every font's name drawn in the font itself (from its own glyph outlines) ================= */
+const fontSvgCache = new Map();
+function fontSampleSVG(key, bold) {
+  const ck = key + (bold ? 'B' : ''); if (fontSvgCache.has(ck)) return fontSvgCache.get(ck);
+  const row = SKICA_FONT_LIST.find(r => r[0] === key) || SKICA_FONT_LIST[0];
+  const loops = skicaTextLoops({ t: 'text', s: row[1], x: 0, y: 0, h: 10, font: row[0], bold: !!bold });
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const l of loops) for (const [x, y] of l) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  /* the same frame for every font (capital height 10 at the same place, room for descenders), so the names line up */
+  void y0; void y1;
+  const r1 = v => Math.round(v * 100) / 100, d = loops.map(l => 'M' + l.map(([x, y]) => r1(x - x0) + ' ' + r1(13 - y)).join('L') + 'Z').join('');
+  const w = r1(x1 - x0 + 0.5), out = `<svg class="fsample" viewBox="0 0 ${w} 17" width="${r1(w * 20 / 17)}" height="20" preserveAspectRatio="xMinYMid meet" aria-label="${row[1]}" role="img"><path fill-rule="evenodd" d="${d}"/></svg>`;
+  fontSvgCache.set(ck, out); return out;
+}
+function fontPickerHTML(attrs, value) {
+  const v = SKICA_FONT_LIST.some(r => r[0] === value) ? value : 'sans';
+  return `<div class="fpick" ${attrs} data-value="${v}"><button type="button" class="fpick-cur" data-fpick-toggle title="Písmo">${fontSampleSVG(v)}<i class="caret" aria-hidden="true"></i></button>`
+    + `<div class="fpick-list" hidden role="listbox">${SKICA_FONT_LIST.map(r => `<button type="button" role="option" data-fv="${r[0]}" aria-pressed="${r[0] === v}" title="${r[1]}">${fontSampleSVG(r[0])}</button>`).join('')}</div></div>`;
+}
+function fontPickerSet(el, v) {
+  if (!el) return; el.dataset.value = v;
+  $('.fpick-cur', el).innerHTML = fontSampleSVG(v) + '<i class="caret" aria-hidden="true"></i>';
+  $$('[data-fv]', el).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.fv === v)));
+}
 /* ================= dialog framework ================= */
 /* a choice row whose labels do not fit beside the field label gets the whole width (label above it); segmented buttons
    that still do not fit wrap their text onto two lines. Measured from the shown (possibly translated) text. */
@@ -1285,6 +1320,7 @@ function openDialog(spec) {
       case 'opt': return `<div class="frow" data-row="${f.id}"><label for="${id}">${f.label}</label><select class="fsel" id="${id}" data-f="${f.id}">${f.options.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></div>`;
       case 'seg': return `<div class="frow" data-row="${f.id}"><span class="fl">${f.label}</span><div class="seg" id="${id}" data-seg="${f.id}">${f.options.map(([v, l]) => `<button data-v="${v}" aria-pressed="false">${l}</button>`).join('')}</div></div>`;
       case 'btns': return `<div class="frow" data-row="${f.id}"><span class="fl">${f.label}</span><div class="btnrow${f.options.length === 1 ? ' one' : ''}">${f.options.map(([v, l]) => `<button class="btn sm" data-btn="${f.id}" data-v="${v}" aria-pressed="false">${l}</button>`).join('')}</div></div>`;
+      case 'font': return `<div class="frow wide" data-row="${f.id}"><span class="fl">${f.label}</span>${fontPickerHTML(`id="${id}" data-fpick="${f.id}"`, f.value)}</div>`;
       case 'area': return `<div class="frow wide" data-row="${f.id}">${f.label ? `<label for="${id}">${f.label}</label>` : ''}<textarea class="ftextarea" id="${id}" data-f="${f.id}" rows="${f.rows || 2}"></textarea></div>`;
       case 'chk': return `<label class="chk" data-row="${f.id}"><input type="checkbox" id="${id}" data-f="${f.id}"><span>${f.label}</span></label>`;
       case 'note': return `<div class="note" id="${id}"></div>`;
@@ -1305,6 +1341,7 @@ function openDialog(spec) {
       if (f.k === 'opt') return $('#dlg-' + id).value;
       if (f.k === 'chk') return $('#dlg-' + id).checked;
       if (f.k === 'area') return $('#dlg-' + id).value;
+      if (f.k === 'font') return $('#dlg-' + id).dataset.value;
       if (f.k === 'seg') { const b = $(`#dlg-${id} [aria-pressed="true"]`); return b ? b.dataset.v : null; }
       return undefined;
     },
@@ -1315,6 +1352,7 @@ function openDialog(spec) {
       else if (f.k === 'opt') $('#dlg-' + id).value = v;
       else if (f.k === 'chk') $('#dlg-' + id).checked = !!v;
       else if (f.k === 'area') { const el2 = $('#dlg-' + id); if (document.activeElement !== el2) el2.value = v; }
+      else if (f.k === 'font') fontPickerSet($('#dlg-' + id), v);
       else if (f.k === 'seg') $$(`#dlg-${id} button`).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
       else if (f.k === 'note') { const n = $('#dlg-' + id); n.textContent = v || ''; n.classList.toggle('err', !!(v && v.startsWith('!'))); if (v && v.startsWith('!')) n.textContent = v.slice(1); }
       else if (f.k === 'sel') { const b = $('#dlg-' + id); $('.tx', b).textContent = v.text; b.classList.toggle('has', !!v.has); b.classList.toggle('active', !!v.active); }
@@ -1330,6 +1368,15 @@ function openDialog(spec) {
 function closeDialog() { const el = $('#dialog'); el.hidden = true; el.innerHTML = ''; dlg = null; }
 $('#dialog').addEventListener('click', e => {
   if (cmd && !sk && !e.target.closest('input, textarea, select')) cmdTick(); /* fields make their step on 'change' */
+  const ft = e.target.closest('[data-fpick-toggle]');
+  if (ft) { const L = $('.fpick-list', ft.parentElement); L.hidden = !L.hidden; return; }
+  const fv = e.target.closest('[data-fv]');
+  if (fv) {
+    const pk = fv.closest('.fpick'), v = fv.dataset.fv; $('.fpick-list', pk).hidden = true; fontPickerSet(pk, v);
+    if (pk.dataset.fpick && dlg && dlg.spec.onChange) dlg.spec.onChange(pk.dataset.fpick);
+    else if (pk.dataset.fent !== undefined && sk) { const t = sk.f.ents[+pk.dataset.fent]; if (t && t.t === 'text') { if (v === 'sans') delete t.font; else t.font = v; renderPalette(); redrawSketch(); } }
+    return;
+  }
   const a = e.target.closest('[data-act]');
   if (a) { if (a.dataset.act === 'ok') { if (sk) finishSketch(true); else okCmd(); } else { if (sk) finishSketch(false); else endCmd(false); } return; }
   const sb = e.target.closest('[data-sel]'); if (sb && dlg && dlg.spec.onSel) { dlg.spec.onSel(sb.dataset.sel); return; }
@@ -1365,7 +1412,12 @@ function beginCmd(c) {
   c._hist = []; c._fut = [];
   /* the first step is the state right after the command opened its dialog (init runs straight after beginCmd) */
   queueMicrotask(() => { if (cmd === c) { c._last = cmdSnap(c); updateUndo(); } });
-  if (c.editIndex !== undefined && c.editIndex !== null) { viewMarker = c.editIndex; refresh(); }
+  if (c.editIndex !== undefined && c.editIndex !== null) {
+    viewMarker = c.editIndex; refresh();
+    /* editing an earlier step shows the model as it was at that step; say so, otherwise later moves look undone
+       (the text shows itself where the later steps put it, so it needs no note) */
+    if (c.editIndex < doc.marker - 1) setTimeout(() => { if (cmd === c && !c.finalPose) toast('Upravujete dřívější krok: model je zobrazený ve stavu tohoto kroku. Pozdější kroky (posun, měřítko…) se po potvrzení znovu použijí.'); }, 50);
+  }
   renderTimeline(); updateUndo();
 }
 function endCmd(applied) {
@@ -2255,6 +2307,7 @@ function renderPalette() {
       body = `<textarea class="ftextarea" id="ent-${i}-s" data-ent="${i}" data-k="s" rows="${Math.min(4, String(e.s).split('\n').length + 1)}" aria-label="Text">${String(e.s).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</textarea>`
         + `<div class="grid2">${num(i, 'x', 'X', e.x)}${num(i, 'y', 'Y', e.y)}</div>`
         + `<div class="frow wide"><div class="seg">${[['l', 'Vlevo'], ['c', 'Na střed'], ['r', 'Vpravo']].map(([v, l]) => `<button data-tal="${v}" data-ent="${i}" aria-pressed="${al === v}">${l}</button>`).join('')}</div></div>`
+        + `<div class="frow wide"><span class="fl">Písmo</span>${fontPickerHTML(`data-fent="${i}"`, e.font || 'sans')}</div>`
         + fld('h', 'Výška písmen', 'mm', e.h, 'Výška velkých písmen')
         + fld('sp', 'Rozestup písmen', 'mm', e.sp || 0, 'Mezera mezi písmeny navíc (záporná je stáhne k sobě)')
         + fld('ws', 'Šířka písmen', '%', Number(e.ws) > 0 ? e.ws : 100, 'Méně než 100 % = užší písmo')
@@ -2305,6 +2358,7 @@ function onPaletteChange(inp) {
   if (k === 'uni') { sk.uniform = inp.checked; renderPalette(); return; }
   if (e && k === 'cons') { if (inp.checked) e.cons = true; else delete e.cons; renderPalette(); redrawSketch(); return; }
   if (e && e.t === 'text' && k === 's') { const t = inp.value.replace(/\r/g, '').replace(/^\n+|\s+$/g, ''); if (t.trim()) e.s = t.slice(0, 400); renderPalette(); redrawSketch(); return; }
+  if (e && e.t === 'text' && k === 'font') { if (inp.value === 'sans') delete e.font; else e.font = inp.value; renderPalette(); redrawSketch(); return; }
   if (e && e.t === 'text' && k === 'mir') { if (inp.checked) e.mir = true; else delete e.mir; renderPalette(); redrawSketch(); return; }
   if (e && e.t === 'text' && ['sp', 'ws', 'sl', 'lh', 'arc'].includes(k)) {
     const v = parseNum(inp.value);
@@ -2397,6 +2451,14 @@ function startExtrude(editIndex, f, opts) {
     init() {
       /* only sketches with a profile that has not been extruded yet (plus the one of the feature being edited) */
       const sketches = Array.from(cur.sketches.values()).filter(s => freeRegions(s, used).length || s.id === this.sketch);
+      /* a sketch already partly extruded (e.g. only the rim of an offset outline) does not offer its leftover profiles any more,
+         unless it is picked in the timeline or in the dialog */
+      this.fresh = new Set(sketches.filter(s => !used.has(s.id) || s.id === this.sketch || s.id === this.preSketch).map(s => s.id));
+      if (!this.fresh.size && sketches.length) {
+        endCmd(false);
+        toast('Všechny skici už jsou vysunuté. Zbylý profil dřív vysunuté skici vysunete, když skicu nejdřív vyberete na časové ose.');
+        return;
+      }
       if (!sketches.length) {
         endCmd(false);
         toast(cur.sketches.size ? 'Všechny skici už jsou vysunuté. Nakreslete novou skicu (S), nebo v režimu Plochy (G) vyberte stěnu a zvolte Vysunout.' : 'Nejprve vytvořte skicu s uzavřeným profilem (S), nebo v režimu Plochy (G) vyberte stěnu a zvolte Vysunout.');
@@ -2405,7 +2467,7 @@ function startExtrude(editIndex, f, opts) {
       if (!this.sketch) {
         /* start with the sketch selected in the timeline or browser, otherwise the newest one with a free profile */
         const pre = this.preSketch && sketches.find(s => s.id === this.preSketch);
-        const pick = pre || sketches[sketches.length - 1];
+        const pick = pre || sketches.filter(s => this.fresh.has(s.id)).pop();
         this.chooseSketch(pick.id, false, !!opts.fromFace);
       }
       this.buildOverlay();
@@ -2439,6 +2501,7 @@ function startExtrude(editIndex, f, opts) {
     buildOverlay() {
       clearGroup(G.overlay); this.regionMeshes = [];
       for (const s of cur.sketches.values()) {
+        if (this.fresh && !this.fresh.has(s.id) && s.id !== this.sketch) continue;
         const regs = s.id === this.sketch && f ? Engine.regions(s).filter(r => !(used.get(s.id) || new Set()).has(r.ei) || this.regions.has(r.ei)) : freeRegions(s, used);
         if (!regs.length) continue;
         for (const r of regs) { const m = regionMesh(s.plane, r, tok.orange, 0.22, 0.02); m.userData = { sid: s.id, ei: r.ei }; this.regionMeshes.push(m); G.overlay.add(m); }
@@ -2745,14 +2808,15 @@ const TEXT_PLANES = { xy: [0, 0, 1], xz: [0, -1, 0], yz: [1, 0, 0] };
 function startText(editIndex, f) {
   const pivot = new THREE.Object3D(); scene.add(pivot);
   const r4 = x => Math.round(x * 1e4) / 1e4;
-  const D0 = { s: 'SkicaCAD', h: 8, depth: 2, bold: true, sp: 0, ws: 100, a: 0, sl: 0, lh: 1.5, arc: 0, al: 'l', mir: false, place: 'xy', n: [0, 0, 1], p: [0, 0, 0], op: 'new', onFace: false };
+  const D0 = { s: 'SkicaCAD', font: 'sans', cf: false, h: 8, depth: 2, bold: true, sp: 0, ws: 100, a: 0, sl: 0, lh: 1.5, arc: 0, al: 'l', mir: false, place: 'xy', n: [0, 0, 1], p: [0, 0, 0], op: 'new', onFace: false };
   const v0 = f ? { ...D0, ...f, place: f.place || 'xy', ws: f.ws || 100, lh: f.lh || 1.5, al: f.al || 'l' } : { ...D0 };
   const c = {
-    editIndex, v: v0, tool: null, gizmoDrag: false, timer: null,
+    editIndex, v: v0, tool: null, gizmoDrag: false, timer: null, later: [], M: null, finalPose: false,
     init() {
       openDialog({
         title: 'Text', icon: 'text3d',
         fields: [{ k: 'area', id: 's', label: 'Text (nový řádek Enterem)', value: this.v.s },
+          { k: 'font', id: 'font', label: 'Písmo', value: this.v.font || 'sans' },
           { k: 'opt', id: 'place', label: 'Umístění', options: [['xy', 'Vodorovně (rovina XY)'], ['xz', 'Svisle zepředu (rovina XZ)'], ['yz', 'Svisle zboku (rovina YZ)'], ['face', 'Na plochu tělesa']], value: this.v.place },
           { k: 'num', id: 'h', label: 'Výška písmen', value: this.v.h },
           { k: 'num', id: 'depth', label: 'Výška textu (vysunutí)', value: this.v.depth },
@@ -2765,17 +2829,17 @@ function startText(editIndex, f) {
           { k: 'num', id: 'arc', label: 'Oblouk (poloměr, 0 = rovně)', value: this.v.arc },
           { k: 'chk', id: 'bold', label: 'Tučné písmo', value: this.v.bold },
           { k: 'chk', id: 'mir', label: 'Zrcadlově (čitelné z druhé strany)', value: this.v.mir },
+          { k: 'chk', id: 'cf', label: 'Střed textu v bodě ukotvení (na ploše: ve středu plochy)', value: !!this.v.cf },
           { k: 'xyz', id: 'p', label: 'Poloha (bod ukotvení)', value: this.v.p },
-          { k: 'opt', id: 'op', label: 'Operace', options: [['new', 'Nové těleso'], ['join', 'Spojit (vystouplý text)'], ['cut', 'Vyříznout (vyrytý text)']], value: this.v.op },
           { k: 'note', id: 'n' }],
         onChange: (id, live) => {
           const v = this.v;
           if (id === 's') { const t = dlg.get('s').replace(/\r/g, ''); if (t.trim()) v.s = t.slice(0, 400); }
           else if (id === 'place') { v.place = dlg.get('place'); if (v.place !== 'face') { v.n = TEXT_PLANES[v.place]; v.onFace = false; } this.layout(); }
           else if (id === 'al') v.al = dlg.get('al');
-          else if (id === 'bold' || id === 'mir') v[id] = !!dlg.get(id);
+          else if (id === 'font') v.font = dlg.get('font');
+          else if (id === 'bold' || id === 'mir' || id === 'cf') v[id] = !!dlg.get(id);
           else if (id === 'p') { const q = dlg.get('p'); if (q.every(isFinite)) v.p = q; }
-          else if (id === 'op') { v.op = dlg.get('op'); this.layout(); }
           else {
             const x = dlg.get(id); if (!isFinite(x)) return;
             if (id === 'h' || id === 'depth') { if (x > 0) v[id] = Math.min(1000, x); }
@@ -2793,26 +2857,44 @@ function startText(editIndex, f) {
       transform.addEventListener('objectChange', this.onGizmo);
       transform.addEventListener('dragging-changed', this.onDragChange);
       transform.attach(pivot);
+      /* editing: later Přesunout / Otočit / Měřítko steps of this text are applied to the preview, so the text is edited where
+         it is now (the rest of the model is shown as it is now too, the text body itself is hidden behind the preview) */
+      if (f && editIndex !== undefined && editIndex !== null && (f.op || 'new') === 'new') {
+        this.later = doc.features.slice(editIndex + 1, doc.marker).filter(g => ['move', 'rotate', 'scale'].includes(g.type) && !(g.type === 'move' && g.copy) && (g.all || (g.bodies || []).includes(f.id)));
+        if (this.later.length) { this.finalPose = true; viewMarker = null; refresh(); this.hideBody = f.id; styleBodies(); }
+      }
       this.layout(); this.update();
     },
+    /* the text as the later steps have placed it, and the matrix that takes it there */
+    placed(polys) {
+      let M = new THREE.Matrix4();
+      for (const g of this.later) { const m = Engine.xformMatrix(g, polys); if (!m) continue; polys = K.transform(polys, m); M = new THREE.Matrix4().fromArray(m).multiply(M); }
+      return { polys, M };
+    },
+    worldP() { const q = v3(this.v.p); return this.M ? q.applyMatrix4(this.M) : q; },
     layout() {
       const l = $('#dialog [data-row="depth"] label'); if (l) l.textContent = this.v.op === 'cut' ? 'Hloubka vyrytí' : 'Výška textu (vysunutí)';
       setPrompt(this.v.place === 'face' && !this.v.onFace ? 'Klepněte na rovnou plochu tělesa, kam má text přijít' : 'Klepnutím na rovnou plochu tělesa text na ni položíte, manipulátorem ho posunete; ostatní nastavení jsou v dialogu');
     },
     feature() {
       const v = this.v, out = { id: f ? f.id : 'tmp', type: 'text3d', s: v.s, h: v.h, depth: v.depth, bold: !!v.bold, al: v.al, place: v.place, n: v.n.slice(), p: v.p.slice(), op: v.op, onFace: !!v.onFace };
+      if (v.font && v.font !== 'sans') out.font = v.font;
+      if (v.cf) out.cf = true;
       if (v.sp) out.sp = v.sp; if (v.ws !== 100) out.ws = v.ws; if (v.a) out.a = v.a; if (v.sl) out.sl = v.sl; if (v.lh !== 1.5) out.lh = v.lh; if (v.arc) out.arc = v.arc; if (v.mir) out.mir = true;
       return out;
     },
-    schedule() { clearTimeout(this.timer); dlg.set('n', 'Počítám…'); this.timer = setTimeout(() => this.update(), 120); },
+    schedule() { if (cmd !== this) return; clearTimeout(this.timer); dlg.set('n', 'Počítám…'); this.timer = setTimeout(() => this.update(), 120); },
     update() {
+      if (cmd !== this) return; /* a late change (the text field losing focus as the dialog closes) */
       clearGroup(G.preview); this.tool = null;
-      if (!this.gizmoDrag) pivot.position.set(this.v.p[0], this.v.p[1], this.v.p[2]);
       try {
         if (this.v.place === 'face' && !this.v.onFace) throw new Error('Klepněte na rovnou plochu tělesa');
         this.tool = Engine.toolForText(this.feature());
-        G.preview.add(previewMesh(this.tool, this.v.op));
-        const bb = K.bbox(this.tool);
+        let shown = this.tool;
+        if (this.later.length) { const pl = this.placed(this.tool); shown = pl.polys; this.M = pl.M; } else this.M = null;
+        if (!this.gizmoDrag) pivot.position.copy(this.worldP());
+        G.preview.add(previewMesh(shown, this.v.op));
+        const bb = K.bbox(shown);
         dlg.set('n', `Text ${fmtc(bb.max[0] - bb.min[0], 1)} × ${fmtc(bb.max[1] - bb.min[1], 1)} × ${fmtc(bb.max[2] - bb.min[2], 1)} mm`);
         dlg.okEnabled(true);
       } catch (e) { dlg.set('n', '!' + e.message); dlg.okEnabled(false); }
@@ -2822,7 +2904,7 @@ function startText(editIndex, f) {
     onClick(ev) {
       const h = hitBodies(ev);
       if (!h) {
-        if (this.v.onFace) return;
+        if (this.v.onFace || this.M) return;
         /* on a plane: the click moves the anchor there */
         ray.setFromCamera(evNdc(ev), cam());
         const n = this.v.n, pl = new THREE.Plane(new V3(n[0], n[1], n[2]), -(n[0] * this.v.p[0] + n[1] * this.v.p[1] + n[2] * this.v.p[2]));
@@ -2830,9 +2912,15 @@ function startText(editIndex, f) {
         this.v.p = [snapV(q.x), snapV(q.y), snapV(q.z)]; dlg.set('p', this.v.p); this.update(); return;
       }
       const fc = faceAtHit(h); if (!fc || fc.kind !== 'plane') { toast('Text položte na rovnou plochu.'); return; }
-      this.v.n = fc.n.map(r4); this.v.p = h.point.toArray().map(r4); this.v.onFace = true; this.v.place = 'face';
-      if (this.v.op === 'new') this.v.op = 'join';
-      dlg.set('place', 'face'); dlg.set('op', this.v.op); dlg.set('p', this.v.p); this.layout(); this.update();
+      let pw = h.point.clone(), nw = v3(fc.n);
+      if (this.M) { const inv = this.M.clone().invert(); pw.applyMatrix4(inv); nw.applyMatrix3(new THREE.Matrix3().getNormalMatrix(inv)).normalize(); }
+      /* the text goes into the middle of the face (area centre of the face's polygons) */
+      const fp = facePolys(fc); let A = 0; const cen = [0, 0, 0];
+      for (const q of fp) for (let k = 1; k < q.v.length - 1; k++) { const a = K.surfaceArea([{ v: [q.v[0], q.v[k], q.v[k + 1]], n: q.n }]); A += a; for (let t = 0; t < 3; t++) cen[t] += a * (q.v[0][t] + q.v[k][t] + q.v[k + 1][t]) / 3; }
+      if (A > 0) { pw = new V3(cen[0] / A, cen[1] / A, cen[2] / A); if (this.M) pw.applyMatrix4(this.M.clone().invert()); }
+      this.v.cf = true; dlg.set('cf', true);
+      this.v.n = nw.toArray().map(r4); this.v.p = pw.toArray().map(r4); this.v.onFace = true; this.v.place = 'face';
+      dlg.set('place', 'face'); dlg.set('p', this.v.p); this.layout(); this.update();
     },
     onGizmo: null, onDragChange: null,
     ok() { if (!this.tool) return null; const out = this.feature(); out.id = f ? f.id : newId(); return out; },
@@ -2844,8 +2932,8 @@ function startText(editIndex, f) {
       controls.enabled = true;
     }
   };
-  c.onGizmo = () => { const p = pivot.position; c.v.p = [snapV(p.x), snapV(p.y), snapV(p.z)]; dlg.set('p', c.v.p); c.update(); };
-  c.onDragChange = e => { controls.enabled = !e.value; c.gizmoDrag = e.value; if (!e.value) { pivot.position.set(c.v.p[0], c.v.p[1], c.v.p[2]); requestRender(); } };
+  c.onGizmo = () => { const p = pivot.position.clone(); if (c.M) p.applyMatrix4(c.M.clone().invert()); c.v.p = [snapV(p.x), snapV(p.y), snapV(p.z)]; dlg.set('p', c.v.p); c.update(); };
+  c.onDragChange = e => { controls.enabled = !e.value; c.gizmoDrag = e.value; if (!e.value) { pivot.position.copy(c.worldP()); requestRender(); } };
   beginCmd(c); c.init();
 }
 
@@ -3613,7 +3701,7 @@ function startMove(editIndex, f, preset) {
     onClick(ev) { const h = hitBodies(ev); if (h) this.onBody(h.object.userData.bodyId); },
     ok() {
       if (!this.bodies.size) return null;
-      const r3 = v => Math.round(v * 1000) / 1000, out = { id: f ? f.id : newId(), type: 'move', bodies: Array.from(this.bodies), t: this.t.map(r3), r: this.r.map(r3), copy: this.copy };
+      const r3 = v => Math.round(v * 1000) / 1000, out = { id: f ? f.id : newId(), type: 'move', bodies: Array.from(this.bodies), t: this.t.map(r3), r: this.r.map(r3), copy: this.copy, pc: this.center.toArray().map(r3) };
       if (this.copy) { out.count = this.count; out.dir = this.dir; if (this.dir !== 'free') out.spacing = this.spacing; }
       return out;
     },
@@ -5233,7 +5321,7 @@ function startScale(editIndex, f) {
     onClick(ev) { const h = hitBodies(ev); if (h) this.onBody(h.object.userData.bodyId); },
     ok() {
       const ids = this.ids(); if (!ids.length || !this.s.every(x => x > 0)) return null;
-      return { id: f ? f.id : newId(), type: 'scale', all: this.all, bodies: this.all ? [] : ids, s: this.s.slice(), pivot: this.pivot };
+      return { id: f ? f.id : newId(), type: 'scale', all: this.all, bodies: this.all ? [] : ids, s: this.s.slice(), pivot: this.pivot, pc: this.pivotPt().map(v => Math.round(v * 1000) / 1000) };
     },
     cleanup() {
       transform.removeEventListener('objectChange', this.onGizmo);
@@ -5415,7 +5503,7 @@ function startRotate(editIndex, f) {
     },
     ok() {
       const ids = this.ids(); if (!ids.length) return null;
-      return { id: f ? f.id : newId(), type: 'rotate', all: this.all, bodies: this.all ? [] : ids, r: this.r.map(v => Math.round(v * 100) / 100), pivot: this.pivotMode, ground: this.ground };
+      return { id: f ? f.id : newId(), type: 'rotate', all: this.all, bodies: this.all ? [] : ids, r: this.r.map(v => Math.round(v * 100) / 100), pivot: this.pivotMode, ground: this.ground, pc: this.center.toArray().map(v => Math.round(v * 1000) / 1000) };
     },
     cleanup(applied) {
       transform.removeEventListener('objectChange', this.onGizmo);

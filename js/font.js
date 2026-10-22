@@ -7,8 +7,16 @@ const SKICA_FONTS = {"sans":{"asc":928,"desc":-236,"g":{" ":[318,[]],"!":[401,[[
         lh: line spacing (× letter height, default 1.5), ws: letter width (%, default 100), sl: slant (deg, italic),
         arc: radius (mm) of the arc the baseline follows (0 = straight; positive bends round the top of a circle, negative
         round the bottom), mir: mirrored (to read from the other side, e.g. engraved into a bottom face) } */
+/* the fonts to choose from: key → regular and bold glyph sets (the bold of DejaVu Sans is stored as 'bold') */
+const SKICA_FONT_LIST = [['sans', 'DejaVu Sans', 'sans', 'bold'], ['serif', 'DejaVu Serif', 'serif', 'serifB'], ['mono', 'DejaVu Sans Mono', 'mono', 'monoB'],
+  ['inter', 'Inter', 'inter', 'interB'], ['poppins', 'Poppins', 'poppins', 'poppinsB'], ['libsans', 'Liberation Sans', 'libsans', 'libsansB'], ['carlito', 'Carlito', 'carlito', 'carlitoB'],
+  ['lora', 'Lora', 'lora', 'loraB'], ['caladea', 'Caladea', 'caladea', 'caladeaB'], ['libserif', 'Liberation Serif', 'libserif', 'libserifB']];
+function skicaFont(e) {
+  const r = SKICA_FONT_LIST.find(x => x[0] === (e.font || 'sans')) || SKICA_FONT_LIST[0], k = e.bold === false ? r[2] : r[3];
+  return SKICA_FONTS[k] || SKICA_FONTS[e.bold === false ? 'sans' : 'bold'];
+}
 function skicaTextMetrics(e) {
-  const F = SKICA_FONTS[e.bold === false ? 'sans' : 'bold'], H = F.g.H;
+  const F = skicaFont(e), H = F.g.H;
   let cap = 0; for (const c of H[1]) for (let i = 1; i < c.length; i += 2) cap = Math.max(cap, c[i]);
   const k = (e.h || 0) / (cap || 730), ws = Number(e.ws) > 0 ? Number(e.ws) / 100 : 1, kx = k * ws, sp = Number(e.sp) || 0;
   const lines = String(e.s || '').split('\n'), lh = (Number(e.lh) > 0 ? Number(e.lh) : 1.5) * (e.h || 0);
@@ -46,4 +54,4 @@ function skicaTextSize(e) {
   const { lines, lh, widths } = skicaTextMetrics(e);
   return { w: Math.max(0, ...widths), h: (e.h || 0) + lh * (lines.length - 1) };
 }
-if (typeof module !== 'undefined') module.exports = { SKICA_FONTS, skicaTextLoops, skicaTextSize };
+if (typeof module !== 'undefined') module.exports = { SKICA_FONTS, SKICA_FONT_LIST, skicaTextLoops, skicaTextSize };
