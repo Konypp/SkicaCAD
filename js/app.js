@@ -330,12 +330,13 @@ const CMD_SKIP = new Set(['tool', 'tools', 'result', 'timer', 'hideBody', 'hideB
 function cmdSnap(c) {
   const o = {};
   for (const k of Object.keys(c)) {
-    if (k[0] === '_' || CMD_SKIP.has(k)) continue;
+    if (k[0] === '_' || CMD_SKIP.has(k) || /^hover/.test(k)) continue; /* what is under the pointer is not a step */
     const v = c[k];
     if (typeof v === 'function' || v === undefined) continue;
     if (v instanceof Set) { const arr = [...v]; if (arr.every(x => x === null || ['string', 'number', 'boolean'].includes(typeof x))) o[k] = JSON.stringify({ __set: arr }); continue; }
     if (v && typeof v === 'object' && !Array.isArray(v) && Object.getPrototypeOf(v) !== Object.prototype) continue;
-    let j; try { j = JSON.stringify(v); } catch (e) { continue; }
+    /* only plain data: an object holding scene objects or vectors (an arrow, a manipulator) is the command's own drawing */
+    let j; try { j = JSON.stringify(v, (key, x) => { if (x && typeof x === 'object' && !Array.isArray(x)) { const pr = Object.getPrototypeOf(x); if (pr !== Object.prototype && pr !== null) throw 0; } return x; }); } catch (e) { continue; }
     if (j === undefined || j.length > 60000) continue;
     o[k] = j;
   }
@@ -360,6 +361,7 @@ function cmdApply(c, snap) {
   c._last = snap;
   /* let the command redraw from its restored settings: commands that keep a selection and a manipulator rebuild with recenter
      (Přesunout, Otočit, Měřítko), the others with their usual refresh */
+  if (typeof c.restored === 'function') try { c.restored(); } catch (e) { /* skip */ }
   const fns = typeof c.recenter === 'function' ? ['recenter'] : ['layout', 'showLen', 'update', 'schedule'];
   for (const fn of fns) if (typeof c[fn] === 'function') { try { c[fn](); } catch (e) { /* the next step shows it */ } }
   if (typeof c.pose === 'function') try { c.pose(); } catch (e) { /* skip */ }
@@ -2446,7 +2448,7 @@ function startExtrude(editIndex, f, opts) {
   opts = opts || {};
   const used = usedRegions(f && f.id);
   const c = {
-    editIndex, sketch: f ? f.sketch : null, regions: new Set(f ? f.regions : []), dist: f ? f.dist : 10, sym: f ? !!f.sym : false,
+    editIndex, sketch: f ? f.sketch : null, regions: new Set(f ? f.regions : []), dist: f ? f.dist : 0, sym: f ? !!f.sym : false,
     op: f ? f.op : 'new', autoOp: !f, regionMeshes: [], tool: null, arrow: null, drag: null,
     init() {
       /* only sketches with a profile that has not been extruded yet (plus the one of the feature being edited) */
@@ -2516,6 +2518,8 @@ function startExtrude(editIndex, f, opts) {
       dlg.set('prof', { text: n ? `${n} ${n === 1 ? 'profil' : n < 5 ? 'profily' : 'profilů'}` : 'Vyberte profil', has: n > 0, active: true });
       setPrompt(n ? 'Táhněte šipkou nebo zadejte vzdálenost. Klepnutím na profil výběr změníte.' : 'Vyberte uzavřený profil skici');
       if (!n) { dlg.set('n', ''); dlg.okEnabled(false); return requestRender(); }
+      /* a new extrusion starts at 0: nothing to preview until a distance is entered or the arrow is dragged */
+      if (!this.dist) { dlg.set('n', 'Zadejte vzdálenost nebo táhněte šipkou.'); dlg.okEnabled(false); this.makeArrow(); return requestRender(); }
       try {
         this.tool = Engine.toolForExtrude(this.feature(), cur.sketches);
         if (this.autoOp) { const o = anyOverlap(this.tool) ? (this.dist < 0 && !this.sym ? 'cut' : 'join') : 'new'; if (o !== this.op) { this.op = o; dlg.set('op', o); } }
@@ -3543,6 +3547,13 @@ function startEdgeMod(mode, editIndex, f) {
       this.hideBody = this.body; styleBodies();
       dlg.set('n', ''); dlg.okEnabled(true); requestRender();
     },
+    /* after Zpět / Znovu the edges are plain copies: find them again among the body's edges, so clicks keep toggling them */
+    restored() {
+      const b = bodyById(this.body); if (!b) { this.segs = []; return; }
+      const ch = chainsFor(b.polys), out = [];
+      for (const s of this.segs) { const m = Engine.matchEdge(ch, Engine.describe(s)); if (m && !out.includes(m)) out.push(m); }
+      this.segs = out;
+    },
     segsFor(hit) {
       const all = chainsFor(meshes.get(hit.id).polys);
       return this.chain ? all.filter(s => s.group === hit.seg.group) : [hit.seg];
@@ -3908,7 +3919,7 @@ function faceToSketch() {
 }
 function startPressFace(editIndex, f, faces) {
   const c = {
-    editIndex, face: null, body: f ? f.body : null, d: f && (f.kind === 'plane' || f.type === 'movefaces') ? f.d : 2, dia: f && f.kind === 'cyl' ? f.newR * 2 : null,
+    editIndex, face: null, body: f ? f.body : null, d: f && (f.kind === 'plane' || f.type === 'movefaces') ? f.d : 0, dia: f && f.kind === 'cyl' ? f.newR * 2 : null,
     timer: null, hideBody: null, result: null, desc: f && f.type !== 'movefaces' ? clone(f) : null, multi: null, move: false,
     init() {
       if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
@@ -3954,6 +3965,7 @@ function startPressFace(editIndex, f, faces) {
         if (cmd !== this) return;
         clearGroup(G.preview); this.hideBody = null; this.result = null;
         const b = bodyById(this.body);
+        if (!this.d && (this.move || this.multi || this.desc.kind === 'plane')) { dlg.set('n', 'Zadejte posunutí.'); styleBodies(); requestRender(); return; }
         try {
           if (!b) throw new Error('Těleso neexistuje');
           if (this.move) this.result = Engine.moveFaces(b.polys, { faces: this.multi, d: this.d });
@@ -6710,7 +6722,7 @@ loadStoredBlobs();
 refreshBusy(() => fitView(VIEW_ISO, true));
 showStart(true);
 if (window.__KOTA_TEST__) window.__kota = { get cmd() { return cmd; }, threeMfBytes, transform, get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart, makeThumb, libThumb, transform, persp, toPx, startMove, alignDesc,
-  get doc() { return doc; }, get cur() { return cur; }, get cmd() { return cmd; }, get sk() { return sk; }, get dlg() { return dlg; }, get sel() { return sel; }, meshes, chainsFor };
+  cmdSnap, get doc() { return doc; }, get cur() { return cur; }, get cmd() { return cmd; }, get sk() { return sk; }, get dlg() { return dlg; }, get sel() { return sel; }, meshes, chainsFor };
 })();
 
 

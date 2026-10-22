@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta 1.60
+- **Zpět v Zaoblení a Zkosení funguje napoprvé:** pohyb myši přes hrany (zvýraznění pod ukazatelem) se počítal jako krok, takže první Zpět jen „vrátilo“ zvýraznění. Zvýraznění pod ukazatelem se do kroků nepočítá v žádném příkazu.
+- Po Zpět / Znovu v Zaoblení a Zkosení jdou vybrané hrany dál klepnutím odebrat (dřív se vrácená hrana přidala podruhé).
+- Kroky Zpět si nepamatují vlastní kreslení příkazů (šipka vysunutí, manipulátor); dřív mohlo Zpět ve Vysunutí skončit chybou.
+- Prošel jsem Zpět ve všech příkazech (klepání do modelu, pohyb myší, pole v dialogu, manipulátor): každé Zpět vrátí právě jeden krok.
+## Beta 1.59
+- **Vysunutí a posunutí plochy začínají na 0:** nové Vysunutí (ze skici i z plochy) a Upravit plochu / Posunout plochy už samy nenastaví 10 nebo 2 mm. Vzdálenost zadáte v dialogu nebo, u vysunutí, tažením šipky; do té doby není náhled a OK je neaktivní. Úprava dřívějšího kroku si nechá svou hodnotu.
 ## Beta 1.58
 - **Vysunutí už nenabízí zbytek dřív vysunuté skici:** když ze skici vysunete jen část (např. jen 2mm okraj odsazeného obrysu), zbylý profil se při dalším Vysunutí neukazuje a skica se nevybírá. Vysunout ho jde dál: vyberte skicu na časové ose, nebo ji zvolte v poli Skica v dialogu.
 ## Beta 1.57
