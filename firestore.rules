@@ -1,13 +1,10 @@
 rules_version = '2';
-// Pravidla Firestore pro projekt filakalk-abcec, který sdílí Filakalk a SkicaCAD.
-// Každý uživatel smí číst a zapisovat jen svůj dokument users/{uid} (Filakalk)
-// a vše pod ním (SkicaCAD: skicacad_designs, skicacad_blobs, skicacad_meta).
+// Pravidla Firestore pro projekt skicacad.
+// Každý přihlášený uživatel smí číst a zapisovat jen svá data pod users/{uid}
+// (skicacad_designs, skicacad_blobs, skicacad_meta).
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
-    }
-    match /users/{uid}/{rest=**} {
+    match /users/{uid}/{document=**} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
   }

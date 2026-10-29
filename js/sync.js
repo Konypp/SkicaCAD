@@ -1,5 +1,4 @@
-/* SkicaCAD – sign in with Google and keep the design library and the settings in step between devices (Firebase, the same
-   project as Filakalk). Loaded as a module only in the installed app / on the web; the app works without it.
+/* SkicaCAD – sign in with Google and keep the design library and the settings in step between devices (Firebase). Own Firebase project 'skicacad'. Loaded as a module only in the installed app / on the web; the app works without it.
 
    Firestore, everything under the user's own document users/{uid}:
      skicacad_designs/{design uid}  { data: design JSON, thumb: picture, name, t: last change (ms), del: deleted, app, updated }
@@ -13,8 +12,9 @@ import { initializeApp, getAuth, GoogleAuthProvider, signInWithPopup, signOut, o
 
 const L = window.SKICA_LIB;
 if (L) {
-  const cfg = { apiKey: 'AIzaSyD2b229Rm8cAgq8EhS98LpuSPiym1NbU70', authDomain: 'filakalk-abcec.firebaseapp.com', projectId: 'filakalk-abcec',
-    storageBucket: 'filakalk-abcec.firebasestorage.app', messagingSenderId: '761484950310', appId: '1:761484950310:web:de3adcc6005dc08ff55fe7' };
+  /* SkicaCAD's own Firebase project (separate from Filakalk) */
+  const cfg = { apiKey: 'AIzaSyB2UGV3Fe9K1MvyUcVmKgw5PaoLIN8fWzA', authDomain: 'skicacad.firebaseapp.com', projectId: 'skicacad',
+    storageBucket: 'skicacad.firebasestorage.app', messagingSenderId: '386666387604', appId: '1:386666387604:web:78759bee70dba9c626bc81' };
   const app = initializeApp(cfg, 'skicacad');
   const auth = getAuth(app);
   let db;
@@ -135,7 +135,7 @@ if (L) {
     unsubs.forEach(f => f()); unsubs = []; clearTimeout(timer); timer = null; ready = false; remote = new Map(); lastErr = '';
     user = u;
     if (!u) { status('Návrhy jsou jen v tomto zařízení.'); return; }
-    if (meta.uid !== u.uid) meta = { uid: u.uid, d: {}, b: {}, s: null }; /* another account: compare everything afresh */
+    if (meta.uid !== u.uid || meta.p !== cfg.projectId) meta = { uid: u.uid, p: cfg.projectId, d: {}, b: {}, s: null }; /* another account or project: compare everything afresh */
     meta.d = meta.d || {}; meta.b = meta.b || {}; saveMeta();
     status('Načítám…');
     start();

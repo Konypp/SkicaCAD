@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 1.62
+- **Vlastní projekt Firebase „skicacad“:** synchronizace už nepoužívá projekt Filakalku (limity, pravidla a data jsou zvlášť). Po přechodu se přihlaste znovu; návrhy uložené v zařízeních se do nového projektu nahrají samy. `firestore.rules` obsahuje pravidla pro nový projekt.
 ## Beta 1.61
 - **Přihlášení Googlem a synchronizace (jako ve Filakalku):** Soubor › Přihlásit se Googlem. Po přihlášení se celá knihovna návrhů (i s náhledy) a nastavení aplikace ukládá k účtu a drží stejná na všech zařízeních, kde jste přihlášeni. Smazání návrhu se projeví všude.
 - Když se stejný návrh změní na dvou zařízeních (např. bez internetu), novější verze zůstane pod svým názvem a starší se uloží jako „… (kopie)“ – nic se neztratí.
