@@ -214,7 +214,10 @@ function planeFromPoly(p) {
 /* ================= settings, document, history ================= */
 const settings = { snap: 1, gridSnap: true, style: 'se', grid: true };
 try { Object.assign(settings, JSON.parse(localStorage.getItem(SKEY)) || {}); } catch (e) {}
-const saveSettings = () => { try { localStorage.setItem(SKEY, JSON.stringify(settings)); } catch (e) {} };
+const saveSettings = () => { try { localStorage.setItem(SKEY, JSON.stringify(settings)); if (!syncQuiet) localStorage.setItem('skicacad-settings-t', String(Date.now())); } catch (e) {} syncNote(); };
+/* the account sync (js/sync.js, only outside the claude.ai preview) is told about every change of the library or settings */
+var syncHook = null, syncQuiet = false, syncState = { user: null, text: '', err: false }, syncFns = null;
+function syncNote() { if (syncHook && !syncQuiet) { try { syncHook(); } catch (e) { /* ignore */ } } }
 
 const XY = Engine.PLANES.XY;
 function exampleDoc() {
@@ -250,13 +253,18 @@ const libThumb = uid => { try { return localStorage.getItem(TKEY(uid)); } catch 
 function libList() { try { const l = JSON.parse(localStorage.getItem(LKEY)); return Array.isArray(l) ? l.filter(x => x && typeof x.uid === 'string') : []; } catch (e) { return []; } }
 function libWrite(list) { try { localStorage.setItem(LKEY, JSON.stringify(list)); } catch (e) { /* ignore */ } }
 function libGet(uid) { try { return validDoc(JSON.parse(localStorage.getItem(DKEY(uid)))); } catch (e) { return null; } }
-function libDelete(uid) { libWrite(libList().filter(x => x.uid !== uid)); try { localStorage.removeItem(DKEY(uid)); localStorage.removeItem(TKEY(uid)); } catch (e) { /* ignore */ } }
+function libDelete(uid) {
+  libWrite(libList().filter(x => x.uid !== uid)); try { localStorage.removeItem(DKEY(uid)); localStorage.removeItem(TKEY(uid)); } catch (e) { /* ignore */ }
+  /* remembered for the account sync, so the design is deleted on the other devices too */
+  if (!syncQuiet) { try { const k = 'skicacad-deleted', a = JSON.parse(localStorage.getItem(k) || '[]'); if (!a.includes(uid)) a.push(uid); localStorage.setItem(k, JSON.stringify(a.slice(-300))); } catch (e) { /* ignore */ } }
+  syncNote();
+}
 function libStore(d) {
   localStorage.setItem(DKEY(d.uid), JSON.stringify(d));
   const l = libList().filter(x => x.uid !== d.uid);
   l.unshift({ uid: d.uid, name: d.name, t: Date.now(), n: d.features.length });
   for (const x of l.splice(LIB_MAX)) { try { localStorage.removeItem(DKEY(x.uid)); localStorage.removeItem(TKEY(x.uid)); } catch (e) { /* ignore */ } }
-  libWrite(l);
+  libWrite(l); syncNote();
 }
 /* one-time move of the old single autosaved design into the library */
 try {
@@ -6520,7 +6528,7 @@ function scheduleThumb(delay = 1500) {
     if (cmd || sk || !$('#busy').hidden || viewMarker !== null) { scheduleThumb(1500); return; }
     const uid = doc.uid; if (!uid || !doc.features.length) return;
     const url = makeThumb();
-    if (url) { try { localStorage.setItem(TKEY(uid), url); } catch (e) { /* storage full: keep going without a picture */ } }
+    if (url) { try { localStorage.setItem(TKEY(uid), url); syncNote(); } catch (e) { /* storage full: keep going without a picture */ } }
   }, delay);
 }
 function makeThumb() {
@@ -6570,7 +6578,8 @@ function showStart(first) {
     ${list.length ? `<div class="sd-label">Předchozí návrhy</div><ul class="sd-list">${rows}</ul>` : '<p class="sd-empty">Zatím tu nejsou žádné uložené návrhy. Jakmile začnete modelovat, návrh se sám uloží a příště ho najdete tady.</p>'}
     <div class="sd-foot"><button class="btn sm" data-act="file">Otevřít ze souboru…</button><button class="btn sm" data-act="example">Ukázkový model</button><button class="btn sm" data-act="backup"${list.length ? '' : ' disabled'}>Zálohovat knihovnu</button><button class="btn sm" data-act="restore">Obnovit ze zálohy…</button></div>
     ${(() => { const u = storageUsed(), r = Math.min(1, u / LS_QUOTA); return `<div class="sd-usage${r >= 0.8 ? ' warn' : ''}" title="Úložiště návrhů v tomto prohlížeči"><span class="bar"><span style="width:${Math.max(1, Math.round(r * 100))}%"></span></span><span>Úložiště: ${r > 0 && r < 0.01 ? '<1' : Math.round(r * 100)} % (${fmtMB(u)} z ~${fmtMB(LS_QUOTA)})</span></div>`; })()}
-    <p class="sd-note">Návrhy se ukládají automaticky jen v tomto prohlížeči. Záloha celé knihovny je jeden soubor .zip, který obnovíte i na jiném zařízení.</p></div>`;
+    <p class="sd-note">${syncState.user ? 'Návrhy se ukládají automaticky a synchronizují se s vaším účtem Google na všech zařízeních, kde jste přihlášeni.' : 'Návrhy se ukládají automaticky jen v tomto prohlížeči. Záloha celé knihovny je jeden soubor .zip, který obnovíte i na jiném zařízení.' + (syncFns ? ' Po přihlášení (Soubor › Přihlásit se Googlem) se synchronizují mezi zařízeními.' : '')}</p>
+    ${syncFns ? `<p class="sd-note sync" id="sd-sync">${esc(syncLine())}</p>` : ''}</div>`;
   ov.hidden = false;
   const b = ov.querySelector('.btn.primary'); if (b) b.focus();
 }
@@ -6636,7 +6645,7 @@ function restoreLibrary(entries) {
     if (j.blobs && typeof j.blobs === 'object') Object.assign(blobs, j.blobs);
     if (have) { have.t = t; have.name = d.name; have.n = d.features.length; updated++; } else { list.push({ uid: d.uid, name: d.name, t, n: d.features.length }); added++; }
   }
-  list.sort((a, b) => b.t - a.t); libWrite(list.slice(0, LIB_MAX)); saveBlobs();
+  list.sort((a, b) => b.t - a.t); libWrite(list.slice(0, LIB_MAX)); saveBlobs(); syncNote();
   toast(`Obnoveno ze zálohy: ${added} nových, ${updated} aktualizovaných, ${same} beze změny` + (failed ? `, ${failed} se nepodařilo načíst` : ''));
   showStart(false); checkStorage();
 }
@@ -6687,17 +6696,17 @@ if ($('#themebtn')) $('#themebtn').addEventListener('click', () => {
 });
 applyTheme();
 function syncLangBtn() { const b = $('#langbtn'); if (!b) return; const en = EN(); b.querySelector('.lc').textContent = en ? 'EN' : 'CZ'; b.title = en ? 'Language: English (switch to Czech)' : 'Jazyk: čeština (přepnout do angličtiny)'; }
-if ($('#langbtn')) $('#langbtn').addEventListener('click', () => {
-  const l = EN() ? 'cs' : 'en';
-  settings.lang = l; saveSettings();
+function setLanguage(l, quiet) {
+  settings.lang = l; if (!quiet) saveSettings();
   if (window.I18N) I18N.set(l);
   if (doc.name === 'Bez názvu' || doc.name === 'Untitled') { doc.name = l === 'en' ? 'Untitled' : 'Bez názvu'; $('#docname').value = doc.name; }
   buildCubeMaterials(); renderRibbon(); renderBrowser(); renderTimeline(); updateInfo(); applyNav();
   if (sk) { renderPalette(); redrawSketch(); }
   if (!$('#startdlg').hidden) showStart(false);
   syncLangBtn(); syncThemeBtn(); requestRender();
-  toast(l === 'en' ? 'Language: English' : 'Jazyk: čeština');
-});
+  if (!quiet) toast(l === 'en' ? 'Language: English' : 'Jazyk: čeština');
+}
+if ($('#langbtn')) $('#langbtn').addEventListener('click', () => setLanguage(EN() ? 'cs' : 'en'));
 syncLangBtn();
 
 /* ================= theme changes ================= */
@@ -6721,6 +6730,79 @@ pushHist();
 loadStoredBlobs();
 refreshBusy(() => fitView(VIEW_ISO, true));
 showStart(true);
+/* ================= account sync (js/sync.js) ================= */
+/* the library as the sync module sees it; its own writes are quiet so they are not sent straight back */
+function quietly(fn) { syncQuiet = true; try { return fn(); } finally { syncQuiet = false; } }
+function syncMenu() {
+  const on = !!syncFns, u = syncState.user;
+  $('#m-login').hidden = !on || !!u; $('#m-logout').hidden = !on || !u; $('#m-synchr').hidden = !on;
+  const w = $('#m-who'); if (w) w.textContent = u || '';
+  const st = $('#m-syncst'); if (st) { st.hidden = !on || !syncState.text; st.textContent = syncText(); st.classList.toggle('err', !!syncState.err); }
+  const n = $('#sd-sync'); if (n) { n.textContent = syncLine(); n.classList.toggle('err', !!syncState.err); }
+}
+/* status texts come in Czech and are shown in the current language; 'Synchronizace selhala (kód).' keeps its code */
+const syncText = () => { const t = syncState.text || '', m = /^Synchronizace selhala( \(.*\))?\.$/.exec(t); return !window.I18N ? t : m ? I18N.t('Synchronizace selhala') + (m[1] || '') + '.' : I18N.t(t); };
+const syncLine = () => (syncState.user ? (EN() ? `Signed in as ${syncState.user}. ` : `Přihlášen: ${syncState.user}. `) : '') + syncText();
+function storeRemote(uid, data, thumb, t) {
+  const d = validDoc(JSON.parse(data)); if (!d) return null;
+  d.uid = uid;
+  localStorage.setItem(DKEY(uid), JSON.stringify(d));
+  if (thumb) localStorage.setItem(TKEY(uid), thumb); else localStorage.removeItem(TKEY(uid));
+  const l = libList().filter(x => x.uid !== uid); l.push({ uid, name: d.name, t, n: d.features.length }); l.sort((a, b) => b.t - a.t);
+  for (const x of l.splice(LIB_MAX)) { try { localStorage.removeItem(DKEY(x.uid)); localStorage.removeItem(TKEY(x.uid)); } catch (e) { /* ignore */ } }
+  libWrite(l);
+  return d;
+}
+function libChangedHere() { if (!$('#startdlg').hidden) showStart(false); }
+window.SKICA_LIB = {
+  version: SKICA.version, toast: m => toast(m),
+  list: libList, raw: uid => { try { return localStorage.getItem(DKEY(uid)); } catch (e) { return null; } }, thumb: libThumb,
+  blobIds: raw => { try { return JSON.parse(raw).features.filter(f => f.type === 'import' && f.blob).map(f => f.blob); } catch (e) { return []; } },
+  blob: id => blobs[id] || null,
+  putBlob(id, v) { if (blobs[id]) return; blobs[id] = v; saveBlobs(); if (doc.features.some(f => f.type === 'import' && f.blob === id)) refresh(); },
+  /* a design that came from the account; the open one is reloaded unless something is being edited right now */
+  put(uid, data, thumb, t) {
+    let d; try { d = quietly(() => storeRemote(uid, data, thumb, t)); } catch (e) { return; }
+    if (!d) return;
+    if (doc.uid === uid && !cmd && !sk && JSON.stringify(d.features) !== JSON.stringify(doc.features) || doc.uid === uid && !cmd && !sk && d.name !== doc.name) loadDoc(d, EN() ? `“${d.name}” updated from another device` : `Návrh „${d.name}“ aktualizován z jiného zařízení`);
+    libChangedHere();
+  },
+  remove(uid) { quietly(() => libDelete(uid)); if (doc.uid === uid) doc.uid = newUid(); libChangedHere(); },
+  /* the design changed on both devices: the older version stays as a copy */
+  copy(uid) {
+    const d = libGet(uid); if (!d) return;
+    d.uid = newUid(); d.name = uniqueName(d.name.replace(/\s*\((kopie|copy)\)$/, '') + (EN() ? ' (copy)' : ' (kopie)'), d.uid);
+    const th = libThumb(uid);
+    libStore(d); if (th) try { localStorage.setItem(TKEY(d.uid), th); } catch (e) { /* ignore */ }
+    if (doc.uid === uid && (cmd || sk)) { doc.uid = d.uid; doc.name = d.name; $('#docname').value = d.name; }
+    toast(EN() ? `The design was changed on two devices; the older version is kept as “${d.name}”.` : `Návrh byl změněn na dvou zařízeních, starší verze zůstala jako „${d.name}“.`);
+  },
+  copyFrom(data, thumb) {
+    let d; try { d = validDoc(JSON.parse(data)); } catch (e) { return; } if (!d) return;
+    d.uid = newUid(); d.name = uniqueName(d.name + (EN() ? ' (copy)' : ' (kopie)'), d.uid);
+    libStore(d); if (thumb) try { localStorage.setItem(TKEY(d.uid), thumb); } catch (e) { /* ignore */ }
+    libChangedHere();
+    toast(EN() ? `The design was changed on two devices; the older version is kept as “${d.name}”.` : `Návrh byl změněn na dvou zařízeních, starší verze zůstala jako „${d.name}“.`);
+  },
+  takeDeleted() { try { const a = JSON.parse(localStorage.getItem('skicacad-deleted') || '[]'); localStorage.removeItem('skicacad-deleted'); return a; } catch (e) { return []; } },
+  settings: () => JSON.stringify(settings),
+  settingsT: () => { try { return Number(localStorage.getItem('skicacad-settings-t')) || 0; } catch (e) { return 0; } },
+  applySettings(str) {
+    let o; try { o = JSON.parse(str); } catch (e) { return; } if (!o || typeof o !== 'object') return;
+    const lang = settings.lang;
+    quietly(() => { for (const k of Object.keys(settings)) if (!(k in o)) delete settings[k]; Object.assign(settings, o); saveSettings(); });
+    applyTheme(); applyNav(); syncThemeBtn();
+    if (settings.lang && settings.lang !== lang && window.I18N) quietly(() => setLanguage(settings.lang, true));
+    requestRender();
+  },
+  onChange(fn) { syncHook = fn; },
+  syncStatus(s) { syncState = s; syncMenu(); },
+  syncReady(fns) { syncFns = fns; syncMenu(); }
+};
+$('#m-login').addEventListener('click', () => { closeMenu(); if (syncFns) syncFns.login(); });
+$('#m-logout').addEventListener('click', () => { closeMenu(); if (syncFns) syncFns.logout(); });
+if (window.I18N) I18N.onChange(() => syncMenu());
+
 if (window.__KOTA_TEST__) window.__kota = { get cmd() { return cmd; }, threeMfBytes, transform, get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart, makeThumb, libThumb, transform, persp, toPx, startMove, alignDesc,
   cmdSnap, get doc() { return doc; }, get cur() { return cur; }, get cmd() { return cmd; }, get sk() { return sk; }, get dlg() { return dlg; }, get sel() { return sel; }, meshes, chainsFor };
 })();

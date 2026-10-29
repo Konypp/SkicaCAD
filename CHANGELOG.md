@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta 1.61
+- **Přihlášení Googlem a synchronizace (jako ve Filakalku):** Soubor › Přihlásit se Googlem. Po přihlášení se celá knihovna návrhů (i s náhledy) a nastavení aplikace ukládá k účtu a drží stejná na všech zařízeních, kde jste přihlášeni. Smazání návrhu se projeví všude.
+- Když se stejný návrh změní na dvou zařízeních (např. bez internetu), novější verze zůstane pod svým názvem a starší se uloží jako „… (kopie)“ – nic se neztratí.
+- Bez internetu se dál pracuje normálně; změny se odešlou po připojení, nejdřív se ale načte stav účtu.
+- Importované modely do 1 MB se synchronizují také, větší zůstanou jen v zařízení.
+- Používá stejný projekt Firebase jako Filakalk (přihlášení je ale v každé aplikaci zvlášť). Ve Firestore je potřeba povolit podkolekce – pravidla jsou v souboru `firestore.rules`.
+- V náhledu na claude.ai přihlášení není (běží jen v nainstalované aplikaci a na GitHub Pages).
 ## Beta 1.60
 - **Zpět v Zaoblení a Zkosení funguje napoprvé:** pohyb myši přes hrany (zvýraznění pod ukazatelem) se počítal jako krok, takže první Zpět jen „vrátilo“ zvýraznění. Zvýraznění pod ukazatelem se do kroků nepočítá v žádném příkazu.
 - Po Zpět / Znovu v Zaoblení a Zkosení jdou vybrané hrany dál klepnutím odebrat (dřív se vrácená hrana přidala podruhé).

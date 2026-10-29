@@ -342,3 +342,7 @@ button { cursor: pointer; }
 /* slider under a number field (e.g. bend angle) */
 .frange-row { display: block; padding-left: 108px; margin-top: -4px; }
 .frange { width: 100%; accent-color: var(--accent); margin: 2px 0 4px; }
+/* account sync status in the File menu and in Moje návrhy */
+.menu .msync { padding: 2px 12px 6px; font-size: 11.5px; color: var(--muted); max-width: 300px; }
+.menu .msync.err, .sd-note.sync.err { color: var(--danger, #c0392b); }
+.sd-note.sync { margin-top: -4px; }
