@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 1.63
+- **Přihlášení v úvodní nabídce:** po spuštění (a v Moje návrhy) je nahoře tlačítko Přihlásit se Googlem; po přihlášení je tam účet se stavem synchronizace a tlačítko Odhlásit. Položky v menu Soubor zůstávají.
+## Beta 1.63
+- **Přihlášení v úvodní nabídce:** po spuštění (a v Moje návrhy) je nahoře tlačítko Přihlásit se Googlem; po přihlášení je tam účet se stavem synchronizace a tlačítko Odhlásit. Položky v menu Soubor zůstávají.
 ## Beta 1.62
 - **Vlastní projekt Firebase „skicacad“:** synchronizace už nepoužívá projekt Filakalku (limity, pravidla a data jsou zvlášť). Po přechodu se přihlaste znovu; návrhy uložené v zařízeních se do nového projektu nahrají samy. `firestore.rules` obsahuje pravidla pro nový projekt.
 ## Beta 1.61

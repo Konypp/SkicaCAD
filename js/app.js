@@ -6566,11 +6566,22 @@ function makeThumb() {
 const fmtDate = t => { const d = new Date(t), p = n => String(n).padStart(2, '0'); return `${d.getDate()}. ${d.getMonth() + 1}. ${d.getFullYear()} ${d.getHours()}:${p(d.getMinutes())}`; };
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const krok = n => (n === 1 ? '1 krok' : n >= 2 && n <= 4 ? `${n} kroky` : `${n} kroků`);
+/* account row of the start dialog: sign in, or who is signed in with the sync state */
+const GLOGO = '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>';
+function noteText() { return (syncState.user ? 'Návrhy se ukládají automaticky a synchronizují se s vaším účtem Google na všech zařízeních, kde jste přihlášeni.' : 'Návrhy se ukládají automaticky jen v tomto prohlížeči. Záloha celé knihovny je jeden soubor .zip, který obnovíte i na jiném zařízení.'); }
+function acctHTML() {
+  const st = syncText();
+  if (!syncState.user) return `<button class="btn sd-login" data-act="login">${GLOGO}<span>Přihlásit se Googlem</span></button>
+    <span class="sd-acct-t">Návrhy a nastavení budou stejné na všech vašich zařízeních.</span>${syncState.err && st ? `<span class="sd-acct-st err">${esc(st)}</span>` : ''}`;
+  return `<span class="sd-acct-u">${GLOGO}<span><b>${esc(syncState.user)}</b>${st ? `<span class="sd-acct-st${syncState.err ? ' err' : ''}">${esc(st)}</span>` : ''}</span></span>
+    <button class="btn sm" data-act="logout">Odhlásit</button>`;
+}
 function showStart(first) {
   const ov = $('#startdlg'), list = libList(), last = list[0];
   const rows = list.map(x => `<li data-uid="${x.uid}"${doc.uid === x.uid && doc.features.length ? ' class="cur"' : ''}><button class="sd-open" data-open="${x.uid}">${(t => (t ? `<img class="sd-thumb" src="${t}" alt="" loading="lazy">` : `<span class="sd-thumb sd-nothumb">${svg('box', 22)}</span>`))(libThumb(x.uid))}<span class="sd-txt"><span class="sd-name">${esc(x.name)}</span><span class="sd-meta">${fmtDate(x.t)} · ${krok(x.n)}${doc.uid === x.uid && doc.features.length ? ' · otevřený' : ''}</span></span></button><button class="ibtn sd-del" data-del="${x.uid}" title="Smazat návrh" aria-label="Smazat návrh ${esc(x.name)}">${svg('skdel', 15)}</button></li>`).join('');
   ov.innerHTML = `<div class="sd-box" role="dialog" aria-modal="true" aria-labelledby="sd-title">
     <div class="sd-head"><h2 id="sd-title">${first ? 'Vítejte ve ' + esc(SKICA.full) : 'Moje návrhy'}</h2><button class="ibtn" data-act="close" aria-label="Zavřít" title="Zavřít">${svg('close', 16)}</button></div>
+    <div class="sd-acct" id="sd-acct"${syncFns ? '' : ' hidden'}>${acctHTML()}</div>
     <div class="sd-actions">
       <button class="btn primary" data-act="new">Nový návrh</button>
       ${last ? `<button class="btn" data-open="${last.uid}">Pokračovat: ${esc(last.name)}</button>` : ''}
@@ -6578,8 +6589,8 @@ function showStart(first) {
     ${list.length ? `<div class="sd-label">Předchozí návrhy</div><ul class="sd-list">${rows}</ul>` : '<p class="sd-empty">Zatím tu nejsou žádné uložené návrhy. Jakmile začnete modelovat, návrh se sám uloží a příště ho najdete tady.</p>'}
     <div class="sd-foot"><button class="btn sm" data-act="file">Otevřít ze souboru…</button><button class="btn sm" data-act="example">Ukázkový model</button><button class="btn sm" data-act="backup"${list.length ? '' : ' disabled'}>Zálohovat knihovnu</button><button class="btn sm" data-act="restore">Obnovit ze zálohy…</button></div>
     ${(() => { const u = storageUsed(), r = Math.min(1, u / LS_QUOTA); return `<div class="sd-usage${r >= 0.8 ? ' warn' : ''}" title="Úložiště návrhů v tomto prohlížeči"><span class="bar"><span style="width:${Math.max(1, Math.round(r * 100))}%"></span></span><span>Úložiště: ${r > 0 && r < 0.01 ? '<1' : Math.round(r * 100)} % (${fmtMB(u)} z ~${fmtMB(LS_QUOTA)})</span></div>`; })()}
-    <p class="sd-note">${syncState.user ? 'Návrhy se ukládají automaticky a synchronizují se s vaším účtem Google na všech zařízeních, kde jste přihlášeni.' : 'Návrhy se ukládají automaticky jen v tomto prohlížeči. Záloha celé knihovny je jeden soubor .zip, který obnovíte i na jiném zařízení.' + (syncFns ? ' Po přihlášení (Soubor › Přihlásit se Googlem) se synchronizují mezi zařízeními.' : '')}</p>
-    ${syncFns ? `<p class="sd-note sync" id="sd-sync">${esc(syncLine())}</p>` : ''}</div>`;
+    <p class="sd-note" id="sd-notetext">${noteText()}</p>
+    </div>`;
   ov.hidden = false;
   const b = ov.querySelector('.btn.primary'); if (b) b.focus();
 }
@@ -6599,6 +6610,8 @@ $('#startdlg').addEventListener('click', e => {
     pruneBlobs(); showStart(false); return;
   }
   const a = t.dataset.act;
+  if (a === 'login') { if (syncFns) syncFns.login(); return; }
+  if (a === 'logout') { if (syncFns) syncFns.logout(); return; }
   if (a === 'close') hideStart();
   else if (a === 'new') { hideStart(); if (doc.features.length) loadDoc(emptyDoc(), 'Nový návrh'); }
   else if (a === 'file') { hideStart(); $('#fileinput').click(); }
@@ -6738,11 +6751,12 @@ function syncMenu() {
   $('#m-login').hidden = !on || !!u; $('#m-logout').hidden = !on || !u; $('#m-synchr').hidden = !on;
   const w = $('#m-who'); if (w) w.textContent = u || '';
   const st = $('#m-syncst'); if (st) { st.hidden = !on || !syncState.text; st.textContent = syncText(); st.classList.toggle('err', !!syncState.err); }
-  const n = $('#sd-sync'); if (n) { n.textContent = syncLine(); n.classList.toggle('err', !!syncState.err); }
+  const a = $('#sd-acct'); if (a) { a.hidden = !on; if (on) a.innerHTML = acctHTML(); }
+  const nt = $('#sd-notetext'); if (nt) nt.textContent = noteText();
 }
 /* status texts come in Czech and are shown in the current language; 'Synchronizace selhala (kód).' keeps its code */
-const syncText = () => { const t = syncState.text || '', m = /^Synchronizace selhala( \(.*\))?\.$/.exec(t); return !window.I18N ? t : m ? I18N.t('Synchronizace selhala') + (m[1] || '') + '.' : I18N.t(t); };
-const syncLine = () => (syncState.user ? (EN() ? `Signed in as ${syncState.user}. ` : `Přihlášen: ${syncState.user}. `) : '') + syncText();
+function syncText() { const t = syncState.text || '', m = /^Synchronizace selhala( \(.*\))?\.$/.exec(t); return !window.I18N ? t : m ? I18N.t('Synchronizace selhala') + (m[1] || '') + '.' : I18N.t(t); }
+
 function storeRemote(uid, data, thumb, t) {
   const d = validDoc(JSON.parse(data)); if (!d) return null;
   d.uid = uid;
