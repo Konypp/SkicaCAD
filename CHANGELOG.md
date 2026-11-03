@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 1.89
+- **Kloubový model – typ kloubu Háček** (podle zaslaných modelů ArticulatedTwoPiece / CircleHook / NegativePiece): kroužek jednoho článku, skloněný o 45°, zasahuje do kapsy sousedního a obepíná v ní svislý čep, který spojuje dno se stropem kapsy. Článek se otáčí kolem čepu do stran (±30° ověřeno) a má trochu vůle nahoru a dolů; v tahu i nadzvednutí drží. Kapsa má střechu pod 45°, kroužek je skloněný, čep svislý a kroužek nese krček od podložky – tiskne se vcelku bez podpěr. Velikost se řídí průřezem tělesa.
+- **TĚLESO › Součásti › Háček a kapsa:** stejný spoj jako dva samostatné díly pro vlastní modely (jako „copy-paste to animal“): Háček (kroužek na krčku) se připojí k jednomu dílu přes Kombinovat › Sjednotit, Kapsa – negativ se odečte od druhého přes Kombinovat › Odečíst (čep v kapse zůstane). Nastavuje se šířka a výška kapsy, vůle a poloha.
 ## Beta 1.88
 - **Kloubový model – Rozmístění kloubů: Podél křivky.** Klepáním naklikáte křivku podél zahnutého modelu (třeba had do S) od začátku ke konci; klouby (počet podle Počtu kloubů) se rozmístí rovnoměrně po křivce a každý stojí kolmo na ni, natočený až o 80°. Křivka nesmí dělat smyčky ani se vracet. Zapínání na koncích je jen u rovného řetězu.
 - **Konektory – Způsob řezu: Křivkou.** Body klepete do pohledu přes těleso, řez vede křivkou ve směru pohledu (jako Rozříznout křivkou) a kolík nebo snap-fit se postaví na nejdelší rovný úsek křivky. Rybina, kulový a čepový kloub zůstávají jen u rovného řezu.

@@ -7,7 +7,7 @@ const PLANES = {
   XZ: { o: [0, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] },
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
-const FEATURE_LABEL = { buckle: 'Spona', articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Konektory', curvecut: 'Rozříznout křivkou', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
+const FEATURE_LABEL = { buckle: 'Spona', articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Konektory', hookjoint: 'Háček a kapsa', curvecut: 'Rozříznout křivkou', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
   fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
@@ -1580,6 +1580,46 @@ function curveCut(polys, f) {
   if (!a.length || !b.length || Math.abs(KK.signedVolume(a)) < 1e-6 || Math.abs(KK.signedVolume(b)) < 1e-6) throw new Error('Křivka těleso nerozdělí; veďte ji přes celé těleso');
   return { a, b, apart };
 }
+/* ---------- Háček s čepem (after the printed articulated animals): a ring leaning 45° on one part hooks round an
+   upright post in a pocket of the other part. Local frame: x along the chain from the joint plane (the pocket's side
+   at x >= 0), y across, z up from the bed; hw = half the width, zs = the height available. Returns the ring, the pocket
+   (cut from the other part, the post left standing in it), the post, and the pivot (the post's axis at x = pd). The
+   ring spins round the post when the parts turn sideways; the pocket has 45° roofs, the ring leans 45°, the post
+   stands upright, so it all prints without supports. */
+function hookGeom(hw, zs, g, opts) {
+  const wall = 1.6, floor = 1.6, roof = 1.6;
+  let Rr = Math.min(12, (hw - wall - g) / 1.15), rt, rp, Rc, hz, zf, zm, top, pd;
+  for (; Rr >= 2.5; Rr *= 0.93) {
+    rt = Math.max(0.8, 0.15 * Rr); Rc = Rr + rt + g; rp = Math.max(1, 0.4 * (Rr - rt - g)); hz = Math.SQRT1_2 * (Rr + rt);
+    zf = floor; zm = zf + g + hz; top = zm + hz + g + (Rc - rp);
+    if (Rc <= hw - wall + 1e-9 && top <= zs - roof) break;
+  }
+  if (Rr < 2.5) return null;
+  pd = Math.max(0.5, Math.SQRT1_2 * Rr - rt - g - 1.2);
+  const C = [pd, 0, zm], cyl = (P, r, z0, z1) => cylAlong([P[0], P[1], z0], [0, 0, 1], r, z1 - z0);
+  /* ring: a torus leaning 45° (rising towards the pocket), round the post */
+  const t45 = Math.PI / 4, cs = Math.cos(t45), sn = Math.sin(t45);
+  const ring = KK.transform(KK.primitive('torus', { R: Rr, t: rt }), [cs, 0, sn, 0, 0, 1, 0, 0, -sn, 0, cs, 0, C[0], C[1], C[2], 1]);
+  /* pocket: the room the ring sweeps round the post (a cylinder with a 45° cone roof) and the same outline drawn out to
+     the joint plane so the ring can come in from the other part */
+  const zr = zm + hz + g;
+  const XZ = { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] };
+  const prof = [[-Rc, zf], [Rc, zf], [Rc, zr], [rp, zr + Rc - rp], [-rp, zr + Rc - rp], [-Rc, zr]];
+  let pocket = KK.boolean(cyl(C, Rc, zf, zr), KK.translate(KK.primitive('cone', { r: Rc, rt: rp, h: Rc - rp }), [C[0], C[1], zr + (Rc - rp) / 2]), 'union');
+  pocket = KK.boolean(pocket, KK.fixOrientation(KK.extrudeProfiles([{ pts: prof, closed: true }], XZ, -2, pd)), 'union');
+  const post = cyl(C, rp, zf - 0.5, zr + Rc - rp + roof * 0.6);
+  return { ring, pocket: KK.boolean(pocket, post, 'subtract'), post, pivot: [pd, 0], Rr, rt, rp, Rc, pd, zf, zm, top };
+}
+/* Háček a kapsa as two separate parts (Součásti): the hook (ring on a neck) to join to one model and the pocket with its
+   post left out (a negative) to cut from the other; both in place to each other, the joint plane at x = 0 */
+function hookParts(f) {
+  const w = Math.max(10, Number(f.w) || 26), h = Math.max(10, Number(f.h) || 26), g = Math.max(0.15, Number(f.gap) || 0.4);
+  const H = hookGeom(w / 2, h, g);
+  if (!H) throw new Error('Kapsa je příliš malá; zvětšete šířku nebo výšku');
+  const Rk = H.Rc + 1.6, nx1 = H.pd - Math.SQRT1_2 * H.Rr, nw = Math.max(1.2, H.rt * 1.2), ztop = H.zm - Math.SQRT1_2 * H.Rr + H.rt, x0 = H.pd - Rk - g - 3;
+  const neck = KK.translate(KK.primitive('box', { w: nx1 - x0, d: 2 * nw, h: ztop + 0.01 }), [(nx1 + x0) / 2, 0, ztop / 2]);
+  return { hook: KK.boolean(neck, H.ring, 'union'), negative: H.pocket, H };
+}
 /* ---------- Kloubový model: a body cut into segments joined by print-in-place hinges ----------
    The segments swing about vertical axes (they lie on the bed and move in the bed's plane, like an articulated snake or
    dragon). At each joint the right segment ends in a round knuckle, the left one has a matching hollow; a tongue of the
@@ -1859,7 +1899,25 @@ function articulateCore(polys, f) {
     const P = [0, 0, 0]; P[a] = xp; P[sAx] = sc;
     const z0 = zc - BIG / 2, z1 = zc + BIG / 2, far = BIG / 2;
     let A, B;
-    if (style === 'ring') {
+    if (style === 'hook') {
+      /* Háček s čepem: the left segment's ring reaches into a pocket of the right one and hooks round its post */
+      const H = hookGeom(hw, zs, g);
+      if (!H) throw new Error('Těleso je v místě kloubu na háček příliš malé; použijte méně kloubů nebo jiný typ');
+      const ey = KK.cross([0, 0, 1], ea), M = [ea[0], ea[1], 0, 0, ey[0], ey[1], 0, 0, 0, 0, 1, 0, P[0], P[1], sec.min[2], 1];
+      const W = q => KK.transform(q, M);
+      const piv = [0, 0, 0]; piv[a] = xp + H.pd; piv[sAx] = sc; piv[2] = zc;
+      A = I(rest, boxAS([xp - far * 2, xp - g], [sc - far, sc + far], [z0, z1]));
+      /* as for the disc joint: the right segment keeps a round knuckle (the pocket's wall) about the post, the left one
+         has the matching hollow and a V for the swing; a neck from the bed carries the ring out of the hollow */
+      const Rk = H.Rc + 1.6, knuck = vcyl(piv, Rk, z0, z1), hollow = vcyl(piv, Rk + g, z0, z1);
+      A = I(S(A, hollow), wedge(piv, -1, alpha));
+      const nx1 = H.pd - Math.SQRT1_2 * H.Rr, nw = Math.max(1.2, H.rt * 1.2), ztop = H.zm - Math.SQRT1_2 * H.Rr + H.rt;
+      const neck = W(KK.translate(KK.primitive('box', { w: Rk + g + 3 + nx1 - H.pd, d: 2 * nw, h: ztop + 0.01 }), [(nx1 + H.pd - Rk - g - 3) / 2, 0, ztop / 2]));
+      A = U(U(A, I(neck, rest)), W(H.ring));
+      const Bh = I(rest, boxAS([xp, xp + far * 2], [sc - far, sc + far], [z0, z1]));
+      B = U(I(Bh, wedge(piv, 1, alpha)), I(Bh, knuck));
+      B = U(S(B, W(H.pocket)), I(W(H.post), rest));
+    } else if (style === 'ring') {
       /* Očka (after the printed chain toys): two round rings interlocked like chain links at right angles; each passes
          through the other's centre. The left segment's ring A leans back 40° (its plane holds the axis across), the
          right segment's ring B stands upright along the chain, its bottom flattened on the bed; on flat straps that
@@ -2358,6 +2416,11 @@ function step(state, f) {
         .concat(segs.slice(1).map((p, i) => ({ id: f.id + (i ? '_' + i : ''), name: base + ' – článek ' + (i + 2), polys: p, from: f.id })));
       break;
     }
+    case 'hookjoint': {
+      const P = hookParts(f), p0 = (f.pos || [0, 0, 0]).map(Number);
+      out = bodies.concat([{ id: f.id, name: 'Háček', polys: KK.translate(P.hook, p0), from: f.id }, { id: f.id + '_n', name: 'Kapsa – negativ', polys: KK.translate(P.negative, p0), from: f.id }]);
+      break;
+    }
     case 'buckle': {
       const B = buckleParts(f), p0 = (f.pos || [0, 0, 0]).map(Number);
       out = bodies.concat([{ id: f.id, name: 'Spona – samice', polys: KK.translate(B.female, [p0[0], p0[1] - B.Wf / 2 - 3, p0[2]]), from: f.id },
@@ -2417,7 +2480,7 @@ function makeRebuilder() {
   };
 }
 
-return { curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { hookParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 
