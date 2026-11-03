@@ -7,10 +7,20 @@ const PLANES = {
   XZ: { o: [0, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] },
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
-const FEATURE_LABEL = { buckle: 'Spona', articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Konektory', curvecut: 'Rozříznout křivkou', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
+const FEATURE_LABEL = { buckle: 'Spona', articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Konektory', libpart: 'Vložený díl', curvecut: 'Rozříznout křivkou', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
   fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
+/* ready-made parts (js/partslib.js): packed meshes, unpacked once */
+const LIB_PARTS = { link: 'Článek s háčkem', two: 'Dva spojené články', hook: 'Háček', neg: 'Kapsa – negativ' };
+const libCache = new Map();
+function libPolys(f) {
+  const key = f.key || (f.part in LIB_PARTS ? f.part : 'link');
+  let base = libCache.get(key);
+  if (!base) { const L = typeof PARTS_LIB !== 'undefined' ? PARTS_LIB : (typeof window !== 'undefined' ? window.PARTS_LIB : null); if (!L || !L[key]) throw new Error('Knihovna dílů chybí'); base = KK.unpack(L[key]); libCache.set(key, base); }
+  const s = (Number(f.scale) > 0 ? Number(f.scale) : 100) / 100, a = (Number(f.rot) || 0) * Math.PI / 180, c = Math.cos(a) * s, sn = Math.sin(a) * s, p = (f.pos || [0, 0, 0]).map(Number);
+  return KK.transform(base, [c, sn, 0, 0, -sn, c, 0, 0, 0, 0, s, 0, p[0], p[1], p[2], 1]);
+}
 function blobPolys(id) {
   if (blobCache.has(id)) return blobCache.get(id);
   const b = blobResolver(id); if (!b) return null;
@@ -2133,6 +2143,13 @@ function step(state, f) {
       });
       break;
     }
+    case 'libpart': {
+      const name = LIB_PARTS[f.part] || 'Díl';
+      if (f.part === 'two') /* the two links come as two bodies, hooked into each other */
+        out = bodies.concat(['two_a', 'two_b'].map((key, i) => ({ id: f.id + (i ? '_' + i : ''), name: 'Článek ' + (i + 1), polys: libPolys({ ...f, key }), from: f.id })));
+      else out = bodies.concat([{ id: f.id, name, polys: libPolys(f), from: f.id }]);
+      break;
+    }
     case 'import':
       out = applyTool(bodies, f, importPolys(f), polys => ({ id: f.id, name: f.name || ('Import ' + (++n)), polys, from: f.id })); break;
     case 'mirror': case 'pattern': {
@@ -2417,7 +2434,7 @@ function makeRebuilder() {
   };
 }
 
-return { curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { LIB_PARTS, libPolys, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

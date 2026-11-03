@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 1.91
+- **TĚLESO › Součásti › Kloubové díly:** vložení hotových dílů přímo z dodaných modelů (Articulated_SinglePiece, ArticulatedTwoPiece, CircleHook, NegativePieceHoleAndCylinder) jako nová tělesa: **Článek s háčkem**, **Dva spojené články** (dvě tělesa do sebe zaháknutá), **Háček** (připojit ke svému modelu) a **Kapsa – negativ** (odečíst od svého modelu, čep zůstane). Velikost v %, otočení kolem svislé osy a poloha (i klepnutím). Díly jsou uložené v aplikaci (js/partslib.js), fungují i offline.
 ## Beta 1.90
 - Kloub Háček a součást Háček a kapsa (z Beta 1.89) odstraněny.
 ## Beta 1.88
