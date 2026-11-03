@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 1.98
+- **Kloub Flexi – rovné stěny mezery:** dodaný nástroj měl ve stěnách kotouče kolem misky nepatrný schod (asi 0,08 mm) a spoustu vnitřních vrcholů; na řezu po něm zůstával vystouplý kruh, který se ukázal hlavně po posunutí sousední plochy. Kotouč nástroje se teď skládá z přesného rovného válce a z modelu se bere jen prostředek s miskou a koulí, takže obě stěny mezery jsou rovné a posunutí ploch je nezkřiví. Pohyb a držení kloubu se nemění.
 ## Beta 1.97
 - **Kloubový model – typ kloubu Flexi:** v místě kloubu se z tělesa vyřízne dodaný nástroj FlexiJoint Maker (tenký kotouč – mezera mezi články – s miskou kolem koule uprostřed). Zbudou dva články držené koulí v misce, tisknou se vcelku a kloub se natáčí do všech stran (ověřeno ±15° v každé ose). Nástroj se na tenkém tělese zmenší (nikdy nezvětšuje, aby zůstaly vůle); u tělesa širšího než kotouč se okolí prořízne deskou stejné tloušťky. Funguje i u Řezů a Podél křivky.
 - **Kloubové díly › Kloubový spoj:** přibyl typ Flexi.

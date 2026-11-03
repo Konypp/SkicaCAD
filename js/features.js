@@ -1845,6 +1845,18 @@ function articulateOblique(polys, f) {
   out.push(rest);
   return out;
 }
+/* the FlexiJoint cutter with its flat faces rebuilt as whole polygons (the mesh had vertices inside them, which then
+   stayed in the cut faces and folded when a neighbouring face was moved) */
+let flexiCache = null;
+function flexiTool() {
+  if (flexiCache) return flexiCache;
+  /* the flat disc is remade exactly (its own faces whole), only the middle (the cup, the ball's room and the holes the
+     neck passes through, all within r 7.75) is taken from the mesh */
+  const T = libPolys({ key: 'flexneg' }), h = 1.382, rc = 7.75;
+  const cyl = (r, x0, x1) => cylAlong([x0, 0, 0], [1, 0, 0], r, x1 - x0);
+  const disc = KK.boolean(cyl(16.99, -h, h), cyl(rc, -h - 1, h + 1), 'subtract'), mid = KK.boolean(T, cyl(rc, -10, 10), 'intersect');
+  return (flexiCache = { disc, mid });
+}
 /* the separate shells of a solid (polygons joined through shared corners) */
 function shellsOf(P) {
   const par = P.map((_, i) => i), find = i => { while (par[i] !== i) i = par[i] = par[par[i]]; return i; }, seen = new Map();
@@ -1907,11 +1919,11 @@ function articulateCore(polys, f) {
          held together by the ball in the cup, printed in one piece. The cutter stands across the chain at the joint,
          scaled down on a thin body (never up, so the clearances stay as designed); a body wider than its disc is cut
          through by a plain slab of the disc's thickness round it. The two parts are told apart by their shells. */
-      const T0 = libPolys({ key: 'flexneg' }), core = 6.82, half = 1.382, disc = 16.99;
+      const T0 = flexiTool(), core = 6.82, half = 1.382, disc = 16.99;
       const s = Math.min(1, (Math.min(hw, zs / 2) - 1) / core);
       if (!(s >= 0.35)) throw new Error('Těleso je v místě kloubu na kloub Flexi příliš malé; použijte méně kloubů nebo jiný typ');
       const ez = [0, 0, 1], ey = KK.cross(ez, ea), M = [ea[0] * s, ea[1] * s, ea[2] * s, 0, ey[0] * s, ey[1] * s, ey[2] * s, 0, 0, 0, s, 0, P[0], P[1], zc, 1];
-      let cut = S(rest, KK.transform(T0, M));
+      let cut = S(S(rest, KK.transform(T0.disc, M)), KK.transform(T0.mid, M));
       if (Math.hypot(hw, zs / 2) > (disc - 0.6) * s) { /* the slab round the disc */
         const ring = S(boxAS([xp - half * s, xp + half * s], [sc - far, sc + far], [z0, z1]), cylAlong(P.map((v, k) => k === 2 ? zc : v - ea[k] * (half * s + 1)), ea, (disc - 0.5) * s, 2 * half * s + 2));
         cut = S(cut, ring);
@@ -1919,7 +1931,7 @@ function articulateCore(polys, f) {
       const parts = shellsOf(cut), L = [], Rp = [];
       for (const sh of parts) { const b = KK.bbox(sh), m = (b.min[a] + b.max[a]) / 2; (m < xp ? L : Rp).push(...sh); }
       if (!L.length || !Rp.length) throw new Error('Kloub Flexi se nepodařilo vytvořit (díly se neoddělily)');
-      A = L; B = Rp;
+      A = KK.rebuildFaces(L); B = KK.rebuildFaces(Rp);
     } else if (style === 'ball') {
       /* Kulový: a ball on a neck of the left segment sits in a round socket of the right one, printed in place with a
          clearance all round, so the right segment turns about every axis (sideways, up and down, and twists). The
