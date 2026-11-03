@@ -7,7 +7,7 @@ const PLANES = {
   XZ: { o: [0, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] },
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
-const FEATURE_LABEL = { buckle: 'Spona', articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Konektory', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
+const FEATURE_LABEL = { buckle: 'Spona', articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Konektory', curvecut: 'Rozříznout křivkou', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
   fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
@@ -1480,6 +1480,87 @@ function pegSplit(polys, f) {
   if (!lower.length || !upper.length) throw new Error('Konektor se nepodařilo vytvořit');
   return { lower, upper, pegs: extra.map(x => x.polys), extra, n, w, c, u, v };
 }
+/* ---------- Rozříznout křivkou: cut a body along a curve through clicked points ----------
+   mode 'view': the curve is drawn on the view; the cut runs through it straight along the view direction f.d (like a
+   cookie cutter), so it can zig-zag or wave across the body. mode 'around': the points lie on the body round an axis
+   (f.axis through the body's middle); the cut runs from the curve straight in to the axis, so a cylinder parts into a
+   top and a bottom with a shaped seam. f.smooth draws a smooth curve through the points, f.gap leaves a gap between the
+   parts (the seam is moved by half of it each way). Returns the two parts and a direction to show them apart. */
+function curveCut(polys, f) {
+  const pts = (f.pts || []).map(p => p.map(Number)), gap = Math.max(0, Number(f.gap) || 0), bb = KK.bbox(polys);
+  const span = Math.hypot(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]), BIG = span * 2 + 50;
+  const c = [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2);
+  let toolA, toolB, apart;
+  if (f.mode === 'around') {
+    if (pts.length < 1) throw new Error('Klepněte alespoň na jeden bod na tělese');
+    const ax = { x: 0, y: 1, z: 2 }[f.axis] === undefined ? 2 : { x: 0, y: 1, z: 2 }[f.axis];
+    const ea = [0, 0, 0]; ea[ax] = 1;
+    const e1 = [0, 0, 0]; e1[(ax + 1) % 3] = 1; const e2 = KK.cross(ea, e1);
+    /* the points as angle round the axis and height along it, sorted by angle */
+    let P = pts.map(p => { const d = KK.vsub(p, c); return [Math.atan2(KK.vdot(d, e2), KK.vdot(d, e1)), KK.vdot(d, ea)]; }).sort((p, q) => p[0] - q[0]);
+    P = P.filter((p, i) => i === 0 || p[0] - P[i - 1][0] > 1e-3);
+    const n = P.length, TAU = 2 * Math.PI;
+    const at = i => { const k = ((i % n) + n) % n, wrap = Math.floor(i / n); return [P[k][0] + wrap * TAU, P[k][1]]; };
+    const H = th => { /* height of the seam at angle th (periodic) */
+      if (n === 1) return P[0][1];
+      let i = 0; while (i < n - 1 && !(th >= at(i)[0] && th < at(i + 1)[0])) i++;
+      if (!(th >= at(i)[0] && th < at(i + 1)[0])) { i = th < at(0)[0] ? -1 : n - 1; }
+      const p0 = at(i - 1), p1 = at(i), p2 = at(i + 1), p3 = at(i + 2), t = (th - p1[0]) / (p2[0] - p1[0] || 1);
+      if (!f.smooth) return p1[1] + (p2[1] - p1[1]) * t;
+      const dt = p2[0] - p1[0], m1 = (p2[1] - p0[1]) / (p2[0] - p0[0] || 1) * dt, m2 = (p3[1] - p1[1]) / (p3[0] - p1[0] || 1) * dt;
+      const t2 = t * t, t3 = t2 * t;
+      return (2 * t3 - 3 * t2 + 1) * p1[1] + (t3 - 2 * t2 + t) * m1 + (-2 * t3 + 3 * t2) * p2[1] + (t3 - t2) * m2;
+    };
+    const ths = []; const N = 180; for (let k = 0; k < N; k++) ths.push(-Math.PI + TAU * k / N);
+    for (const p of P) ths.push(p[0]);
+    ths.sort((p, q) => p - q);
+    const T = ths.filter((t, i) => i === 0 || t - ths[i - 1] > 1e-4), hs = T.map(H);
+    let rim = 0; for (const x of [bb.min, bb.max]) for (const y of [bb.min, bb.max]) for (const z of [bb.min, bb.max]) { const q = KK.vsub([x[0], y[1], z[2]], c), h = KK.vdot(q, ea); rim = Math.max(rim, Math.sqrt(Math.max(0, KK.vdot(q, q) - h * h))); }
+    rim += 5; const r0 = Math.min(0.5, rim * 0.02), hmean = hs.reduce((s, h) => s + h, 0) / hs.length, hlo = Math.min(...hs) - BIG;
+    const at3 = (r, th, h) => [0, 1, 2].map(k => c[k] + r * (Math.cos(th) * e1[k] + Math.sin(th) * e2[k]) + h * ea[k]);
+    const solid = s => { /* everything below the seam, moved by s along the axis */
+      const out = [], add = (v, want) => { const p = KK.mkPoly(v); if (!p) return; if (KK.vdot(p.n, want) < 0) { p.v.reverse(); p.n = p.n.map(x => -x); p.w = -p.w; } out.push(p); };
+      const M = T.length, O = at3(0, 0, hmean + s);
+      for (let k = 0; k < M; k++) {
+        const j = (k + 1) % M, ta = T[k], tb = T[j], ha = hs[k] + s, hb = hs[j] + s, mid = ta + (((tb - ta) % TAU) + TAU) % TAU / 2;
+        const Ia = at3(r0, ta, ha), Ib = at3(r0, tb, hb), Aa = at3(rim, ta, ha), Ab = at3(rim, tb, hb), Ba = at3(rim, ta, hlo), Bb = at3(rim, tb, hlo);
+        add([O, Ia, Ib], ea); add([Ia, Aa, Ab], ea); add([Ia, Ab, Ib], ea);
+        add([Ba, Bb, Ab, Aa], [0, 1, 2].map(i => Math.cos(mid) * e1[i] + Math.sin(mid) * e2[i]));
+      }
+      add(T.map(t => at3(rim, t, hlo)), ea.map(x => -x));
+      return out;
+    };
+    toolA = solid(-gap / 2); toolB = solid(gap / 2); apart = ea.map(x => x * 6);
+  } else {
+    if (pts.length < 2) throw new Error('Klepněte alespoň na dva body křivky');
+    const d = KK.vnorm((f.d || [0, 0, -1]).map(Number)), B0 = basisFromPlane(d, 0);
+    let Q = pts.map(p => [KK.vdot(p, B0.u), KK.vdot(p, B0.v)]).filter((q, i, A) => i === 0 || Math.hypot(q[0] - A[i - 1][0], q[1] - A[i - 1][1]) > 1e-3);
+    if (Q.length < 2) throw new Error('Body křivky splývají');
+    if (f.smooth && Q.length > 2) Q = KK.splinePoints(Q, false, 12);
+    const nrm = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1; return [-dy / l, dx / l]; };
+    const off = s => Q.map((q, i) => { /* the polyline moved sideways by s (mitred corners) */
+      const n1 = i > 0 ? nrm(Q[i - 1], q) : null, n2 = i < Q.length - 1 ? nrm(q, Q[i + 1]) : null;
+      let m = n1 && n2 ? [n1[0] + n2[0], n1[1] + n2[1]] : (n1 || n2); const l = Math.hypot(m[0], m[1]) || 1; m = [m[0] / l, m[1] / l];
+      const k = s / Math.max(0.35, m[0] * (n1 || n2)[0] + m[1] * (n1 || n2)[1]);
+      return [q[0] + m[0] * k, q[1] + m[1] * k];
+    });
+    const tool = s => { /* the side on the left of the curve, through the whole body along the view */
+      const R = off(s), a = R[0], b = R[R.length - 1], t0 = KK.vnorm([a[0] - R[1][0], a[1] - R[1][1], 0]), t1 = KK.vnorm([b[0] - R[R.length - 2][0], b[1] - R[R.length - 2][1], 0]);
+      const D = KK.vnorm([b[0] - a[0], b[1] - a[1], 0]), L = [-D[1], D[0]];
+      const E0 = [a[0] + t0[0] * BIG, a[1] + t0[1] * BIG], E1 = [b[0] + t1[0] * BIG, b[1] + t1[1] * BIG];
+      let ring = [E0, ...R, E1, [E1[0] + L[0] * 3 * BIG, E1[1] + L[1] * 3 * BIG], [E0[0] + L[0] * 3 * BIG, E0[1] + L[1] * 3 * BIG]];
+      if (KK.area2D(ring) < 0) ring = ring.reverse();
+      const w = KK.vdot(c, d);
+      return KK.extrudeProfiles([{ pts: ring, closed: true }], { o: [0, 0, 0], u: B0.u, v: B0.v, n: d }, w - BIG, w + BIG);
+    };
+    toolA = tool(gap / 2); toolB = tool(-gap / 2);
+    const D = KK.vnorm([Q[Q.length - 1][0] - Q[0][0], Q[Q.length - 1][1] - Q[0][1], 0]);
+    apart = [0, 1, 2].map(k => (-D[1] * B0.u[k] + D[0] * B0.v[k]) * 6);
+  }
+  const a = KK.boolean(polys, toolA, 'intersect'), b = KK.boolean(polys, toolB, 'subtract');
+  if (!a.length || !b.length || Math.abs(KK.signedVolume(a)) < 1e-6 || Math.abs(KK.signedVolume(b)) < 1e-6) throw new Error('Křivka těleso nerozdělí; veďte ji přes celé těleso');
+  return { a, b, apart };
+}
 /* ---------- Kloubový model: a body cut into segments joined by print-in-place hinges ----------
    The segments swing about vertical axes (they lie on the bed and move in the bed's plane, like an articulated snake or
    dragon). At each joint the right segment ends in a round knuckle, the left one has a matching hollow; a tongue of the
@@ -2191,6 +2272,13 @@ function step(state, f) {
         { id: f.id + '_m', name: 'Spona – samec', polys: KK.translate(B.male, [p0[0], p0[1] + B.Wf / 2 + 3, p0[2]]), from: f.id }]);
       break;
     }
+    case 'curvecut': {
+      const b = bodies.find(x => x.id === f.body);
+      if (!b) throw new Error('Těleso neexistuje');
+      const r = curveCut(b.polys, f);
+      out = bodies.map(x => (x === b ? { ...x, polys: r.a, seams: undefined } : x)).concat([{ id: f.id, name: (b.name || 'Těleso') + ' – druhý díl', polys: r.b, from: f.id }]);
+      break;
+    }
     case 'pegsplit': {
       const b = bodies.find(x => x.id === f.body);
       if (!b) throw new Error('Těleso neexistuje');
@@ -2237,7 +2325,7 @@ function makeRebuilder() {
   };
 }
 
-return { tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

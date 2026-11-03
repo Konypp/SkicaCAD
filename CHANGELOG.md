@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 1.83
+- **Rozříznout křivkou** (TĚLESO › Tvar): těleso se rozřízne podél křivky naklikané po bodech, na dva díly.
+  - **Ve směru pohledu:** body se klepají do pohledu přes těleso (třeba klikatě); řez vede křivkou rovně ve směru pohledu, jako vykrajovátko.
+  - **Po obvodu ke středu:** body se klepají na povrch tělesa dokola kolem osy X/Y/Z; řez vede od křivky ke středu, takže válec se rozdělí na horní a spodní díl s tvarovanou spárou (zubatou nebo vlnitou).
+  - Volby Hladká křivka (oblouky místo zlomů) a Mezera mezi díly (výchozí 0,3 mm, aby díly do sebe zapadly). Zpět o bod / Smazat body.
 ## Beta 1.82
 - **Očka podle tištěného řetízku:** očko jednoho článku je skloněné o 40° dozadu, očko dalšího stojí podél řetězu a jeho spodek je zploštělý na podložce (jako u zaslaného modelu, změřeno z něj). Výřezy jako na modelu: vpředu svislý výřez do V, kam zapadá stojaté očko, vzadu vodorovná drážka do V pro skloněné očko; přední čelo článku je svislé. Ohyb do stran ±30°, nahoru a dolů ±40°, v tahu drží. U nízkých plochých řemínků zůstává první očko ležaté.
 ## Beta 1.81

@@ -58,6 +58,7 @@ const ICONS = {
   fillet: '<path class="b" d="M4 20V9h6a5 5 0 0 0 5 5h5v6z"/><path d="M4 20V9h6a5 5 0 0 0 5 5h5v6z"/><path class="o" d="M10 9a5 5 0 0 0 5 5" style="fill:none;stroke:var(--orange);stroke-width:2.4"/><path d="M10 9V4h10v10" stroke-dasharray="2 2" opacity=".6"/>',
   chamfer: '<path class="b" d="M4 20V9h6l5 5h5v6z"/><path d="M4 20V9h6l5 5h5v6z"/><path d="M10 9l5 5" style="stroke:var(--orange);stroke-width:2.4"/><path d="M10 9V4h10v10" stroke-dasharray="2 2" opacity=".6"/>',
   splitbody: '<path class="b" d="M4 8 12 4l8 4v8l-8 4-8-4z" opacity=".55"/><path d="M4 8 12 4l8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"/><path d="M2 13.5 12 9l10 4.5" stroke-dasharray="2.2 1.6"/>',
+  curvecut: '<path class="b" d="M4 8 12 4l8 4v8l-8 4-8-4z" opacity=".55"/><path d="M4 8 12 4l8 4v8l-8 4-8-4z"/><path d="M2 14l3-3 3 3 4-5 3 3 3-3 4 2" stroke-dasharray="2.2 1.6"/><circle cx="5" cy="11" r="1.1"/><circle cx="12" cy="9" r="1.1"/><circle cx="18" cy="11" r="1.1"/>',
   bendface: '<path class="b" d="M3 5h9a8 8 0 0 1 8 8v8h-5v-8a3 3 0 0 0-3-3H3z" opacity=".55"/><path d="M3 5h9a8 8 0 0 1 8 8v8h-5v-8a3 3 0 0 0-3-3H3z"/>',
   combine: '<rect class="b" x="3" y="7" width="11" height="11" rx="1"/><circle class="b2" cx="15" cy="10" r="6" opacity=".85"/><rect x="3" y="7" width="11" height="11" rx="1"/><circle cx="15" cy="10" r="6"/>',
   move: '<path d="M12 3v18M3 12h18M12 3 9.5 5.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5"/><rect class="b" x="9" y="9" width="6" height="6" rx="1"/>',
@@ -1118,7 +1119,7 @@ function featureTitle(i) {
   let n = 0; for (let j = 0; j <= i; j++) if (doc.features[j].type === f.type) n++;
   return Engine.FEATURE_LABEL[f.type] + ' ' + n;
 }
-const TL_ICON = { buckle: 'buckle', articulate: 'articulate', blob: 'blob', skin: 'skin', sweep: 'sweep', loft: 'loft', deform: 'deform', lattice: 'lattice', softmove: 'softmove', subdiv: 'subdiv', sculpt: 'sculpt', remesh: 'remesh', hollow: 'hollow', flatbase: 'flatbase', pegsplit: 'pegsplit', text3d: 'sktext', movefaces: 'pressface', shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
+const TL_ICON = { buckle: 'buckle', articulate: 'articulate', blob: 'blob', skin: 'skin', sweep: 'sweep', loft: 'loft', deform: 'deform', lattice: 'lattice', softmove: 'softmove', subdiv: 'subdiv', sculpt: 'sculpt', remesh: 'remesh', hollow: 'hollow', flatbase: 'flatbase', pegsplit: 'pegsplit', text3d: 'sktext', movefaces: 'pressface', shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', curvecut: 'curvecut', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
 function renderTimeline() {
   const tr = $('#tltrack'); tr.innerHTML = '';
   const m = viewMarker === null ? doc.marker : viewMarker;
@@ -1196,7 +1197,7 @@ const RIBBON = {
       { menu: 'prim', label: 'Základní tělesa', items: [['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus'], ['text3d', 'Text']] },
       { menu: 'parts', label: 'Součásti', items: [['bolt', 'Šroub'], ['nut', 'Matice'], ['hinge', 'Pant'], ['latch', 'Západka'], ['buckle', 'Spona']] }]],
     ['Upravit', [{ menu: 'edge', label: 'Hrany', items: [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení']] }, ['hole', 'Díra', 'H'], ['shell', 'Skořepina'], ['move', 'Přesunout', 'M'], ['scale', 'Měřítko'], ['rotate', 'Otočit', 'R'], ['facemode', 'Plochy', 'G'],
-      { menu: 'shape', label: 'Tvar', items: [['combine', 'Kombinovat'], ['splitbody', 'Rozříznout']] },
+      { menu: 'shape', label: 'Tvar', items: [['combine', 'Kombinovat'], ['splitbody', 'Rozříznout'], ['curvecut', 'Rozříznout křivkou']] },
       { menu: 'xform', label: 'Uspořádat', items: [['center', 'Zarovnat'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole']] },
       ['del', 'Odstranit', 'Del']]],
     ['Nástroje', [['selall', 'Vybrat vše', 'Ctrl+A'], ['measure', 'Měřit', 'I'], ['simulate', 'Simulace'], ['import', 'Importovat']]]
@@ -1289,7 +1290,7 @@ function runCommand(id) {
     case 'pressface': startPressFace(); break;
     case 'buckle': startBuckle(); break;
     case 'blob': case 'skin': case 'sweep': case 'loft': case 'deform': case 'lattice': case 'softmove': case 'subdiv': case 'sculpt': case 'remesh':
-    case 'hollow': case 'flatbase': case 'pegsplit': case 'articulate': case 'printcheck': startOrganic(id); break;
+    case 'hollow': case 'flatbase': case 'pegsplit': case 'articulate': case 'printcheck': case 'curvecut': startOrganic(id); break;
     case 'revolve': startRevolve(); break;
     case 'mirror': startMirror(); break;
     case 'pattern': startPattern(); break;
@@ -1503,7 +1504,7 @@ function editFeature(i) {
     case 'boxpose': startSimulate(i, ef); break;
     case 'fillet': case 'chamfer': startEdgeMod(f.type, i, ef); break;
     case 'blob': case 'skin': case 'sweep': case 'loft': case 'deform': case 'lattice': case 'softmove': case 'subdiv': case 'sculpt': case 'remesh':
-    case 'hollow': case 'flatbase': case 'pegsplit': case 'articulate': startOrganic(f.type, i, ef); break;
+    case 'hollow': case 'flatbase': case 'pegsplit': case 'articulate': case 'curvecut': startOrganic(f.type, i, ef); break;
     case 'buckle': startBuckle(i, ef); break;
     case 'combine': startCombine(i, ef); break;
     case 'move': startMove(i, ef); break;
@@ -7339,6 +7340,47 @@ const ORG_MODS = {
       return { polys: segs[0], extra: segs.slice(1), alt: true, note: `${segs.length} článků · kloubů ${segs.length - 1}` };
     },
     prompt: c => (c.v.snap && c.v.style === 'flex' && c.v.ends !== 'fold' ? 'Těleso se rozdělí na články, které se tisknou zvlášť a po tisku se zacvaknou do sebe' : 'Těleso se rozdělí na články spojené klouby, které se tisknou vcelku (vůle 0,3–0,5 mm podle tiskárny)')
+  },
+  curvecut: {
+    defaults: () => ({ mode: 'view', axis: 'z', pts: [], d: null, smooth: false, gap: 0.3 }),
+    load: f => ({ mode: f.mode || 'view', axis: f.axis || 'z', pts: (f.pts || []).map(p => p.slice()), d: f.d || null, smooth: !!f.smooth, gap: f.gap === undefined ? 0.3 : f.gap }),
+    fields: v => [{ k: 'seg', id: 'mode', label: 'Řez', options: [['view', 'Ve směru pohledu'], ['around', 'Po obvodu ke středu']], value: v.mode },
+      { k: 'seg', id: 'axis', label: 'Osa', options: AXSEG, value: v.axis },
+      { k: 'sel', id: 'cp', label: 'Body křivky' }, { k: 'btns', id: 'cb', label: '', options: [['undo', 'Zpět o bod'], ['clear', 'Smazat body']] },
+      { k: 'chk', id: 'smooth', label: 'Hladká křivka', value: v.smooth }, { k: 'num', id: 'gap', label: 'Mezera mezi díly', value: v.gap }, { k: 'note', id: 'tip' }],
+    feature: v => ({ mode: v.mode, pts: v.pts, ...(v.mode === 'view' ? { d: v.d } : { axis: v.axis }), smooth: !!v.smooth, gap: v.gap }),
+    ready: v => v.pts.length >= (v.mode === 'view' ? 2 : 1),
+    change(c, id) { if (id === 'mode') { c.v.pts = []; c.v.d = null; } },
+    btn(c, id, v) { if (id !== 'cb') return; if (v === 'undo') c.v.pts.pop(); else c.v.pts = []; if (!c.v.pts.length) c.v.d = null; },
+    pointsFirst: true,
+    click(c, ev, h) {
+      if (c.v.mode === 'view') {
+        if (h) return false;
+        const p = cutLinePoint(c, ev); if (!p) return false;
+        if (!c.v.pts.length) c.v.d = viewDir(); /* the cut runs along the view the curve was drawn in */
+        c.v.pts.push(p); return true;
+      }
+      if (!h) return false;
+      c.v.pts.push([h.point.x, h.point.y, h.point.z].map(r3)); return true;
+    },
+    layout(c) {
+      const k = c.v.pts.length, view = c.v.mode === 'view';
+      dlg.show('axis', !view); dlg.show('cb', k > 0);
+      dlg.set('cp', { text: k ? `${k} ${k === 1 ? 'bod' : k < 5 ? 'body' : 'bodů'} – klepnutím přidáte další` : view ? 'Klepejte do pohledu přes těleso' : 'Klepejte na těleso dokola', has: k > 0, active: !!c.body });
+      dlg.set('tip', view ? 'Ve směru pohledu: body klepejte do pohledu jeden za druhým přes celé těleso (třeba klikatě); řez vede křivkou rovně ve směru, kterým se právě díváte, jako vykrajovátko. Pohled během klepání neotáčejte.'
+        : 'Po obvodu ke středu: body klepejte přímo na povrch tělesa dokola kolem zvolené osy (stačí tam, kde se má výška řezu měnit); řez vede od křivky rovně ke středu a těleso rozdělí na horní a spodní díl.');
+      clearGroup(c.dots); if (!k) return;
+      c.v.pts.forEach(p => c.dots.add(orgDot(p, false)));
+      let order = c.v.pts;
+      if (!view) { /* in order round the axis, closed */
+        const b = bodyById(c.body); if (b) { const bb = K.bbox(b.polys), m = [0, 1, 2].map(i => (bb.min[i] + bb.max[i]) / 2), a = { x: 0, y: 1, z: 2 }[c.v.axis], i1 = (a + 1) % 3, i2 = (a + 2) % 3;
+          order = c.v.pts.slice().sort((p, q) => Math.atan2(p[i2] - m[i2], p[i1] - m[i1]) - Math.atan2(q[i2] - m[i2], q[i1] - m[i1])); if (order.length > 2) order = order.concat([order[0]]); }
+      }
+      const seg = []; for (let i = 0; i + 1 < order.length; i++) seg.push(...order[i], ...order[i + 1]);
+      if (seg.length) { const l = noRay(new THREE.LineSegments(lineGeo(seg), new THREE.LineBasicMaterial({ color: tok.org, depthTest: false, transparent: true }))); l.renderOrder = 12; c.dots.add(l); }
+    },
+    preview(polys, f) { const r = Engine.curveCut(polys, f); return { polys: r.a, extra: [K.translate(r.b, r.apart)], note: 'Náhled je rozložený; po potvrzení díly zůstanou na místě.' }; },
+    prompt: c => (c.v.mode === 'view' ? 'Klepejte do pohledu body křivky přes těleso; řez povede ve směru pohledu' : 'Klepejte body na povrch tělesa dokola; řez povede od nich ke středu')
   },
   pegsplit: {
     defaults: () => ({ kind: 'peg', mode: 'axis', axis: 'z', at: null, cut: null, n: 1, d: 5, len: 10, tol: 0.2, style: 'attached', angle: 30, dir: 'long' }),
