@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 1.84
+- **Očka už nepřesahují model:** velikost a výška oček se volí podle skutečného průřezu tělesa – vyzkouší se několik rozložení od největšího a vezme se první, při kterém obě očka (i se stěnou 0,3 mm) leží celá uvnitř tělesa. U kulatých těles (ležící válec, had) se očka zmenší nebo posunou do výšky, kde je těleso nejširší.
 ## Beta 1.83
 - **Rozříznout křivkou** (TĚLESO › Tvar): těleso se rozřízne podél křivky naklikané po bodech, na dva díly.
   - **Ve směru pohledu:** body se klepají do pohledu přes těleso (třeba klikatě); řez vede křivkou rovně ve směru pohledu, jako vykrajovátko.

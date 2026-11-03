@@ -1817,15 +1817,46 @@ function articulateCore(polys, f) {
          themselves, so only the bodies' faces limit the swing. The cut-outs are as on the toys, all faces at 45° or
          steeper: a V notch in the front of the left segment along A's axis, where B passes, and a V groove across the
          back of the right segment, where A passes. */
-      const zmin = sec.min[2];
-      let r = Math.min((hw - g - 0.6) / 3, (zs - 2 * g - 0.6) / 5.5, 2.2), lean = r >= 0.75;
-      if (!lean) r = Math.min((hw - 2 * g - 1.1) / 3, (zs / 2 - g - 0.3) / 3, 2.2);
-      if (!(r >= 0.7)) throw new Error('Těleso je v místě kloubu na očka příliš malé; použijte méně kloubů nebo jiný typ');
-      const R = 2 * r + g + 0.3, cl = r + g + 0.4, be = lean ? 40 * Math.PI / 180 : 0, ez = [0, 0, 1];
-      const u = [0, 1, 2].map(k => ea[k] * Math.cos(be) + ez[k] * Math.sin(be)); /* from PA to PB */
-      const e1 = [0, 1, 2].map(k => ez[k] * Math.cos(be) - ea[k] * Math.sin(be)), e2 = es;
-      const PB = [0, 0, zmin + R + (lean ? 0.5 : 1) * r]; PB[a] = xp + R * Math.cos(be) / 2; PB[sAx] = sc;
-      const PA = PB.map((v, k) => v - R * u[k]);
+      const zmin = sec.min[2], ez = [0, 0, 1];
+      /* the rings must stay inside the body (a round body is narrower near its top and bottom): candidate layouts are
+         tried, largest first, and the first whose rings (with a 0.3 mm wall) lie wholly inside the body is taken */
+      const inside = (() => {
+        const dir = KK.vnorm([0.5773, 0.6131, 0.5401]), list = rest.map(p => ({ p, dn: KK.vdot(p.n, dir) }));
+        return q => { let k = 0; for (const { p, dn } of list) { if (Math.abs(dn) < 1e-12) continue; const t = (p.w - KK.vdot(p.n, q)) / dn; if (t <= 1e-9) continue; if (KK.pointInConvex([q[0] + t * dir[0], q[1] + t * dir[1], q[2] + t * dir[2]], p, 1e-9)) k++; } return k % 2 === 1; };
+      })();
+      const ringFits = (P, ax, R, r) => {
+        const b1 = Math.abs(ax[2]) > 0.9 ? KK.vnorm(KK.cross(ax, [1, 0, 0])) : KK.vnorm(KK.cross(ax, [0, 0, 1])), b2 = KK.cross(ax, b1), m = r + 0.3;
+        for (let i = 0; i < 36; i++) for (let j = 0; j < 8; j++) {
+          const f1 = i / 36 * 2 * Math.PI, f2 = j / 8 * 2 * Math.PI, rr = R + m * Math.cos(f2);
+          const q = [0, 1, 2].map(k => P[k] + rr * (Math.cos(f1) * b1[k] + Math.sin(f1) * b2[k]) + m * Math.sin(f2) * ax[k]);
+          if (q[2] < zmin + 0.05) continue; /* the bed flattens it there */
+          if (!inside(q)) return false;
+        }
+        return true;
+      };
+      const layout = (lean, r, mid) => {
+        const R = 2 * r + g + 0.3, be = lean ? 40 * Math.PI / 180 : 0;
+        const u = [0, 1, 2].map(k => ea[k] * Math.cos(be) + ez[k] * Math.sin(be)), e1 = [0, 1, 2].map(k => ez[k] * Math.cos(be) - ea[k] * Math.sin(be));
+        let zb = zmin + R + (lean ? 0.5 : 1) * r;
+        if (mid) { /* the pair centred on the section's height (for round bodies) */
+          const top = R + r, lo = Math.min(-(R + r), -2 * R * Math.sin(be) - r); /* B round PB; A lies lower by R sin 40° */
+          zb = zc - (top + lo) / 2;
+        }
+        const PB = [0, 0, zb]; PB[a] = xp + R * Math.cos(be) / 2; PB[sAx] = sc;
+        const PA = PB.map((v, k) => v - R * u[k]);
+        return { R, r, be, u, e1, PA, PB };
+      };
+      let L = null;
+      const r0 = Math.min((hw - g - 0.6) / 3, (zs - 2 * g - 0.6) / 5.5, 2.2), r1 = Math.min((hw - 2 * g - 1.1) / 3, (zs / 2 - g - 0.3) / 3, 2.2);
+      for (const [lean, rmax] of [[true, r0], [false, r1]]) {
+        for (let rt = rmax; !L && rt >= 0.7; rt *= 0.88) for (const mid of [false, true]) {
+          const T = layout(lean, rt, mid);
+          if (ringFits(T.PA, T.e1, T.R, rt) && ringFits(T.PB, es, T.R, rt)) { L = T; break; }
+        }
+        if (L) break;
+      }
+      if (!L) throw new Error('Těleso je v místě kloubu na očka příliš malé; použijte méně kloubů nebo jiný typ');
+      const { R, r, be, u, e1, PA, PB } = L, e2 = es, cl = r + g + 0.4;
       const toAxis = (P, ax) => { /* a torus about axis ax */
         const t = KK.primitive('torus', { R, t: r }), c = KK.cross([0, 0, 1], ax), sn = Math.hypot(...c), cs = ax[2];
         return KK.translate(sn < 1e-9 ? t : rotAbout(t, [0, 0, 0], c.map(v => v / sn), Math.atan2(sn, cs)), P);
