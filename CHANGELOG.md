@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta 1.64
+- **Nová záložka ORGANICKÉ** (fialová, vedle TĚLESO) s nástroji pro postavičky a měkké tvary, jak se modelují v Blenderu a podobných programech:
+  - **Tvořit:** *Měkké spojení* – koule, elipsoidy, kapsle, kvádry a prstence, které se v místě dotyku plynule slijí; tvary mohou i odebírat (oči, ústa), volba souměrnosti podle X a šablona postavičky. *Kostra* – „panáček z čárek“ s tloušťkou v každém bodě (ruce, nohy, ocasy), se šablonou. *Tažení po křivce* – kruh nebo profil ze skici podél otevřené čáry/křivky, se zkroucením a zúžením. *Přechod profilů* – plynulý tvar přes 2–5 profilů ze skic.
+  - **Deformovat:** *Deformace* (zkroutit, zúžit, ohnout, i jen v části délky), *Mřížka* (body klece taženy manipulátorem), *Měkký posun* (místo táhne okolí v dosahu), *Vyhladit dělením* (Catmull–Clark, z hranatého oblé).
+  - **Sochat:** *Sochat* štětci Nanést, Nafouknout, Vyhladit, Uchopit, Zploštit, Stáhnout (souměrně, obráceně, každý tah jde vrátit), *Přesíťovat* na rovnoměrnou síť s vyhlazením.
+  - **Pro tisk:** *Plochá podstava*, *Díly s kolíky* (řez rovinou, 1–3 kolíky na dílu nebo samostatné, s vůlí), *Vydutit* (stěna dané tloušťky, otvor pro vytečení), *Kontrola tisku* (barevně převisy a tenké stěny, nic nemění).
+- Všechny nové kroky jsou v časové ose a dají se upravit jako ostatní.
 ## Beta 1.63
 - **Přihlášení v úvodní nabídce:** po spuštění (a v Moje návrhy) je nahoře tlačítko Přihlásit se Googlem; po přihlášení je tam účet se stavem synchronizace a tlačítko Odhlásit. Položky v menu Soubor zůstávají.
 ## Beta 1.63

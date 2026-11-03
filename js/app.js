@@ -14,6 +14,20 @@ const v3 = a => new V3(a[0], a[1], a[2]);
 
 /* ================= icons ================= */
 const ICONS = {
+  blob: '<circle class="p" cx="9" cy="14" r="5.5"/><circle class="p" cx="15.5" cy="8.5" r="4.5"/><path d="M4.4 17.2A5.5 5.5 0 0 1 8.2 8.6c.8-.1 1.6-.4 2.2-1A4.5 4.5 0 1 1 17 13c-.6.5-.9 1.3-1 2.1a5.5 5.5 0 0 1-11.6 2.1z"/>',
+  skin: '<path class="p" d="M12 3.5a2.6 2.6 0 1 1 0 5.2 2.6 2.6 0 0 1 0-5.2zM9.5 10h5l1 5h-2l-.5 5.5h-2L10.5 15h-2z" opacity=".8"/><path d="M12 8.7V15M12 11l-5 2.5M12 11l5 2.5M12 15l-3 5.5M12 15l3 5.5"/><circle cx="12" cy="6.1" r="2.6"/>',
+  sweep: '<path class="p" d="M4 18c0-6 4-11 10-12" style="fill:none;stroke:var(--org);stroke-width:5;opacity:.45"/><path d="M4 18c0-6 4-11 10-12"/><ellipse cx="4" cy="18.5" rx="2.6" ry="1.4"/><ellipse cx="15.5" cy="6" rx="1.4" ry="2.6"/>',
+  loft: '<path class="p" d="M5 19h14l-3-12H8z" opacity=".6"/><rect x="4" y="18" width="16" height="2.5" rx="1"/><ellipse cx="12" cy="6" rx="4" ry="1.6"/><path d="M4 19 8 6M20 19 16 6"/>',
+  deform: '<path class="p" d="M8 3h8c0 4-4 5-4 9s4 5 4 9H8c0-4 4-5 4-9S8 7 8 3z" opacity=".55"/><path d="M8 3h8c0 4-4 5-4 9s4 5 4 9H8c0-4 4-5 4-9S8 7 8 3z"/>',
+  lattice: '<path class="p" d="M6 7c3-2 9-2 12 0v10c-3 2-9 2-12 0z" opacity=".5"/><path d="M4 4h16v16H4zM12 4v16M4 12h16" stroke-dasharray="2 1.6"/><circle cx="4" cy="4" r="1.4"/><circle cx="20" cy="4" r="1.4"/><circle cx="4" cy="20" r="1.4"/><circle cx="20" cy="20" r="1.4"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/>',
+  softmove: '<path class="p" d="M3 19c4 0 5-9 9-9s5 9 9 9z" opacity=".55"/><path d="M3 19c4 0 5-9 9-9s5 9 9 9"/><path d="M12 9V3M9.5 5.5 12 3l2.5 2.5"/>',
+  subdiv: '<rect x="3.5" y="3.5" width="17" height="17" rx="1" stroke-dasharray="2 1.6"/><path class="p" d="M12 4c5 0 8 3 8 8s-3 8-8 8-8-3-8-8 3-8 8-8z" opacity=".55"/><path d="M12 4c5 0 8 3 8 8s-3 8-8 8-8-3-8-8 3-8 8-8z"/>',
+  sculpt: '<path class="p" d="M4 20c0-5 3-9 8-9s8 4 8 9z" opacity=".55"/><path d="M4 20c0-5 3-9 8-9s8 4 8 9z"/><path d="m14 3 5 5-6 6-3 1 1-3z"/>',
+  remesh: '<path class="p" d="M4 12 12 4l8 8-8 8z" opacity=".5"/><path d="M4 12 12 4l8 8-8 8zM8 8l8 8M16 8l-8 8M4 12h16M12 4v16"/>',
+  hollow: '<path class="p" d="M12 3c5 0 8 4 8 9s-3 9-8 9-8-4-8-9 3-9 8-9zM12 6.5c-3 0-5 2.5-5 5.5s2 5.5 5 5.5 5-2.5 5-5.5-2-5.5-5-5.5z" fill-rule="evenodd" opacity=".6"/><path d="M12 3c5 0 8 4 8 9s-3 9-8 9-8-4-8-9 3-9 8-9z"/><path d="M12 6.5c-3 0-5 2.5-5 5.5s2 5.5 5 5.5 5-2.5 5-5.5-2-5.5-5-5.5z" stroke-dasharray="2 1.6"/>',
+  flatbase: '<path class="p" d="M7 17c-2-2-3-5-2-8 1-4 5-6 8-5s6 4 6 8-1 4-3 5z" opacity=".55"/><path d="M7 17c-2-2-3-5-2-8 1-4 5-6 8-5s6 4 6 8-1 4-3 5"/><path d="M3 17.5h18M4 21h16" style="stroke-width:2"/>',
+  pegsplit: '<path class="p" d="M5 3h14v7H5zM5 14h14v7H5z" opacity=".55"/><path d="M5 3h14v7H5zM5 14h14v7H5z"/><path d="M10.5 10v4M13.5 10v4" style="stroke:var(--orange);stroke-width:2"/>',
+  printcheck: '<path class="p" d="M4 20 9 9h6l5 11z" opacity=".45"/><path d="M4 20 9 9h6l5 11zM9 9V4h6v5"/><path d="M15 9l5 11" style="stroke:var(--danger);stroke-width:2.2"/>',
   menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
   undo: '<path d="M9 6 4 11l5 5M4 11h10a5 5 0 0 1 0 10h-3"/>',
   redo: '<path d="M15 6l5 5-5 5M20 11H10a5 5 0 0 0 0 10h3"/>',
@@ -151,7 +165,7 @@ G.planes.visible = false;
 const tok = {};
 function readTokens() {
   const cs = getComputedStyle(document.documentElement);
-  ['--accent', '--accent-hover', '--orange', '--danger', '--body', '--edge', '--sketch', '--grid', '--grid-major', '--cube', '--cube-ink', '--panel', '--line', '--muted', '--ok', '--ink']
+  ['--accent', '--accent-hover', '--orange', '--danger', '--org', '--body', '--edge', '--sketch', '--grid', '--grid-major', '--cube', '--cube-ink', '--panel', '--line', '--muted', '--ok', '--ink']
     .forEach(n => { try { tok[n.slice(2)] = new THREE.Color(cs.getPropertyValue(n).trim() || '#888'); } catch (e) { tok[n.slice(2)] = new THREE.Color('#888'); } });
 }
 readTokens();
@@ -1099,7 +1113,7 @@ function featureTitle(i) {
   let n = 0; for (let j = 0; j <= i; j++) if (doc.features[j].type === f.type) n++;
   return Engine.FEATURE_LABEL[f.type] + ' ' + n;
 }
-const TL_ICON = { text3d: 'sktext', movefaces: 'pressface', shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
+const TL_ICON = { blob: 'blob', skin: 'skin', sweep: 'sweep', loft: 'loft', deform: 'deform', lattice: 'lattice', softmove: 'softmove', subdiv: 'subdiv', sculpt: 'sculpt', remesh: 'remesh', hollow: 'hollow', flatbase: 'flatbase', pegsplit: 'pegsplit', text3d: 'sktext', movefaces: 'pressface', shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
 function renderTimeline() {
   const tr = $('#tltrack'); tr.innerHTML = '';
   const m = viewMarker === null ? doc.marker : viewMarker;
@@ -1182,6 +1196,12 @@ const RIBBON = {
       ['del', 'Odstranit', 'Del']]],
     ['Nástroje', [['selall', 'Vybrat vše', 'Ctrl+A'], ['measure', 'Měřit', 'I'], ['simulate', 'Simulace'], ['import', 'Importovat']]]
   ],
+  organic: [
+    ['Tvořit', [['blob', 'Měkké spojení'], ['skin', 'Kostra'], ['sweep', 'Tažení po křivce'], ['loft', 'Přechod profilů']]],
+    ['Deformovat', [['deform', 'Deformace'], ['lattice', 'Mřížka'], ['softmove', 'Měkký posun'], ['subdiv', 'Vyhladit dělením']]],
+    ['Sochat', [['sculpt', 'Sochat'], ['remesh', 'Přesíťovat']]],
+    ['Pro tisk', [['flatbase', 'Plochá podstava'], ['pegsplit', 'Díly s kolíky'], ['hollow', 'Vydutit'], ['printcheck', 'Kontrola tisku']]]
+  ],
   sketch: [
     ['Vytvořit', [['line', 'Čára', 'L'], ['spline', 'Křivka', 'K'], ['rect', 'Obdélník', 'R'], ['circle', 'Kružnice', 'C'],
       { menu: 'skshape', label: 'Další tvary', items: [['ellipse', 'Elipsa', 'E'], ['ngon', 'Mnohoúhelník', 'P'], ['slot', 'Drážka', 'D']] }]],
@@ -1192,13 +1212,16 @@ const RIBBON = {
 };
 const ribMem = {};
 const itemPressed = id => sk ? (SK_TOOLS.includes(id) ? sk.tool === id : id === 'skcons' ? !!sk.consMode : null) : id === 'facemode' ? faceMode : null;
+let ribTab = 'solid'; /* TĚLESO or ORGANICKÉ (the sketch tab replaces both while a sketch is open) */
 function renderRibbon() {
-  const mode = sk ? 'sketch' : 'solid', body = $('#rbody');
+  const mode = sk ? 'sketch' : ribTab, body = $('#rbody');
   closeRibMenu();
   $('#tab-sketch').hidden = !sk;
-  $('#tab-solid').setAttribute('aria-selected', String(!sk));
+  $('#tab-solid').setAttribute('aria-selected', String(!sk && ribTab === 'solid'));
+  $('#tab-org').setAttribute('aria-selected', String(!sk && ribTab === 'organic'));
   $('#tab-sketch').setAttribute('aria-selected', String(!!sk));
-  $('#tab-solid').disabled = !!sk;
+  $('#tab-solid').disabled = !!sk; $('#tab-org').disabled = !!sk;
+  $('.ribbon').classList.toggle('org', !sk && ribTab === 'organic');
   const btn = ([id, label, key]) => { const pr = itemPressed(id); return `<button class="tool${id === 'finish' ? ' finish' : ''}" data-cmd="${id}" title="${label}${key ? ' (' + key + ')' : ''}"${pr === null ? '' : ` aria-pressed="${pr}"`}><span class="ico">${svg(id, 24)}</span><span>${label}</span></button>`; };
   body.innerHTML = RIBBON[mode].map(([g, items]) => `<div class="rgroup"><div class="rtools">${items.map(it => {
     if (!it.menu) return btn(it);
@@ -1206,11 +1229,13 @@ function renderRibbon() {
     return `<button class="tool tmenu" data-menu="${it.menu}" aria-haspopup="true" aria-expanded="false" title="${it.label}"${on ? ' aria-pressed="true"' : ''}><span class="ico">${svg(shown[0], 24)}</span><span>${it.label}<i class="caret" aria-hidden="true"></i></span></button>`;
   }).join('')}</div><div class="rlabel">${g}</div></div>`).join('');
 }
+$('#tab-solid').addEventListener('click', () => { if (sk) return; ribTab = 'solid'; renderRibbon(); });
+$('#tab-org').addEventListener('click', () => { if (sk) return; ribTab = 'organic'; renderRibbon(); });
 function closeRibMenu() { const m = document.getElementById('ribmenu'); if (m) m.remove(); document.querySelectorAll('#rbody [data-menu][aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false')); }
 function openRibMenu(btn) {
   const was = btn.getAttribute('aria-expanded') === 'true';
   closeRibMenu(); if (was) return;
-  const def = RIBBON[sk ? 'sketch' : 'solid'].flatMap(g => g[1]).find(x => x.menu === btn.dataset.menu); if (!def) return;
+  const def = RIBBON[sk ? 'sketch' : ribTab].flatMap(g => g[1]).find(x => x.menu === btn.dataset.menu); if (!def) return;
   const m = document.createElement('div'); m.id = 'ribmenu'; m.className = 'ribmenu'; m.setAttribute('role', 'menu');
   m.innerHTML = def.items.map(([id, label, key]) => { const pr = itemPressed(id); return `<button role="menuitem" data-cmd="${id}"${pr ? ' aria-pressed="true"' : ''}><span class="ico">${svg(id, 22)}</span><span class="lbl">${label}</span>${key ? `<kbd>${key}</kbd>` : ''}</button>`; }).join('');
   m.addEventListener('click', e => { const b = e.target.closest('[data-cmd]'); if (!b) return; ribMem[def.menu] = b.dataset.cmd; closeRibMenu(); runCommand(b.dataset.cmd); renderRibbon(); });
@@ -1257,6 +1282,8 @@ function runCommand(id) {
     case 'selall': if (faceMode) setFaceMode(false); selectAll(); break;
     case 'facemode': setFaceMode(!faceMode); break;
     case 'pressface': startPressFace(); break;
+    case 'blob': case 'skin': case 'sweep': case 'loft': case 'deform': case 'lattice': case 'softmove': case 'subdiv': case 'sculpt': case 'remesh':
+    case 'hollow': case 'flatbase': case 'pegsplit': case 'printcheck': startOrganic(id); break;
     case 'revolve': startRevolve(); break;
     case 'mirror': startMirror(); break;
     case 'pattern': startPattern(); break;
@@ -1468,6 +1495,8 @@ function editFeature(i) {
     case 'latch': startLatch(i, ef); break;
     case 'boxpose': startSimulate(i, ef); break;
     case 'fillet': case 'chamfer': startEdgeMod(f.type, i, ef); break;
+    case 'blob': case 'skin': case 'sweep': case 'loft': case 'deform': case 'lattice': case 'softmove': case 'subdiv': case 'sculpt': case 'remesh':
+    case 'hollow': case 'flatbase': case 'pegsplit': startOrganic(f.type, i, ef); break;
     case 'combine': startCombine(i, ef); break;
     case 'move': startMove(i, ef); break;
     case 'rotate': startRotate(i, ef); break;
@@ -6743,6 +6772,756 @@ pushHist();
 loadStoredBlobs();
 refreshBusy(() => fitView(VIEW_ISO, true));
 showStart(true);
+/* ================= ORGANICKÉ: organic modelling commands (geometry in js/organic.js) ================= */
+const ORG_TYPES = ['blob', 'skin', 'sweep', 'loft', 'deform', 'lattice', 'softmove', 'subdiv', 'sculpt', 'remesh', 'hollow', 'flatbase', 'pegsplit'];
+const QSEG = [['low', 'Hrubá'], ['mid', 'Střední'], ['high', 'Jemná']];
+const r3 = x => Math.round(x * 1000) / 1000;
+/* a preview mesh for a modified body: tinted with the organic colour, semi-transparent when asked */
+function orgPreview(polys, opacity) {
+  const m = meshFromPolys(polys, bodyMaterial()); noRay(m);
+  m.material.color.copy(tok.body).lerp(tok.org, 0.3);
+  if (opacity < 1) { m.material.transparent = true; m.material.opacity = opacity; m.material.depthWrite = false; }
+  return m;
+}
+/* small round markers (control points, skeleton nodes, centres) drawn on top */
+function orgDot(p, on, color) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(1, 14, 10), new THREE.MeshBasicMaterial({ color: on ? tok.accent : (color || tok.org), depthTest: false, transparent: true, opacity: 0.95 }));
+  m.renderOrder = 13; m.position.copy(v3(p)); m.userData.dot = true; return m;
+}
+function orgDotsScale(group) { for (const o of group.children) if (o.userData.dot) o.scale.setScalar(worldPerPx(o.position) * (TOUCH ? 9 : 6.5) * (o.userData.big ? 1.3 : 1)); }
+/* the point of a view ray on the plane through p facing the camera */
+function rayOnViewPlane(ev, p) {
+  ray.setFromCamera(evNdc(ev), cam());
+  const n = new V3(); cam().getWorldDirection(n);
+  const pl = new THREE.Plane().setFromNormalAndCoplanarPoint(n, v3(p));
+  return ray.ray.intersectPlane(pl, new V3());
+}
+function dotAt(ev, list) { /* index of the marker under the pointer */
+  const px = evPx(ev); let best = -1, bd = TOUCH ? 22 : 14;
+  list.forEach((p, i) => { const s = toPx(v3(p)); const d = Math.hypot(s[0] - px[0] + 0, s[1] - px[1]); if (d < bd) { bd = d; best = i; } });
+  return best;
+}
+
+/* ---------- Měkké spojení (soft union of shapes) ---------- */
+const BLOB_KINDS = { sphere: 'Koule', ellipsoid: 'Elipsoid', capsule: 'Kapsle', box: 'Kvádr', torus: 'Prstenec' };
+const BLOB_NEW = {
+  sphere: () => ({ t: 'sphere', d: 16 }), ellipsoid: () => ({ t: 'ellipsoid', sx: 20, sy: 14, sz: 12, rot: [0, 0, 0] }),
+  capsule: () => ({ t: 'capsule', len: 16, d1: 8, d2: 8, rot: [0, 0, 0] }), box: () => ({ t: 'box', sx: 16, sy: 12, sz: 10, r: 3, rot: [0, 0, 0] }), torus: () => ({ t: 'torus', R: 8, tt: 4, rot: [0, 0, 0] })
+};
+/* a small figurine to start from: body, head, eyes, arms, legs (one side, mirrored) */
+const FIGURE = () => [
+  { t: 'ellipsoid', c: [0, 0, 20], sx: 22, sy: 16, sz: 26, rot: [0, 0, 0] },
+  { t: 'sphere', c: [0, 0, 40], d: 20 },
+  { t: 'sphere', c: [4, -8.5, 42], d: 4, neg: true },
+  { t: 'capsule', c: [12, 0, 24], len: 12, d1: 6, d2: 5, rot: [0, 55, 0] },
+  { t: 'capsule', c: [5.5, 0, 6], len: 10, d1: 8, d2: 7, rot: [0, 0, 0] },
+  { t: 'ellipsoid', c: [6, -2.5, 1.5], sx: 9, sy: 13, sz: 5, rot: [0, 0, 0] }
+];
+function startBlob(editIndex, f) {
+  const pivot = new THREE.Object3D(); pivot.rotation.order = 'ZYX'; scene.add(pivot);
+  const c = {
+    editIndex, el: f ? clone(f.el) : [{ t: 'sphere', c: [0, 0, 10], d: 20 }], cur: 0, k: f ? f.k : 4, q: f ? f.q || 'mid' : 'mid', sym: f ? !!f.sym : false, op: f ? f.op || 'new' : 'new',
+    gm: 'translate', tool: null, timer: null, gizmoDrag: false, dots: null,
+    init() {
+      openDialog({
+        title: 'Měkké spojení', icon: 'blob',
+        fields: [{ k: 'opt', id: 'cur', label: 'Tvar', options: [] },
+          { k: 'btns', id: 'add', label: 'Přidat', options: Object.entries(BLOB_KINDS) },
+          { k: 'btns', id: 'act', label: '', options: [['dup', 'Duplikovat'], ['del', 'Smazat'], ['tpl', 'Šablona']] },
+          { k: 'num', id: 'd', label: 'Průměr' }, { k: 'num', id: 'sx', label: 'Šířka (X)' }, { k: 'num', id: 'sy', label: 'Hloubka (Y)' }, { k: 'num', id: 'sz', label: 'Výška (Z)' },
+          { k: 'num', id: 'len', label: 'Délka' }, { k: 'num', id: 'd1', label: 'Průměr dole' }, { k: 'num', id: 'd2', label: 'Průměr nahoře' },
+          { k: 'num', id: 'r', label: 'Zaoblení hran' }, { k: 'num', id: 'R', label: 'Poloměr prstence' }, { k: 'num', id: 'tt', label: 'Tloušťka prstence' },
+          { k: 'xyz', id: 'c', label: 'Střed' }, { k: 'xyz', id: 'rot', label: 'Natočení (°)' },
+          { k: 'chk', id: 'neg', label: 'Odebírá hmotu (vyhloubení, oči, ústa)' },
+          { k: 'seg', id: 'gm', label: 'Manipulátor', options: [['translate', 'Posun'], ['rotate', 'Otočení']], value: 'translate' },
+          { k: 'num', id: 'k', label: 'Měkkost spojení', value: this.k, range: [0, 20, 0.5] },
+          { k: 'chk', id: 'sym', label: 'Souměrně podle osy X (levá strana = pravá)', value: this.sym },
+          { k: 'seg', id: 'q', label: 'Jemnost', options: QSEG, value: this.q },
+          { k: 'opt', id: 'op', label: 'Operace', options: OPS, value: this.op }, { k: 'note', id: 'n' }],
+        onChange: (id, live) => {
+          const e = this.el[this.cur];
+          if (id === 'cur') { this.cur = Number(dlg.get('cur')) || 0; this.layout(); return; }
+          if (id === 'gm') { this.gm = dlg.get('gm'); transform.setMode(this.gm); this.layout(); return; }
+          if (id === 'k') { const v = dlg.get('k'); if (v >= 0) this.k = v; }
+          else if (id === 'sym') this.sym = dlg.get('sym');
+          else if (id === 'q') this.q = dlg.get('q');
+          else if (id === 'op') this.op = dlg.get('op');
+          else if (e && id === 'neg') e.neg = dlg.get('neg');
+          else if (e && (id === 'c' || id === 'rot')) e[id] = dlg.get(id);
+          else if (e) { const v = dlg.get(id); if (v > 0 || (id === 'r' && v >= 0)) e[id] = v; }
+          this.layout(true); this.schedule(live);
+        },
+        onBtn: (id, v) => {
+          const e = this.el[this.cur];
+          if (id === 'add') {
+            const n = BLOB_NEW[v](), base = e ? e.c : [0, 0, 10];
+            n.c = [r3(base[0] + 8), base[1], base[2]]; this.el.push(n); this.cur = this.el.length - 1;
+          } else if (v === 'dup' && e) { const n = clone(e); n.c = [r3(e.c[0] + 6), e.c[1], e.c[2]]; this.el.push(n); this.cur = this.el.length - 1; }
+          else if (v === 'del' && e) { if (this.el.length === 1) { toast('Měkké spojení potřebuje alespoň jeden tvar.'); return; } this.el.splice(this.cur, 1); this.cur = Math.max(0, this.cur - 1); }
+          else if (v === 'tpl') { this.el = FIGURE(); this.cur = 0; this.sym = true; dlg.set('sym', true); }
+          this.layout(); this.schedule();
+        }
+      });
+      this.dots = new THREE.Group(); G.overlay.add(this.dots);
+      transform.setMode('translate'); transform.setSpace('world');
+      transform.addEventListener('objectChange', this.onGizmo); transform.addEventListener('dragging-changed', this.onDragChange);
+      transform.attach(pivot);
+      this.layout(); this.schedule();
+    },
+    /* the dialog shows the fields of the selected shape */
+    layout(keep) {
+      const e = this.el[this.cur];
+      dlg.setOptions('cur', this.el.map((x, i) => [String(i), `${i + 1} · ${BLOB_KINDS[x.t]}${x.neg ? ' (odebírá)' : ''}`]), String(this.cur));
+      const has = { sphere: ['d'], ellipsoid: ['sx', 'sy', 'sz', 'rot'], capsule: ['len', 'd1', 'd2', 'rot'], box: ['sx', 'sy', 'sz', 'r', 'rot'], torus: ['R', 'tt', 'rot'] }[e.t];
+      for (const k of ['d', 'sx', 'sy', 'sz', 'len', 'd1', 'd2', 'r', 'R', 'tt', 'rot']) { dlg.show(k, has.includes(k)); if (has.includes(k) && e[k] !== undefined && !(keep && document.activeElement && document.activeElement.dataset.f === k)) dlg.set(k, e[k]); }
+      dlg.set('c', e.c); dlg.set('neg', !!e.neg); dlg.show('gm', has.includes('rot'));
+      if (!has.includes('rot') && this.gm === 'rotate') { this.gm = 'translate'; dlg.set('gm', 'translate'); transform.setMode('translate'); }
+      if (!this.gizmoDrag) { pivot.position.copy(v3(e.c)); const rr = (e.rot || [0, 0, 0]).map(x => x * Math.PI / 180); pivot.rotation.set(rr[0], rr[1], rr[2], 'ZYX'); }
+      transform.setSpace(this.gm === 'rotate' ? 'local' : 'world');
+      clearGroup(this.dots);
+      const all = this.sym ? Engine.mirrorElements(this.el) : this.el;
+      all.forEach((x, i) => { const d = orgDot(x.c, i === this.cur, x.neg ? tok.danger : null); if (i >= this.el.length) d.material.opacity = 0.35; this.dots.add(d); });
+      setPrompt('Klepnutím na tvar ho vyberete, manipulátorem posunete nebo otočíte; tvary přidáte v dialogu');
+      requestRender();
+    },
+    feature() { return { id: f ? f.id : 'tmp', type: 'blob', el: clone(this.el), k: this.k, q: this.q, sym: this.sym, op: this.op }; },
+    schedule(fast) {
+      clearTimeout(this.timer);
+      const run = q => {
+        if (cmd !== this) return;
+        try {
+          const ft = this.feature(); ft.q = q;
+          this.tool = Engine.blobTool(ft);
+          clearGroup(G.preview); G.preview.add(previewMesh(this.tool, this.op));
+          dlg.set('n', q === this.q ? `${fmtc(K.signedVolume(this.tool) / 1000, 2)} cm³` : 'Počítám…'); dlg.okEnabled(q === this.q);
+        } catch (e) { this.tool = null; dlg.set('n', '!' + e.message); dlg.okEnabled(false); }
+        requestRender();
+      };
+      dlg.okEnabled(false);
+      if (fast) { this.timer = setTimeout(() => { run('low'); this.timer = setTimeout(() => run(this.q), 450); }, 30); }
+      else { dlg.set('n', 'Počítám náhled…'); this.timer = setTimeout(() => run(this.q), 60); }
+    },
+    onFrame() { if (this.dots) orgDotsScale(this.dots); },
+    onMove(ev) { dom.style.cursor = dotAt(ev, this.el.map(x => x.c)) >= 0 ? 'pointer' : ''; },
+    onClick(ev) {
+      let i = dotAt(ev, this.el.map(x => x.c));
+      if (i < 0 && this.tool) { /* a click on the shape: the element closest to that point */
+        ray.setFromCamera(evNdc(ev), cam());
+        const h = ray.intersectObjects(G.preview.children, true)[0];
+        if (h) { let bd = Infinity; this.el.forEach((x, j) => { try { const d = Math.abs(ORG.prepElement(x).f(h.point.x, h.point.y, h.point.z)); if (d < bd) { bd = d; i = j; } } catch (er) { /* skip */ } }); }
+      }
+      if (i >= 0 && i !== this.cur) { this.cur = i; this.layout(); }
+    },
+    onGizmo: null, onDragChange: null,
+    ok() { if (!this.tool) return null; const out = this.feature(); out.id = f ? f.id : newId(); return out; },
+    cleanup() {
+      clearTimeout(this.timer);
+      transform.removeEventListener('objectChange', this.onGizmo); transform.removeEventListener('dragging-changed', this.onDragChange);
+      transform.detach(); transform.setSpace('world'); scene.remove(pivot); controls.enabled = true; clearGroup(G.overlay);
+    }
+  };
+  c.onGizmo = () => {
+    const e = c.el[c.cur]; if (!e) return;
+    if (c.gm === 'rotate') { const r = pivot.rotation; r.reorder('ZYX'); e.rot = [r.x, r.y, r.z].map(x => Math.round(x * 180 / Math.PI * 10) / 10); dlg.set('rot', e.rot); }
+    else { const p = pivot.position; e.c = [snapV(p.x), snapV(p.y), snapV(p.z)]; dlg.set('c', e.c); }
+    c.layout(true); c.schedule(true);
+  };
+  c.onDragChange = e => { controls.enabled = !e.value; c.gizmoDrag = e.value; if (!e.value) { c.layout(); c.schedule(); } };
+  beginCmd(c); c.init();
+}
+
+/* ---------- Kostra (stick skeleton with thickness) ---------- */
+const STICKMAN = () => ({
+  nodes: [{ p: [0, 0, 18], d: 12 }, { p: [0, 0, 32], d: 10 }, { p: [0, 0, 42], d: 14 }, { p: [10, 0, 28], d: 5 }, { p: [16, 0, 20], d: 4 }, { p: [5, 0, 10], d: 7 }, { p: [6, 0, 1.5], d: 6 }],
+  edges: [[0, 1], [1, 2], [1, 3], [3, 4], [0, 5], [5, 6]]
+});
+function startSkin(editIndex, f) {
+  const pivot = new THREE.Object3D(); scene.add(pivot);
+  const c = {
+    editIndex, nodes: f ? clone(f.nodes) : [], edges: f ? clone(f.edges) : [], cur: f && f.nodes.length ? 0 : -1, k: f ? f.k : 2, q: f ? f.q || 'mid' : 'mid', sym: f ? !!f.sym : false, op: f ? f.op || 'new' : 'new',
+    tool: null, timer: null, gizmoDrag: false, dots: null,
+    init() {
+      openDialog({
+        title: 'Kostra', icon: 'skin',
+        fields: [{ k: 'sel', id: 'nd', label: 'Bod kostry' }, { k: 'num', id: 'd', label: 'Tloušťka v bodě' }, { k: 'xyz', id: 'p', label: 'Poloha bodu' },
+          { k: 'btns', id: 'act', label: '', options: [['del', 'Smazat bod'], ['root', 'Nová větev'], ['tpl', 'Šablona']] },
+          { k: 'num', id: 'k', label: 'Měkkost spojení', value: this.k, range: [0, 10, 0.5] },
+          { k: 'chk', id: 'sym', label: 'Souměrně podle osy X (levá strana = pravá)', value: this.sym },
+          { k: 'seg', id: 'q', label: 'Jemnost', options: QSEG, value: this.q },
+          { k: 'opt', id: 'op', label: 'Operace', options: OPS, value: this.op }, { k: 'note', id: 'n' }],
+        onChange: (id, live) => {
+          const nd = this.nodes[this.cur];
+          if (id === 'd' && nd) { const v = dlg.get('d'); if (v > 0) nd.d = v; }
+          else if (id === 'p' && nd) nd.p = dlg.get('p');
+          else if (id === 'k') { const v = dlg.get('k'); if (v >= 0) this.k = v; }
+          else if (id === 'sym') this.sym = dlg.get('sym');
+          else if (id === 'q') this.q = dlg.get('q');
+          else if (id === 'op') this.op = dlg.get('op');
+          this.layout(true); this.schedule(live);
+        },
+        onBtn: (id, v) => {
+          if (v === 'del' && this.cur >= 0) {
+            const i = this.cur; this.nodes.splice(i, 1);
+            this.edges = this.edges.filter(e => e[0] !== i && e[1] !== i).map(e => e.map(x => (x > i ? x - 1 : x)));
+            this.cur = this.nodes.length ? Math.min(i, this.nodes.length - 1) : -1;
+          } else if (v === 'root') { this.cur = -1; toast('Klepněte do pohledu, kde má začít nová kostra.'); }
+          else if (v === 'tpl') { const t = STICKMAN(); this.nodes = t.nodes; this.edges = t.edges; this.cur = 0; this.sym = true; dlg.set('sym', true); }
+          this.layout(); this.schedule();
+        }
+      });
+      this.dots = new THREE.Group(); G.overlay.add(this.dots);
+      transform.setMode('translate'); transform.setSpace('world');
+      transform.addEventListener('objectChange', this.onGizmo); transform.addEventListener('dragging-changed', this.onDragChange);
+      this.layout(); this.schedule();
+    },
+    layout(keep) {
+      const nd = this.nodes[this.cur];
+      dlg.set('nd', { text: nd ? `Bod ${this.cur + 1} z ${this.nodes.length}` : this.nodes.length ? 'Klepněte na bod nebo do pohledu' : 'Klepněte do pohledu', has: !!nd, active: true });
+      dlg.show('d', !!nd); dlg.show('p', !!nd);
+      if (nd) { if (!(keep && document.activeElement && document.activeElement.dataset.f === 'd')) dlg.set('d', nd.d); dlg.set('p', nd.p); }
+      if (nd) { transform.attach(pivot); if (!this.gizmoDrag) pivot.position.copy(v3(nd.p)); } else transform.detach();
+      clearGroup(this.dots);
+      this.nodes.forEach((n, i) => { const d = orgDot(n.p, i === this.cur); d.userData.big = true; this.dots.add(d); });
+      const seg = []; for (const [a, b] of this.edges) { const A = this.nodes[a].p, B = this.nodes[b].p; seg.push(...A, ...B); }
+      if (seg.length) { const l = noRay(new THREE.LineSegments(lineGeo(seg), new THREE.LineBasicMaterial({ color: tok.org, depthTest: false, transparent: true }))); l.renderOrder = 12; this.dots.add(l); }
+      setPrompt(this.nodes.length ? 'Klepnutím do pohledu přidáte další bod napojený na vybraný, klepnutím na bod ho vyberete; tloušťku nastavíte v dialogu' : 'Klepněte do pohledu, kde má kostra začít (nebo zvolte Šablonu panáčka)');
+      requestRender();
+    },
+    feature() { return { id: f ? f.id : 'tmp', type: 'skin', nodes: clone(this.nodes), edges: clone(this.edges), k: this.k, q: this.q, sym: this.sym, op: this.op }; },
+    schedule(fast) {
+      clearTimeout(this.timer); dlg.okEnabled(false);
+      if (!this.nodes.length) { clearGroup(G.preview); this.tool = null; dlg.set('n', ''); requestRender(); return; }
+      const run = q => {
+        if (cmd !== this) return;
+        try {
+          const ft = this.feature(); ft.q = q; this.tool = Engine.skinTool(ft);
+          clearGroup(G.preview); const m = previewMesh(this.tool, this.op); G.preview.add(m);
+          m.traverse(o => { if (o.material && o.isMesh) { o.material.transparent = true; o.material.opacity = 0.7; } });
+          dlg.set('n', q === this.q ? `${fmtc(K.signedVolume(this.tool) / 1000, 2)} cm³` : 'Počítám…'); dlg.okEnabled(q === this.q);
+        } catch (e) { this.tool = null; dlg.set('n', '!' + e.message); }
+        requestRender();
+      };
+      if (fast) this.timer = setTimeout(() => { run('low'); this.timer = setTimeout(() => run(this.q), 450); }, 30);
+      else { dlg.set('n', 'Počítám náhled…'); this.timer = setTimeout(() => run(this.q), 60); }
+    },
+    onFrame() { if (this.dots) orgDotsScale(this.dots); },
+    onMove(ev) { dom.style.cursor = dotAt(ev, this.nodes.map(n => n.p)) >= 0 ? 'pointer' : 'crosshair'; },
+    onClick(ev) {
+      const i = dotAt(ev, this.nodes.map(n => n.p));
+      if (i >= 0) { if (i !== this.cur) { this.cur = i; this.layout(); } return; }
+      let p;
+      const nd = this.nodes[this.cur];
+      if (nd) p = rayOnViewPlane(ev, nd.p);
+      else { const h = hitBodies(ev); if (h) p = h.point; else { ray.setFromCamera(evNdc(ev), cam()); p = ray.ray.intersectPlane(new THREE.Plane(new V3(0, 0, 1), 0), new V3()); } }
+      if (!p) return;
+      this.nodes.push({ p: [snapV(p.x), snapV(p.y), snapV(p.z)], d: nd ? Math.max(1, r3(nd.d * 0.85)) : 8 });
+      if (nd) this.edges.push([this.cur, this.nodes.length - 1]);
+      this.cur = this.nodes.length - 1;
+      this.layout(); this.schedule();
+    },
+    onGizmo: null, onDragChange: null,
+    ok() { if (!this.tool) return null; const out = this.feature(); out.id = f ? f.id : newId(); return out; },
+    cleanup() {
+      clearTimeout(this.timer);
+      transform.removeEventListener('objectChange', this.onGizmo); transform.removeEventListener('dragging-changed', this.onDragChange);
+      transform.detach(); scene.remove(pivot); controls.enabled = true; clearGroup(G.overlay);
+    }
+  };
+  c.onGizmo = () => { const nd = c.nodes[c.cur]; if (!nd) return; const p = pivot.position; nd.p = [snapV(p.x), snapV(p.y), snapV(p.z)]; dlg.set('p', nd.p); c.layout(true); c.schedule(true); };
+  c.onDragChange = e => { controls.enabled = !e.value; c.gizmoDrag = e.value; if (!e.value) { c.layout(); c.schedule(); } };
+  beginCmd(c); c.init();
+}
+
+/* ---------- Tažení po křivce, Přechod profilů ---------- */
+function curveChoices() {
+  const out = [];
+  for (const s of cur.sketches.values()) for (const ei of Engine.sketchCurves(s)) out.push([s.id + ':' + ei, `${s.name || 'Skica'} · ${ENT_LABEL[s.ents[ei].t] || 'Čára'} ${ei + 1}`]);
+  return out;
+}
+function profileChoices() {
+  const out = [];
+  for (const s of cur.sketches.values()) for (const r of Engine.regions(s)) out.push([s.id + ':' + r.ei, `${s.name || 'Skica'} · ${ENT_LABEL[s.ents[r.ei].t] || 'Profil'} ${r.ei + 1}`]);
+  return out;
+}
+const refOf = v => { if (!v || !v.includes(':')) return null; const [sketch, ei] = v.split(':'); return { sketch, ei: Number(ei) }; };
+const refKey = r => (r ? r.sketch + ':' + r.ei : '');
+function sketchLine(s, ei, color) {
+  const e = s.ents[ei]; if (!e) return null;
+  const pts = e.t === 'spline' ? K.splinePoints(e.pts, !!e.closed, 16, e.lin) : e.pts || K.profilePoints(e);
+  const P = s.plane, arr = [];
+  const closed = e.closed || ['rect', 'circle', 'ellipse', 'ngon', 'slot'].includes(e.t);
+  const L = closed && e.t !== 'spline' && e.t !== 'poly' ? K.profilePoints(e) : pts;
+  for (let i = 0; i + 1 < L.length + (closed ? 1 : 0); i++) { const a = L[i], b = L[(i + 1) % L.length]; const A = P3(P, a[0], a[1]), B = P3(P, b[0], b[1]); arr.push(A.x, A.y, A.z, B.x, B.y, B.z); }
+  const l = noRay(new THREE.LineSegments(lineGeo(arr), new THREE.LineBasicMaterial({ color, depthTest: false, transparent: true, linewidth: 2 }))); l.renderOrder = 12; return l;
+}
+function startSweep(editIndex, f) {
+  const c = {
+    editIndex, path: f ? f.path : null, prof: f ? f.prof || null : null, d: f ? f.d || 4 : 4, twist: f ? f.twist || 0 : 0, scale: f ? f.scale || 100 : 100, op: f ? f.op || 'new' : 'new', tool: null,
+    init() {
+      const curves = curveChoices();
+      if (!curves.length) { endCmd(false); toast('Nejdřív nakreslete ve skice dráhu: otevřenou čáru nebo křivku.'); return; }
+      if (!this.path) this.path = refOf(curves[curves.length - 1][0]);
+      openDialog({
+        title: 'Tažení po křivce', icon: 'sweep',
+        fields: [{ k: 'opt', id: 'path', label: 'Dráha', options: curves, value: refKey(this.path) },
+          { k: 'opt', id: 'prof', label: 'Průřez', options: [['', 'Kruh'], ...profileChoices()], value: refKey(this.prof) },
+          { k: 'num', id: 'd', label: 'Průměr kruhu', value: this.d },
+          { k: 'num', id: 'twist', label: 'Zkroucení po délce', unit: '°', value: this.twist },
+          { k: 'num', id: 'scale', label: 'Velikost na konci', unit: '%', value: this.scale, range: [5, 300, 5] },
+          { k: 'opt', id: 'op', label: 'Operace', options: OPS, value: this.op }, { k: 'note', id: 'n' }],
+        onChange: id => {
+          if (id === 'path') this.path = refOf(dlg.get('path'));
+          else if (id === 'prof') this.prof = refOf(dlg.get('prof'));
+          else if (id === 'op') this.op = dlg.get('op');
+          else { const v = dlg.get(id); if (isFinite(v) && (id === 'twist' || v > 0)) this[id] = v; }
+          this.update();
+        }
+      });
+      setPrompt('Dráhu a průřez vyberte v dialogu; průřez se postaví kolmo na začátek dráhy');
+      this.update();
+    },
+    feature() { const o = { id: f ? f.id : 'tmp', type: 'sweep', path: this.path, twist: this.twist, scale: this.scale, op: this.op }; if (this.prof) o.prof = this.prof; else o.d = this.d; return o; },
+    update() {
+      dlg.show('d', !this.prof);
+      clearGroup(G.overlay); clearGroup(G.preview); this.tool = null;
+      const s = this.path && cur.sketches.get(this.path.sketch); if (s) { const l = sketchLine(s, this.path.ei, tok.org); if (l) G.overlay.add(l); }
+      const sp = this.prof && cur.sketches.get(this.prof.sketch); if (sp) { const l = sketchLine(sp, this.prof.ei, tok.accent); if (l) G.overlay.add(l); }
+      try { this.tool = Engine.sweepTool(this.feature(), cur.sketches); G.preview.add(previewMesh(this.tool, this.op)); dlg.set('n', ''); dlg.okEnabled(true); }
+      catch (e) { dlg.set('n', '!' + e.message); dlg.okEnabled(false); }
+      requestRender();
+    },
+    ok() { if (!this.tool) return null; const out = this.feature(); out.id = f ? f.id : newId(); return out; },
+    cleanup() { clearGroup(G.overlay); }
+  };
+  beginCmd(c); c.init();
+}
+function startLoft(editIndex, f) {
+  const c = {
+    editIndex, secs: f ? clone(f.secs) : [], smooth: f ? f.smooth !== false : true, op: f ? f.op || 'new' : 'new', tool: null,
+    init() {
+      const profs = profileChoices();
+      if (profs.length < 2) { endCmd(false); toast('Přechod potřebuje alespoň dva uzavřené profily ve skicách (v různých rovinách).'); return; }
+      if (!f) { const bySketch = new Map(); for (const [v] of profs) { const r = refOf(v); if (!bySketch.has(r.sketch)) bySketch.set(r.sketch, r); } this.secs = [...bySketch.values()].slice(0, 4); if (this.secs.length < 2) this.secs = profs.slice(0, 2).map(p => refOf(p[0])); }
+      const opts = [['', '– žádný –'], ...profs];
+      openDialog({
+        title: 'Přechod profilů', icon: 'loft',
+        fields: [0, 1, 2, 3, 4].map(i => ({ k: 'opt', id: 's' + i, label: `Profil ${i + 1}`, options: opts, value: refKey(this.secs[i]) })).concat([
+          { k: 'chk', id: 'smooth', label: 'Plynulý přechod přes všechny profily', value: this.smooth },
+          { k: 'opt', id: 'op', label: 'Operace', options: OPS, value: this.op }, { k: 'note', id: 'n' }]),
+        onChange: id => {
+          if (id === 'smooth') this.smooth = dlg.get('smooth');
+          else if (id === 'op') this.op = dlg.get('op');
+          else this.secs = [0, 1, 2, 3, 4].map(i => refOf(dlg.get('s' + i))).filter(Boolean);
+          this.update();
+        }
+      });
+      setPrompt('Profily vyberte v dialogu v pořadí, jak jdou za sebou');
+      this.update();
+    },
+    feature() { return { id: f ? f.id : 'tmp', type: 'loft', secs: clone(this.secs), smooth: this.smooth, op: this.op }; },
+    update() {
+      clearGroup(G.overlay); clearGroup(G.preview); this.tool = null;
+      for (const r of this.secs) { const s = cur.sketches.get(r.sketch); if (s) { const l = sketchLine(s, r.ei, tok.org); if (l) G.overlay.add(l); } }
+      try { this.tool = Engine.loftTool(this.feature(), cur.sketches); G.preview.add(previewMesh(this.tool, this.op)); dlg.set('n', ''); dlg.okEnabled(true); }
+      catch (e) { dlg.set('n', '!' + e.message); dlg.okEnabled(false); }
+      requestRender();
+    },
+    ok() { if (!this.tool) return null; const out = this.feature(); out.id = f ? f.id : newId(); return out; },
+    cleanup() { clearGroup(G.overlay); }
+  };
+  beginCmd(c); c.init();
+}
+
+/* ---------- modifications of one body (deformations, remesh, hollow, base, pegs) ---------- */
+const AXSEG = [['x', 'X'], ['y', 'Y'], ['z', 'Z']];
+const ORG_MODS = {
+  deform: {
+    defaults: () => ({ mode: 'twist', axis: 'z', amount: 45, from: 0, to: 100, dir: 'b' }),
+    fields: v => [{ k: 'seg', id: 'mode', label: 'Deformace', options: [['twist', 'Zkroutit'], ['taper', 'Zúžit'], ['bend', 'Ohnout']], value: v.mode },
+      { k: 'seg', id: 'axis', label: 'Osa', options: AXSEG, value: v.axis }, { k: 'num', id: 'amount', label: 'Úhel', unit: '°', value: v.amount },
+      { k: 'opt', id: 'dir', label: 'Ohnout směrem', options: [['b', '+'], ['c', '+']], value: v.dir },
+      { k: 'num', id: 'from', label: 'Od (% délky)', unit: '%', value: v.from, range: [0, 100, 1] }, { k: 'num', id: 'to', label: 'Do (% délky)', unit: '%', value: v.to, range: [0, 100, 1] }],
+    layout(c) {
+      const v = c.v, a = { x: 0, y: 1, z: 2 }[v.axis], L = 'XYZ';
+      dlg.setOptions('dir', [['b', 'k ose ' + L[(a + 1) % 3]], ['c', 'k ose ' + L[(a + 2) % 3]]], v.dir);
+      dlg.show('dir', v.mode === 'bend');
+      const lab = $('#dialog [data-row="amount"] label'), u = $('#dialog [data-row="amount"] .u');
+      if (lab) lab.textContent = v.mode === 'taper' ? 'Velikost na konci' : v.mode === 'bend' ? 'Úhel ohnutí' : 'Úhel zkroucení';
+      if (u) u.textContent = v.mode === 'taper' ? '%' : '°';
+    },
+    change(c, id) { if (id === 'mode') { const m = dlg.get('mode'); if (m !== c.v.mode) { c.v.amount = m === 'taper' ? 50 : m === 'bend' ? 60 : 45; dlg.set('amount', c.v.amount); } } }
+  },
+  lattice: {
+    defaults: () => ({ n: 3, pts: {} }),
+    fields: v => [{ k: 'seg', id: 'ln', label: 'Body mřížky', options: [['2', '2×2×2'], ['3', '3×3×3'], ['4', '4×4×4']], value: String(v.n) },
+      { k: 'sel', id: 'ps', label: 'Vybrané body' }, { k: 'xyz', id: 'off', label: 'Posun vybraných' },
+      { k: 'btns', id: 'lb', label: '', options: [['all', 'Vybrat vše'], ['none', 'Zrušit výběr'], ['reset', 'Vynulovat']] }],
+    load: f => ({ n: f.n, pts: clone(f.pts || {}) }),
+    feature: v => ({ n: v.n, pts: v.pts }),
+    gizmo: true,
+    setup(c) { c.lsel = new Set(); },
+    change(c, id) {
+      if (id === 'ln') { const n = Number(dlg.get('ln')); if (n !== c.v.n) { c.v.n = n; c.v.pts = {}; c.lsel.clear(); } }
+      if (id === 'off' && c.lsel.size) { const o = dlg.get('off'); for (const i of c.lsel) c.v.pts[i] = o.slice(); }
+    },
+    btn(c, id, v) {
+      const N = Math.pow(c.v.n, 3);
+      if (v === 'all') for (let i = 0; i < N; i++) c.lsel.add(i);
+      else if (v === 'none') c.lsel.clear();
+      else if (v === 'reset') { if (c.lsel.size) for (const i of c.lsel) delete c.v.pts[i]; else c.v.pts = {}; }
+    },
+    points(c) { const b = bodyById(c.body); if (!b) return []; const P = ORG.latticePoints(ORG.latticeBox(b.polys), c.v.n); return P.map((p, i) => { const o = c.v.pts[i]; return o ? [p[0] + o[0], p[1] + o[1], p[2] + o[2]] : p; }); },
+    layout(c) {
+      const n = c.lsel.size;
+      dlg.set('ps', { text: n ? `${n} ${n === 1 ? 'bod' : n < 5 ? 'body' : 'bodů'}` : 'Klepněte na bod mřížky (Ctrl: více bodů)', has: n > 0, active: !!c.body });
+      dlg.show('off', n > 0);
+      if (n) { const i = [...c.lsel][0]; dlg.set('off', c.v.pts[i] || [0, 0, 0]); }
+      const P = this.points(c); clearGroup(c.dots); if (!P.length) { c.showGizmo(false); return; }
+      P.forEach((p, i) => c.dots.add(orgDot(p, c.lsel.has(i))));
+      const m = c.v.n, seg = [], id = (i, j, k) => i + m * (j + m * k);
+      for (let k = 0; k < m; k++) for (let j = 0; j < m; j++) for (let i = 0; i < m; i++) {
+        if (i + 1 < m) seg.push(...P[id(i, j, k)], ...P[id(i + 1, j, k)]);
+        if (j + 1 < m) seg.push(...P[id(i, j, k)], ...P[id(i, j + 1, k)]);
+        if (k + 1 < m) seg.push(...P[id(i, j, k)], ...P[id(i, j, k + 1)]);
+      }
+      if (seg.length) { const l = noRay(new THREE.LineSegments(lineGeo(seg), new THREE.LineBasicMaterial({ color: tok.org, depthTest: false, transparent: true, opacity: 0.7 }))); l.renderOrder = 12; c.dots.add(l); }
+      if (n && !c.gizmoDrag) { const s = [0, 0, 0]; for (const i of c.lsel) for (let a = 0; a < 3; a++) s[a] += P[i][a] / n; c.pivot.position.copy(v3(s)); c.gp = s; }
+      c.showGizmo(n > 0);
+    },
+    pointsFirst: true,
+    click(c, ev) {
+      const i = dotAt(ev, this.points(c)); if (i < 0) return false;
+      if (!(ev.ctrlKey || ev.metaKey || ev.shiftKey)) { const was = c.lsel.has(i) && c.lsel.size === 1; c.lsel.clear(); if (!was) c.lsel.add(i); }
+      else if (c.lsel.has(i)) c.lsel.delete(i); else c.lsel.add(i);
+      return true;
+    },
+    onGizmo(c) {
+      const p = c.pivot.position, d = [p.x - c.gp[0], p.y - c.gp[1], p.z - c.gp[2]]; c.gp = [p.x, p.y, p.z];
+      for (const i of c.lsel) { const o = c.v.pts[i] || [0, 0, 0]; c.v.pts[i] = o.map((x, a) => r3(x + d[a])); }
+    },
+    prompt: 'Klepněte na body mřížky (Ctrl přidá další) a táhněte je manipulátorem; těleso se plynule přizpůsobí'
+  },
+  softmove: {
+    defaults: () => ({ c: null, d: [0, 0, 5], r: 10, fall: 'smooth' }),
+    fields: v => [{ k: 'sel', id: 'pt', label: 'Bod' }, { k: 'xyz', id: 'd', label: 'Posun', value: v.d }, { k: 'num', id: 'r', label: 'Dosah', value: v.r, range: [1, 60, 0.5] },
+      { k: 'seg', id: 'fall', label: 'Průběh', options: [['smooth', 'Plynulý'], ['sharp', 'Špičatý'], ['sphere', 'Kulatý']], value: v.fall }],
+    gizmo: true,
+    ready: v => !!v.c,
+    layout(c) {
+      dlg.set('pt', { text: c.v.c ? c.v.c.map(x => fmtc(x, 1)).join('; ') : 'Klepněte na místo na tělese', has: !!c.v.c, active: !!c.body });
+      clearGroup(c.dots);
+      if (c.v.c) {
+        c.dots.add(orgDot(c.v.c, true));
+        const s = noRay(new THREE.Mesh(new THREE.SphereGeometry(c.v.r, 24, 16), new THREE.MeshBasicMaterial({ color: tok.org, wireframe: true, transparent: true, opacity: 0.18, depthTest: false })));
+        s.position.copy(v3(c.v.c)); c.dots.add(s);
+        if (!c.gizmoDrag) c.pivot.position.copy(v3(c.v.c.map((x, i) => x + c.v.d[i])));
+      }
+      c.showGizmo(!!c.v.c);
+    },
+    click(c, ev, h) { if (!h) return false; c.v.c = [h.point.x, h.point.y, h.point.z].map(r3); return true; },
+    onGizmo(c) { const p = c.pivot.position; c.v.d = [p.x - c.v.c[0], p.y - c.v.c[1], p.z - c.v.c[2]].map(r3); dlg.set('d', c.v.d); },
+    prompt: 'Klepněte na místo na tělese a táhněte manipulátorem; okolí v dosahu se plynule posune'
+  },
+  subdiv: {
+    defaults: () => ({ levels: 2 }),
+    fields: v => [{ k: 'seg', id: 'levels', label: 'Úrovně', options: [['1', '1'], ['2', '2'], ['3', '3']], value: String(v.levels) }],
+    feature: v => ({ levels: Number(v.levels) }),
+    prompt: 'Hrany a rohy se zaoblí; čím víc úrovní, tím je tvar hladší (z krychle se stane oblý kámen)'
+  },
+  remesh: {
+    defaults: () => ({ q: 'mid', smooth: 0 }),
+    fields: v => [{ k: 'seg', id: 'q', label: 'Jemnost sítě', options: QSEG, value: v.q }, { k: 'num', id: 'smooth', label: 'Vyhlazení', unit: '×', value: v.smooth, range: [0, 6, 1] }],
+    prompt: 'Těleso se převede na rovnoměrnou síť (hodí se před sochání nebo deformace)'
+  },
+  hollow: {
+    defaults: () => ({ t: 2, q: 'mid', hole: true, d: 5, p: null, n: null }),
+    fields: v => [{ k: 'num', id: 't', label: 'Tloušťka stěny', value: v.t }, { k: 'seg', id: 'q', label: 'Jemnost sítě', options: QSEG, value: v.q },
+      { k: 'chk', id: 'hole', label: 'Otvor pro vytečení pryskyřice / odlehčení', value: v.hole }, { k: 'num', id: 'd', label: 'Průměr otvoru', value: v.d }, { k: 'sel', id: 'hp', label: 'Místo otvoru' }],
+    load: f => ({ t: f.t, q: f.q || 'mid', hole: !!f.hole, d: f.hole ? f.hole.d : 5, p: f.hole ? f.hole.p : null, n: f.hole ? f.hole.n : null }),
+    feature: v => ({ t: v.t, q: v.q, ...(v.hole && v.p ? { hole: { p: v.p, n: v.n, d: v.d } } : {}) }),
+    bodyChosen(c) { /* the drain hole goes to the lowest point by default */
+      const b = bodyById(c.body); if (!b || c.v.p) return;
+      let lo = null; for (const p of b.polys) for (const q of p.v) if (!lo || q[2] < lo[2]) lo = q;
+      if (lo) { c.v.p = lo.map(r3); c.v.n = [0, 0, -1]; }
+    },
+    layout(c) {
+      dlg.show('d', c.v.hole); dlg.show('hp', c.v.hole);
+      dlg.set('hp', { text: c.v.p ? 'Klepnutím na těleso otvor přesunete' : 'Klepněte na těleso', has: !!c.v.p, active: c.v.hole });
+      clearGroup(c.dots); if (c.v.hole && c.v.p) c.dots.add(orgDot(c.v.p, true));
+    },
+    click(c, ev, h) { if (!h || !c.v.hole) return false; const n = h.face ? h.face.normal.clone().transformDirection(h.object.matrixWorld) : new V3(0, 0, -1); c.v.p = [h.point.x, h.point.y, h.point.z].map(r3); c.v.n = [n.x, n.y, n.z].map(x => Math.round(x * 1e4) / 1e4); return true; },
+    prompt: 'Těleso se vydutí na zadanou tloušťku stěny; klepnutím na těleso umístíte otvor'
+  },
+  flatbase: {
+    defaults: () => ({ cut: 1, drop: true }),
+    fields: v => [{ k: 'num', id: 'cut', label: 'Odříznout zespodu', value: v.cut, range: [0, 20, 0.1] }, { k: 'chk', id: 'drop', label: 'Postavit na podložku (Z = 0)', value: v.drop }],
+    prompt: 'Spodek tělesa se zarovná do roviny, aby postavička stála a dobře se tiskla'
+  },
+  pegsplit: {
+    defaults: () => ({ axis: 'z', at: null, n: 1, d: 5, len: 10, tol: 0.2, style: 'attached' }),
+    fields: v => [{ k: 'seg', id: 'axis', label: 'Řez kolmo na osu', options: AXSEG, value: v.axis }, { k: 'num', id: 'at', label: 'Poloha řezu', value: v.at || 0, range: [0, 100, 0.1] },
+      { k: 'seg', id: 'pn', label: 'Počet kolíků', options: [['1', '1'], ['2', '2'], ['3', '3']], value: String(v.n) },
+      { k: 'num', id: 'd', label: 'Průměr kolíku', value: v.d }, { k: 'num', id: 'len', label: 'Délka kolíku', value: v.len }, { k: 'num', id: 'tol', label: 'Vůle v otvoru', value: v.tol },
+      { k: 'seg', id: 'style', label: 'Kolíky', options: [['attached', 'Na spodním dílu'], ['loose', 'Samostatné']], value: v.style }],
+    feature: v => ({ axis: v.axis, at: v.at, n: Number(v.n), d: v.d, len: v.len, tol: v.tol, style: v.style }),
+    bodyChosen(c) { this.range(c, true); },
+    range(c, reset) {
+      const b = bodyById(c.body); if (!b) return; const a = { x: 0, y: 1, z: 2 }[c.v.axis], bb = K.bbox(b.polys), r = $('#dlg-at-r');
+      if (r) { r.min = String(r3(bb.min[a] + 0.5)); r.max = String(r3(bb.max[a] - 0.5)); }
+      if (reset || !(c.v.at > bb.min[a] && c.v.at < bb.max[a])) { c.v.at = r3((bb.min[a] + bb.max[a]) / 2); dlg.set('at', c.v.at); }
+    },
+    change(c, id) { if (id === 'axis') { c.v.axis = dlg.get('axis'); this.range(c, true); } if (id === 'pn') c.v.n = Number(dlg.get('pn')); },
+    preview(polys, f) {
+      const r = Engine.pegSplit(polys, f), sh = [0, 0, 0]; sh[{ x: 0, y: 1, z: 2 }[f.axis]] = 6;
+      return { polys: r.lower, extra: [K.translate(r.upper, sh), ...r.pegs.map((p, i) => K.translate(p, [K.bbox(polys).max[0] + 8 + i * (f.d + 4), 0, 0]))], note: 'Náhled je rozložený; po potvrzení díly zůstanou na místě, samostatné kolíky leží vedle.' };
+    },
+    prompt: 'Těleso se rozřízne rovinou; kolíky drží díly pohromadě (díly se tisknou zvlášť)'
+  }
+};
+function startOrgMod(type, editIndex, f) {
+  const S = ORG_MODS[type], pivot = new THREE.Object3D(); scene.add(pivot);
+  const plain = { body: 1, id: 1, type: 1 };
+  const c = {
+    editIndex, body: f ? f.body : null, v: f ? (S.load ? S.load(f) : Object.fromEntries(Object.entries(f).filter(([k]) => !plain[k]))) : S.defaults(),
+    timer: null, hideBody: null, result: null, dots: null, pivot, gizmoDrag: false, gp: null,
+    init() {
+      if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
+      openDialog({
+        title: Engine.FEATURE_LABEL[type], icon: type,
+        fields: [{ k: 'sel', id: 'body', label: 'Těleso' }, ...S.fields(this.v), { k: 'note', id: 'n' }],
+        onChange: (id, live) => {
+          if (S.change) S.change(this, id);
+          const fd = dlg.spec.fields.find(x => x.id === id);
+          if (fd && id in this.v && !(type === 'lattice' && id === 'off')) {
+            const x = dlg.get(id);
+            if (fd.k === 'num') { if (isFinite(x)) this.v[id] = x; } else this.v[id] = fd.k === 'seg' && /^\d+$/.test(x) ? Number(x) : x;
+          }
+          this.layout(); this.schedule(live);
+        },
+        onBtn: (id, v) => { if (S.btn) S.btn(this, id, v); this.layout(); this.schedule(); }
+      });
+      this.dots = new THREE.Group(); G.overlay.add(this.dots);
+      if (S.setup) S.setup(this);
+      if (S.gizmo) { transform.setMode('translate'); transform.setSpace('world'); transform.addEventListener('objectChange', this.onGizmo); transform.addEventListener('dragging-changed', this.onDragChange); }
+      if (!f && sel.size === 1) this.body = [...sel][0];
+      if (this.body && S.bodyChosen) S.bodyChosen(this);
+      this.layout(); this.schedule();
+    },
+    showGizmo(on) { if (!S.gizmo) return; if (on) { if (transform.object !== pivot) transform.attach(pivot); } else if (transform.object === pivot) transform.detach(); },
+    layout() {
+      dlg.set('body', { text: this.body ? bodyName(bodyById(this.body) || { name: '?' }) : 'Klepněte na těleso', has: !!this.body, active: !this.body });
+      if (S.layout) S.layout(this);
+      setPrompt(this.body ? S.prompt : 'Klepněte na těleso');
+      if (!this.body) dlg.okEnabled(false);
+      requestRender();
+    },
+    feature() { return { id: f ? f.id : 'tmp', type, body: this.body, ...(S.feature ? S.feature(this.v) : clone(this.v)) }; },
+    schedule(live) {
+      clearTimeout(this.timer); if (!this.body) return;
+      if (S.ready && !S.ready(this.v)) { clearGroup(G.preview); this.hideBody = null; this.result = null; styleBodies(); dlg.set('n', ''); dlg.okEnabled(false); requestRender(); return; }
+      dlg.set('n', 'Počítám náhled…'); dlg.okEnabled(false);
+      this.timer = setTimeout(() => {
+        if (cmd !== this) return;
+        clearGroup(G.preview); this.hideBody = null; this.result = null;
+        const b = bodyById(this.body);
+        try {
+          if (!b) throw new Error('Těleso neexistuje');
+          const ft = this.feature();
+          let note = '';
+          if (S.preview) { const r = S.preview(b.polys, ft); this.result = r.polys; G.preview.add(orgPreview(r.polys, 1)); for (const x of r.extra) G.preview.add(orgPreview(x, 1)); note = r.note; }
+          else { this.result = Engine.orgModify(b.polys, ft); G.preview.add(orgPreview(this.result, type === 'hollow' ? 0.6 : 1)); }
+          this.hideBody = this.body;
+          const v0 = K.signedVolume(b.polys) / 1000, v1 = K.signedVolume(this.result) / 1000;
+          dlg.set('n', note || `Objem ${fmtc(v0, 2)} → ${fmtc(v1, 2)} cm³ · ${this.result.length} ploch`); dlg.okEnabled(true);
+        } catch (e) { dlg.set('n', '!' + e.message); }
+        styleBodies(); requestRender();
+      }, live ? 150 : 250);
+    },
+    onFrame() { if (this.dots) orgDotsScale(this.dots); },
+    onMove(ev) { const h = hitBodies(ev); dom.style.cursor = h ? 'pointer' : ''; },
+    onClick(ev) {
+      if (this.body && S.pointsFirst && S.click(this, ev, null)) { this.layout(); this.schedule(); return; } /* a control point */
+      ray.setFromCamera(evNdc(ev), cam());
+      const hits = ray.intersectObjects(pickableMeshes().concat(G.preview.children), true), h = hits[0]; if (!h) return;
+      const id = h.object.userData.bodyId || this.body;
+      if (id !== this.body) { this.body = id; if (S.bodyChosen) S.bodyChosen(this); this.layout(); this.schedule(); return; }
+      if (S.click && S.click(this, ev, h)) { this.layout(); this.schedule(); }
+    },
+    onGizmo: null, onDragChange: null,
+    ok() { if (!this.result) return null; const o = this.feature(); o.id = f ? f.id : newId(); return o; },
+    cleanup() {
+      clearTimeout(this.timer); this.hideBody = null; clearGroup(G.overlay);
+      if (S.gizmo) { transform.removeEventListener('objectChange', this.onGizmo); transform.removeEventListener('dragging-changed', this.onDragChange); if (transform.object === pivot) transform.detach(); }
+      scene.remove(pivot); controls.enabled = true;
+    }
+  };
+  c.onGizmo = () => { if (S.onGizmo) { S.onGizmo(c); c.layout(); c.schedule(true); } };
+  c.onDragChange = e => { controls.enabled = !e.value; c.gizmoDrag = e.value; if (!e.value) { c.layout(); c.schedule(); } };
+  beginCmd(c); c.init();
+}
+
+/* ---------- Sochat (volumetric sculpting with brushes) ---------- */
+const BRUSH_LABEL = [['draw', 'Nanést'], ['inflate', 'Nafouknout'], ['smooth', 'Vyhladit'], ['grab', 'Uchopit'], ['flatten', 'Zploštit'], ['pinch', 'Stáhnout']];
+function startSculpt(editIndex, f) {
+  const c = {
+    editIndex, body: f ? f.body : null, q: f ? f.q || 'mid' : 'mid', brush: 'draw', r: 6, s: 1, inv: false, sym: false,
+    ns: 0, timer: null, hideBody: null, result: null, grid: null, stroke: null, ring: null,
+    init() {
+      if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
+      this._strokes = f && f.dabs && f.dabs.length ? [f.dabs.slice()] : [];
+      this.ns = this._strokes.length;
+      openDialog({
+        title: 'Sochání', icon: 'sculpt',
+        fields: [{ k: 'sel', id: 'body', label: 'Těleso' }, { k: 'opt', id: 'brush', label: 'Štětec', options: BRUSH_LABEL, value: this.brush },
+          { k: 'num', id: 'r', label: 'Velikost štětce', value: this.r, range: [1, 40, 0.5] }, { k: 'num', id: 's', label: 'Síla', unit: '', value: this.s, range: [0.1, 3, 0.1] },
+          { k: 'chk', id: 'inv', label: 'Obráceně (ubírat)', value: this.inv }, { k: 'chk', id: 'sym', label: 'Souměrně podle osy X', value: this.sym },
+          { k: 'seg', id: 'q', label: 'Jemnost', options: QSEG, value: this.q }, { k: 'note', id: 'n' }],
+        onChange: id => {
+          if (id === 'brush') this.brush = dlg.get('brush');
+          else if (id === 'inv' || id === 'sym') this[id] = dlg.get(id);
+          else if (id === 'q') { this.q = dlg.get('q'); this.rebuild(); }
+          else { const v = dlg.get(id); if (v > 0) this[id] = v; }
+          this.layout();
+        }
+      });
+      if (!f && sel.size === 1) this.body = [...sel][0];
+      this.ring = noRay(new THREE.Mesh(new THREE.RingGeometry(0.92, 1, 40), new THREE.MeshBasicMaterial({ color: tok.org, transparent: true, opacity: 0.9, depthTest: false, side: THREE.DoubleSide })));
+      this.ring.renderOrder = 14; this.ring.visible = false; G.overlay.add(this.ring);
+      this.layout(); if (this.body) this.rebuild();
+    },
+    layout() {
+      dlg.set('body', { text: this.body ? bodyName(bodyById(this.body) || { name: '?' }) : 'Klepněte na těleso', has: !!this.body, active: !this.body });
+      dlg.show('inv', ['draw', 'inflate', 'pinch'].includes(this.brush));
+      setPrompt(this.body ? 'Táhněte po tělese štětcem; mimo těleso táhnutím otáčíte pohled' : 'Klepněte na těleso, které chcete sochat');
+      const n = this._strokes ? this._strokes.slice(0, this.ns).reduce((s, x) => s + x.length, 0) : 0;
+      dlg.set('n', this.body ? `${this.ns} ${this.ns === 1 ? 'tah' : this.ns > 1 && this.ns < 5 ? 'tahy' : 'tahů'} · ${n} ${n === 1 ? 'dotek' : n > 1 && n < 5 ? 'doteky' : 'doteků'}` : '');
+      dlg.okEnabled(!!this.body && !!this.grid);
+      requestRender();
+    },
+    dabs() { return this._strokes.slice(0, this.ns).flat(); },
+    feature() { return { id: f ? f.id : 'tmp', type: 'sculpt', body: this.body, q: this.q, dabs: this.dabs() }; },
+    /* the voxel grid with all strokes so far (after a change of body or fineness, and after Zpět / Znovu) */
+    rebuild() {
+      const b = bodyById(this.body); if (!b) return;
+      dlg.set('n', 'Připravuji síť…');
+      setTimeout(() => {
+        if (cmd !== this) return;
+        try { this.grid = ORG.sculptGrid(b.polys, { q: this.q, dabs: this.dabs() }); this.remesh(); }
+        catch (e) { dlg.set('n', '!' + e.message); }
+      }, 30);
+    },
+    remesh() {
+      clearTimeout(this.timer); this.timer = null;
+      try {
+        this.result = ORG.polygonize(this.grid);
+        clearGroup(G.preview); const m = orgPreview(this.result, 1); m.raycast = THREE.Mesh.prototype.raycast; m.userData.sculpt = true; G.preview.add(m);
+        this.hideBody = this.body; styleBodies();
+      } catch (e) { dlg.set('n', '!' + e.message); }
+      this.layout();
+    },
+    restored() { if (this._strokes && this.body) this.rebuild(); },
+    hit(ev) { ray.setFromCamera(evNdc(ev), cam()); const m = G.preview.children.find(o => o.userData.sculpt); return m ? ray.intersectObject(m, false)[0] || null : null; },
+    dab(p, n, extra) {
+      const s = this.brush === 'smooth' || this.brush === 'flatten' ? Math.min(1, this.s * 0.5) : this.s * (this.inv ? -1 : 1) * (this.brush === 'draw' ? this.r * 0.15 : this.brush === 'inflate' ? 0.35 : 1);
+      const d = [this.brush, r3(p.x), r3(p.y), r3(p.z), r3(n.x), r3(n.y), r3(n.z), this.r, Math.round(s * 1000) / 1000, ...(extra || [])];
+      const out = [d];
+      if (this.sym) { const m = d.slice(); m[1] = -m[1]; m[4] = -m[4]; if (extra) m[9] = -m[9]; if (Math.abs(d[1]) > this.r * 0.25) out.push(m); }
+      for (const x of out) { ORG.applyDab(this.grid, x); this.stroke.push(x); }
+      if (!this.timer) this.timer = setTimeout(() => { this.timer = null; if (cmd === this && this.grid) this.remesh(); }, 140);
+    },
+    onDown(ev) {
+      if (!this.grid) return false;
+      const h = this.hit(ev); if (!h) return false;
+      const n = h.face.normal.clone().transformDirection(h.object.matrixWorld);
+      this.stroke = []; this.last = h.point.clone(); this.grabN = n;
+      if (this.brush === 'grab') this.grab = { p: h.point.clone(), plane: new THREE.Plane().setFromNormalAndCoplanarPoint(cam().getWorldDirection(new V3()), h.point) };
+      else this.dab(h.point, n);
+      controls.enabled = false; return true;
+    },
+    onDrag(ev) {
+      if (!this.stroke) return;
+      if (this.grab) {
+        ray.setFromCamera(evNdc(ev), cam()); const q = ray.ray.intersectPlane(this.grab.plane, new V3()); if (!q) return;
+        const d = q.clone().sub(this.grab.p); if (d.length() < this.r * 0.08) return;
+        this.dab(this.grab.p, this.grabN, [r3(d.x), r3(d.y), r3(d.z)]); this.grab.p = q; return;
+      }
+      const h = this.hit(ev); if (!h) return;
+      if (h.point.distanceTo(this.last) < this.r * 0.3) return;
+      this.dab(h.point, h.face.normal.clone().transformDirection(h.object.matrixWorld)); this.last = h.point.clone();
+    },
+    onUp() {
+      controls.enabled = true;
+      if (this.stroke && this.stroke.length) { this._strokes.length = this.ns; this._strokes.push(this.stroke); this.ns++; }
+      this.stroke = null; this.grab = null;
+      if (this.grid) this.remesh();
+    },
+    onMove(ev) {
+      if (!this.grid) { dom.style.cursor = hitBodies(ev) ? 'pointer' : ''; return; }
+      const h = this.hit(ev);
+      if (h) { const n = h.face.normal.clone().transformDirection(h.object.matrixWorld); this.ring.visible = true; this.ring.position.copy(h.point).addScaledVector(n, 0.05); this.ring.quaternion.setFromUnitVectors(new V3(0, 0, 1), n); this.ring.scale.setScalar(this.r); }
+      else this.ring.visible = false;
+      dom.style.cursor = h ? 'crosshair' : ''; requestRender();
+    },
+    onClick(ev) {
+      if (this.grid) return;
+      const h = hitBodies(ev); if (!h) return;
+      this.body = h.object.userData.bodyId; this.layout(); this.rebuild();
+    },
+    ok() { if (!this.grid || !this.body) return null; const o = this.feature(); o.id = f ? f.id : newId(); return o; },
+    cleanup() { clearTimeout(this.timer); this.hideBody = null; clearGroup(G.overlay); controls.enabled = true; }
+  };
+  beginCmd(c); c.init();
+}
+
+/* ---------- Kontrola tisku (overhangs and thin walls, nothing is changed) ---------- */
+function startPrintCheck() {
+  const c = {
+    angle: 45, thin: 0.8, timer: null,
+    init() {
+      if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
+      openDialog({ title: 'Kontrola tisku', icon: 'printcheck',
+        fields: [{ k: 'num', id: 'angle', label: 'Největší převis bez podpěr', unit: '°', value: this.angle, range: [20, 80, 1] },
+          { k: 'num', id: 'thin', label: 'Nejtenčí stěna', value: this.thin, range: [0.2, 3, 0.1] }, { k: 'note', id: 'leg' }, { k: 'note', id: 'n' }],
+        onChange: id => { const v = dlg.get(id); if (v > 0) this[id] = v; this.schedule(); } });
+      dlg.set('leg', 'Červeně: převisy, které potřebují podpěry. Oranžově: příliš tenké stěny. Nic se nemění.');
+      dlg.okLabel('Zavřít'); this.schedule();
+    },
+    schedule() {
+      clearTimeout(this.timer); dlg.set('n', 'Kontroluji…');
+      this.timer = setTimeout(() => {
+        if (cmd !== this) return;
+        clearGroup(G.preview); let aO = 0, aT = 0;
+        for (const b of cur.bodies) {
+          if (!isVis(b.id)) continue;
+          const r = ORG.printCheck(b.polys, { angle: this.angle, thin: this.thin }), pos = [], col = [];
+          const cO = tok.danger, cT = tok.orange;
+          r.tris.forEach((t, i) => { const fl = r.flags[i]; if (!fl) return; const cc = fl & 2 ? cT : cO; for (const q of t) { pos.push(q[0], q[1], q[2]); col.push(cc.r, cc.g, cc.b); } });
+          aO += r.overhang; aT += r.thin;
+          if (pos.length) {
+            const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+            const m = noRay(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.85, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: THREE.DoubleSide })));
+            G.preview.add(m);
+          }
+        }
+        dlg.set('n', `Převisy: ${fmtc(aO / 100, 2)} cm² · tenké stěny: ${fmtc(aT / 100, 2)} cm²` + (!aO && !aT ? ' – v pořádku' : ''));
+        dlg.okEnabled(true); requestRender();
+      }, 80);
+    },
+    ok() { endCmd(false); return null; },
+    cleanup() { clearTimeout(this.timer); clearGroup(G.preview); }
+  };
+  beginCmd(c); c.init();
+}
+function startOrganic(id, i, ef) {
+  if (id === 'blob') return startBlob(i, ef);
+  if (id === 'skin') return startSkin(i, ef);
+  if (id === 'sweep') return startSweep(i, ef);
+  if (id === 'loft') return startLoft(i, ef);
+  if (id === 'sculpt') return startSculpt(i, ef);
+  if (id === 'printcheck') return startPrintCheck();
+  return startOrgMod(id, i, ef);
+}
+
 /* ================= account sync (js/sync.js) ================= */
 /* the library as the sync module sees it; its own writes are quiet so they are not sent straight back */
 function quietly(fn) { syncQuiet = true; try { return fn(); } finally { syncQuiet = false; } }

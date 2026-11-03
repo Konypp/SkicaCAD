@@ -18,6 +18,9 @@ html, body { margin: 0; padding: 0; }
   --orange-soft: #fbe6cf;
   --ok: #24935a;
   --danger: #d2433e;
+  --org: #8a4fd0;
+  --org-soft: #efe5fb;
+  --ic-org: #cdb2f0;
   --ic-blue: #9cc8ec;
   --ic-blue-2: #5fa3dc;
   --ic-orange: #f2b36b;
@@ -38,7 +41,7 @@ html, body { margin: 0; padding: 0; }
   :root:not([data-theme="light"]) {
     --app: #1b1e22; --panel: #26292e; --panel-2: #30343a; --panel-3: #3a3f46; --field: #1c1f23; --line: #3d434b;
     --ink: #e4e7eb; --muted: #9aa3ad; --accent: #3aa2ec; --accent-ink: #0b1620; --accent-soft: #1d3a52; --accent-hover: #7cc4f5;
-    --orange: #f0a24f; --orange-soft: #4a3420; --ok: #3cc07c; --danger: #f06a64;
+    --orange: #f0a24f; --orange-soft: #4a3420; --ok: #3cc07c; --danger: #f06a64; --org: #b48cf0; --org-soft: #34284a; --ic-org: #6a4a9a;
     --ic-blue: #3f78a8; --ic-blue-2: #6aa9dd; --ic-orange: #c9843f;
     --vp-top: #3b424b; --vp-bot: #17191d; --body: #9aa2ac; --edge: #0e1013; --sketch: #6cb0ff;
     --grid: #343a42; --grid-major: #4a525c; --cube: #3a4048; --cube-ink: #e4e7eb;
@@ -49,7 +52,7 @@ html, body { margin: 0; padding: 0; }
 :root[data-theme="dark"] {
   --app: #1b1e22; --panel: #26292e; --panel-2: #30343a; --panel-3: #3a3f46; --field: #1c1f23; --line: #3d434b;
   --ink: #e4e7eb; --muted: #9aa3ad; --accent: #3aa2ec; --accent-ink: #0b1620; --accent-soft: #1d3a52; --accent-hover: #7cc4f5;
-  --orange: #f0a24f; --orange-soft: #4a3420; --ok: #3cc07c; --danger: #f06a64;
+  --orange: #f0a24f; --orange-soft: #4a3420; --ok: #3cc07c; --danger: #f06a64; --org: #b48cf0; --org-soft: #34284a; --ic-org: #6a4a9a;
   --ic-blue: #3f78a8; --ic-blue-2: #6aa9dd; --ic-orange: #c9843f;
   --vp-top: #3b424b; --vp-bot: #17191d; --body: #9aa2ac; --edge: #0e1013; --sketch: #6cb0ff;
   --grid: #343a42; --grid-major: #4a525c; --cube: #3a4048; --cube-ink: #e4e7eb;
@@ -70,6 +73,13 @@ button { cursor: pointer; }
 .ico svg .o { fill: var(--ic-orange); }
 .ico svg .g { fill: var(--ok); }
 .ico svg .r { fill: var(--danger); }
+.ico svg .p { fill: var(--ic-org); }
+/* ORGANICKÉ: its own tab and a tinted ribbon, so these tools are told apart from the CAD ones */
+.rtab.org { color: var(--org); }
+.rtab.org[aria-selected="true"] { color: var(--org); border-bottom-color: var(--org); }
+.ribbon.org .rbody { background: linear-gradient(to bottom, var(--org-soft), transparent 70%); }
+.ribbon.org .rlabel { color: var(--org); }
+.ribbon.org .tool .ico { color: var(--org); }
 
 .app { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr) auto; }
 
