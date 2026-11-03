@@ -1,5 +1,16 @@
 # Changelog
 
+## Beta 1.75
+- **Samec spony se tiskne bez podpěr:** jazyk a pružná ramena s háčky leží na podložce (dřív visela 1,5 mm nad ní, jen přichycená k základně, a bez podpěr by se prověsila). Platí pro samostatnou Sponu i pro spony na koncích řemínku; do samice zapadne stejně.
+## Beta 1.74
+- **Spona sklápěcí** (Kloubový model › Zapínání na koncích) místo „Jazyk a poutko“ – podle tištěných řemínků: samec leží naplocho na konci, samice se tiskne **nastojato** na začátku řemínku na úzké patce s kosočtverečnými čepy, které se otáčejí v otvorech ramen prvního článku. Po tisku se samice sklopí o 90° ven do roviny řemínku, ústím od něj. Tenká dutina samice tak nepotřebuje most a spona je jen o málo silnější než řemínek; délka řemínku zůstává stejná. „Jazyk a poutko“ zůstává jen u starších modelů.
+## Beta 1.73
+- **Zapínání na koncích řemínku už řemínek neprodlužuje:** konce se odříznou o délku samice a samce (nebo poutka a jazyku) a díly se připojí na jejich místo, takže celková délka zůstane stejná. Klouby se rozmístí rovnoměrně po zbylé délce.
+## Beta 1.72
+- **Kloubový model – typ Nahoru/dolů** (podle tištěných řemínků hodinek): jazýček článku sedí mezi dvěma rameny sousedního, na bocích má kosočtverečné čepy ve V drážkách (všechny plochy pod 45°, tiskne se naplocho bez podpěr); konce článků jsou z boku kulaté kolem osy. Články se ohýbají nahoru a dolů (kolem zápěstí), drží v tahu i do stran.
+- **Zapínání na koncích:** Žádné / Spona / **Jazyk a poutko** – na začátku řemínku stojí úzké poutko tvaru U (s náběhem nahoře), na konci je plochý jazyk rozdělený na tři prsty; jazyk se zasune do poutka a drží v něm těsně.
+## Beta 1.71
+- **Kloubový model bez typu Očka:** zůstávají Kotouč a Pant (oba se otáčejí kolem svislé osy Z). Starší modely s Očky se dál počítají a při úpravě tuto volbu nabídnou.
 ## Beta 1.70
 - **Spona – samice s výrazným vykrojením po stranách:** široký oblouk nad okénky (jako „pas“ spony na batohu), hlubší než boční stěna, takže háčky samce z boku vystupují a jdou snadno zmáčknout palcem a ukazovákem. Vykrojení končí přesně u přední hrany okénka, kde plná stěna dál drží háčky. Samice je kvůli tomu o něco delší.
 ## Beta 1.69

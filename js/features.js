@@ -1410,7 +1410,9 @@ function sectionAt(polys, a, x) {
 function buckleParts(f) {
   const Wf = Math.max(12, Number(f.w) || 25), H = Math.max(6, Number(f.h) || 8), g = Math.max(0.15, Number(f.gap) || 0.3);
   const ws = Math.max(1.6, Math.min(3, Wf * 0.08)), tw = Math.max(1.2, Math.min(2, H * 0.16));
-  const Wc = Wf - 2 * ws, Hc = H - 2 * tw, hm = Hc - 2 * g, zoff = tw + g;
+  /* the male's tongue and prongs lie on the bed (z = 0) so they print without supports; in use they slide into the
+     female's cavity, which is tw + g above her bottom */
+  const Wc = Wf - 2 * ws, Hc = H - 2 * tw, hm = Hc - 2 * g, zoff = 0, zcav = tw + g;
   if (hm < 1.6) throw new Error('Spona je příliš nízká; zvyšte výšku spony');
   const Li = Wf * 0.75, Lc = Li + g, lh = Math.max(3, Wf * 0.22), pw = Math.max(1.6, Math.min(3, Wf * 0.1)), hk = Math.min(ws * 0.85, 2);
   const tc = Wc - 2 * (g + pw + hk + 0.8);
@@ -1448,14 +1450,123 @@ function buckleParts(f) {
     const hole = box(2.2, 2.2 + sl, -(Wc / 2 - 0.5), Wc / 2 - 0.5, -1, H + 1);
     if (part === 'f') fem = KK.boolean(fem, hole, 'subtract'); else mal = KK.boolean(mal, hole, 'subtract');
   }
-  return { female: fem, male: mal, Lf, Lb, H, Wf };
+  return { female: fem, male: mal, Lf, Lb, H, Wf, zcav };
+}
+/* ---------- Jazyk a poutko: the clasp of a thin strap (like a printed watch strap) ----------
+   Local frame as for the buckle. The female is a narrow upright U at the strap's end, open at the top; the male is a
+   flat tongue split into three fingers. Worn, the strap's last links bend down and the tongue slides into the U, where
+   it is held snugly (the slot is a touch narrower than the tongue; the fingers give). */
+function tongueParts(f) {
+  const W = Math.max(8, Number(f.w) || 16), h = Math.max(2, Number(f.h) || 3.5), fit = Number(f.fit === undefined ? -0.05 : f.fit);
+  const tt = Math.max(1.2, Math.min(2, h * 0.5)), Lt = Math.max(8, Math.min(W * 0.9, 16)), wt = 1.5, slot = Math.max(0.6, tt + fit), hb = Math.max(h, 3);
+  const Lu = 2 * wt + slot, Hu = hb + Lt + 1;
+  const box = (x0, x1, y0, y1, z0, z1) => KK.translate(KK.primitive('box', { w: x1 - x0, d: y1 - y0, h: z1 - z0 }), [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2]);
+  let female = KK.boolean(box(0, Lu, -W / 2, W / 2, 0, Hu), box(wt, wt + slot, -W / 2 - 1, W / 2 + 1, hb, Hu + 1), 'subtract');
+  /* a lead-in at the top of the slot */
+  const lead = KK.extrudeProfiles([{ pts: [[wt - 0.6, Hu + 0.01], [wt, Hu - 0.8], [wt + slot, Hu - 0.8], [wt + slot + 0.6, Hu + 0.01]], closed: true }], { o: [0, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] }, -W / 2 - 1, W / 2 + 1);
+  female = KK.boolean(female, KK.fixOrientation(lead), 'subtract');
+  const tw = W - 2;
+  let male = box(-1, Lt, -tw / 2, tw / 2, 0, tt);
+  for (const y of [-tw / 6, tw / 6]) male = KK.boolean(male, box(Lt * 0.3, Lt + 1, y - 0.4, y + 0.4, -1, tt + 1), 'subtract');
+  /* rounded-off tip corners for an easy start */
+  for (const sg of [-1, 1]) {
+    const c = KK.extrudeProfiles([{ pts: [[Lt - 2, sg * tw / 2], [Lt + 0.1, sg * tw / 2], [Lt + 0.1, sg * (tw / 2 - 2)]].map(([x, y]) => [x, y]), closed: true }].map(q => ({ ...q, pts: KK.area2D(q.pts) < 0 ? q.pts.slice().reverse() : q.pts })), { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] }, -1, tt + 1);
+    male = KK.boolean(male, c, 'subtract');
+  }
+  return { female, male, W, Lu, Lt };
 }
 /* place a buckle half: local +x along dir (unit vector in the bed's plane), back at point o (z of the bed at o[2]) */
 function placeLocal(polys, o, dir) {
   const c = dir[0], s2 = dir[1];
   return KK.transform(polys, [c, s2, 0, 0, -s2, c, 0, 0, 0, 0, 1, 0, o[0], o[1], o[2], 1]);
 }
+/* the clasp halves replace the ends of the strap (the strap keeps its length): the body is shortened at both ends by
+   the length of the clasp parts, jointed, and the parts are joined on, the female at the start, the male at the end */
 function articulate(polys, f) {
+  if (f.ends === 'fold') return articulateFold(polys, f);
+  if (f.ends !== 'buckle' && f.ends !== 'tongue') return articulateCore(polys, f);
+  const a = f.axis === 'y' ? 1 : 0, sAx = 1 - a, bb = KK.bbox(polys);
+  const parts = [[bb.min[a], -1], [bb.max[a], 1]].map(([xe, sg]) => {
+    const sec = sectionAt(polys, a, xe - sg * 0.6) || { min: bb.min, max: bb.max };
+    const wEnd = sec.max[sAx] - sec.min[sAx], hEnd = sec.max[2] - sec.min[2];
+    const B = f.ends === 'tongue' ? tongueParts({ w: Number(f.bw) || wEnd, h: hEnd })
+      : buckleParts({ w: Number(f.bw) || Math.max(14, wEnd), h: Number(f.bh) || Math.max(7, hEnd), gap: f.bgap || 0.3 });
+    const body = sg < 0 ? B.female : B.male, len = KK.bbox(body).max[0];
+    return { xe, sg, body, len, sec };
+  });
+  const L = bb.max[a] - bb.min[a], inner = L - parts[0].len - parts[1].len;
+  if (inner < 6) throw new Error('Řemínek je na zapínání příliš krátký');
+  /* the strap without its ends (1 mm is left under each part so they join) */
+  const lo = bb.min[a] + parts[0].len - 1, hi = bb.max[a] - parts[1].len + 1, BIG = 4 * Math.max(...[0, 1, 2].map(k => bb.max[k] - bb.min[k])) + 100;
+  const blo = bb.min.map(v => v - BIG), bhi = bb.max.map(v => v + BIG); blo[a] = lo; bhi[a] = hi;
+  const keep = KK.translate(KK.primitive('box', { w: bhi[0] - blo[0], d: bhi[1] - blo[1], h: bhi[2] - blo[2] }), [0, 1, 2].map(k => (blo[k] + bhi[k]) / 2));
+  const trimmed = KK.boolean(polys, keep, 'intersect');
+  const out = articulateCore(trimmed, { ...f, ends: undefined });
+  for (const [k, p] of [[0, parts[0]], [out.length - 1, parts[1]]]) {
+    const o = [0, 0, p.sec.min[2]]; o[a] = p.xe - p.sg * p.len; o[sAx] = (p.sec.min[sAx] + p.sec.max[sAx]) / 2;
+    const dir = [0, 0]; dir[a] = p.sg;
+    out[k] = KK.boolean(out[k], placeLocal(p.body, o, dir), 'union');
+  }
+  return out;
+}
+/* Spona sklápěcí: a buckle as thin as the strap (after the printed watch straps). The male lies flat at the end; the
+   female is printed standing up at the start (its thin cavity needs no bridge that way) on a narrow foot that turns in
+   an up/down joint of the first link: after printing, fold it 90° outwards into the strap's line, mouth outwards. The
+   foot carries diamond lugs that turn in round bores of the link's arms. */
+function articulateFold(polys, f) {
+  const a = f.axis === 'y' ? 1 : 0, sAx = 1 - a, bb = KK.bbox(polys), g = Math.max(0.15, Number(f.gap) || 0.4);
+  const ea = [0, 0, 0], es = [0, 0, 0], ez = [0, 0, 1]; ea[a] = 1; es[sAx] = 1;
+  const BIG = 4 * Math.max(...[0, 1, 2].map(k => bb.max[k] - bb.min[k])) + 100;
+  const P3 = (av, sv, zv) => { const p = [0, 0, zv]; p[a] = av; p[sAx] = sv; return p; };
+  const boxAS = (ar, sr, zr) => { const lo = P3(ar[0], sr[0], zr[0]), hi = P3(ar[1], sr[1], zr[1]); return KK.translate(KK.primitive('box', { w: hi[0] - lo[0], d: hi[1] - lo[1], h: hi[2] - lo[2] }), [0, 1, 2].map(k => (lo[k] + hi[k]) / 2)); };
+  const I = (p, q) => KK.boolean(p, q, 'intersect'), U = (p, q) => KK.boolean(p, q, 'union'), S = (p, q) => KK.boolean(p, q, 'subtract');
+  const secS = sectionAt(polys, a, bb.min[a] + 0.6) || { min: bb.min, max: bb.max }, secE = sectionAt(polys, a, bb.max[a] - 0.6) || { min: bb.min, max: bb.max };
+  const W = Number(f.bw) || (secS.max[sAx] - secS.min[sAx]), sc = (secS.min[sAx] + secS.max[sAx]) / 2, z0 = secS.min[2], zs = secS.max[2] - secS.min[2], zc = z0 + zs / 2, hz = zs / 2;
+  /* thin buckle: cavity just thick enough for a male of ~1.6 mm */
+  const T = Math.max(4.6, zs + 0.6), B = buckleParts({ w: Math.max(12, W), h: T, gap: f.bgap || 0.3 });
+  const hw = W / 2, wa = Math.max(1.6, Math.min(3, hw * 0.22)), st = hw - wa - g;
+  const dp = Math.max(0.8, Math.min(hz * 0.6, 2)), Rr = Math.max(hz, dp + g * 1.42 + 1.2), pd = Math.min(wa * 0.55, 1.4);
+  if (st < 2 || zs < 2.4) throw new Error('Řemínek je na sklápěcí sponu příliš malý');
+  const zw = zc + Rr + g, rise = Math.max(0, W / 2 - st), zb2 = zw + rise, Hup = zb2 - zc + B.Lf; /* height above the axis */
+  /* the axis sits so that the folded female ends where the strap began; the male takes the strap's other end */
+  const xpf = bb.min[a] + Hup, mlen = KK.bbox(B.male).max[0];
+  if (bb.max[a] - mlen - xpf < 8) throw new Error('Řemínek je na zapínání příliš krátký');
+  const lo = xpf - Rr - 0.5, hi = bb.max[a] - mlen + 1;
+  const trimmed = I(polys, boxAS([lo, hi], [sc - BIG, sc + BIG], [z0 - BIG, z0 + BIG]));
+  const out = articulateCore(trimmed, { ...f, ends: undefined });
+  /* male at the end */
+  { const o = [0, 0, secE.min[2]]; o[a] = bb.max[a] - mlen; o[sAx] = (secE.min[sAx] + secE.max[sAx]) / 2; const dir = [0, 0]; dir[a] = 1; out[out.length - 1] = U(out[out.length - 1], placeLocal(B.male, o, dir)); }
+  /* the first link: arms round about the axis, the middle hollowed round for the female's foot, bores for its lugs */
+  const Q = P3(xpf, sc, zc), along = r => { const o = Q.slice(); o[sAx] -= BIG / 2; return cylAlong(o, es, r, BIG); };
+  const cylR = along(Rr), cylG = along(Rr + g);
+  const halfB = boxAS([xpf + g / 2, xpf + BIG], [sc - BIG, sc + BIG], [z0 - BIG, z0 + BIG]);
+  const inner = boxAS([xpf - BIG, xpf + BIG], [sc - st, sc + st], [z0 - BIG, z0 + BIG]);
+  const outer = S(boxAS([xpf - BIG, xpf + BIG], [sc - BIG, sc + BIG], [z0 - BIG, z0 + BIG]), boxAS([xpf - BIG, xpf + BIG], [sc - st - g, sc + st + g], [z0 - BIG, z0 + BIG]));
+  let link = out[0];
+  link = U(I(link, I(S(halfB, cylG), inner)), I(link, I(U(halfB, cylR), outer)));
+  for (const sg of [-1, 1]) { const o = Q.slice(); o[sAx] = sc + sg * st; link = S(link, cylAlong(o, KK.vmul(es, sg), dp + g, g + pd + g)); }
+  /* the female, standing: foot (round about the axis), neck, a 45° widening, then the buckle's female, mouth up */
+  const slab = boxAS([xpf - BIG, xpf + BIG], [sc - BIG, sc + BIG], [z0, z0 + BIG]);
+  let fem = I(I(cylR, inner), slab);
+  fem = U(fem, boxAS([xpf - T / 2, xpf + T / 2], [sc - st, sc + st], [zc, zw + 0.01]));
+  { const n = KK.cross(es, ez), sgn = KK.vdot(n, ea) > 0 ? 1 : -1, pts = [[sc - st, zw], [sc + st, zw], [sc + W / 2, zb2 + 0.01], [sc - W / 2, zb2 + 0.01]];
+    const tr = KK.extrudeProfiles([{ pts, closed: true }], { o: [0, 0, 0], u: es, v: ez, n }, sgn > 0 ? xpf - T / 2 : -(xpf + T / 2), sgn > 0 ? xpf + T / 2 : -(xpf - T / 2));
+    fem = U(fem, KK.fixOrientation(tr)); }
+  { const m = a === 0 ? [0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, xpf - T / 2, sc, zb2, 1] : [0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, sc, xpf - T / 2, zb2, 1];
+    fem = U(fem, KK.fixOrientation(KK.transform(B.female, m))); }
+  /* diamond lugs on the foot's sides */
+  { const n = KK.cross(ea, ez), sgn = KK.vdot(n, es) > 0 ? 1 : -1, d = [[xpf - dp, zc], [xpf, zc - dp], [xpf + dp, zc], [xpf, zc + dp]];
+    for (const sg of [-1, 1]) {
+      const s0 = sc + sg * (st - 0.3), s1 = sc + sg * (st + g + pd), lo2 = Math.min(s0, s1), hi2 = Math.max(s0, s1);
+      const lug = KK.extrudeProfiles([{ pts: d, closed: true }], { o: [0, 0, 0], u: ea, v: ez, n }, sgn > 0 ? lo2 : -hi2, sgn > 0 ? hi2 : -lo2);
+      fem = U(fem, KK.fixOrientation(lug));
+    } }
+  out[0] = link;
+  out.unshift(fem);
+  out.foldAxis = { Q, es, angle: (KK.vdot(KK.cross(es, ez), ea) > 0 ? -1 : 1) * Math.PI / 2 };
+  return out;
+}
+function articulateCore(polys, f) {
   const a = f.axis === 'y' ? 1 : 0, sAx = 1 - a, bb = KK.bbox(polys), g = Math.max(0.15, Number(f.gap) || 0.4);
   const L = bb.max[a] - bb.min[a], n = Math.max(1, Math.min(40, Math.round(Number(f.n) || 4))), th = Math.max(5, Math.min(60, Number(f.angle) || 30)) * Math.PI / 180;
   const BIG = 4 * Math.max(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]) + 100;
@@ -1463,6 +1574,12 @@ function articulate(polys, f) {
   const C = [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2);
   const span = (k, lo, hi) => { const l = C.map(v => v - BIG / 2), h = C.map(v => v + BIG / 2); l[k] = lo; h[k] = hi; return [l, h]; };
   const vcyl = (P, r, z0, z1) => cylAlong([P[0], P[1], z0], [0, 0, 1], r, z1 - z0);
+  const rotAbout = (polysR, Pc, ax, ang) => { /* rotation about the line through Pc along unit vector ax */
+    const [x, y, z] = ax, c = Math.cos(ang), sn = Math.sin(ang), t = 1 - c;
+    const Rm = [[t * x * x + c, t * x * y - sn * z, t * x * z + sn * y], [t * x * y + sn * z, t * y * y + c, t * y * z - sn * x], [t * x * z - sn * y, t * y * z + sn * x, t * z * z + c]];
+    const tr = [0, 1, 2].map(i => Pc[i] - (Rm[i][0] * Pc[0] + Rm[i][1] * Pc[1] + Rm[i][2] * Pc[2]));
+    return KK.transform(polysR, [Rm[0][0], Rm[1][0], Rm[2][0], 0, Rm[0][1], Rm[1][1], Rm[2][1], 0, Rm[0][2], Rm[1][2], Rm[2][2], 0, tr[0], tr[1], tr[2], 1]);
+  };
   const rotZ = (polysR, P, ang) => { const c = Math.cos(ang), sn = Math.sin(ang); return KK.transform(polysR, [c, sn, 0, 0, -sn, c, 0, 0, 0, 0, 1, 0, P[0] - c * P[0] + sn * P[1], P[1] - sn * P[0] - c * P[1], 0, 1]); };
   const at = Array.isArray(f.at) && f.at.length ? f.at.map(Number).sort((p, q) => p - q) : Array.from({ length: n }, (_, i) => bb.min[a] + L * (i + 1) / (n + 1));
   const out = []; let rest = polys;
@@ -1526,6 +1643,41 @@ function articulate(polys, f) {
       for (const sg of [-1, 1]) eyeB = U(eyeB, boxAS([xp, aB + 1], sg < 0 ? [sc - SO, sc - SI] : [sc + SI, sc + SO], [zb, zb1 - fr]));
       A = U(I(I(rest, boxAS([xp - far * 2, aA], [sc - far, sc + far], [z0, z1])), wedge(P, -1, alpha)), eyeA);
       B = U(I(I(rest, boxAS([aB, xp + far * 2], [sc - far, sc + far], [z0, z1])), wedge(P, 1, alpha)), eyeB);
+    } else if (style === 'flex') {
+      /* bends up and down (about a horizontal axis across the chain), like a watch strap: the right segment ends in a
+         tongue between two arms of the left one; diamond lugs on the tongue's sides sit in V grooves inside the arms
+         (all faces at 45°, so it prints flat without supports). Seen from the side both ends are round about the axis. */
+      /* the round ends reach past the grooves by a solid wall, which is what keeps the joint from pulling apart */
+      const zcc = zc, hz = zs / 2, dp0 = Math.max(0.8, Math.min(hz * 0.6, 2)), Rr = Math.max(hz, dp0 + g * 1.42 + 1.2), wa = Math.max(1.6, Math.min(3, hw * 0.22)), st = hw - wa - g;
+      if (st < 1.5 || zs < 2.4) throw new Error('Těleso je v místě kloubu na ohybový kloub příliš malé; použijte méně kloubů');
+      const Q = P.slice(); Q[2] = zcc;
+      const along = (r) => { const o = Q.slice(); o[sAx] -= BIG / 2; return cylAlong(o, es, r, BIG); };
+      const cylR = along(Rr), cylG = along(Rr + g);
+      const halfA = boxAS([xp - far * 2, xp - g / 2], [sc - far, sc + far], [z0, z1]), halfB = boxAS([xp + g / 2, xp + far * 2], [sc - far, sc + far], [z0, z1]);
+      const inner = boxAS([xp - far, xp + far], [sc - st, sc + st], [z0, z1]);
+      const outer = S(boxAS([xp - far, xp + far], [sc - far, sc + far], [z0, z1]), boxAS([xp - far, xp + far], [sc - st - g, sc + st + g], [z0, z1]));
+      A = I(rest, U(S(halfA, cylG), I(U(cylR, I(cylG, halfA)), outer)));
+      B = I(rest, U(S(halfB, cylG), I(U(cylR, I(cylG, halfB)), inner)));
+      /* diamond lugs on the tongue, V grooves in the arms (swept by the swing so the joint turns) */
+      const dp = dp0, pd = Math.min(wa * 0.55, 1.4);
+      const diamond = (h, s0, s1) => {
+        const pts = [[xp - h, zcc], [xp, zcc - h], [xp + h, zcc], [xp, zcc + h]];
+        const Bp = { o: [0, 0, 0], u: ea, v: [0, 0, 1], n: KK.cross(ea, [0, 0, 1]) };
+        const sg = KK.vdot(Bp.n, es) > 0 ? 1 : -1, q = pts.map(([x, z]) => [x, z]);
+        return KK.extrudeProfiles([{ pts: KK.area2D(q) < 0 ? q.slice().reverse() : q, closed: true }], Bp, sg * (s0 - (a === 0 ? 0 : 0)), sg * s1);
+      };
+      const sideBox = (sg, s0, s1) => (sg < 0 ? [sc - s1, sc - s0] : [sc + s0, sc + s1]);
+      const steps = Math.max(2, Math.ceil(th / (10 * Math.PI / 180)));
+      for (const sg of [-1, 1]) {
+        const [l0, l1] = sideBox(sg, st - 0.3, st + g + pd);
+        /* a diamond prism placed by its side-axis range */
+        const lug = (h, lo, hi) => { let d = diamond(h, 0, 1); const bbd = KK.bbox(d); const sc0 = bbd.min[sAx], sc1 = bbd.max[sAx]; const m = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]; m[sAx * 5] = (hi - lo) / (sc1 - sc0 || 1); m[12 + sAx] = lo - sc0 * m[sAx * 5]; return KK.transform(d, m); };
+        B = U(B, lug(dp, l0, l1));
+        const [g0, g1] = sideBox(sg, st, st + g + pd + g);
+        let groove = lug(dp + g * 1.42, g0, g1);
+        for (let i = -steps; i <= steps; i++) if (i) groove = U(groove, rotAbout(lug(dp + g * 1.42, g0, g1), Q, es, th * i / steps));
+        A = S(A, groove);
+      }
     } else if (style === 'hinge') {
       /* a pin hinge with an upright axis, three knuckles (odd count, no axial play): the left segment holds the top and
          bottom knuckles joined by a pin through the middle knuckle of the right segment. The pin and its bore stand
@@ -1565,7 +1717,7 @@ function articulate(polys, f) {
       for (let i = -steps; i <= steps; i++) slot = U(slot, rotZ(box(sLo, sHi), P, thd * i / steps));
       B = S(B, slot);
     }
-    if (style !== 'chain') {
+    if (style !== 'chain' && style !== 'flex') {
       const keep = vcyl(P, hw * 0.92 + g, z0, z1);
       A = U(I(A, wedge(P, -1, alpha)), I(A, keep));
       B = U(I(B, wedge(P, 1, alpha)), I(B, keep));
@@ -1574,18 +1726,6 @@ function articulate(polys, f) {
     out.push(A); rest = B;
   }
   out.push(rest);
-  /* a strap: the female buckle at the start, the male at the end, both pointing outwards */
-  if (f.ends === 'buckle') {
-    const ends = [[0, bb.min[a], -1], [out.length - 1, bb.max[a], 1]];
-    for (const [k, xe, sg] of ends) {
-      const sec = sectionAt(out[k], a, xe - sg * 0.6) || { min: bb.min, max: bb.max };
-      const wEnd = sec.max[sAx] - sec.min[sAx], hEnd = sec.max[2] - sec.min[2];
-      const B = buckleParts({ w: Number(f.bw) || Math.max(14, wEnd), h: Number(f.bh) || Math.max(7, hEnd), gap: f.bgap || 0.3 });
-      const o = [0, 0, sec.min[2]]; o[a] = xe - sg * 1; o[sAx] = (sec.min[sAx] + sec.max[sAx]) / 2;
-      const dir = [0, 0]; dir[a] = sg;
-      out[k] = KK.boolean(out[k], placeLocal(k === 0 ? B.female : B.male, o, dir), 'union');
-    }
-  }
   return out;
 }
 function step(state, f) {
@@ -1939,7 +2079,7 @@ function makeRebuilder() {
   };
 }
 
-return { buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

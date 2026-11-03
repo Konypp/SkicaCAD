@@ -7270,23 +7270,25 @@ const ORG_MODS = {
     prompt: 'Spodek tělesa se zarovná do roviny, aby postavička stála a dobře se tiskla'
   },
   articulate: {
-    defaults: () => ({ style: 'disc', axis: 'x', cnt: 4, gap: 0.4, angle: 30, ends: false, bw: 0, bh: 0 }),
-    load: f => ({ style: f.style || 'disc', axis: f.axis || 'x', cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30, ends: f.ends === 'buckle', bw: f.bw || 0, bh: f.bh || 0 }),
-    fields: v => [{ k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['chain', 'Očka']], value: v.style },
+    defaults: () => ({ style: 'disc', axis: 'x', cnt: 4, gap: 0.4, angle: 30, ends: 'none', bw: 0, bh: 0 }),
+    load: f => ({ style: f.style || 'disc', axis: f.axis || 'x', cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30, ends: f.ends || 'none', bw: f.bw || 0, bh: f.bh || 0 }),
+    fields: v => [{ k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů']].concat(v.style === 'chain' ? [['chain', 'Očka']] : []), value: v.style }, /* Očka only for older models that use them */
       { k: 'seg', id: 'axis', label: 'Řetěz podél osy', options: [['x', 'X'], ['y', 'Y']], value: v.axis },
       { k: 'num', id: 'cnt', label: 'Počet kloubů', unit: 'ks', value: v.cnt, range: [1, 20, 1] },
       { k: 'num', id: 'gap', label: 'Vůle v kloubu', value: v.gap }, { k: 'num', id: 'angle', label: 'Natočení kloubu', unit: '°', value: v.angle, range: [10, 60, 1] },
-      { k: 'chk', id: 'ends', label: 'Spona na koncích (řemínek): na začátku samice, na konci samec', value: v.ends },
+      { k: 'seg', id: 'ends', label: 'Zapínání na koncích (řemínek)', options: [['none', 'Žádné'], ['buckle', 'Spona'], ['fold', 'Spona sklápěcí']].concat(v.ends === 'tongue' ? [['tongue', 'Jazyk a poutko']] : []), value: v.ends },
       { k: 'num', id: 'bw', label: 'Šířka spony (0 = jako řemínek)', value: v.bw }, { k: 'num', id: 'bh', label: 'Výška spony (0 = automaticky)', value: v.bh },
       { k: 'note', id: 'tip' }],
-    feature: v => ({ style: v.style, axis: v.axis, n: Math.max(1, Math.round(v.cnt)), gap: v.gap, angle: v.angle, ...(v.ends ? { ends: 'buckle', bw: v.bw || 0, bh: v.bh || 0 } : {}) }),
+    feature: v => ({ style: v.style, axis: v.axis, n: Math.max(1, Math.round(v.cnt)), gap: v.gap, angle: v.angle, ...(v.ends && v.ends !== 'none' ? { ends: v.ends, bw: v.bw || 0, bh: v.bh || 0 } : {}) }),
     layout(c) {
-      dlg.show('bw', !!c.v.ends); dlg.show('bh', !!c.v.ends);
+      dlg.show('bw', c.v.ends !== 'none'); dlg.show('bh', c.v.ends === 'buckle');
+      const endsTip = c.v.ends === 'fold' ? ' Spona sklápěcí: samice se tiskne nastojato na začátku řemínku (tenká dutina tak nepotřebuje most) a po tisku se v kloubu sklopí o 90° ven, ústím od řemínku; samec leží naplocho na konci. Spona je jen o málo silnější než řemínek.' : '';
       dlg.set('tip', {
         disc: 'Kotouč: jeden článek končí kulatým kloubem, druhý do něj zasahuje jazýčkem s kotoučem. Klouby se otáčejí kolem svislé osy, články se ohýbají do stran (had, drak, ještěrka).',
         hinge: 'Pant: tři klouby nad sebou jako u dveřního pantu, krajní drží svislý čep procházející prostředním. Otáčí se kolem svislé osy, články se ohýbají do stran.',
+        flex: 'Nahoru/dolů: jako tištěný řemínek hodinek – jazýček článku mezi dvěma rameny sousedního, na bocích kosočtverečné čepy ve V drážkách (vše pod 45°). Články se ohýbají nahoru a dolů, třeba kolem zápěstí; konce jsou z boku kulaté.',
         chain: 'Očka: dvě do sebe provlečená oblá očka jako články řetězu, jedno podél, druhé napříč; každé se uzavírá krátkým mostem mezi sloupky na podložce. Spoj má vůli, články se ohýbají do stran i trochu nahoru a dolů.'
-      }[c.v.style] + ' Tiskne se vcelku bez podpěr; po tisku klouby rozhýbejte.');
+      }[c.v.style] + ' Tiskne se vcelku bez podpěr; po tisku klouby rozhýbejte.' + endsTip);
     },
     preview(polys, f) {
       const segs = Engine.articulate(polys, f);
