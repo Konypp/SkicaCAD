@@ -1,8 +1,8 @@
 # Changelog
 
-## Beta 2.00
-- **Kloubový model – typ kloubu Očka (podle zaslaného modelu ohebné hračky):** přední stěna článku má svislý výřez do V (45°) a přes něj vodorovné ouško, zadní stěna dalšího článku má vodorovnou drážku do V (45°) a svislou sponu, která stojí na podložce a prochází ouškem. Ouško a spona jsou převzaté přímo z modelu, výřez a drážka se staví přesně; vše se zvětší nebo zmenší podle průřezu tělesa (nejvýš 2×) a stojí na podložce. Přední stěna článku se navíc zkosí do V kolem spony, aby se spoj ohýbal do stran (ověřeno ±20°); nahoru a dolů zhruba ±10°. Spoj drží v tahu i do stran, tiskne se vcelku bez podpěr.
-- **Kloubové díly › Kloubový spoj:** přibyl typ Očka. Starší typ oček (z dřívějších modelů) má v nabídce popisek Očka (starší).
+## Beta 2.01
+- Typ kloubu Očka (z Beta 2.00) odstraněn.
+- **Kloub Flexi – Řez: Rovný / Zakřivený:** zakřivený řez je kolem misky rovný a dál od ní se v oblouku stáčí k předchozímu článku, takže články do sebe zapadají jako u tištěných ohebných zvířátek (tuleň). Mezera se směrem ven mírně rozevírá, aby se články mohly natáčet (ověřeno ±15° do stran, ±10–15° nahoru a dolů i kolem osy). Volba je v Kloubovém modelu i v Kloubových dílech › Kloubový spoj.
 ## Beta 1.99
 - **Kloub Flexi stojí na podložce:** nástroj se už nestaví doprostřed výšky, ale tak, že dno misky je těsně pod podložkou – svislé očko vychází ze spodní stěny modelu a tiskne se přímo od podložky. Na kulatém tělese (válec), kde je dole úzko, se kloub zvedne výš (napůl nebo doprostřed), aby miska zůstala celá uvnitř; teprve když se nevejde ani tam, nástroj se zmenší. Pohyb (±15° ve všech osách) i držení se nemění.
 ## Beta 1.98
