@@ -2056,12 +2056,14 @@ function articulateCore(polys, f) {
     if (style === 'disc' || style === 'hinge') {
       /* the room to swing is cut from the left segment only (a V of the full swing), so the right one keeps a whole
          face: no small slivers are trimmed off the sides of a round body next to the knuckle */
-      const keep = vcyl(P, hw * 0.92 + g, z0, z1);
-      A = U(I(A, wedge(P, -1, Math.PI / 2 - th - 2 * Math.PI / 180)), I(A, keep));
+      /* the V is cut away (outside the knuckle) rather than the segment rebuilt from two pieces: rebuilding left seams
+         across the body's surface, which showed as dark streaks on round bodies */
+      const keep = vcyl(P, hw * 0.92 + g, z0, z1), cutV = (sg, al) => S(wedge(P, sg, Math.PI - al), keep);
+      A = S(A, cutV(1, Math.PI / 2 - th - 2 * Math.PI / 180));
     } else if (style !== 'chain' && style !== 'flex') {
-      const keep = vcyl(P, hw * 0.92 + g, z0, z1);
-      A = U(I(A, wedge(P, -1, alpha)), I(A, keep));
-      B = U(I(B, wedge(P, 1, alpha)), I(B, keep));
+      const keep = vcyl(P, hw * 0.92 + g, z0, z1), cutV = (sg, al) => S(wedge(P, sg, Math.PI - al), keep);
+      A = S(A, cutV(1, alpha));
+      B = S(B, cutV(-1, alpha));
     }
     if (!A.length || !B.length) throw new Error('Kloub se nepodařilo vytvořit');
     out.push(A); rest = B;

@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 1.92
+- **Kloubový model (Kotouč, Pant): čistší povrch u kloubů.** Prostor pro natočení se teď z článku vyřízne, místo aby se článek skládal ze dvou kusů; skládání nechávalo na povrchu kulatých těles švy, které se zobrazovaly jako tečkované čáry a tmavé šmouhy. Tvar ani pohyblivost kloubů se nemění.
 ## Beta 1.91
 - **TĚLESO › Součásti › Kloubové díly:** vložení hotových dílů přímo z dodaných modelů (Articulated_SinglePiece, ArticulatedTwoPiece, CircleHook, NegativePieceHoleAndCylinder) jako nová tělesa: **Článek s háčkem**, **Dva spojené články** (dvě tělesa do sebe zaháknutá), **Háček** (připojit ke svému modelu) a **Kapsa – negativ** (odečíst od svého modelu, čep zůstane). Velikost v %, otočení kolem svislé osy a poloha (i klepnutím). Díly jsou uložené v aplikaci (js/partslib.js), fungují i offline.
 ## Beta 1.90
