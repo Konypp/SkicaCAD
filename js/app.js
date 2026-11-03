@@ -177,18 +177,21 @@ function lineGeo(arr) { const g = new THREE.BufferGeometry(); g.setAttribute('po
 const noRay = o => { o.raycast = () => {}; return o; };
 
 /* grid + origin */
-const gridMinor = new THREE.LineBasicMaterial({ color: 0xcccccc, transparent: true, opacity: 0.9, depthWrite: false });
-const gridMajor = new THREE.LineBasicMaterial({ color: 0x999999, transparent: true, opacity: 0.9, depthWrite: false });
+/* the grid is drawn first and writes no depth, so bodies always cover it: seen from below, the bottom faces lying on
+   the bed (z = 0) would otherwise show the grid lines through them */
+const gridMinor = new THREE.LineBasicMaterial({ color: 0xcccccc, depthWrite: false });
+const gridMajor = new THREE.LineBasicMaterial({ color: 0x999999, depthWrite: false });
 (() => {
   const ext = 300, mi = [], ma = [];
   for (let i = -ext; i <= ext; i += 10) (i % 50 === 0 ? ma : mi).push(i, -ext, 0, i, ext, 0, -ext, i, 0, ext, i, 0);
   G.grid.add(noRay(new THREE.LineSegments(lineGeo(mi), gridMinor)), noRay(new THREE.LineSegments(lineGeo(ma), gridMajor)));
-  G.grid.renderOrder = -1;
+  G.grid.renderOrder = -2; G.grid.children.forEach(o => { o.renderOrder = -2; });
   /* X and Y axes across the whole grid (no Z axis line); the origin is a small circle */
-  const ax = (a, b, c) => G.origin.add(noRay(new THREE.Line(lineGeo([...a, ...b]), new THREE.LineBasicMaterial({ color: c }))));
+  const ax = (a, b, c) => G.origin.add(noRay(new THREE.Line(lineGeo([...a, ...b]), new THREE.LineBasicMaterial({ color: c, depthWrite: false }))));
   ax([-ext, 0, 0.02], [ext, 0, 0.02], 0xe5484d); ax([0, -ext, 0.02], [0, ext, 0.02], 0x2f9e6a);
   const ring = []; for (let i = 0; i <= 48; i++) { const a = i / 48 * Math.PI * 2; ring.push(Math.cos(a) * 2.5, Math.sin(a) * 2.5, 0.03); }
-  G.origin.add(noRay(new THREE.Line(lineGeo(ring), new THREE.LineBasicMaterial({ color: 0xe2862c }))));
+  G.origin.add(noRay(new THREE.Line(lineGeo(ring), new THREE.LineBasicMaterial({ color: 0xe2862c, depthWrite: false }))));
+  G.origin.children.forEach(o => { o.renderOrder = -1; }); /* over the grid, under the bodies */
 })();
 
 /* origin planes for sketch placement */
@@ -7796,7 +7799,7 @@ $('#m-login').addEventListener('click', () => { closeMenu(); if (syncFns) syncFn
 $('#m-logout').addEventListener('click', () => { closeMenu(); if (syncFns) syncFns.logout(); });
 if (window.I18N) I18N.onChange(() => syncMenu());
 
-if (window.__KOTA_TEST__) window.__kota = { get cmd() { return cmd; }, threeMfBytes, transform, get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart, makeThumb, libThumb, transform, persp, toPx, startMove, alignDesc,
+if (window.__KOTA_TEST__) window.__kota = { get cmd() { return cmd; }, viewTo, threeMfBytes, transform, get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart, makeThumb, libThumb, transform, persp, toPx, startMove, alignDesc,
   cmdSnap, get doc() { return doc; }, get cur() { return cur; }, get cmd() { return cmd; }, get sk() { return sk; }, get dlg() { return dlg; }, get sel() { return sel; }, meshes, chainsFor };
 })();
 

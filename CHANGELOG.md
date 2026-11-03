@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 1.81
+- **Mřížka už neprosvítá tělesy:** při pohledu zespodu (nebo ze šikmého pohledu na spodní plochu ležící na podložce) se čáry mřížky a osy X/Y kreslily přes spodní plochu tělesa, nejvíc to bylo vidět na vybraném tělese. Mřížka a osy se teď kreslí pod tělesy, takže je tělesa vždy zakryjí.
 ## Beta 1.80
 - **Soubor › Exportovat 3MF – jeden objekt s díly:** všechna viditelná tělesa se uloží jako díly jednoho objektu. V Bambu Studiu (i PrusaSliceru) je tak třeba kloubový řemínek jeden objekt složený na svém místě, jednotlivé články jsou jeho díly a každému lze dát jiný filament; Rozmístit je od sebe nerozhází. Původní Exportovat 3MF dál ukládá každé těleso jako samostatný objekt.
 ## Beta 1.79
