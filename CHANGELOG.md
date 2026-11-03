@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 1.99
+- **Kloub Flexi stojí na podložce:** nástroj se už nestaví doprostřed výšky, ale tak, že dno misky je těsně pod podložkou – svislé očko vychází ze spodní stěny modelu a tiskne se přímo od podložky. Na kulatém tělese (válec), kde je dole úzko, se kloub zvedne výš (napůl nebo doprostřed), aby miska zůstala celá uvnitř; teprve když se nevejde ani tam, nástroj se zmenší. Pohyb (±15° ve všech osách) i držení se nemění.
 ## Beta 1.98
 - **Kloub Flexi – rovné stěny mezery:** dodaný nástroj měl ve stěnách kotouče kolem misky nepatrný schod (asi 0,08 mm) a spoustu vnitřních vrcholů; na řezu po něm zůstával vystouplý kruh, který se ukázal hlavně po posunutí sousední plochy. Kotouč nástroje se teď skládá z přesného rovného válce a z modelu se bere jen prostředek s miskou a koulí, takže obě stěny mezery jsou rovné a posunutí ploch je nezkřiví. Pohyb a držení kloubu se nemění.
 ## Beta 1.97

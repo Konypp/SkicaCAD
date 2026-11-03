@@ -1848,6 +1848,7 @@ function articulateOblique(polys, f) {
 /* the FlexiJoint cutter with its flat faces rebuilt as whole polygons (the mesh had vertices inside them, which then
    stayed in the cut faces and folded when a neighbouring face was moved) */
 let flexiCache = null;
+const FLEXI_LOW = -7.7; /* the cup's lowest point below the cutter's centre: it is put 0.3 mm (scaled) under the bed, so the upright eye stands on the bed, coming out of the bottom wall */
 function flexiTool() {
   if (flexiCache) return flexiCache;
   /* the flat disc is remade exactly (its own faces whole), only the middle (the cup, the ball's room and the holes the
@@ -1920,12 +1921,28 @@ function articulateCore(polys, f) {
          scaled down on a thin body (never up, so the clearances stay as designed); a body wider than its disc is cut
          through by a plain slab of the disc's thickness round it. The two parts are told apart by their shells. */
       const T0 = flexiTool(), core = 6.82, half = 1.382, disc = 16.99;
-      const s = Math.min(1, (Math.min(hw, zs / 2) - 1) / core);
-      if (!(s >= 0.35)) throw new Error('Těleso je v místě kloubu na kloub Flexi příliš malé; použijte méně kloubů nebo jiný typ');
-      const ez = [0, 0, 1], ey = KK.cross(ez, ea), M = [ea[0] * s, ea[1] * s, ea[2] * s, 0, ey[0] * s, ey[1] * s, ey[2] * s, 0, 0, 0, s, 0, P[0], P[1], zc, 1];
+      /* it stands on the bed (the cup's bottom just under it, so the upright eye comes out of the bottom wall) when the
+         cup fits the body there; on a round body (narrow at the bottom) it is lifted towards the middle, or made smaller */
+      const inside = insideTest(rest), zb = sec.min[2], fitsAt = (s, tz) => {
+        for (const [dx, r] of [[0, -FLEXI_LOW], [5, core], [-5, core]]) for (let i = 0; i < 24; i++) {
+          const t = i / 24 * 2 * Math.PI, rr = r * s + 0.8, q = [0, 0, tz + rr * Math.sin(t)]; q[a] = xp + dx * s; q[sAx] = sc + rr * Math.cos(t);
+          if (q[2] < zb + 0.05) continue; /* open to the bed on purpose */
+          if (!inside(q)) return false;
+        }
+        return true;
+      };
+      let s = Math.min(1, (hw - 1) / 7.7, (zs - 1) / 15.4), tz = null;
+      for (; s >= 0.35 && tz === null; s *= 0.94) {
+        const low = zb - (FLEXI_LOW + 0.3) * s + (Number(f._flexiDz) || 0);
+        for (const t of f.flexiBed === false ? [zc] : [low, (low + zc) / 2, zc]) if (fitsAt(s, t)) { tz = t; break; }
+        if (tz !== null) break;
+      }
+      if (tz === null) throw new Error('Těleso je v místě kloubu na kloub Flexi příliš malé; použijte méně kloubů nebo jiný typ');
+      if (Array.isArray(f._dbg)) f._dbg.push({ s, tz });
+      const ez = [0, 0, 1], ey = KK.cross(ez, ea), M = [ea[0] * s, ea[1] * s, ea[2] * s, 0, ey[0] * s, ey[1] * s, ey[2] * s, 0, 0, 0, s, 0, P[0], P[1], tz, 1];
       let cut = S(S(rest, KK.transform(T0.disc, M)), KK.transform(T0.mid, M));
-      if (Math.hypot(hw, zs / 2) > (disc - 0.6) * s) { /* the slab round the disc */
-        const ring = S(boxAS([xp - half * s, xp + half * s], [sc - far, sc + far], [z0, z1]), cylAlong(P.map((v, k) => k === 2 ? zc : v - ea[k] * (half * s + 1)), ea, (disc - 0.5) * s, 2 * half * s + 2));
+      if (Math.hypot(hw, Math.max(tz - sec.min[2], sec.max[2] - tz)) > (disc - 0.6) * s) { /* the slab round the disc */
+        const ring = S(boxAS([xp - half * s, xp + half * s], [sc - far, sc + far], [z0, z1]), cylAlong(P.map((v, k) => k === 2 ? tz : v - ea[k] * (half * s + 1)), ea, (disc - 0.5) * s, 2 * half * s + 2));
         cut = S(cut, ring);
       }
       const parts = shellsOf(cut), L = [], Rp = [];
