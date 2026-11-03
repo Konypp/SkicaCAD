@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 1.79
+- **Očka šikmo pod 45°** (podle zaslaného řetízku): kde to průřez dovolí (zhruba čtvercový nebo kulatý, asi od 8 × 7 mm), stojí obě očka šikmo pod 45° na opačné strany a žádné neleží naplocho, takže nic nevisí ve vzduchu. Spoj se dál ohýbá do stran i nahoru a dolů (kolem os oček ±40° a ±30°, šikmou kombinací do stran i nahoru a dolů nejméně ±20°) a v tahu drží. U plochých řemínků zůstává ležaté a stojaté očko.
 ## Beta 1.78
 - **Kloubový model Nahoru/dolů – kuželové čepy:** místo kosočtverečných čepů v drážkách poskládaných po 10° má jazýček na bocích kuželové čepy a ramena kuželové důlky (vše pod 45°, tiskne se bez podpěr). Kloub je kulatý kolem osy, takže se otáčí hladce a bez drhnutí; rozsah ohybu omezují jen tvary článků.
 - **Tisknout po dílech a zacvaknout** (jen u typu Nahoru/dolů, ne se sponou sklápěcí): články se rozloží vedle sebe a tisknou se zvlášť, třeba každý jinou barvou. Čepy jsou nižší a z čela ramen k důlkům vede mělký náběh; jazýček se zasune mezi ramena, ta se rozevřou asi o 0,4 mm a čepy zacvaknou.
