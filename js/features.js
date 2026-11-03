@@ -1869,7 +1869,42 @@ function articulateCore(polys, f) {
     const P = [0, 0, 0]; P[a] = xp; P[sAx] = sc;
     const z0 = zc - BIG / 2, z1 = zc + BIG / 2, far = BIG / 2;
     let A, B;
-    if (style === 'ring') {
+    if (style === 'ball') {
+      /* Kulový: a ball on a neck of the left segment sits in a round socket of the right one, printed in place with a
+         clearance all round, so the right segment turns about every axis (sideways, up and down, and twists). The
+         socket's roof is a 45° tent, the ball has a small flat underside just above the socket's floor, the neck is a
+         diamond (45° faces) and the mouth a cone, so it prints without supports; the mouth is narrower than the ball. */
+      const rb = Math.min(hw - g - 1.6, (zs - 2.4) / (1 + Math.SQRT2) - g, 12);
+      if (!(rb >= 2)) throw new Error('Těleso je v místě kloubu na kulový kloub příliš malé; použijte méně kloubů nebo jiný typ');
+      const R = rb + g, C = [0, 0, sec.min[2] + 1.2 + R]; C[a] = xp + R + 1.2; C[sAx] = sc;
+      /* the swing of a ball joint is held to 25°: the mouth must stay narrower than the ball while the neck sweeps it */
+      const thB = Math.min(th, 25 * Math.PI / 180), dirA = ea.map(v => -v), rn = 0.28 * rb;
+      /* socket: sphere, 45° tent above it, a cone mouth towards the left segment */
+      const tentH = R * Math.SQRT1_2;
+      let sock = KK.translate(KK.primitive('sphere', { r: R }), C);
+      sock = U(sock, KK.translate(KK.primitive('cone', { r: R * Math.SQRT1_2 + 0.01, rt: 0.01, h: tentH + 0.01 }), [C[0], C[1], C[2] + tentH + (tentH + 0.01) / 2]));
+      /* the mouth: the cone the neck sweeps, i.e. of half-angle = swing, its apex moved back so the neck's thickness fits */
+      const sw = thB + Math.PI / 180, del = (rn + g) / Math.sin(sw), mouthLen = del + (C[a] - xp) + 2;
+      const mouth = coneX(C.map((v, k) => v + ea[k] * del), dirA, 0.01, mouthLen * Math.tan(sw), mouthLen);
+      sock = U(sock, mouth);
+      /* ball (flat underside near the floor) and the diamond neck back into the left segment */
+      const ball = I(KK.translate(KK.primitive('sphere', { r: rb }), C), boxAS([C[a] - rb - 1, C[a] + rb + 1], [sc - rb - 1, sc + rb + 1], [C[2] - 0.92 * rb, C[2] + rb + 1]));
+      const nLen = C[a] - (xp - g - Math.max(3, rb));
+      const PV = { o: [0, 0, 0], u: es, v: [0, 0, 1], n: KK.cross(es, [0, 0, 1]) };
+      const ns = KK.vdot(PV.n, ea) > 0 ? 1 : -1, cs = KK.vdot(C, es), czz = C[2];
+      const neckD = KK.extrudeProfiles([{ pts: [[cs - rn, czz], [cs, czz - rn], [cs + rn, czz], [cs, czz + rn]], closed: true }], PV, Math.min(ns * C[a], ns * (C[a] - nLen)), Math.max(ns * C[a], ns * (C[a] - nLen)));
+      const neck = KK.fixOrientation(neckD);
+      /* the left segment: everything up to the gap, opened in a V both ways about the ball's centre for the swing */
+      /* the right segment's face turns about C (inside it): the left one keeps clear of every turned position of that face,
+         i.e. behind the two planes tangent to the circle of radius (C − face) at ±(swing) – a V whose apex lies behind C */
+      const th2 = thB + 2 * Math.PI / 180, al = Math.PI / 2 - th2, d = C[a] - xp + g, Q = C.slice(); Q[a] = C[a] - d / Math.cos(th2);
+      const XZ = { o: [0, 0, 0], u: ea, v: [0, 0, 1], n: KK.cross(ea, [0, 0, 1]) };
+      const wedgeV = () => { const pts = [[Q[a], Q[2]]], M = 24; for (let i = 0; i <= M; i++) { const t = -al + 2 * al * i / M; pts.push([Q[a] - Math.cos(t) * BIG, Q[2] + Math.sin(t) * BIG]); } if (KK.area2D(pts) < 0) pts.reverse(); const nv = KK.vdot(XZ.n, Q); return KK.extrudeProfiles([{ pts, closed: true }], XZ, nv - BIG, nv + BIG); };
+      A = I(I(I(rest, boxAS([xp - far * 2, xp - g], [sc - far, sc + far], [z0, z1])), wedge(Q, -1, al)), KK.fixOrientation(wedgeV()));
+      if (Array.isArray(f._dbg)) f._dbg.push({ body: A, neck: I(neck, rest), ball, C });
+      A = U(U(A, I(neck, rest)), ball);
+      B = S(I(rest, boxAS([xp, xp + far * 2], [sc - far, sc + far], [z0, z1])), sock);
+    } else if (style === 'ring') {
       /* Očka (after the printed chain toys): two round rings interlocked like chain links at right angles; each passes
          through the other's centre. The left segment's ring A leans back 40° (its plane holds the axis across), the
          right segment's ring B stands upright along the chain, its bottom flattened on the bed; on flat straps that

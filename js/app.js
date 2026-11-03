@@ -7287,7 +7287,7 @@ const ORG_MODS = {
   articulate: {
     defaults: () => ({ style: 'disc', axis: 'x', place: 'even', lines: [], curve: [], snap: false, cnt: 4, gap: 0.4, angle: 30, ends: 'none', bw: 0, bh: 0 }),
     load: f => ({ style: f.style || 'disc', snap: !!f.snap, axis: f.axis || 'x', place: f.curve && f.curve.length ? 'curve' : f.lines && f.lines.length ? 'lines' : 'even', lines: (f.lines || []).slice(), curve: (f.curve || []).map(p => p.slice()), cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30, ends: f.ends || 'none', bw: f.bw || 0, bh: f.bh || 0 }),
-    fields: v => [{ k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů']].concat(v.style === 'ring' ? [['ring', 'Očka']] : v.style === 'chain' ? [['chain', 'Očka (starší)']] : []), value: v.style }, /* the eyes only for older models that use them */
+    fields: v => [{ k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů'], ['ball', 'Kulový']].concat(v.style === 'ring' ? [['ring', 'Očka']] : v.style === 'chain' ? [['chain', 'Očka (starší)']] : []), value: v.style }, /* the eyes only for older models that use them */
       { k: 'chk', id: 'snap', label: 'Tisknout po dílech a zacvaknout', value: v.snap },
       { k: 'seg', id: 'axis', label: 'Řetěz podél osy', options: [['x', 'X'], ['y', 'Y']], value: v.axis },
       { k: 'seg', id: 'place', label: 'Rozmístění kloubů', options: [['even', 'Rovnoměrně'], ['lines', 'Řezy'], ['curve', 'Podél křivky']], value: v.place },
@@ -7348,6 +7348,7 @@ const ORG_MODS = {
       const endsTip = c.v.ends === 'fold' ? ' Spona sklápěcí: samice se tiskne nastojato na začátku řemínku (tenká dutina tak nepotřebuje most) a po tisku se v kloubu sklopí o 90° ven, ústím od řemínku; samec leží naplocho na konci. Spona je jen o málo silnější než řemínek.' : '';
       dlg.set('tip', {
         disc: 'Kotouč: jeden článek končí kulatým kloubem, druhý do něj zasahuje jazýčkem s kotoučem. Klouby se otáčejí kolem svislé osy, články se ohýbají do stran (had, drak, ještěrka).',
+        ball: 'Kulový: koule na krčku jednoho článku sedí v kulové jamce sousedního, kolem dokola je vůle. Článek se otáčí ve všech osách – do stran, nahoru a dolů i kolem své osy (natočení nejvýš 25°, aby koule nevyklouzla ústím). Jamka má střechu pod 45°, krček je kosočtverečný, takže se tiskne vcelku bez podpěr; jen malá plôška pod koulí se tiskne přes mezeru.',
         hinge: 'Pant: tři klouby nad sebou jako u dveřního pantu, krajní drží svislý čep procházející prostředním. Otáčí se kolem svislé osy, články se ohýbají do stran.',
         flex: 'Nahoru/dolů: jako tištěný řemínek hodinek – jazýček článku mezi dvěma rameny sousedního, na bocích kuželové čepy v kuželových důlcích (vše pod 45°), takže se otáčí hladce. Články se ohýbají nahoru a dolů, třeba kolem zápěstí; konce jsou z boku kulaté.',
         ring: 'Očka: jako tištěné řetízkové hračky – dvě kulatá očka provlečená do sebe jako články řetězu, každé prochází středem toho druhého. Očko jednoho článku je skloněné o 40° dozadu, očko druhého stojí podél řetězu se zploštělým spodkem na podložce; vpředu je svislý výřez do V, vzadu vodorovná drážka do V. U nízkých plochých řemínků leží první očko naplocho. Článek se ohýbá do stran i nahoru a dolů.',

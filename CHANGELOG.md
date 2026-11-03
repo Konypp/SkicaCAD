@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 1.93
+- **Kloubový model – typ kloubu Kulový:** koule na kosočtverečném krčku jednoho článku sedí v kulové jamce sousedního s vůlí kolem dokola; tiskne se vcelku. Článek se otáčí ve všech osách – do stran, nahoru a dolů i kolem své osy (ověřeno ±28° v každé ose i kombinovaně), v tahu i do stran drží. Natočení je omezené na 25° (aby ústí jamky zůstalo užší než koule). Jamka má střechu pod 45°, ústí je kužel, krček má plochy pod 45°; jen malá plôška pod koulí se tiskne přes mezeru. Velikost koule se řídí průřezem tělesa.
 ## Beta 1.92
 - **Kloubový model (Kotouč, Pant): čistší povrch u kloubů.** Prostor pro natočení se teď z článku vyřízne, místo aby se článek skládal ze dvou kusů; skládání nechávalo na povrchu kulatých těles švy, které se zobrazovaly jako tečkované čáry a tmavé šmouhy. Tvar ani pohyblivost kloubů se nemění.
 ## Beta 1.91
