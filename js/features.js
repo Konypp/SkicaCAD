@@ -28,7 +28,7 @@ const jointCache = new Map();
 function jointParts(f) {
   const style = f.style in JOINT_PARTS ? f.style : 'disc', round = f.shape === 'round';
   const L = Math.max(10, Math.min(400, Number(f.len) || 60)), H = Math.max(3, Math.min(200, Number(f.h) || 14)), W = round ? H : Math.max(3, Math.min(200, Number(f.w) || 20));
-  const opt = { style, axis: 'x', n: 1, at: [0], gap: Number(f.gap) || 0.4, angle: Number(f.angle) || 30, ...(f.snap && style === 'flex' ? { snap: true } : {}), ...(f.curved && style === 'flexi' ? { curved: true } : {}) };
+  const opt = { style, axis: 'x', n: 1, at: [0], gap: Number(f.gap) || 0.4, angle: Number(f.angle) || 30, ...(f.snap && style === 'flex' ? { snap: true } : {}) };
   const key = JSON.stringify([round, L, W, H, opt]);
   let segs = jointCache.get(key);
   if (!segs) {
@@ -1858,17 +1858,6 @@ function flexiTool() {
   const disc = KK.boolean(cyl(16.99, -h, h), cyl(rc, -h - 1, h + 1), 'subtract'), mid = KK.boolean(T, cyl(rc, -10, 10), 'intersect');
   return (flexiCache = { disc, mid });
 }
-/* the curved gap of the Flexi joint (Řez zakřivený): flat round the cup, then bending back towards the left segment
-   in an arc (radius 14), so the segments nest into each other like the printed flexi toys; revolved about the chain
-   axis out to rEnd (in the cutter's own units) */
-function flexiCurvedDisc(rEnd) {
-  const h0 = 1.382, rc = 8, Rb = 18, r1 = rc + 0.6 * Rb, sl = (r1 - rc) / Math.sqrt(Rb * Rb - (r1 - rc) * (r1 - rc));
-  const xs = r => r <= rc ? 0 : r <= r1 ? -(Rb - Math.sqrt(Rb * Rb - (r - rc) * (r - rc))) : xs(r1) - (r - r1) * sl;
-  const h = r => h0 + 0.12 * Math.max(0, r - rc); /* the gap opens a little outwards: room for the segments to turn */
-  const rs = []; for (let r = 7.45; r < rEnd; r += 0.5) rs.push(r); rs.push(rEnd);
-  const pts = rs.map(r => [xs(r) + h(r), r]).concat(rs.slice().reverse().map(r => [xs(r) - h(r), r]));
-  return KK.revolveProfiles([{ t: 'poly', pts }], { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] }, { p: [0, 0], d: [1, 0] }, 2 * Math.PI);
-}
 /* the separate shells of a solid (polygons joined through shared corners) */
 function shellsOf(P) {
   const par = P.map((_, i) => i), find = i => { while (par[i] !== i) i = par[i] = par[par[i]]; return i; }, seen = new Map();
@@ -1952,9 +1941,8 @@ function articulateCore(polys, f) {
       if (Array.isArray(f._dbg)) f._dbg.push({ s, tz });
       const ez = [0, 0, 1], ey = KK.cross(ez, ea), M = [ea[0] * s, ea[1] * s, ea[2] * s, 0, ey[0] * s, ey[1] * s, ey[2] * s, 0, 0, 0, s, 0, P[0], P[1], tz, 1];
       const reach = Math.hypot(hw, Math.max(tz - sec.min[2], sec.max[2] - tz));
-      let cut = S(rest, KK.transform(f.curved ? flexiCurvedDisc(Math.max(disc, reach / s + 1)) : T0.disc, M));
-      cut = S(cut, KK.transform(T0.mid, M));
-      if (!f.curved && reach > (disc - 0.6) * s) { /* the slab round the disc */
+      let cut = S(S(rest, KK.transform(T0.disc, M)), KK.transform(T0.mid, M));
+      if (reach > (disc - 0.6) * s) { /* the slab round the disc */
         const ring = S(boxAS([xp - half * s, xp + half * s], [sc - far, sc + far], [z0, z1]), cylAlong(P.map((v, k) => k === 2 ? tz : v - ea[k] * (half * s + 1)), ea, (disc - 0.5) * s, 2 * half * s + 2));
         cut = S(cut, ring);
       }

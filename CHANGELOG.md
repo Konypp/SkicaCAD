@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.02
+- Zakřivený řez kloubu Flexi (z Beta 2.01) odstraněn; Flexi má opět jen rovný řez.
 ## Beta 2.01
 - Typ kloubu Očka (z Beta 2.00) odstraněn.
 - **Kloub Flexi – Řez: Rovný / Zakřivený:** zakřivený řez je kolem misky rovný a dál od ní se v oblouku stáčí k předchozímu článku, takže články do sebe zapadají jako u tištěných ohebných zvířátek (tuleň). Mezera se směrem ven mírně rozevírá, aby se články mohly natáčet (ověřeno ±15° do stran, ±10–15° nahoru a dolů i kolem osy). Volba je v Kloubovém modelu i v Kloubových dílech › Kloubový spoj.

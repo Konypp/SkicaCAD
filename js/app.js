@@ -7287,11 +7287,10 @@ const ORG_MODS = {
     prompt: 'Spodek tělesa se zarovná do roviny, aby postavička stála a dobře se tiskla'
   },
   articulate: {
-    defaults: () => ({ style: 'disc', cut: 'flat', axis: 'x', place: 'even', lines: [], curve: [], snap: false, cnt: 4, gap: 0.4, angle: 30, ends: 'none', bw: 0, bh: 0 }),
-    load: f => ({ style: f.style || 'disc', cut: f.curved ? 'curved' : 'flat', snap: !!f.snap, axis: f.axis || 'x', place: f.curve && f.curve.length ? 'curve' : f.lines && f.lines.length ? 'lines' : 'even', lines: (f.lines || []).slice(), curve: (f.curve || []).map(p => p.slice()), cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30, ends: f.ends || 'none', bw: f.bw || 0, bh: f.bh || 0 }),
+    defaults: () => ({ style: 'disc', axis: 'x', place: 'even', lines: [], curve: [], snap: false, cnt: 4, gap: 0.4, angle: 30, ends: 'none', bw: 0, bh: 0 }),
+    load: f => ({ style: f.style || 'disc', snap: !!f.snap, axis: f.axis || 'x', place: f.curve && f.curve.length ? 'curve' : f.lines && f.lines.length ? 'lines' : 'even', lines: (f.lines || []).slice(), curve: (f.curve || []).map(p => p.slice()), cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30, ends: f.ends || 'none', bw: f.bw || 0, bh: f.bh || 0 }),
     fields: v => [{ k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů'], ['ball', 'Kulový'], ['flexi', 'Flexi']].concat(v.style === 'ring' ? [['ring', 'Očka']] : v.style === 'chain' ? [['chain', 'Očka (starší)']] : []), value: v.style }, /* the eyes only for older models that use them */
       { k: 'chk', id: 'snap', label: 'Tisknout po dílech a zacvaknout', value: v.snap },
-      { k: 'seg', id: 'cut', label: 'Řez', options: [['flat', 'Rovný'], ['curved', 'Zakřivený']], value: v.cut },
       { k: 'seg', id: 'axis', label: 'Řetěz podél osy', options: [['x', 'X'], ['y', 'Y']], value: v.axis },
       { k: 'seg', id: 'place', label: 'Rozmístění kloubů', options: [['even', 'Rovnoměrně'], ['lines', 'Řezy'], ['curve', 'Podél křivky']], value: v.place },
       { k: 'sel', id: 'jl', label: 'Řezy' }, { k: 'btns', id: 'jb', label: '', options: [['undo', 'Zpět'], ['clear', 'Smazat vše']] },
@@ -7303,10 +7302,10 @@ const ORG_MODS = {
     feature: v => {
       if (v.place === 'curve' && v.curve.length >= 2) {
         const J = curveJoints(v.curve, Math.max(1, Math.round(v.cnt)));
-        return { style: v.style, ...(v.style === 'flexi' && v.cut === 'curved' ? { curved: true } : {}), ...(v.snap && v.style === 'flex' ? { snap: true } : {}), axis: J.axis, n: J.at.length, at: J.at, atS: J.atS, tilt: J.tilt, curve: v.curve, gap: v.gap, angle: v.angle };
+        return { style: v.style, ...(v.snap && v.style === 'flex' ? { snap: true } : {}), axis: J.axis, n: J.at.length, at: J.at, atS: J.atS, tilt: J.tilt, curve: v.curve, gap: v.gap, angle: v.angle };
       }
       const L = v.place === 'lines' ? v.lines : [], a = v.axis === 'y' ? 1 : 0;
-      return { style: v.style, ...(v.style === 'flexi' && v.cut === 'curved' ? { curved: true } : {}), ...(v.snap && v.style === 'flex' && v.ends !== 'fold' ? { snap: true } : {}), axis: v.axis, n: L.length || Math.max(1, Math.round(v.cnt)), ...(L.length ? { at: L.map(l => l.at !== undefined ? l.at : r3((l.a[a] + l.b[a]) / 2)), ...(L.some(l => l.tilt) ? { tilt: L.map(l => l.tilt || 0) } : {}), lines: L } : {}), gap: v.gap, angle: v.angle, ...(v.ends && v.ends !== 'none' ? { ends: v.ends, bw: v.bw || 0, bh: v.bh || 0 } : {}) };
+      return { style: v.style, ...(v.snap && v.style === 'flex' && v.ends !== 'fold' ? { snap: true } : {}), axis: v.axis, n: L.length || Math.max(1, Math.round(v.cnt)), ...(L.length ? { at: L.map(l => l.at !== undefined ? l.at : r3((l.a[a] + l.b[a]) / 2)), ...(L.some(l => l.tilt) ? { tilt: L.map(l => l.tilt || 0) } : {}), lines: L } : {}), gap: v.gap, angle: v.angle, ...(v.ends && v.ends !== 'none' ? { ends: v.ends, bw: v.bw || 0, bh: v.bh || 0 } : {}) };
     },
     ready: v => (v.place !== 'lines' || v.lines.length > 0) && (v.place !== 'curve' || v.curve.length >= 2),
     drawing: c => c.v.place === 'lines',
@@ -7332,7 +7331,7 @@ const ORG_MODS = {
     btn(c, id, v) { if (id !== 'jb') return; const L = c.v.place === 'curve' ? c.v.curve : c.v.lines; if (v === 'undo') L.pop(); else L.length = 0; },
     layout(c) {
       const ln = c.v.place === 'lines', cv = c.v.place === 'curve', k = ln ? c.v.lines.length : c.v.curve.length;
-      dlg.show('snap', c.v.style === 'flex' && c.v.ends !== 'fold'); dlg.show('cut', c.v.style === 'flexi');
+      dlg.show('snap', c.v.style === 'flex' && c.v.ends !== 'fold');
       dlg.show('jl', ln || cv); dlg.show('jb', (ln || cv) && k > 0); dlg.show('cnt', !ln); dlg.show('ends', !cv); dlg.show('axis', !cv);
       dlg.label('jl', cv ? 'Křivka' : 'Řezy');
       if (ln) dlg.set('jl', { text: k ? `${k} ${k === 1 ? 'řez' : k < 5 ? 'řezy' : 'řezů'} – tažením přidáte další` : 'Táhněte myší přes model', has: k > 0, active: !!c.body });
@@ -7859,13 +7858,12 @@ const JOINT_TIP = {
 const PART_FAMS = [['joint', 'Kloubový spoj'], ['lib', 'Hotové díly']];
 function startJointPart(editIndex, f, pre) {
   const c = {
-    editIndex, v: f ? { style: f.style || 'disc', shape: f.shape || 'box', w: f.w || 20, h: f.h || 14, len: f.len || 60, gap: f.gap || 0.4, angle: f.angle || 30, snap: !!f.snap, cut: f.curved ? 'curved' : 'flat', rot: f.rot || 0 }
-      : { style: 'disc', shape: 'box', w: 20, h: 14, len: 60, gap: 0.4, angle: 30, snap: false, cut: 'flat', rot: 0 }, pos: f ? f.pos.slice() : pre ? pre.pos.slice() : [0, 0, 0], tool: null, timer: 0,
+    editIndex, v: f ? { style: f.style || 'disc', shape: f.shape || 'box', w: f.w || 20, h: f.h || 14, len: f.len || 60, gap: f.gap || 0.4, angle: f.angle || 30, snap: !!f.snap, rot: f.rot || 0 }
+      : { style: 'disc', shape: 'box', w: 20, h: 14, len: 60, gap: 0.4, angle: 30, snap: false, rot: 0 }, pos: f ? f.pos.slice() : pre ? pre.pos.slice() : [0, 0, 0], tool: null, timer: 0,
     init() {
       openDialog({ title: f ? 'Kloubový spoj' : 'Kloubové díly', icon: 'articulate',
         fields: [...(f ? [] : [{ k: 'seg', id: 'fam', label: 'Druh', options: PART_FAMS, value: 'joint' }]), { k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů'], ['ball', 'Kulový'], ['flexi', 'Flexi']], value: this.v.style },
           { k: 'chk', id: 'snap', label: 'Tisknout po dílech a zacvaknout', value: this.v.snap },
-          { k: 'seg', id: 'cut', label: 'Řez', options: [['flat', 'Rovný'], ['curved', 'Zakřivený']], value: this.v.cut },
           { k: 'seg', id: 'shape', label: 'Tvar', options: [['box', 'Hranol'], ['round', 'Válec']], value: this.v.shape },
           { k: 'num', id: 'len', label: 'Délka', value: this.v.len, range: [10, 400, 1] }, { k: 'num', id: 'w', label: 'Šířka', value: this.v.w, range: [3, 200, 1] },
           { k: 'num', id: 'h', label: 'Výška', value: this.v.h, range: [3, 200, 1] },
@@ -7874,7 +7872,7 @@ function startJointPart(editIndex, f, pre) {
           { k: 'xyz', id: 'pos', label: 'Poloha', value: this.pos }, { k: 'note', id: 'tip' }, { k: 'note', id: 'n' }],
         onChange: id => {
           if (id === 'fam') { if (dlg.get('fam') === 'lib') { const pos = this.pos; clearTimeout(this.timer); endCmd(false); startLibPart(undefined, null, { pos }); } return; }
-          if (id === 'style' || id === 'shape' || id === 'cut') this.v[id] = dlg.get(id);
+          if (id === 'style' || id === 'shape') this.v[id] = dlg.get(id);
           else if (id === 'snap') this.v.snap = !!dlg.get('snap');
           else if (id === 'pos') this.pos = dlg.get('pos');
           else { const x = dlg.get(id); if (isFinite(x) && (id === 'rot' || x > 0)) this.v[id] = x; }
@@ -7883,10 +7881,10 @@ function startJointPart(editIndex, f, pre) {
       setPrompt('Klepnutím do pohledu nebo na těleso spoj umístíte');
       this.update();
     },
-    feature() { const { cut, ...v } = this.v; return { id: f ? f.id : 'tmp', type: 'jointpart', ...v, snap: this.v.style === 'flex' && this.v.snap, ...(this.v.style === 'flexi' && cut === 'curved' ? { curved: true } : {}), pos: this.pos.slice() }; },
+    feature() { return { id: f ? f.id : 'tmp', type: 'jointpart', ...this.v, snap: this.v.style === 'flex' && this.v.snap, pos: this.pos.slice() }; },
     update() {
       const round = this.v.shape === 'round';
-      dlg.show('w', !round); dlg.label('h', round ? 'Průměr' : 'Výška'); dlg.show('snap', this.v.style === 'flex'); dlg.show('cut', this.v.style === 'flexi');
+      dlg.show('w', !round); dlg.label('h', round ? 'Průměr' : 'Výška'); dlg.show('snap', this.v.style === 'flex');
       dlg.set('tip', JOINT_TIP[this.v.style] || ''); dlg.set('n', 'Počítám…'); dlg.okEnabled(false);
       clearTimeout(this.timer);
       this.timer = setTimeout(() => {
