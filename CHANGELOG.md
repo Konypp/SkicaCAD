@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 1.96
+- **Kulový kloub – odstraněn zásek na boku:** na kulatých tělesech se z druhého článku vedle mezery vyřezával mělký svislý klín (zbytek ořezu určeného pro jiné typy kloubů). Kulový kloub má vlastní prostor pro natočení, takže se ten ořez u něj už nepoužívá; povrch obou článků zůstává celý. Pohyblivost a držení kloubu se nemění.
 ## Beta 1.95
 - **TĚLESO › Součásti › Kloubové díly:** Kloubový spoj a Kloubové díly jsou jedna nabídka; v okně se přepíná Druh: Kloubový spoj (všechny typy kloubů s vlastními rozměry) nebo Hotové díly (Článek s háčkem, Dva spojené články, Háček, Kapsa – negativ).
 - **Kulový kloub – silnější krček:** krček se od koule kuželovitě rozšiřuje (kosočtverečný průřez, spodní hrana vodorovná, plochy pod 45°) a ústí jamky je kužel, který krček opisuje. Úhel krčku se volí co největší tak, aby okraj ústí zůstal užší než koule. Natočení je nejvýš 20° (dřív 25°); čím menší Natočení kloubu, tím silnější krček. Při výchozím nastavení je krček u koule asi o třetinu silnější a k článku se dál rozšiřuje.

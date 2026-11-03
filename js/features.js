@@ -1966,7 +1966,7 @@ function articulateCore(polys, f) {
       const XZ = { o: [0, 0, 0], u: ea, v: [0, 0, 1], n: KK.cross(ea, [0, 0, 1]) };
       const wedgeV = () => { const pts = [[Q[a], Q[2]]], M = 24; for (let i = 0; i <= M; i++) { const t = -al + 2 * al * i / M; pts.push([Q[a] - Math.cos(t) * BIG, Q[2] + Math.sin(t) * BIG]); } if (KK.area2D(pts) < 0) pts.reverse(); const nv = KK.vdot(XZ.n, Q); return KK.extrudeProfiles([{ pts, closed: true }], XZ, nv - BIG, nv + BIG); };
       A = I(I(I(rest, boxAS([xp - far * 2, xp - g], [sc - far, sc + far], [z0, z1])), wedge(Q, -1, al)), KK.fixOrientation(wedgeV()));
-      if (Array.isArray(f._dbg)) f._dbg.push({ body: A, neck: I(neck, rest), ball, C, rb, nA, rn });
+      if (Array.isArray(f._dbg)) f._dbg.push({ body: A, neck: I(neck, rest), ball, C, rb, nA, rn, sock, be, del });
       A = U(U(A, I(neck, rest)), ball);
       B = S(I(rest, boxAS([xp, xp + far * 2], [sc - far, sc + far], [z0, z1])), sock);
     } else if (style === 'ring') {
@@ -2160,7 +2160,7 @@ function articulateCore(polys, f) {
          across the body's surface, which showed as dark streaks on round bodies */
       const keep = vcyl(P, hw * 0.92 + g, z0, z1), cutV = (sg, al) => S(wedge(P, sg, Math.PI - al), keep);
       A = S(A, cutV(1, Math.PI / 2 - th - 2 * Math.PI / 180));
-    } else if (style !== 'chain' && style !== 'flex') {
+    } else if (style !== 'chain' && style !== 'flex' && style !== 'ball') {
       const keep = vcyl(P, hw * 0.92 + g, z0, z1), cutV = (sg, al) => S(wedge(P, sg, Math.PI - al), keep);
       A = S(A, cutV(1, alpha));
       B = S(B, cutV(-1, alpha));
