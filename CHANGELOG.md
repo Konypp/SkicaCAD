@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 1.88
+- **Kloubový model – Rozmístění kloubů: Podél křivky.** Klepáním naklikáte křivku podél zahnutého modelu (třeba had do S) od začátku ke konci; klouby (počet podle Počtu kloubů) se rozmístí rovnoměrně po křivce a každý stojí kolmo na ni, natočený až o 80°. Křivka nesmí dělat smyčky ani se vracet. Zapínání na koncích je jen u rovného řetězu.
+- **Konektory – Způsob řezu: Křivkou.** Body klepete do pohledu přes těleso, řez vede křivkou ve směru pohledu (jako Rozříznout křivkou) a kolík nebo snap-fit se postaví na nejdelší rovný úsek křivky. Rybina, kulový a čepový kloub zůstávají jen u rovného řezu.
 ## Beta 1.87
 - **Kloubový model (Kotouč a Pant) bez malých trojúhelníkových zářezů:** prostor pro natočení se dřív ořezával z obou článků, a u kulatých těles (ležící válec) tak vedle kloubu na boku vznikal malý trojúhelníkový zářez. Teď se celé zkosení do V udělá jen na jednom článku, druhý má rovné čelo. Natočení zůstává stejné.
 ## Beta 1.86

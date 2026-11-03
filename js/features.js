@@ -1359,10 +1359,29 @@ function connectorPlane(polys, f) {
   if (!(at > bb.min[a] + 1e-3 && at < bb.max[a] - 1e-3)) throw new Error('Rovina řezu těleso neprotíná');
   return { n, w: at, bb };
 }
+/* a cut along a curve drawn on the view (f.curve: {pts, d}): the parts split by the curve, and the plane of the curve's
+   longest straight stretch, where the connector goes */
+function connectorCurve(polys, f) {
+  const kind = f.kind || 'peg';
+  if (kind !== 'peg' && kind !== 'snap') throw new Error('Rybina, kulový a čepový kloub potřebují rovný řez; s křivkou jde kolík nebo snap-fit');
+  const pts = (f.curve.pts || []).map(p => p.map(Number)), d = KK.vnorm(f.curve.d.map(Number)), B0 = basisFromPlane(d, 0);
+  const r = curveCut(polys, { mode: 'view', pts, d, gap: 0 });
+  const Q = pts.map(p => [KK.vdot(p, B0.u), KK.vdot(p, B0.v)]);
+  let best = -1, bl = 0; for (let i = 0; i + 1 < Q.length; i++) { const l = Math.hypot(Q[i + 1][0] - Q[i][0], Q[i + 1][1] - Q[i][1]); if (l > bl) { bl = l; best = i; } }
+  const A2 = Q[best], B2 = Q[best + 1], dx = (B2[0] - A2[0]) / bl, dy = (B2[1] - A2[1]) / bl;
+  const n = KK.vnorm([0, 1, 2].map(k => -dy * B0.u[k] + dx * B0.v[k]));
+  const w = KK.vdot(n, [0, 1, 2].map(k => A2[0] * B0.u[k] + A2[1] * B0.v[k]));
+  return { n, w, bb: KK.bbox(polys), top: r.a, bot: r.b };
+}
 function pegSplit(polys, f) {
-  const { n, w, bb } = connectorPlane(polys, f), kind = f.kind || 'peg';
-  const hs = cutTool({}, n, w, bb);
-  const top = KK.boolean(polys, hs, 'intersect'), bot = KK.boolean(polys, hs, 'subtract');
+  const kind = f.kind || 'peg';
+  let n, w, bb, top, bot;
+  if (f.curve) ({ n, w, bb, top, bot } = connectorCurve(polys, f));
+  else {
+    ({ n, w, bb } = connectorPlane(polys, f));
+    const hs = cutTool({}, n, w, bb);
+    top = KK.boolean(polys, hs, 'intersect'); bot = KK.boolean(polys, hs, 'subtract');
+  }
   if (!top.length || !bot.length) throw new Error('Rovina řezu těleso neprotíná');
   const cap = bot.filter(p => KK.vdot(p.n, n) > 0.999 && Math.abs(p.w - w) < 1e-3);
   if (!cap.length) throw new Error('Řez se nepodařilo najít');
@@ -1576,6 +1595,35 @@ function sectionAt(polys, a, x) {
   }
   return any ? { min: mn, max: mx } : null;
 }
+/* the section of a body by the plane (axis a) = x through the piece nearest to Q: a curved body (a snake in an S) may
+   cross the plane in several places, only the one at the joint counts */
+function sectionNear(polys, a, x, Q) {
+  const segs = [], key = p => p.map(v => Math.round(v * 1e4)).join(',');
+  for (const p of polys) {
+    const pts = [];
+    for (let i = 0; i < p.v.length; i++) {
+      const A = p.v[i], B = p.v[(i + 1) % p.v.length], da = A[a] - x, db = B[a] - x;
+      if ((da < 0) === (db < 0) || da === db) continue;
+      const t = da / (da - db); pts.push([0, 1, 2].map(k => A[k] + (B[k] - A[k]) * t));
+    }
+    if (pts.length >= 2) segs.push([pts[0], pts[1]]);
+  }
+  if (!segs.length) return null;
+  const parent = new Map(), find = k => { while (parent.get(k) !== k) { parent.set(k, parent.get(parent.get(k))); k = parent.get(k); } return k; };
+  const add = k => { if (!parent.has(k)) parent.set(k, k); };
+  for (const [p, q] of segs) { const kp = key(p), kq = key(q); add(kp); add(kq); parent.set(find(kp), find(kq)); }
+  const boxes = new Map();
+  for (const [p, q] of segs) {
+    const r = find(key(p)); let b = boxes.get(r); if (!b) boxes.set(r, (b = { min: [Infinity, Infinity, Infinity], max: [-Infinity, -Infinity, -Infinity] }));
+    for (const v of [p, q]) for (let k = 0; k < 3; k++) { if (v[k] < b.min[k]) b.min[k] = v[k]; if (v[k] > b.max[k]) b.max[k] = v[k]; }
+  }
+  let best = null, bd = Infinity;
+  for (const b of boxes.values()) {
+    let d = 0; for (let k = 0; k < 3; k++) if (k !== a) { const o = Math.max(b.min[k] - Q[k], 0, Q[k] - b.max[k]); d += o * o; }
+    if (d < bd) { bd = d; best = b; }
+  }
+  return best;
+}
 /* ---------- Spona: a side release buckle (like on backpacks), both halves printed flat ----------
    Local frame: along +x from the back (x = 0, where a strap or webbing joins) to the front, bottom on z = 0, centred on
    y = 0. The female is a flat sleeve with windows in its sides near the back of the cavity; the male has a centre
@@ -1751,13 +1799,16 @@ function articulateFold(polys, f) {
    with f.at): they are made one by one, each with the rest of the body turned so that its cut is square to the axis */
 function articulateOblique(polys, f) {
   const a = f.axis === 'y' ? 1 : 0, s = 1 - a, bb = KK.bbox(polys), m = [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2);
-  const pairs = f.at.map((x, i) => [Number(x), Math.max(-60, Math.min(60, Number(f.tilt[i]) || 0))]).filter(p => p[0] > bb.min[a] + 1 && p[0] < bb.max[a] - 1).sort((p, q) => p[0] - q[0]);
+  /* along a curve (f.atS: the side position of each joint, in the curve's order) the joints may turn further */
+  const lim = Array.isArray(f.atS) ? 80 : 60;
+  let pairs = f.at.map((x, i) => [Number(x), Math.max(-lim, Math.min(lim, Number((f.tilt || [])[i]) || 0)), Array.isArray(f.atS) ? Number(f.atS[i]) : m[s]]).filter(p => p[0] > bb.min[a] + 1 && p[0] < bb.max[a] - 1);
+  if (!Array.isArray(f.atS)) pairs = pairs.sort((p, q) => p[0] - q[0]);
   if (!pairs.length) throw new Error('Žádný z řezů neprotíná článkovanou část tělesa');
   const rotZ = (P, Q, deg) => { const t = deg * Math.PI / 180, c = Math.cos(t), sn = Math.sin(t); return KK.transform(P, [c, sn, 0, 0, -sn, c, 0, 0, 0, 0, 1, 0, Q[0] - c * Q[0] + sn * Q[1], Q[1] - sn * Q[0] - c * Q[1], 0, 1]); };
   const out = []; let rest = polys;
-  for (const [x, t] of pairs) {
-    const Q = m.slice(); Q[a] = x;
-    const segs = articulateCore(rotZ(rest, Q, -t), { ...f, at: [x], tilt: undefined, n: 1 });
+  for (const [x, t, sv] of pairs) {
+    const Q = m.slice(); Q[a] = x; Q[s] = sv;
+    const segs = articulateCore(rotZ(rest, Q, -t), { ...f, at: [x], tilt: undefined, atS: undefined, n: 1, near: Array.isArray(f.atS) ? Q : undefined });
     if (segs.length !== 2) throw new Error('Kloub se nepodařilo vytvořit');
     out.push(rotZ(segs[0], Q, t)); rest = rotZ(segs[1], Q, t);
   }
@@ -1765,7 +1816,7 @@ function articulateOblique(polys, f) {
   return out;
 }
 function articulateCore(polys, f) {
-  if (Array.isArray(f.tilt) && Array.isArray(f.at) && f.tilt.some(t => Math.abs(Number(t) || 0) > 0.5)) return articulateOblique(polys, f);
+  if (Array.isArray(f.at) && (Array.isArray(f.atS) || (Array.isArray(f.tilt) && f.tilt.some(t => Math.abs(Number(t) || 0) > 0.5)))) return articulateOblique(polys, f);
   const a = f.axis === 'y' ? 1 : 0, sAx = 1 - a, bb = KK.bbox(polys), g = Math.max(0.15, Number(f.gap) || 0.4);
   const L = bb.max[a] - bb.min[a], n = Math.max(1, Math.min(40, Math.round(Number(f.n) || 4))), th = Math.max(5, Math.min(60, Number(f.angle) || 30)) * Math.PI / 180;
   const BIG = 4 * Math.max(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]) + 100;
@@ -1802,7 +1853,7 @@ function articulateCore(polys, f) {
   };
   const alpha = Math.PI / 2 - th / 2 - 2 * Math.PI / 180;
   for (const xp of at) {
-    const sec = sectionAt(rest, a, xp);
+    const sec = f.near ? sectionNear(rest, a, xp, f.near) : sectionAt(rest, a, xp);
     if (!sec) throw new Error('Kloub mimo těleso');
     const sc = (sec.min[sAx] + sec.max[sAx]) / 2, zc = (sec.min[2] + sec.max[2]) / 2, zs = sec.max[2] - sec.min[2], hw = (sec.max[sAx] - sec.min[sAx]) / 2;
     const P = [0, 0, 0]; P[a] = xp; P[sAx] = sc;
