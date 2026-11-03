@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 1.86
+- **Typ kloubu Očka odstraněn z nabídky** Kloubového modelu. Zůstávají Kotouč, Pant a Nahoru/dolů. Starší modely, které Očka už používají, se dál přepočítají a typ se u nich v dialogu zobrazí.
 ## Beta 1.85
 - **Očka bez velkých ořezů:** spára mezi články se už neotevírá šikmo podle skloněného očka (to ořezávalo velký klín ze spodku jednoho a z vrchu druhého článku), ale vodorovně a jen o úhel natočení – z modelu zůstanou jen výřezy pro očka a pro ohyb. Stojaté očko se přednostně opírá o podložku (zploštělý spodek); výš se zvedne jen tam, kde by jinak vylezlo z tělesa. Ohyb ±30° do stran i nahoru a dolů, v tahu drží.
 ## Beta 1.84

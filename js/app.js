@@ -7285,7 +7285,7 @@ const ORG_MODS = {
   articulate: {
     defaults: () => ({ style: 'disc', axis: 'x', place: 'even', lines: [], snap: false, cnt: 4, gap: 0.4, angle: 30, ends: 'none', bw: 0, bh: 0 }),
     load: f => ({ style: f.style || 'disc', snap: !!f.snap, axis: f.axis || 'x', place: f.lines && f.lines.length ? 'lines' : 'even', lines: (f.lines || []).slice(), cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30, ends: f.ends || 'none', bw: f.bw || 0, bh: f.bh || 0 }),
-    fields: v => [{ k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů'], ['ring', 'Očka']].concat(v.style === 'chain' ? [['chain', 'Očka (starší)']] : []), value: v.style }, /* the older bridged eyes only for models that use them */
+    fields: v => [{ k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů']].concat(v.style === 'ring' ? [['ring', 'Očka']] : v.style === 'chain' ? [['chain', 'Očka (starší)']] : []), value: v.style }, /* the eyes only for older models that use them */
       { k: 'chk', id: 'snap', label: 'Tisknout po dílech a zacvaknout', value: v.snap },
       { k: 'seg', id: 'axis', label: 'Řetěz podél osy', options: [['x', 'X'], ['y', 'Y']], value: v.axis },
       { k: 'seg', id: 'place', label: 'Rozmístění kloubů', options: [['even', 'Rovnoměrně'], ['lines', 'Řezy']], value: v.place },
