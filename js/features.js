@@ -1992,7 +1992,12 @@ function articulateCore(polys, f) {
       for (let i = -steps; i <= steps; i++) slot = U(slot, rotZ(box(sLo, sHi), P, thd * i / steps));
       B = S(B, slot);
     }
-    if (style !== 'chain' && style !== 'flex') {
+    if (style === 'disc' || style === 'hinge') {
+      /* the room to swing is cut from the left segment only (a V of the full swing), so the right one keeps a whole
+         face: no small slivers are trimmed off the sides of a round body next to the knuckle */
+      const keep = vcyl(P, hw * 0.92 + g, z0, z1);
+      A = U(I(A, wedge(P, -1, Math.PI / 2 - th - 2 * Math.PI / 180)), I(A, keep));
+    } else if (style !== 'chain' && style !== 'flex') {
       const keep = vcyl(P, hw * 0.92 + g, z0, z1);
       A = U(I(A, wedge(P, -1, alpha)), I(A, keep));
       B = U(I(B, wedge(P, 1, alpha)), I(B, keep));

@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 1.87
+- **Kloubový model (Kotouč a Pant) bez malých trojúhelníkových zářezů:** prostor pro natočení se dřív ořezával z obou článků, a u kulatých těles (ležící válec) tak vedle kloubu na boku vznikal malý trojúhelníkový zářez. Teď se celé zkosení do V udělá jen na jednom článku, druhý má rovné čelo. Natočení zůstává stejné.
 ## Beta 1.86
 - **Typ kloubu Očka odstraněn z nabídky** Kloubového modelu. Zůstávají Kotouč, Pant a Nahoru/dolů. Starší modely, které Očka už používají, se dál přepočítají a typ se u nich v dialogu zobrazí.
 ## Beta 1.85
