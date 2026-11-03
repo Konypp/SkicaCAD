@@ -7,7 +7,7 @@ const PLANES = {
   XZ: { o: [0, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] },
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
-const FEATURE_LABEL = { blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Díly s kolíky', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
+const FEATURE_LABEL = { articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Díly s kolíky', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
   fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
@@ -1387,6 +1387,62 @@ function pegSplit(polys, f) {
   }
   return { lower, upper, pegs, n, at };
 }
+/* ---------- Kloubový model: a body cut into segments joined by print-in-place hinges ----------
+   The segments swing about vertical axes (they lie on the bed and move in the bed's plane, like an articulated snake or
+   dragon). At each joint the right segment ends in a round knuckle, the left one has a matching hollow; a tongue of the
+   left segment (a disc on a neck, in the middle of the height) sits in a slot of the knuckle, with a clearance all round,
+   so the parts are trapped together yet print in one go without supports. */
+function sectionAt(polys, a, x) {
+  const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity]; let any = false;
+  for (const p of polys) for (let i = 0; i < p.v.length; i++) {
+    const A = p.v[i], B = p.v[(i + 1) % p.v.length], da = A[a] - x, db = B[a] - x;
+    if ((da < 0) === (db < 0) || da === db) continue;
+    const t = da / (da - db); any = true;
+    for (let k = 0; k < 3; k++) { const v = A[k] + (B[k] - A[k]) * t; if (v < mn[k]) mn[k] = v; if (v > mx[k]) mx[k] = v; }
+  }
+  return any ? { min: mn, max: mx } : null;
+}
+function articulate(polys, f) {
+  const a = f.axis === 'y' ? 1 : 0, sAx = 1 - a, bb = KK.bbox(polys), g = Math.max(0.15, Number(f.gap) || 0.4);
+  const L = bb.max[a] - bb.min[a], n = Math.max(1, Math.min(40, Math.round(Number(f.n) || 4))), th = Math.max(5, Math.min(60, Number(f.angle) || 30)) * Math.PI / 180;
+  const BIG = 4 * Math.max(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]) + 100;
+  const box = (lo, hi) => KK.translate(KK.primitive('box', { w: hi[0] - lo[0], d: hi[1] - lo[1], h: hi[2] - lo[2] }), [0, 1, 2].map(k => (lo[k] + hi[k]) / 2));
+  const C = [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2);
+  const span = (k, lo, hi) => { const l = C.map(v => v - BIG / 2), h = C.map(v => v + BIG / 2); l[k] = lo; h[k] = hi; return [l, h]; };
+  const vcyl = (P, r, z0, z1) => cylAlong([P[0], P[1], z0], [0, 0, 1], r, z1 - z0);
+  const rotZ = (polysR, P, ang) => { const c = Math.cos(ang), sn = Math.sin(ang); return KK.transform(polysR, [c, sn, 0, 0, -sn, c, 0, 0, 0, 0, 1, 0, P[0] - c * P[0] + sn * P[1], P[1] - sn * P[0] - c * P[1], 0, 1]); };
+  const at = Array.isArray(f.at) && f.at.length ? f.at.map(Number).sort((p, q) => p - q) : Array.from({ length: n }, (_, i) => bb.min[a] + L * (i + 1) / (n + 1));
+  const out = []; let rest = polys;
+  for (const xp of at) {
+    const sec = sectionAt(rest, a, xp);
+    if (!sec) throw new Error('Kloub mimo těleso');
+    const sc = (sec.min[sAx] + sec.max[sAx]) / 2, zc = (sec.min[2] + sec.max[2]) / 2, zs = sec.max[2] - sec.min[2];
+    const Rk = (sec.max[sAx] - sec.min[sAx]) / 2 * 0.92;
+    if (Rk < 2 * g + 1.5 || zs < 6 * g + 1.5) throw new Error('Těleso je v místě kloubu na kloub příliš tenké; použijte méně kloubů');
+    const P = [0, 0, 0]; P[a] = xp; P[sAx] = sc;
+    const T = zs * 0.34, rd = Rk * 0.55, wn = rd * 0.9, z0 = zc - BIG / 2, z1 = zc + BIG / 2;
+    const [la, ha] = span(a, xp - BIG, xp);
+    const halfA = box(la, ha);
+    let A = KK.boolean(KK.boolean(rest, halfA, 'intersect'), vcyl(P, Rk + g, z0, z1), 'subtract');
+    let B = KK.boolean(rest, KK.boolean(halfA, vcyl(P, Rk, z0, z1), 'subtract'), 'subtract');
+    /* tongue of A: disc around the axis on a neck towards A, in the middle of the height */
+    const neckLo = [0, 0, 0], neckHi = [0, 0, 0];
+    neckLo[a] = xp - Rk - g - 2; neckHi[a] = xp; neckLo[sAx] = sc - wn / 2; neckHi[sAx] = sc + wn / 2; neckLo[2] = zc - T / 2; neckHi[2] = zc + T / 2;
+    let tongue = KK.boolean(vcyl(P, rd, zc - T / 2, zc + T / 2), box(neckLo, neckHi), 'union');
+    tongue = KK.boolean(tongue, rest, 'intersect');
+    A = KK.boolean(A, tongue, 'union');
+    /* slot in B's knuckle: the disc with clearance plus the room the neck sweeps when the joint turns */
+    const sLo = neckLo.slice(), sHi = neckHi.slice(); sLo[a] = xp - Rk - 1; sLo[sAx] -= g; sHi[sAx] += g; sLo[2] -= g; sHi[2] += g; sHi[a] = xp;
+    let slot = vcyl(P, rd + g, zc - T / 2 - g, zc + T / 2 + g);
+    const steps = Math.max(2, Math.ceil(th / (10 * Math.PI / 180)));
+    for (let i = -steps; i <= steps; i++) slot = KK.boolean(slot, rotZ(box(sLo, sHi), P, th * i / steps), 'union');
+    B = KK.boolean(B, slot, 'subtract');
+    if (!A.length || !B.length) throw new Error('Kloub se nepodařilo vytvořit');
+    out.push(A); rest = B;
+  }
+  out.push(rest);
+  return out;
+}
 function step(state, f) {
   const sketches = new Map(state.sketches), bodies = state.bodies;
   let n = state.n;
@@ -1678,6 +1734,14 @@ function step(state, f) {
       out = bodies.map(x => (x === b ? { ...x, polys, seams: undefined } : x));
       break;
     }
+    case 'articulate': {
+      const b = bodies.find(x => x.id === f.body);
+      if (!b) throw new Error('Těleso neexistuje');
+      const segs = articulate(b.polys, f), base = b.name || 'Těleso';
+      out = bodies.map(x => (x === b ? { ...x, polys: segs[0], name: base + ' – článek 1', seams: undefined } : x))
+        .concat(segs.slice(1).map((p, i) => ({ id: f.id + (i ? '_' + i : ''), name: base + ' – článek ' + (i + 2), polys: p, from: f.id })));
+      break;
+    }
     case 'pegsplit': {
       const b = bodies.find(x => x.id === f.body);
       if (!b) throw new Error('Těleso neexistuje');
@@ -1724,7 +1788,7 @@ function makeRebuilder() {
   };
 }
 
-return { orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

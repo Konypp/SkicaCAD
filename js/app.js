@@ -14,6 +14,7 @@ const v3 = a => new V3(a[0], a[1], a[2]);
 
 /* ================= icons ================= */
 const ICONS = {
+  articulate: '<path class="p" d="M2.5 14.5 7 11l4.5 3.5L16 11l5.5 3.5-2 3L16 15l-4.5 3.5L7 15l-2.5 2.5z" opacity=".6"/><circle cx="7" cy="13" r="2.4"/><circle cx="12" cy="16.2" r="2.4"/><circle cx="17" cy="13" r="2.4"/><path d="M3 15.5 4.8 14M9.2 14.3l.6 1M14.3 15.2l.6-1M19.2 14 21 15.5"/>',
   blob: '<circle class="p" cx="9" cy="14" r="5.5"/><circle class="p" cx="15.5" cy="8.5" r="4.5"/><path d="M4.4 17.2A5.5 5.5 0 0 1 8.2 8.6c.8-.1 1.6-.4 2.2-1A4.5 4.5 0 1 1 17 13c-.6.5-.9 1.3-1 2.1a5.5 5.5 0 0 1-11.6 2.1z"/>',
   skin: '<path class="p" d="M12 3.5a2.6 2.6 0 1 1 0 5.2 2.6 2.6 0 0 1 0-5.2zM9.5 10h5l1 5h-2l-.5 5.5h-2L10.5 15h-2z" opacity=".8"/><path d="M12 8.7V15M12 11l-5 2.5M12 11l5 2.5M12 15l-3 5.5M12 15l3 5.5"/><circle cx="12" cy="6.1" r="2.6"/>',
   sweep: '<path class="p" d="M4 18c0-6 4-11 10-12" style="fill:none;stroke:var(--org);stroke-width:5;opacity:.45"/><path d="M4 18c0-6 4-11 10-12"/><ellipse cx="4" cy="18.5" rx="2.6" ry="1.4"/><ellipse cx="15.5" cy="6" rx="1.4" ry="2.6"/>',
@@ -1113,7 +1114,7 @@ function featureTitle(i) {
   let n = 0; for (let j = 0; j <= i; j++) if (doc.features[j].type === f.type) n++;
   return Engine.FEATURE_LABEL[f.type] + ' ' + n;
 }
-const TL_ICON = { blob: 'blob', skin: 'skin', sweep: 'sweep', loft: 'loft', deform: 'deform', lattice: 'lattice', softmove: 'softmove', subdiv: 'subdiv', sculpt: 'sculpt', remesh: 'remesh', hollow: 'hollow', flatbase: 'flatbase', pegsplit: 'pegsplit', text3d: 'sktext', movefaces: 'pressface', shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
+const TL_ICON = { articulate: 'articulate', blob: 'blob', skin: 'skin', sweep: 'sweep', loft: 'loft', deform: 'deform', lattice: 'lattice', softmove: 'softmove', subdiv: 'subdiv', sculpt: 'sculpt', remesh: 'remesh', hollow: 'hollow', flatbase: 'flatbase', pegsplit: 'pegsplit', text3d: 'sktext', movefaces: 'pressface', shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
 function renderTimeline() {
   const tr = $('#tltrack'); tr.innerHTML = '';
   const m = viewMarker === null ? doc.marker : viewMarker;
@@ -1200,7 +1201,7 @@ const RIBBON = {
     ['Tvořit', [['blob', 'Měkké spojení'], ['skin', 'Kostra'], ['sweep', 'Tažení po křivce'], ['loft', 'Přechod profilů']]],
     ['Deformovat', [['deform', 'Deformace'], ['lattice', 'Mřížka'], ['softmove', 'Měkký posun'], ['subdiv', 'Vyhladit dělením']]],
     ['Sochat', [['sculpt', 'Sochat'], ['remesh', 'Přesíťovat']]],
-    ['Pro tisk', [['flatbase', 'Plochá podstava'], ['pegsplit', 'Díly s kolíky'], ['hollow', 'Vydutit'], ['printcheck', 'Kontrola tisku']]]
+    ['Pro tisk', [['articulate', 'Kloubový model'], ['flatbase', 'Plochá podstava'], ['pegsplit', 'Díly s kolíky'], ['hollow', 'Vydutit'], ['printcheck', 'Kontrola tisku']]]
   ],
   sketch: [
     ['Vytvořit', [['line', 'Čára', 'L'], ['spline', 'Křivka', 'K'], ['rect', 'Obdélník', 'R'], ['circle', 'Kružnice', 'C'],
@@ -1283,7 +1284,7 @@ function runCommand(id) {
     case 'facemode': setFaceMode(!faceMode); break;
     case 'pressface': startPressFace(); break;
     case 'blob': case 'skin': case 'sweep': case 'loft': case 'deform': case 'lattice': case 'softmove': case 'subdiv': case 'sculpt': case 'remesh':
-    case 'hollow': case 'flatbase': case 'pegsplit': case 'printcheck': startOrganic(id); break;
+    case 'hollow': case 'flatbase': case 'pegsplit': case 'articulate': case 'printcheck': startOrganic(id); break;
     case 'revolve': startRevolve(); break;
     case 'mirror': startMirror(); break;
     case 'pattern': startPattern(); break;
@@ -1496,7 +1497,7 @@ function editFeature(i) {
     case 'boxpose': startSimulate(i, ef); break;
     case 'fillet': case 'chamfer': startEdgeMod(f.type, i, ef); break;
     case 'blob': case 'skin': case 'sweep': case 'loft': case 'deform': case 'lattice': case 'softmove': case 'subdiv': case 'sculpt': case 'remesh':
-    case 'hollow': case 'flatbase': case 'pegsplit': startOrganic(f.type, i, ef); break;
+    case 'hollow': case 'flatbase': case 'pegsplit': case 'articulate': startOrganic(f.type, i, ef); break;
     case 'combine': startCombine(i, ef); break;
     case 'move': startMove(i, ef); break;
     case 'rotate': startRotate(i, ef); break;
@@ -1529,13 +1530,16 @@ const anyOverlap = tool => cur.bodies.some(b => isVis(b.id) && Engine.overlaps(b
 const snapV = v => (settings.gridSnap ? Math.round(v / settings.snap) * settings.snap : Math.round(v * 1000) / 1000);
 
 /* ================= sketch: plane pick ================= */
+let sketchOffset = 0; /* the last offset used, so several sketches one above another are quick to make */
 function startSketchCmd() {
   const c = {
-    hover: null,
+    hover: null, off: sketchOffset,
     init() {
       G.planes.visible = true;
       setPrompt('Vyberte rovinu počátku nebo rovinnou plochu tělesa');
-      openDialog({ title: 'Vytvořit skicu', icon: 'sketch', fields: [{ k: 'note', id: 'n', value: 'Klepněte na jednu z rovin XY, XZ, YZ nebo na rovinnou plochu modelu.' }] }).okEnabled(false);
+      openDialog({ title: 'Vytvořit skicu', icon: 'sketch', fields: [{ k: 'note', id: 'n', value: 'Klepněte na jednu z rovin XY, XZ, YZ nebo na rovinnou plochu modelu.' },
+        { k: 'num', id: 'off', label: 'Odsazení roviny', value: this.off }, { k: 'note', id: 'n2', value: 'Skica se posune o zadanou vzdálenost kolmo od vybrané roviny (např. pro Přechod profilů).' }],
+        onChange: id => { const v = dlg.get('off'); if (isFinite(v)) this.off = v; } }).okEnabled(false);
       requestRender();
     },
     pick(ev) {
@@ -1566,10 +1570,12 @@ function startSketchCmd() {
       const p = this.pick(ev);
       if (!p) return;
       if (p.bad) { toast('Skicu lze umístit jen na rovinnou plochu.'); return; }
+      const off = this.off || 0; sketchOffset = off;
       endCmd(true);
       planeMeshes.forEach(m => { m.material.opacity = 0.16; });
       const n = doc.features.filter(f => f.type === 'sketch').length + 1;
-      enterSketch({ id: newId(), type: 'sketch', name: 'Skica ' + n, plane: p.plane, ents: [] }, null);
+      const plane = off ? { ...p.plane, o: p.plane.o.map((x, i) => Math.round((x + p.plane.n[i] * off) * 1e4) / 1e4) } : p.plane;
+      enterSketch({ id: newId(), type: 'sketch', name: 'Skica ' + n, plane, ents: [] }, null);
     },
     cleanup() { planeMeshes.forEach(m => { m.material.opacity = 0.16; }); }
   };
@@ -6773,7 +6779,7 @@ loadStoredBlobs();
 refreshBusy(() => fitView(VIEW_ISO, true));
 showStart(true);
 /* ================= ORGANICKÉ: organic modelling commands (geometry in js/organic.js) ================= */
-const ORG_TYPES = ['blob', 'skin', 'sweep', 'loft', 'deform', 'lattice', 'softmove', 'subdiv', 'sculpt', 'remesh', 'hollow', 'flatbase', 'pegsplit'];
+const ORG_TYPES = ['articulate', 'blob', 'skin', 'sweep', 'loft', 'deform', 'lattice', 'softmove', 'subdiv', 'sculpt', 'remesh', 'hollow', 'flatbase', 'pegsplit'];
 const QSEG = [['low', 'Hrubá'], ['mid', 'Střední'], ['high', 'Jemná']];
 const r3 = x => Math.round(x * 1000) / 1000;
 /* a preview mesh for a modified body: tinted with the organic colour, semi-transparent when asked */
@@ -7257,6 +7263,20 @@ const ORG_MODS = {
     fields: v => [{ k: 'num', id: 'cut', label: 'Odříznout zespodu', value: v.cut, range: [0, 20, 0.1] }, { k: 'chk', id: 'drop', label: 'Postavit na podložku (Z = 0)', value: v.drop }],
     prompt: 'Spodek tělesa se zarovná do roviny, aby postavička stála a dobře se tiskla'
   },
+  articulate: {
+    defaults: () => ({ axis: 'x', cnt: 4, gap: 0.4, angle: 30 }),
+    load: f => ({ axis: f.axis || 'x', cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30 }),
+    fields: v => [{ k: 'seg', id: 'axis', label: 'Řetěz podél osy', options: [['x', 'X'], ['y', 'Y']], value: v.axis },
+      { k: 'num', id: 'cnt', label: 'Počet kloubů', unit: 'ks', value: v.cnt, range: [1, 20, 1] },
+      { k: 'num', id: 'gap', label: 'Vůle v kloubu', value: v.gap }, { k: 'num', id: 'angle', label: 'Natočení kloubu', unit: '°', value: v.angle, range: [10, 60, 1] },
+      { k: 'note', id: 'tip', value: 'Klouby se otáčejí kolem svislé osy: model leží na podložce a články se ohýbají do stran (had, drak, ještěrka). Tiskne se vcelku bez podpěr; po tisku klouby rozhýbejte.' }],
+    feature: v => ({ axis: v.axis, n: Math.max(1, Math.round(v.cnt)), gap: v.gap, angle: v.angle }),
+    preview(polys, f) {
+      const segs = Engine.articulate(polys, f);
+      return { polys: segs[0], extra: segs.slice(1), alt: true, note: `${segs.length} článků · kloubů ${segs.length - 1}` };
+    },
+    prompt: 'Těleso se rozdělí na články spojené klouby, které se tisknou vcelku (vůle 0,3–0,5 mm podle tiskárny)'
+  },
   pegsplit: {
     defaults: () => ({ axis: 'z', at: null, n: 1, d: 5, len: 10, tol: 0.2, style: 'attached' }),
     fields: v => [{ k: 'seg', id: 'axis', label: 'Řez kolmo na osu', options: AXSEG, value: v.axis }, { k: 'num', id: 'at', label: 'Poloha řezu', value: v.at || 0, range: [0, 100, 0.1] },
@@ -7328,7 +7348,11 @@ function startOrgMod(type, editIndex, f) {
           if (!b) throw new Error('Těleso neexistuje');
           const ft = this.feature();
           let note = '';
-          if (S.preview) { const r = S.preview(b.polys, ft); this.result = r.polys; G.preview.add(orgPreview(r.polys, 1)); for (const x of r.extra) G.preview.add(orgPreview(x, 1)); note = r.note; }
+          if (S.preview) {
+            const r = S.preview(b.polys, ft); this.result = r.polys; G.preview.add(orgPreview(r.polys, 1));
+            r.extra.forEach((x, i) => { const m = orgPreview(x, 1); if (r.alt && i % 2 === 0) m.material.color.copy(tok.body).lerp(tok.accent, 0.35); G.preview.add(m); });
+            note = r.note;
+          }
           else { this.result = Engine.orgModify(b.polys, ft); G.preview.add(orgPreview(this.result, type === 'hollow' ? 0.6 : 1)); }
           this.hideBody = this.body;
           const v0 = K.signedVolume(b.polys) / 1000, v1 = K.signedVolume(this.result) / 1000;

@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 1.65
+- **Kloubový model** (ORGANICKÉ › Pro tisk): těleso se rozdělí na články spojené klouby tištěnými vcelku – kulatý kloub na jednom článku, jazýček s kotoučem uvězněný ve štěrbině, vůle kolem dokola. Klouby se otáčejí kolem svislé osy (had, drak, ještěrka ležící na podložce). Nastavení: osa řetězu, počet kloubů, vůle (výchozí 0,4 mm), natočení kloubu.
+- **Vytvořit skicu: Odsazení roviny** – skica se posune kolmo od vybrané roviny nebo plochy o zadanou vzdálenost (např. skici nad sebou pro Přechod profilů). Hodnota se pamatuje pro další skicu.
 ## Beta 1.64
 - **Nová záložka ORGANICKÉ** (fialová, vedle TĚLESO) s nástroji pro postavičky a měkké tvary, jak se modelují v Blenderu a podobných programech:
   - **Tvořit:** *Měkké spojení* – koule, elipsoidy, kapsle, kvádry a prstence, které se v místě dotyku plynule slijí; tvary mohou i odebírat (oči, ústa), volba souměrnosti podle X a šablona postavičky. *Kostra* – „panáček z čárek“ s tloušťkou v každém bodě (ruce, nohy, ocasy), se šablonou. *Tažení po křivce* – kruh nebo profil ze skici podél otevřené čáry/křivky, se zkroucením a zúžením. *Přechod profilů* – plynulý tvar přes 2–5 profilů ze skic.
