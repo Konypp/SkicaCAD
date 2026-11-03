@@ -252,7 +252,7 @@ function seamXform(seams, m) {
     let n = [0, 1, 2].map(k => q.n[0] * ca[k] + q.n[1] * cb[k] + q.n[2] * cc[k]);
     n = KK.vnorm(det < 0 ? KK.vmul(n, -1) : n);
     const A = P(q.a), B = P(q.b);
-    return { n, w: KK.vdot(n, A), a: A, b: B };
+    return { ...q, n, w: KK.vdot(n, A), a: A, b: B, ...(q.pts ? { pts: q.pts.map(P) } : {}) };
   });
 }
 const xfBody = (x, m) => ({ ...x, polys: KK.transform(x.polys, m), seams: seamXform(x.seams, m) });
@@ -265,6 +265,7 @@ function faceClip(polys, seams, n, w, group, p) {
   for (const q of seams || []) {
     if (KK.vdot(q.n, n) < 0.9999 || Math.abs(q.w - w) > 2e-3) continue;
     const g = seamPatch(polys, q); if (!g || !g.some(i => gs.has(i))) continue;
+    if (q.pts) { const R = curveRegion(q); out.push(inPoly3(R, q.n, p) ? { poly: R, n: q.n } : { poly: R, n: q.n, out: true }); continue; }
     const h = seamPlane(q), sd = KK.vdot(h.m, p) - h.d;
     out.push(sd >= 0 ? h : { m: KK.vmul(h.m, -1), d: -h.d });
   }
@@ -281,19 +282,74 @@ function clipConvex(v, h) {
 }
 /* the face polygons clipped to the half-planes (convex pieces in the face plane) */
 function clipRegion(polys, group, clip) {
-  const out = [];
+  const out = [], tris = new Map();
+  const trisOf = h => { let t = tris.get(h); if (!t) tris.set(h, t = earTris(h.poly, h.n)); return t; };
   for (const i of group) {
-    let v = polys[i].v;
-    for (const h of clip) { v = clipConvex(v, h); if (v.length < 3) break; }
-    if (v.length >= 3) { const q = { v, n: polys[i].n, w: polys[i].w }; if (KK.surfaceArea([q]) > 1e-8) out.push(q); }
+    let pieces = [polys[i].v];
+    for (const h of clip) {
+      if (h.poly) { /* inside or outside a polygon on the face: through its triangles (convex) */
+        const T = trisOf(h), next = [];
+        if (!h.out) { for (const v of pieces) for (const t of T) { let w = v; for (const e of t) { w = clipConvex(w, e); if (w.length < 3) break; } if (w.length >= 3) next.push(w); } }
+        else { let cur = pieces; for (const t of T) { const nx = []; for (const v of cur) for (let k = 0; k < 3; k++) { let w = clipConvex(v, { m: KK.vmul(t[k].m, -1), d: -t[k].d }); for (let j = 0; j < k && w.length >= 3; j++) w = clipConvex(w, t[j]); if (w.length >= 3) nx.push(w); } cur = nx; } next.push(...cur); }
+        pieces = next;
+      } else pieces = pieces.map(v => clipConvex(v, h)).filter(v => v.length >= 3);
+      if (!pieces.length) break;
+    }
+    for (const v of pieces) { const q = { v, n: polys[i].n, w: polys[i].w }; if (KK.surfaceArea([q]) > 1e-8) out.push(q); }
   }
   return out;
+}
+/* a curved dividing line (Rozdělit plochu křivkou / odsazením hrany): a closed loop as it is, an open one made into the
+   region on its left – its ends run on far along their directions and come back round on the left of the chord */
+function curveRegion(q) {
+  if (q._reg) return q._reg;
+  const B = basisFromPlane(q.n, q.w), to2 = p => { const d = KK.vsub(p, B.o); return [KK.vdot(d, B.u), KK.vdot(d, B.v)]; };
+  const to3 = p => KK.vadd(B.o, KK.vadd(KK.vmul(B.u, p[0]), KK.vmul(B.v, p[1])));
+  let P = q.pts.map(to2);
+  if (!q.closed) {
+    const F = 1e4, n = P.length, dir = (a, b) => { const d = [b[0] - a[0], b[1] - a[1]], l = Math.hypot(d[0], d[1]) || 1; return [d[0] / l, d[1] / l]; };
+    const ds = dir(P[1], P[0]), de = dir(P[n - 2], P[n - 1]), c = dir(P[0], P[n - 1]), L = [-c[1], c[0]];
+    const s0 = [P[0][0] + ds[0] * F, P[0][1] + ds[1] * F], e0 = [P[n - 1][0] + de[0] * F, P[n - 1][1] + de[1] * F];
+    P = [s0, ...P, e0, [e0[0] + L[0] * 3 * F, e0[1] + L[1] * 3 * F], [s0[0] + L[0] * 3 * F, s0[1] + L[1] * 3 * F]];
+  }
+  Object.defineProperty(q, '_reg', { value: P.map(to3), enumerable: false });
+  return q._reg;
+}
+/* is p (on the plane) inside the polygon R (3D points on the plane of normal n) */
+function inPoly3(R, n, p) {
+  const B = basisFromPlane(n, KK.vdot(n, R[0])), to2 = x => { const d = KK.vsub(x, B.o); return [KK.vdot(d, B.u), KK.vdot(d, B.v)]; };
+  return KK.inPoly2D(to2(p), R.map(to2));
+}
+/* triangles of a simple polygon (ear clipping), each as its three inward half-planes {m, d} */
+function earTris(R, n) {
+  const B = basisFromPlane(n, KK.vdot(n, R[0])), P = R.map(x => { const d = KK.vsub(x, B.o); return [KK.vdot(d, B.u), KK.vdot(d, B.v)]; });
+  let idx = P.map((_, i) => i); if (KK.area2D(P) < 0) idx.reverse();
+  const cr = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]), out = [];
+  const inTri = (p, a, b, c) => cr(a, b, p) > 1e-12 && cr(b, c, p) > 1e-12 && cr(c, a, p) > 1e-12;
+  let guard = 0;
+  while (idx.length > 3 && guard++ < 100000) {
+    let found = false;
+    for (let k = 0; k < idx.length; k++) {
+      const i0 = idx[(k + idx.length - 1) % idx.length], i1 = idx[k], i2 = idx[(k + 1) % idx.length], a = P[i0], b = P[i1], c = P[i2];
+      if (cr(a, b, c) <= 1e-12) continue;
+      if (idx.some(j => j !== i0 && j !== i1 && j !== i2 && inTri(P[j], a, b, c))) continue;
+      out.push([i0, i1, i2]); idx.splice(k, 1); found = true; break;
+    }
+    if (!found) { idx.splice(0, 1); } /* degenerate: drop a point rather than loop */
+  }
+  if (idx.length === 3 && cr(P[idx[0]], P[idx[1]], P[idx[2]]) > 1e-12) out.push(idx.slice());
+  return out.map(t => t.map((i, k) => { const a = R[i], b = R[t[(k + 1) % 3]], c = R[t[(k + 2) % 3]]; let m = KK.vnorm(KK.cross(n, KK.vsub(b, a))); if (KK.vdot(m, c) < KK.vdot(m, a)) m = KK.vmul(m, -1); return { m, d: KK.vdot(m, a) }; }));
 }
 /* polyline segments (flat xyz array) where the seams cross their faces, for drawing */
 function seamSegments(polys, seams) {
   const arr = [];
   for (const q of seams || []) {
     const g = seamPatch(polys, q); if (!g) continue;
+    if (q.pts) { /* the curve's pieces that lie on the face */
+      const on = x => g.some(i => KK.pointInConvex(x, polys[i], 1e-6)), n = q.pts.length;
+      for (let k = 0; k < (q.closed ? n : n - 1); k++) { const A = q.pts[k], B = q.pts[(k + 1) % n]; if (on(KK.vmul(KK.vadd(A, B), 0.5))) arr.push(...A, ...B); }
+      continue;
+    }
     const h = seamPlane(q), dir = KK.vnorm(KK.vsub(q.b, q.a));
     for (const i of g) {
       const v = polys[i].v; let t0 = Infinity, t1 = -Infinity;
@@ -1918,7 +1974,7 @@ function articulateCore(polys, f) {
       /* Flexi: the cutter of the FlexiJoint maker (js/partslib.js, flexneg) is taken away from the body at the joint: a
          thin disc (the gap between the segments) with a cup round a ball in its middle, so what is left is two segments
          held together by the ball in the cup, printed in one piece. The cutter stands across the chain at the joint,
-         scaled down on a thin body (never up, so the clearances stay as designed); a body wider than its disc is cut
+         scaled to the section (up to 4×; its gaps grow with it); a body wider than its disc is cut
          through by a plain slab of the disc's thickness round it. The two parts are told apart by their shells. */
       const T0 = flexiTool(), core = 6.82, half = 1.382, disc = 16.99;
       /* it stands on the bed (the cup's bottom just under it, so the upright eye comes out of the bottom wall) when the
@@ -1931,7 +1987,7 @@ function articulateCore(polys, f) {
         }
         return true;
       };
-      let s = Math.min(1, (hw - 1) / 7.7, (zs - 1) / 15.4), tz = null;
+      let s = Math.min(4, (hw - 1) / 7.7, (zs - 1) / 15.4), tz = null;
       for (; s >= 0.35 && tz === null; s *= 0.94) {
         const low = zb - (FLEXI_LOW + 0.3) * s + (Number(f._flexiDz) || 0);
         for (const t of f.flexiBed === false ? [zc] : [low, (low + zc) / 2, zc]) if (fitsAt(s, t)) { tz = t; break; }
@@ -2506,11 +2562,11 @@ function step(state, f) {
     case 'splitface': {
       const b = bodies.find(x => x.id === f.body);
       if (!b) throw new Error('Těleso neexistuje');
-      const q = { n: f.n.map(Number), w: Number(f.w), a: f.a.map(Number), b: f.b.map(Number) }, d = KK.vsub(q.b, q.a);
+      const q = { n: f.n.map(Number), w: Number(f.w), a: f.a.map(Number), b: f.b.map(Number), ...(Array.isArray(f.pts) && f.pts.length >= 2 ? { pts: f.pts.map(p => p.map(Number)), closed: !!f.closed } : {}) }, d = KK.vsub(q.b, q.a);
       if (KK.vdot(d, d) < 1e-8) throw new Error('Body dělicí čáry splývají');
       const g = seamPatch(b.polys, q);
       if (!g) throw new Error('Plocha nebyla nalezena');
-      const h = seamPlane(q), A = clipRegion(b.polys, g, [h]), B = clipRegion(b.polys, g, [{ m: KK.vmul(h.m, -1), d: -h.d }]);
+      const h = q.pts ? { poly: curveRegion(q), n: q.n } : seamPlane(q), A = clipRegion(b.polys, g, [h]), B = clipRegion(b.polys, g, [q.pts ? { ...h, out: true } : { m: KK.vmul(h.m, -1), d: -h.d }]);
       if (KK.surfaceArea(A) < 1e-4 || KK.surfaceArea(B) < 1e-4) throw new Error('Čára plochu nerozdělí, musí plochou procházet');
       out = bodies.map(x => (x === b ? { ...x, seams: (x.seams || []).concat([q]) } : x));
       break;
@@ -2597,7 +2653,7 @@ function makeRebuilder() {
   };
 }
 
-return { LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

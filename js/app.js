@@ -3814,7 +3814,8 @@ function faceAtHit(h) {
   const area = cpolys ? K.surfaceArea(cpolys) : group.reduce((s, i) => s + K.surfaceArea([polys[i]]), 0);
   const r6 = x => Math.round(x * 1e6) / 1e6;
   return { bodyId, polys, kind: 'plane', group, n: poly.n.slice(), w: poly.w, p: cen, area, ...(smooth ? { smooth: true } : {}),
-    ...(cpolys ? { clip: clip.map(q => ({ m: q.m.map(r6), d: r6(q.d) })), cpolys, ck: clip.map(q => (q.d > 0 ? '+' : '-') + q.m.map(v => v.toFixed(3)).join()).join('|') } : {}) };
+    ...(cpolys ? { clip: clip.map(q => (q.poly ? { poly: q.poly.map(p => p.map(r6)), n: q.n.map(r6), ...(q.out ? { out: true } : {}) } : { m: q.m.map(r6), d: r6(q.d) })), cpolys,
+      ck: clip.map(q => (q.poly ? (q.out ? 'o' : 'i') + q.poly.length + ':' + q.poly[0].map(v => v.toFixed(3)).join() : (q.d > 0 ? '+' : '-') + q.m.map(v => v.toFixed(3)).join())).join('|') } : {}) };
 }
 /* polygons of a selected face (only its part when the face is split) */
 const facePolys = face => face.cpolys || face.group.map(i => face.polys[i]);
@@ -4691,15 +4692,27 @@ function startSplitFace(editIndex, f, face) {
     editIndex, body: f ? f.body : face && face.kind === 'plane' ? face.bodyId : null,
     n: f ? f.n.slice() : face && face.kind === 'plane' ? face.n.slice() : null, w: f ? f.w : face && face.kind === 'plane' ? face.w : 0,
     seed: f ? f.a.slice() : face && face.kind === 'plane' ? face.p.slice() : null,
-    pts: f ? [v3(f.a), v3(f.b)] : [], hover: null, valid: false,
+    mode: f ? f.mode || (f.pts ? 'curve' : 'line') : 'line',
+    pts: f && !f.pts ? [v3(f.a), v3(f.b)] : [], cpts: f && f.mode !== 'edge' && f.cpts ? f.cpts.map(v3) : [], edge: null, dist: f && f.dist ? f.dist : 5,
+    fixed: f && f.mode === 'edge' ? f : null, hover: null, valid: false, q: null,
     polys() { const b = cur.bodies.find(x => x.id === this.body); return b ? b.polys : null; },
     init() {
       if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
       openDialog({
         title: 'Rozdělit plochu', icon: 'splitface',
-        fields: [{ k: 'sel', id: 'face', label: 'Plocha' }, { k: 'sel', id: 'p1', label: 'Bod 1' }, { k: 'sel', id: 'p2', label: 'Bod 2' },
-          { k: 'btns', id: 'dir', label: 'Čára z bodu 1', options: [['u', 'Vodorovně'], ['v', 'Svisle']] }, { k: 'note', id: 'n' }],
+        fields: [{ k: 'sel', id: 'face', label: 'Plocha' },
+          { k: 'seg', id: 'mode', label: 'Dělit', options: [['line', 'Čarou'], ['curve', 'Křivkou'], ['edge', 'Odsazením hrany']], value: this.mode },
+          { k: 'sel', id: 'p1', label: 'Bod 1' }, { k: 'sel', id: 'p2', label: 'Bod 2' },
+          { k: 'btns', id: 'dir', label: 'Čára z bodu 1', options: [['u', 'Vodorovně'], ['v', 'Svisle']] },
+          { k: 'sel', id: 'cp', label: 'Křivka' }, { k: 'btns', id: 'cb', label: '', options: [['undo', 'Zpět'], ['clear', 'Smazat vše']] },
+          { k: 'sel', id: 'ed', label: 'Hrana' }, { k: 'num', id: 'dist', label: 'Odsazení', value: this.dist },
+          { k: 'note', id: 'n' }],
+        onChange: id => {
+          if (id === 'mode') { this.mode = dlg.get('mode'); this.fixed = null; this.update(); }
+          else if (id === 'dist') { const x = dlg.get('dist'); if (isFinite(x) && x > 0) { this.dist = x; this.fixed = null; this.update(); } }
+        },
         onBtn: (id, v) => {
+          if (id === 'cb') { if (v === 'undo') this.cpts.pop(); else this.cpts = []; this.update(); return; }
           if (id !== 'dir' || !this.n || !this.pts.length) return;
           const B = Engine.basisFromPlane(this.n, this.w), d = v3(v === 'u' ? B.u : B.v);
           this.pts = [this.pts[0], this.pts[0].clone().addScaledVector(d, 10)]; this.update();
@@ -4708,6 +4721,10 @@ function startSplitFace(editIndex, f, face) {
       this.update();
     },
     basis() { return Engine.basisFromPlane(this.n, this.w); },
+    to2(p) { const B = this.basis(), d = K.vsub(p, B.o); return [K.vdot(d, B.u), K.vdot(d, B.v)]; },
+    to3(q) { const B = this.basis(); return K.vadd(B.o, K.vadd(K.vmul(B.u, q[0]), K.vmul(B.v, q[1]))); },
+    group() { const P = this.polys(); return P && this.n ? K.planarFace(P, this.n, this.w, this.seed) || [] : []; },
+    onFace(p) { const P = this.polys(); return this.group().some(i => K.pointInConvex(p, P[i], 1e-5)); },
     /* point on the face plane under the pointer; snaps to corners, edge midpoints, circle centres and edges of that plane, then to the grid */
     pick(ev) {
       const P = this.polys(); if (!P) return null;
@@ -4718,17 +4735,12 @@ function startSplitFace(editIndex, f, face) {
       const t = measureTargets(P); let best = null, bd = R;
       for (const q of t.pts) { if (!onPl(q.p.toArray())) continue; const sp = toPx(q.p), d = Math.hypot(sp[0] - mx, sp[1] - my) - (q.kind === 'v' ? 3 : 0); if (d < bd) { bd = d; best = { p: q.p.clone(), kind: q.kind }; } }
       if (best) return best;
-      bd = R * 0.75;
-      for (const ch of t.chains) {
-        if (!ch.pts.every(onPl)) continue;
-        let prev = null, prevP = null;
-        for (const p of ch.pts) { const q = toPx(v3(p)); if (prev) { const [d, tt] = segDist(mx, my, prev, q); if (d < bd) { bd = d; best = { p: v3(prevP).lerp(v3(p), tt), kind: 'e', ch }; } } prev = q; prevP = p; }
-      }
+      best = this.pickEdge(ev, R * 0.75);
       /* on a straight edge the point moves in grid steps from the edge's start */
       if (best && best.ch.kind === 'line' && settings.gridSnap) {
         const a = v3(best.ch.line.p0), b = v3(best.ch.line.p1), L = a.distanceTo(b), st = settings.snap;
-        const t = Math.min(L, Math.max(0, Math.round(best.p.distanceTo(a) / st) * st));
-        best.p = a.clone().lerp(b, L > 0 ? t / L : 0);
+        const tt = Math.min(L, Math.max(0, Math.round(best.p.distanceTo(a) / st) * st));
+        best.p = a.clone().lerp(b, L > 0 ? tt / L : 0);
       }
       if (best) return best;
       if (settings.gridSnap) {
@@ -4738,40 +4750,90 @@ function startSplitFace(editIndex, f, face) {
       }
       return { p: x, kind: 'f' };
     },
-    line(a, b) { return { n: this.n, w: this.w, a: a.toArray(), b: b.toArray() }; },
+    /* the edge (chain) of the face's plane nearest the pointer */
+    pickEdge(ev, lim) {
+      const P = this.polys(); if (!P) return null;
+      const [mx, my] = evPx(ev), onPl = p => Math.abs(K.vdot(this.n, p) - this.w) < 1e-3;
+      let best = null, bd = lim;
+      for (const ch of measureTargets(P).chains) {
+        if (!ch.pts.every(onPl)) continue;
+        let prev = null, prevP = null;
+        for (const p of ch.pts) { const q = toPx(v3(p)); if (prev) { const [d, tt] = segDist(mx, my, prev, q); if (d < bd) { bd = d; best = { p: v3(prevP).lerp(v3(p), tt), kind: 'e', ch }; } } prev = q; prevP = p; }
+      }
+      return best;
+    },
+    /* the dividing line as stored: {a, b} (straight) or {pts, closed} (curve) */
+    seam() {
+      if (this.mode === 'line') return this.pts.length === 2 && this.pts[0].distanceTo(this.pts[1]) > 1e-3 ? { n: this.n, w: this.w, a: this.pts[0].toArray(), b: this.pts[1].toArray() } : null;
+      if (this.mode === 'curve') {
+        const P = this.cpts.map(p => this.to2(p.toArray())); if (P.length < 2) return null;
+        const L = (P.length > 2 ? K.splinePoints(P, false, 10) : P).map(q => this.to3(q));
+        return { n: this.n, w: this.w, a: L[0], b: L[1], pts: L, closed: false };
+      }
+      if (this.fixed) return { n: this.n, w: this.w, a: this.fixed.a, b: this.fixed.b, ...(this.fixed.pts ? { pts: this.fixed.pts, closed: !!this.fixed.closed } : {}) };
+      if (!this.edge) return null;
+      /* the edge moved into the face by the offset: a straight edge gives a straight line, a round one a curve */
+      const ch = this.edge; let P2 = ch.pts.map(p => this.to2(p));
+      const closed = ch.kind === 'circle' || (P2.length > 3 && Math.hypot(P2[0][0] - P2[P2.length - 1][0], P2[0][1] - P2[P2.length - 1][1]) < 1e-4);
+      if (closed && Math.hypot(P2[0][0] - P2[P2.length - 1][0], P2[0][1] - P2[P2.length - 1][1]) < 1e-4) P2 = P2.slice(0, -1);
+      if (ch.kind === 'line') P2 = [this.to2(ch.line.p0), this.to2(ch.line.p1)];
+      for (const sg of [1, -1]) {
+        const O = offsetPts(P2, closed, sg * this.dist), mid = this.to3(O[Math.floor(O.length / 2)]);
+        const mid2 = O.length === 2 ? this.to3([(O[0][0] + O[1][0]) / 2, (O[0][1] + O[1][1]) / 2]) : mid;
+        if (!this.onFace(mid2)) continue;
+        const L = O.map(q => this.to3(q));
+        return ch.kind === 'line' ? { n: this.n, w: this.w, a: L[0], b: L[1] } : { n: this.n, w: this.w, a: L[0], b: L[1], pts: L, closed };
+      }
+      return null;
+    },
     update() {
       clearGroup(G.overlay);
-      const P = this.polys(), has = !!(P && this.n);
+      const P = this.polys(), has = !!(P && this.n), m = this.mode;
       dlg.set('face', { text: has ? 'Rovinná plocha' : 'Klepněte na rovinnou plochu', has, active: !has });
       const f3 = p => `${fmtc(p.x, 2)}; ${fmtc(p.y, 2)}; ${fmtc(p.z, 2)}`;
       dlg.set('p1', { text: this.pts[0] ? f3(this.pts[0]) : 'Klepněte na plochu', has: !!this.pts[0], active: has && (this.pts.length === 0 || this.pts.length === 2) });
       dlg.set('p2', { text: this.pts[1] ? f3(this.pts[1]) : 'Klepněte na plochu', has: !!this.pts[1], active: has && this.pts.length === 1 });
-      dlg.show('dir', this.pts.length >= 1);
+      dlg.set('cp', { text: this.cpts.length ? this.cpts.length + ' bodů' : 'Klepejte body na plochu', has: this.cpts.length > 0, active: has });
+      dlg.set('ed', { text: this.edge || this.fixed ? 'Vybraná hrana' : 'Klepněte na hranu plochy', has: !!(this.edge || this.fixed), active: has && !this.edge });
+      for (const id of ['p1', 'p2']) dlg.show(id, m === 'line');
+      dlg.show('dir', m === 'line' && this.pts.length >= 1);
+      for (const id of ['cp', 'cb']) dlg.show(id, m === 'curve');
+      for (const id of ['ed', 'dist']) dlg.show(id, m === 'edge');
       this.valid = false;
       if (has) {
-        const g = K.planarFace(P, this.n, this.w, this.seed);
-        if (g) G.overlay.add(faceOverlay(g.map(i => P[i]), planeKey(P[g[0]]), tok.accent, 0.18));
-        const b = this.pts.length === 2 ? this.pts[1] : this.pts.length === 1 && this.hover ? this.hover.p : null;
-        if (b && this.pts[0].distanceTo(b) > 1e-3) {
-          const q = this.line(this.pts[0], b), seg = Engine.seamSegments(P, [q]);
+        const g = this.group();
+        if (g.length) G.overlay.add(faceOverlay(g.map(i => P[i]), planeKey(P[g[0]]), tok.accent, 0.18));
+        let q = this.seam();
+        if (!q && m === 'line' && this.pts.length === 1 && this.hover && this.pts[0].distanceTo(this.hover.p) > 1e-3) q = { n: this.n, w: this.w, a: this.pts[0].toArray(), b: this.hover.p.toArray() };
+        if (q) {
+          const seg = Engine.seamSegments(P, [q]);
           if (seg.length) { const l = noRay(new THREE.LineSegments(lineGeo(seg), new THREE.LineBasicMaterial({ color: tok.orange, depthTest: false, transparent: true }))); l.renderOrder = 12; G.overlay.add(l); }
-          if (this.pts.length === 2) {
-            const h = Engine.seamPlane(q), gg = g || [];
-            const A = K.surfaceArea(Engine.clipRegion(P, gg, [h])), Bb = K.surfaceArea(Engine.clipRegion(P, gg, [{ m: K.vmul(h.m, -1), d: -h.d }]));
+          if (this.seam()) {
+            let A = 0, Bb = 0;
+            try {
+              const h = q.pts ? { poly: Engine.curveRegion(q), n: q.n } : Engine.seamPlane(q), hb = q.pts ? { ...h, out: true } : { m: K.vmul(h.m, -1), d: -h.d };
+              A = K.surfaceArea(Engine.clipRegion(P, g, [h])); Bb = K.surfaceArea(Engine.clipRegion(P, g, [hb]));
+            } catch (e) { A = 0; }
             this.valid = A > 1e-4 && Bb > 1e-4;
             dlg.set('n', this.valid ? `Plocha se rozdělí na části ${fmtc(A, 1)} mm² a ${fmtc(Bb, 1)} mm². Každou pak vyberete a upravíte samostatně.` : '!Čára plochu nerozdělí, musí plochou procházet.');
           }
         }
-        if (this.pts.length < 2) dlg.set('n', this.pts.length ? 'Klepněte na druhý bod, nebo veďte čáru vodorovně či svisle.' : 'Body se přichytí k rohům, středům hran a hranám plochy, jinak k mřížce.');
-        if (this.pts.length) G.overlay.add(mpts(this.pts, tok.orange, 10));
+        if (!this.valid && !this.seam()) {
+          if (m === 'line') dlg.set('n', this.pts.length ? 'Klepněte na druhý bod, nebo veďte čáru vodorovně či svisle.' : 'Body se přichytí k rohům, středům hran a hranám plochy, jinak k mřížce.');
+          else if (m === 'curve') dlg.set('n', 'Klepejte body křivky přes plochu (od kraje ke kraji); křivka jimi projde hladce.');
+          else dlg.set('n', this.edge ? '!Hranu nelze o tolik odsadit dovnitř plochy.' : 'Klepněte na hranu plochy; posune se dovnitř plochy o Odsazení a vznikne nová plocha.');
+        }
+        if (m === 'line' && this.pts.length) G.overlay.add(mpts(this.pts, tok.orange, 10));
+        if (m === 'curve' && this.cpts.length) G.overlay.add(mpts(this.cpts, tok.orange, 10));
+        if (m === 'edge' && this.edge) { const seg = []; const E = this.edge.pts; for (let k = 1; k < E.length; k++) seg.push(...E[k - 1], ...E[k]); const l = noRay(new THREE.LineSegments(lineGeo(new Float32Array(seg)), new THREE.LineBasicMaterial({ color: tok.accent, depthTest: false, transparent: true }))); l.renderOrder = 12; G.overlay.add(l); }
         if (this.hover) G.overlay.add(mpts([this.hover.p], tok.accent, 12));
       } else dlg.set('n', 'Vyberte rovinnou stěnu tělesa, kterou chcete rozdělit.');
-      setPrompt(!has ? 'Klepněte na rovinnou plochu, kterou chcete rozdělit' : this.pts.length === 1 ? 'Klepněte na druhý bod dělicí čáry' : 'Klepněte na první bod dělicí čáry');
+      setPrompt(!has ? 'Klepněte na rovinnou plochu, kterou chcete rozdělit' : m === 'curve' ? 'Klepejte body dělicí křivky' : m === 'edge' ? 'Klepněte na hranu, která se odsadí dovnitř plochy' : this.pts.length === 1 ? 'Klepněte na druhý bod dělicí čáry' : 'Klepněte na první bod dělicí čáry');
       dlg.okEnabled(this.valid); requestRender();
     },
     onMove(ev) {
       if (!this.n) { dom.style.cursor = hitBodies(ev) ? 'pointer' : ''; return; }
-      const q = this.pick(ev); dom.style.cursor = q ? 'crosshair' : '';
+      const q = this.mode === 'edge' ? this.pickEdge(ev, R) : this.pick(ev); dom.style.cursor = q ? 'crosshair' : '';
       const key = o => (o ? o.kind + o.p.toArray().map(v => v.toFixed(4)).join() : '');
       if (key(q) !== key(this.hover)) { this.hover = q; this.update(); }
     },
@@ -4781,14 +4843,21 @@ function startSplitFace(editIndex, f, face) {
         if (!fc || fc.kind !== 'plane') { if (h) toast('Rozdělit lze jen rovinnou plochu.'); return; }
         this.body = fc.bodyId; this.n = fc.n.slice(); this.w = fc.w; this.seed = fc.p.slice(); this.update(); return;
       }
+      if (this.mode === 'edge') { const e = this.pickEdge(ev, R); if (!e) return; this.edge = e.ch; this.fixed = null; this.update(); return; }
       const q = this.pick(ev); if (!q) return;
+      if (this.mode === 'curve') { this.cpts.push(q.p); this.hover = TOUCH ? null : q; this.update(); return; }
       if (this.pts.length >= 2) this.pts = [];
       this.pts.push(q.p); this.hover = TOUCH ? null : q; this.update();
     },
     ok() {
       if (!this.valid) return null;
-      const r4 = v => Math.round(v * 1e4) / 1e4, r6 = v => Math.round(v * 1e6) / 1e6;
-      return { id: f ? f.id : newId(), type: 'splitface', body: this.body, n: this.n.map(r6), w: r6(this.w), a: this.pts[0].toArray().map(r4), b: this.pts[1].toArray().map(r4) };
+      const r4 = v => Math.round(v * 1e4) / 1e4, r6 = v => Math.round(v * 1e6) / 1e6, q = this.seam();
+      const o = { id: f ? f.id : newId(), type: 'splitface', body: this.body, n: this.n.map(r6), w: r6(this.w), a: q.a.map(r4), b: q.b.map(r4) };
+      if (this.mode !== 'line') o.mode = this.mode;
+      if (q.pts) { o.pts = q.pts.map(p => p.map(r4)); if (q.closed) o.closed = true; }
+      if (this.mode === 'curve') o.cpts = this.cpts.map(p => p.toArray().map(r4));
+      if (this.mode === 'edge') o.dist = this.dist;
+      return o;
     },
     after() { selFace = null; selFaces = []; hoverFace = null; setTimeout(() => toast('Plocha je rozdělená. V režimu Plochy klepněte na její část a upravte ji.'), 700); },
     cleanup() { this.hover = null; }
@@ -7351,7 +7420,7 @@ const ORG_MODS = {
       dlg.set('tip', {
         disc: 'Kotouč: jeden článek končí kulatým kloubem, druhý do něj zasahuje jazýčkem s kotoučem. Klouby se otáčejí kolem svislé osy, články se ohýbají do stran (had, drak, ještěrka).',
         ball: 'Kulový: koule na krčku jednoho článku sedí v kulové jamce sousedního, kolem dokola je vůle. Článek se otáčí ve všech osách – do stran, nahoru a dolů i kolem své osy (natočení nejvýš 20°, aby koule nevyklouzla ústím). Krček se od koule kuželovitě rozšiřuje – čím menší Natočení kloubu, tím je silnější. Jamka má střechu pod 45°, krček je kosočtverečný, takže se tiskne vcelku bez podpěr; jen malá plôška pod koulí se tiskne přes mezeru.',
-        flexi: 'Flexi: z tělesa se v místě kloubu vyřízne nástroj FlexiJoint Maker – tenký kotouč (mezera mezi články) s miskou kolem koule uprostřed. Zbudou dva články spojené koulí v misce; kloub se natáčí do všech stran. Kloub stojí na podložce – svislé očko vychází ze spodní stěny (na kulatém tělese se zvedne výš, aby miska zůstala uvnitř). Na tenkém tělese se nástroj zmenší.',
+        flexi: 'Flexi: z tělesa se v místě kloubu vyřízne nástroj FlexiJoint Maker – tenký kotouč (mezera mezi články) s miskou kolem koule uprostřed. Zbudou dva články spojené koulí v misce; kloub se natáčí do všech stran. Kloub stojí na podložce – svislé očko vychází ze spodní stěny (na kulatém tělese se zvedne výš, aby miska zůstala uvnitř). Velikost nástroje se řídí průřezem tělesa – na tenkém se zmenší, na velkém zvětší (nejvýš 4×) i s mezerami.',
         hinge: 'Pant: tři klouby nad sebou jako u dveřního pantu, krajní drží svislý čep procházející prostředním. Otáčí se kolem svislé osy, články se ohýbají do stran.',
         flex: 'Nahoru/dolů: jako tištěný řemínek hodinek – jazýček článku mezi dvěma rameny sousedního, na bocích kuželové čepy v kuželových důlcích (vše pod 45°), takže se otáčí hladce. Články se ohýbají nahoru a dolů, třeba kolem zápěstí; konce jsou z boku kulaté.',
         ring: 'Očka: jako tištěné řetízkové hračky – dvě kulatá očka provlečená do sebe jako články řetězu, každé prochází středem toho druhého. Očko jednoho článku je skloněné o 40° dozadu, očko druhého stojí podél řetězu se zploštělým spodkem na podložce; vpředu je svislý výřez do V, vzadu vodorovná drážka do V. U nízkých plochých řemínků leží první očko naplocho. Článek se ohýbá do stran i nahoru a dolů.',
@@ -7991,7 +8060,7 @@ $('#m-login').addEventListener('click', () => { closeMenu(); if (syncFns) syncFn
 $('#m-logout').addEventListener('click', () => { closeMenu(); if (syncFns) syncFns.logout(); });
 if (window.I18N) I18N.onChange(() => syncMenu());
 
-if (window.__KOTA_TEST__) window.__kota = { get cmd() { return cmd; }, viewTo, threeMfBytes, transform, get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart, makeThumb, libThumb, transform, persp, toPx, startMove, alignDesc,
+if (window.__KOTA_TEST__) window.__kota = { get cmd() { return cmd; }, viewTo, startSplitFace, threeMfBytes, transform, get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart, makeThumb, libThumb, transform, persp, toPx, startMove, alignDesc,
   cmdSnap, get doc() { return doc; }, get cur() { return cur; }, get cmd() { return cmd; }, get sk() { return sk; }, get dlg() { return dlg; }, get sel() { return sel; }, meshes, chainsFor };
 })();
 

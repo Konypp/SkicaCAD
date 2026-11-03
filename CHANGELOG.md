@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.03
+- **Rozdělit plochu – Dělit: Čarou / Křivkou / Odsazením hrany.** Křivkou: klepejte body přes plochu, dělicí křivka jimi projde hladce. Odsazením hrany: klepněte na hranu plochy a zadejte Odsazení – hrana se posune dovnitř plochy a vznikne nová plocha (rovná hrana dá rovnou čáru, kruhová nebo oblouková hrana soustřednou křivku, např. okraj na víčku válce). Každou část pak vyberete v režimu Plochy a vysunete, posunete nebo z ní uděláte skicu.
+- **Kloub Flexi se i zvětšuje:** nástroj se řídí průřezem tělesa – na tenkém se zmenší, na velkém zvětší (nejvýš 4×) i s mezerami; dřív zůstával na velkých modelech v původní velikosti.
 ## Beta 2.02
 - Zakřivený řez kloubu Flexi (z Beta 2.01) odstraněn; Flexi má opět jen rovný řez.
 ## Beta 2.01
