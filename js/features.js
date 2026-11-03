@@ -1898,21 +1898,34 @@ function articulateCore(polys, f) {
       /* Kulový: a ball on a neck of the left segment sits in a round socket of the right one, printed in place with a
          clearance all round, so the right segment turns about every axis (sideways, up and down, and twists). The
          socket's roof is a 45° tent, the ball has a small flat underside just above the socket's floor, the neck is a
-         diamond (45° faces) and the mouth a cone, so it prints without supports; the mouth is narrower than the ball. */
-      /* the swing of a ball joint is held to 25°: the mouth must stay narrower than the ball while the neck sweeps it */
-      const thB = Math.min(th, 25 * Math.PI / 180), dirA = ea.map(v => -v), sw = thB + Math.PI / 180;
+         diamond (45° faces) and the mouth a cone, so it prints without supports; the mouth is narrower than the ball.
+         The neck widens away from the ball (a diamond pyramid of half-angle nA about the ball's centre, its bottom ridge
+         level), so it is thickest where it bends most; the mouth is the cone it sweeps (half-angle nA + swing), and nA
+         is as large as keeps the mouth's rim on the socket narrower than the ball. Less swing → thicker neck. */
+      /* the swing of a ball joint is held to 20°: the mouth must stay narrower than the ball while the neck sweeps it */
+      const thB = Math.min(th, 20 * Math.PI / 180), dirA = ea.map(v => -v), sw = thB + Math.PI / 180;
       /* the socket (with a wall round it) must lie wholly inside the body: on a round body (cylinder, sphere) the section
          narrows away from its middle, so sizes and heights are tried, largest first, until the socket, its roof and the
          mouth on the face all keep inside */
       const inside = insideTest(rest), wall = 0.9;
-      const fits = (C, R, rn) => {
-        const del = (rn + g) / Math.sin(sw), D = [];
+      /* the neck's half-angle for a ball of radius rb: the largest (up to 40°) whose mouth rim on the socket stays within
+         0.86 rb, so the ball cannot slip out */
+      const neckAngle = rb => {
+        const R = rb + g;
+        for (let nA = 40; nA > 16; nA -= 0.5) {
+          const be = nA * Math.PI / 180 + sw, del = g / Math.sin(be), rim = (R * Math.cos(be) + del) * Math.tan(be);
+          if (rim <= 0.86 * rb) return nA * Math.PI / 180;
+        }
+        return 16 * Math.PI / 180;
+      };
+      const fits = (C, R, nA) => {
+        const be = nA + sw, del = g / Math.sin(be), D = [];
         for (let i = 0; i < 16; i++) for (let j = 1; j < 8; j++) { const t = i / 16 * 2 * Math.PI, f2 = j / 8 * Math.PI, r = R + wall; D.push([r * Math.sin(f2) * Math.cos(t), r * Math.sin(f2) * Math.sin(t), r * Math.cos(f2)]); }
         D.push([0, 0, R * Math.SQRT2 + wall], [0, 0, -R - wall]);
         for (const d of D) { const q = [C[0] + d[0], C[1] + d[1], C[2] + d[2]]; if (!inside(q)) return false; }
         /* the mouth where it meets the face, and half-way to the socket */
         for (const xf of [xp + 0.05, (xp + C[a] - R) / 2]) {
-          const rf = (del + C[a] - xf) * Math.tan(sw) + wall;
+          const rf = (del + C[a] - xf) * Math.tan(be) + wall;
           for (let i = 0; i < 16; i++) { const t = i / 16 * 2 * Math.PI, q = [0, 0, C[2] + rf * Math.sin(t)]; q[a] = xf; q[sAx] = sc + rf * Math.cos(t); if (!inside(q)) return false; }
         }
         return true;
@@ -1922,27 +1935,30 @@ function articulateCore(polys, f) {
         R = rb + g;
         for (const cz of [zc - (Math.SQRT2 - 1) * R / 2, sec.min[2] + 1.2 + R]) {
           const T = [0, 0, cz]; T[a] = xp + R + 1.2; T[sAx] = sc;
-          if (fits(T, R, 0.28 * rb)) { C = T; break; }
+          if (fits(T, R, neckAngle(rb))) { C = T; break; }
         }
         if (C) break;
       }
       if (!C) throw new Error('Těleso je v místě kloubu na kulový kloub příliš malé; použijte méně kloubů nebo jiný typ');
-      const rn = 0.28 * rb;
+      const nA = neckAngle(rb), be = nA + sw, rn = rb * Math.sin(nA);
       /* socket: sphere, 45° tent above it, a cone mouth towards the left segment */
       const tentH = R * Math.SQRT1_2;
       let sock = KK.translate(KK.primitive('sphere', { r: R }), C);
       sock = U(sock, KK.translate(KK.primitive('cone', { r: R * Math.SQRT1_2 + 0.01, rt: 0.01, h: tentH + 0.01 }), [C[0], C[1], C[2] + tentH + (tentH + 0.01) / 2]));
       /* the mouth: the cone the neck sweeps, i.e. of half-angle = swing, its apex moved back so the neck's thickness fits */
-      const del = (rn + g) / Math.sin(sw), mouthLen = del + (C[a] - xp) + 2;
-      const mouth = coneX(C.map((v, k) => v + ea[k] * del), dirA, 0.01, mouthLen * Math.tan(sw), mouthLen);
+      const del = g / Math.sin(be), mouthLen = del + (C[a] - xp) + 2;
+      const mouth = coneX(C.map((v, k) => v + ea[k] * del), dirA, 0.01, mouthLen * Math.tan(be), mouthLen);
       sock = U(sock, mouth);
       /* ball (flat underside near the floor) and the diamond neck back into the left segment */
       const ball = I(KK.translate(KK.primitive('sphere', { r: rb }), C), boxAS([C[a] - rb - 1, C[a] + rb + 1], [sc - rb - 1, sc + rb + 1], [C[2] - 0.92 * rb, C[2] + rb + 1]));
       const nLen = C[a] - (xp - g - Math.max(3, rb));
-      const PV = { o: [0, 0, 0], u: es, v: [0, 0, 1], n: KK.cross(es, [0, 0, 1]) };
-      const ns = KK.vdot(PV.n, ea) > 0 ? 1 : -1, cs = KK.vdot(C, es), czz = C[2];
-      const neckD = KK.extrudeProfiles([{ pts: [[cs - rn, czz], [cs, czz - rn], [cs + rn, czz], [cs, czz + rn]], closed: true }], PV, Math.min(ns * C[a], ns * (C[a] - nLen)), Math.max(ns * C[a], ns * (C[a] - nLen)));
-      const neck = KK.fixOrientation(neckD);
+      /* cross-sections at distance t back from C: a diamond of half-diagonal w(t) = (0.95 t tan nA + rn) / 2 standing on
+         the level ridge rn below C, so it keeps inside the cone of half-angle nA (and its faces at 45°) */
+      const ez = [0, 0, 1], sec2 = t => { const w = (0.95 * t * Math.tan(nA) + rn) / 2, o = C.map((v, k) => v - ea[k] * t - ez[k] * rn);
+        const at = (x, z) => o.map((v, k) => v + es[k] * x + ez[k] * z); return [at(0, 0), at(w, w), at(0, 2 * w), at(-w, w)]; };
+      const n0 = sec2(rb * Math.cos(nA) * 0.85), n1 = sec2(nLen), fcs = [n0, n1.slice().reverse()];
+      for (let i = 0; i < 4; i++) fcs.push([n0[i], n1[i], n1[(i + 1) % 4], n0[(i + 1) % 4]]);
+      const neck = KK.fixOrientation(fcs.map(v => KK.mkPoly(v)).filter(Boolean));
       /* the left segment: everything up to the gap, opened in a V both ways about the ball's centre for the swing */
       /* the right segment's face turns about C (inside it): the left one keeps clear of every turned position of that face,
          i.e. behind the two planes tangent to the circle of radius (C − face) at ±(swing) – a V whose apex lies behind C */
@@ -1950,7 +1966,7 @@ function articulateCore(polys, f) {
       const XZ = { o: [0, 0, 0], u: ea, v: [0, 0, 1], n: KK.cross(ea, [0, 0, 1]) };
       const wedgeV = () => { const pts = [[Q[a], Q[2]]], M = 24; for (let i = 0; i <= M; i++) { const t = -al + 2 * al * i / M; pts.push([Q[a] - Math.cos(t) * BIG, Q[2] + Math.sin(t) * BIG]); } if (KK.area2D(pts) < 0) pts.reverse(); const nv = KK.vdot(XZ.n, Q); return KK.extrudeProfiles([{ pts, closed: true }], XZ, nv - BIG, nv + BIG); };
       A = I(I(I(rest, boxAS([xp - far * 2, xp - g], [sc - far, sc + far], [z0, z1])), wedge(Q, -1, al)), KK.fixOrientation(wedgeV()));
-      if (Array.isArray(f._dbg)) f._dbg.push({ body: A, neck: I(neck, rest), ball, C });
+      if (Array.isArray(f._dbg)) f._dbg.push({ body: A, neck: I(neck, rest), ball, C, rb, nA, rn });
       A = U(U(A, I(neck, rest)), ball);
       B = S(I(rest, boxAS([xp, xp + far * 2], [sc - far, sc + far], [z0, z1])), sock);
     } else if (style === 'ring') {

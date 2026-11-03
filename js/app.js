@@ -1195,7 +1195,7 @@ const RIBBON = {
   solid: [
     ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'],
       { menu: 'prim', label: 'Základní tělesa', items: [['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus'], ['text3d', 'Text']] },
-      { menu: 'parts', label: 'Součásti', items: [['bolt', 'Šroub'], ['nut', 'Matice'], ['hinge', 'Pant'], ['latch', 'Západka'], ['buckle', 'Spona'], ['jointpart', 'Kloubový spoj'], ['libpart', 'Kloubové díly']] }]],
+      { menu: 'parts', label: 'Součásti', items: [['bolt', 'Šroub'], ['nut', 'Matice'], ['hinge', 'Pant'], ['latch', 'Západka'], ['buckle', 'Spona'], ['jointpart', 'Kloubové díly']] }]],
     ['Upravit', [{ menu: 'edge', label: 'Hrany', items: [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení']] }, ['hole', 'Díra', 'H'], ['shell', 'Skořepina'], ['move', 'Přesunout', 'M'], ['scale', 'Měřítko'], ['rotate', 'Otočit', 'R'], ['facemode', 'Plochy', 'G'],
       { menu: 'shape', label: 'Tvar', items: [['combine', 'Kombinovat'], ['splitbody', 'Rozříznout'], ['curvecut', 'Rozříznout křivkou']] },
       { menu: 'xform', label: 'Uspořádat', items: [['center', 'Zarovnat'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole']] },
@@ -7350,7 +7350,7 @@ const ORG_MODS = {
       const endsTip = c.v.ends === 'fold' ? ' Spona sklápěcí: samice se tiskne nastojato na začátku řemínku (tenká dutina tak nepotřebuje most) a po tisku se v kloubu sklopí o 90° ven, ústím od řemínku; samec leží naplocho na konci. Spona je jen o málo silnější než řemínek.' : '';
       dlg.set('tip', {
         disc: 'Kotouč: jeden článek končí kulatým kloubem, druhý do něj zasahuje jazýčkem s kotoučem. Klouby se otáčejí kolem svislé osy, články se ohýbají do stran (had, drak, ještěrka).',
-        ball: 'Kulový: koule na krčku jednoho článku sedí v kulové jamce sousedního, kolem dokola je vůle. Článek se otáčí ve všech osách – do stran, nahoru a dolů i kolem své osy (natočení nejvýš 25°, aby koule nevyklouzla ústím). Jamka má střechu pod 45°, krček je kosočtverečný, takže se tiskne vcelku bez podpěr; jen malá plôška pod koulí se tiskne přes mezeru.',
+        ball: 'Kulový: koule na krčku jednoho článku sedí v kulové jamce sousedního, kolem dokola je vůle. Článek se otáčí ve všech osách – do stran, nahoru a dolů i kolem své osy (natočení nejvýš 20°, aby koule nevyklouzla ústím). Krček se od koule kuželovitě rozšiřuje – čím menší Natočení kloubu, tím je silnější. Jamka má střechu pod 45°, krček je kosočtverečný, takže se tiskne vcelku bez podpěr; jen malá plôška pod koulí se tiskne přes mezeru.',
         hinge: 'Pant: tři klouby nad sebou jako u dveřního pantu, krajní drží svislý čep procházející prostředním. Otáčí se kolem svislé osy, články se ohýbají do stran.',
         flex: 'Nahoru/dolů: jako tištěný řemínek hodinek – jazýček článku mezi dvěma rameny sousedního, na bocích kuželové čepy v kuželových důlcích (vše pod 45°), takže se otáčí hladce. Články se ohýbají nahoru a dolů, třeba kolem zápěstí; konce jsou z boku kulaté.',
         ring: 'Očka: jako tištěné řetízkové hračky – dvě kulatá očka provlečená do sebe jako články řetězu, každé prochází středem toho druhého. Očko jednoho článku je skloněné o 40° dozadu, očko druhého stojí podél řetězu se zploštělým spodkem na podložce; vpředu je svislý výřez do V, vzadu vodorovná drážka do V. U nízkých plochých řemínků leží první očko naplocho. Článek se ohýbá do stran i nahoru a dolů.',
@@ -7809,15 +7809,16 @@ const LIB_TIP = {
   hook: 'Háček: kroužek skloněný o 45° s kořenem. Připojte ho ke konci vlastního modelu (Kombinovat › Sjednotit).',
   neg: 'Kapsa – negativ: odečtěte ho od vlastního modelu (Kombinovat › Odečíst); vznikne kapsa a čep v ní zůstane. Háček druhého dílu pak do kapsy obepne čep.'
 };
-function startLibPart(editIndex, f) {
+function startLibPart(editIndex, f, pre) {
   const c = {
-    editIndex, v: f ? { part: f.part, scale: f.scale || 100, rot: f.rot || 0 } : { part: 'link', scale: 100, rot: 0 }, pos: f ? f.pos.slice() : [0, 0, 0], tool: null,
+    editIndex, v: f ? { part: f.part, scale: f.scale || 100, rot: f.rot || 0 } : { part: 'link', scale: 100, rot: 0 }, pos: f ? f.pos.slice() : pre ? pre.pos.slice() : [0, 0, 0], tool: null,
     init() {
       openDialog({ title: 'Kloubové díly', icon: 'articulate',
-        fields: [{ k: 'opt', id: 'part', label: 'Díl', options: Object.entries(Engine.LIB_PARTS), value: this.v.part },
+        fields: [...(f ? [] : [{ k: 'seg', id: 'fam', label: 'Druh', options: PART_FAMS, value: 'lib' }]), { k: 'opt', id: 'part', label: 'Díl', options: Object.entries(Engine.LIB_PARTS), value: this.v.part },
           { k: 'num', id: 'scale', label: 'Velikost', unit: '%', value: this.v.scale, range: [25, 400, 1] }, { k: 'num', id: 'rot', label: 'Otočení', unit: '°', value: this.v.rot, range: [-180, 180, 15] },
           { k: 'xyz', id: 'pos', label: 'Poloha', value: this.pos }, { k: 'note', id: 'tip' }, { k: 'note', id: 'n' }],
         onChange: id => {
+          if (id === 'fam') { if (dlg.get('fam') === 'joint') { const pos = this.pos; endCmd(false); startJointPart(undefined, null, { pos }); } return; }
           if (id === 'part') this.v.part = dlg.get('part');
           else if (id === 'pos') this.pos = dlg.get('pos');
           else { const x = dlg.get(id); if (isFinite(x) && (id === 'rot' || x > 0)) this.v[id] = x; }
@@ -7852,13 +7853,14 @@ const JOINT_TIP = {
   flex: 'Kloub nahoru/dolů: jazyk mezi dvěma rameny s kuželovými čepy, ohýbá se nahoru a dolů. Oba díly jsou už spojené a tisknou se vcelku bez podpěr; každý připojte k vlastnímu modelu (Kombinovat › Sjednotit).',
   ball: 'Kulový kloub: koule v jamce, natáčí se do všech stran i kolem osy. Oba díly jsou už spojené a tisknou se vcelku bez podpěr; každý připojte k vlastnímu modelu (Kombinovat › Sjednotit).'
 };
-function startJointPart(editIndex, f) {
+const PART_FAMS = [['joint', 'Kloubový spoj'], ['lib', 'Hotové díly']];
+function startJointPart(editIndex, f, pre) {
   const c = {
     editIndex, v: f ? { style: f.style || 'disc', shape: f.shape || 'box', w: f.w || 20, h: f.h || 14, len: f.len || 60, gap: f.gap || 0.4, angle: f.angle || 30, snap: !!f.snap, rot: f.rot || 0 }
-      : { style: 'disc', shape: 'box', w: 20, h: 14, len: 60, gap: 0.4, angle: 30, snap: false, rot: 0 }, pos: f ? f.pos.slice() : [0, 0, 0], tool: null, timer: 0,
+      : { style: 'disc', shape: 'box', w: 20, h: 14, len: 60, gap: 0.4, angle: 30, snap: false, rot: 0 }, pos: f ? f.pos.slice() : pre ? pre.pos.slice() : [0, 0, 0], tool: null, timer: 0,
     init() {
-      openDialog({ title: 'Kloubový spoj', icon: 'articulate',
-        fields: [{ k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů'], ['ball', 'Kulový']], value: this.v.style },
+      openDialog({ title: f ? 'Kloubový spoj' : 'Kloubové díly', icon: 'articulate',
+        fields: [...(f ? [] : [{ k: 'seg', id: 'fam', label: 'Druh', options: PART_FAMS, value: 'joint' }]), { k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů'], ['ball', 'Kulový']], value: this.v.style },
           { k: 'chk', id: 'snap', label: 'Tisknout po dílech a zacvaknout', value: this.v.snap },
           { k: 'seg', id: 'shape', label: 'Tvar', options: [['box', 'Hranol'], ['round', 'Válec']], value: this.v.shape },
           { k: 'num', id: 'len', label: 'Délka', value: this.v.len, range: [10, 400, 1] }, { k: 'num', id: 'w', label: 'Šířka', value: this.v.w, range: [3, 200, 1] },
@@ -7867,6 +7869,7 @@ function startJointPart(editIndex, f) {
           { k: 'num', id: 'rot', label: 'Otočení', unit: '°', value: this.v.rot, range: [-180, 180, 15] },
           { k: 'xyz', id: 'pos', label: 'Poloha', value: this.pos }, { k: 'note', id: 'tip' }, { k: 'note', id: 'n' }],
         onChange: id => {
+          if (id === 'fam') { if (dlg.get('fam') === 'lib') { const pos = this.pos; clearTimeout(this.timer); endCmd(false); startLibPart(undefined, null, { pos }); } return; }
           if (id === 'style' || id === 'shape') this.v[id] = dlg.get(id);
           else if (id === 'snap') this.v.snap = !!dlg.get('snap');
           else if (id === 'pos') this.pos = dlg.get('pos');
