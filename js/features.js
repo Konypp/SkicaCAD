@@ -23,7 +23,7 @@ function libPolys(f) {
 }
 /* ready-made joints: a short bar (a block or a lying cylinder) cut in the middle by the chosen joint of the jointed
    model, printed in place; the user joins each half to a model of their own */
-const JOINT_PARTS = { disc: 'Kotoučový kloub', hinge: 'Pantový kloub', flex: 'Kloub nahoru/dolů', ball: 'Kulový kloub' };
+const JOINT_PARTS = { disc: 'Kotoučový kloub', hinge: 'Pantový kloub', flex: 'Kloub nahoru/dolů', ball: 'Kulový kloub', flexi: 'Kloub Flexi' };
 const jointCache = new Map();
 function jointParts(f) {
   const style = f.style in JOINT_PARTS ? f.style : 'disc', round = f.shape === 'round';
@@ -1845,6 +1845,13 @@ function articulateOblique(polys, f) {
   out.push(rest);
   return out;
 }
+/* the separate shells of a solid (polygons joined through shared corners) */
+function shellsOf(P) {
+  const par = P.map((_, i) => i), find = i => { while (par[i] !== i) i = par[i] = par[par[i]]; return i; }, seen = new Map();
+  P.forEach((p, i) => p.v.forEach(q => { const k = KK.qk(q); if (seen.has(k)) par[find(i)] = find(seen.get(k)); else seen.set(k, i); }));
+  const g = new Map(); P.forEach((p, i) => { const r = find(i); if (!g.has(r)) g.set(r, []); g.get(r).push(p); });
+  return [...g.values()].filter(sh => KK.signedVolume(sh) > 1e-3);
+}
 /* a point-in-solid test by ray parity (one fixed skew direction) */
 function insideTest(polys) {
   const dir = KK.vnorm([0.5773, 0.6131, 0.5401]), list = polys.map(p => ({ p, dn: KK.vdot(p.n, dir) }));
@@ -1894,7 +1901,26 @@ function articulateCore(polys, f) {
     const P = [0, 0, 0]; P[a] = xp; P[sAx] = sc;
     const z0 = zc - BIG / 2, z1 = zc + BIG / 2, far = BIG / 2;
     let A, B;
-    if (style === 'ball') {
+    if (style === 'flexi') {
+      /* Flexi: the cutter of the FlexiJoint maker (js/partslib.js, flexneg) is taken away from the body at the joint: a
+         thin disc (the gap between the segments) with a cup round a ball in its middle, so what is left is two segments
+         held together by the ball in the cup, printed in one piece. The cutter stands across the chain at the joint,
+         scaled down on a thin body (never up, so the clearances stay as designed); a body wider than its disc is cut
+         through by a plain slab of the disc's thickness round it. The two parts are told apart by their shells. */
+      const T0 = libPolys({ key: 'flexneg' }), core = 6.82, half = 1.382, disc = 16.99;
+      const s = Math.min(1, (Math.min(hw, zs / 2) - 1) / core);
+      if (!(s >= 0.35)) throw new Error('Těleso je v místě kloubu na kloub Flexi příliš malé; použijte méně kloubů nebo jiný typ');
+      const ez = [0, 0, 1], ey = KK.cross(ez, ea), M = [ea[0] * s, ea[1] * s, ea[2] * s, 0, ey[0] * s, ey[1] * s, ey[2] * s, 0, 0, 0, s, 0, P[0], P[1], zc, 1];
+      let cut = S(rest, KK.transform(T0, M));
+      if (Math.hypot(hw, zs / 2) > (disc - 0.6) * s) { /* the slab round the disc */
+        const ring = S(boxAS([xp - half * s, xp + half * s], [sc - far, sc + far], [z0, z1]), cylAlong(P.map((v, k) => k === 2 ? zc : v - ea[k] * (half * s + 1)), ea, (disc - 0.5) * s, 2 * half * s + 2));
+        cut = S(cut, ring);
+      }
+      const parts = shellsOf(cut), L = [], Rp = [];
+      for (const sh of parts) { const b = KK.bbox(sh), m = (b.min[a] + b.max[a]) / 2; (m < xp ? L : Rp).push(...sh); }
+      if (!L.length || !Rp.length) throw new Error('Kloub Flexi se nepodařilo vytvořit (díly se neoddělily)');
+      A = L; B = Rp;
+    } else if (style === 'ball') {
       /* Kulový: a ball on a neck of the left segment sits in a round socket of the right one, printed in place with a
          clearance all round, so the right segment turns about every axis (sideways, up and down, and twists). The
          socket's roof is a 45° tent, the ball has a small flat underside just above the socket's floor, the neck is a
@@ -2160,7 +2186,7 @@ function articulateCore(polys, f) {
          across the body's surface, which showed as dark streaks on round bodies */
       const keep = vcyl(P, hw * 0.92 + g, z0, z1), cutV = (sg, al) => S(wedge(P, sg, Math.PI - al), keep);
       A = S(A, cutV(1, Math.PI / 2 - th - 2 * Math.PI / 180));
-    } else if (style !== 'chain' && style !== 'flex' && style !== 'ball') {
+    } else if (style !== 'chain' && style !== 'flex' && style !== 'ball' && style !== 'flexi') {
       const keep = vcyl(P, hw * 0.92 + g, z0, z1), cutV = (sg, al) => S(wedge(P, sg, Math.PI - al), keep);
       A = S(A, cutV(1, alpha));
       B = S(B, cutV(-1, alpha));
