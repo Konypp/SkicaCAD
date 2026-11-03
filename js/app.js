@@ -14,6 +14,7 @@ const v3 = a => new V3(a[0], a[1], a[2]);
 
 /* ================= icons ================= */
 const ICONS = {
+  buckle: '<path class="b" d="M3 7h7l2 2v6l-2 2H3z"/><path d="M3 7h7l2 2v6l-2 2H3zM5 10h4v4H5"/><path class="b2" d="M21 8h-4l-5 2v4l5 2h4z"/><path d="M21 8h-4l-5 2v4l5 2h4zM12.5 11.2 15 12l-2.5.8"/>',
   articulate: '<path class="p" d="M2.5 14.5 7 11l4.5 3.5L16 11l5.5 3.5-2 3L16 15l-4.5 3.5L7 15l-2.5 2.5z" opacity=".6"/><circle cx="7" cy="13" r="2.4"/><circle cx="12" cy="16.2" r="2.4"/><circle cx="17" cy="13" r="2.4"/><path d="M3 15.5 4.8 14M9.2 14.3l.6 1M14.3 15.2l.6-1M19.2 14 21 15.5"/>',
   blob: '<circle class="p" cx="9" cy="14" r="5.5"/><circle class="p" cx="15.5" cy="8.5" r="4.5"/><path d="M4.4 17.2A5.5 5.5 0 0 1 8.2 8.6c.8-.1 1.6-.4 2.2-1A4.5 4.5 0 1 1 17 13c-.6.5-.9 1.3-1 2.1a5.5 5.5 0 0 1-11.6 2.1z"/>',
   skin: '<path class="p" d="M12 3.5a2.6 2.6 0 1 1 0 5.2 2.6 2.6 0 0 1 0-5.2zM9.5 10h5l1 5h-2l-.5 5.5h-2L10.5 15h-2z" opacity=".8"/><path d="M12 8.7V15M12 11l-5 2.5M12 11l5 2.5M12 15l-3 5.5M12 15l3 5.5"/><circle cx="12" cy="6.1" r="2.6"/>',
@@ -1114,7 +1115,7 @@ function featureTitle(i) {
   let n = 0; for (let j = 0; j <= i; j++) if (doc.features[j].type === f.type) n++;
   return Engine.FEATURE_LABEL[f.type] + ' ' + n;
 }
-const TL_ICON = { articulate: 'articulate', blob: 'blob', skin: 'skin', sweep: 'sweep', loft: 'loft', deform: 'deform', lattice: 'lattice', softmove: 'softmove', subdiv: 'subdiv', sculpt: 'sculpt', remesh: 'remesh', hollow: 'hollow', flatbase: 'flatbase', pegsplit: 'pegsplit', text3d: 'sktext', movefaces: 'pressface', shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
+const TL_ICON = { buckle: 'buckle', articulate: 'articulate', blob: 'blob', skin: 'skin', sweep: 'sweep', loft: 'loft', deform: 'deform', lattice: 'lattice', softmove: 'softmove', subdiv: 'subdiv', sculpt: 'sculpt', remesh: 'remesh', hollow: 'hollow', flatbase: 'flatbase', pegsplit: 'pegsplit', text3d: 'sktext', movefaces: 'pressface', shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
 function renderTimeline() {
   const tr = $('#tltrack'); tr.innerHTML = '';
   const m = viewMarker === null ? doc.marker : viewMarker;
@@ -1190,7 +1191,7 @@ const RIBBON = {
   solid: [
     ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'],
       { menu: 'prim', label: 'Základní tělesa', items: [['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus'], ['text3d', 'Text']] },
-      { menu: 'parts', label: 'Součásti', items: [['bolt', 'Šroub'], ['nut', 'Matice'], ['hinge', 'Pant'], ['latch', 'Západka']] }]],
+      { menu: 'parts', label: 'Součásti', items: [['bolt', 'Šroub'], ['nut', 'Matice'], ['hinge', 'Pant'], ['latch', 'Západka'], ['buckle', 'Spona']] }]],
     ['Upravit', [{ menu: 'edge', label: 'Hrany', items: [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení']] }, ['hole', 'Díra', 'H'], ['shell', 'Skořepina'], ['move', 'Přesunout', 'M'], ['scale', 'Měřítko'], ['rotate', 'Otočit', 'R'], ['facemode', 'Plochy', 'G'],
       { menu: 'shape', label: 'Tvar', items: [['combine', 'Kombinovat'], ['splitbody', 'Rozříznout']] },
       { menu: 'xform', label: 'Uspořádat', items: [['center', 'Zarovnat'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole']] },
@@ -1283,6 +1284,7 @@ function runCommand(id) {
     case 'selall': if (faceMode) setFaceMode(false); selectAll(); break;
     case 'facemode': setFaceMode(!faceMode); break;
     case 'pressface': startPressFace(); break;
+    case 'buckle': startBuckle(); break;
     case 'blob': case 'skin': case 'sweep': case 'loft': case 'deform': case 'lattice': case 'softmove': case 'subdiv': case 'sculpt': case 'remesh':
     case 'hollow': case 'flatbase': case 'pegsplit': case 'articulate': case 'printcheck': startOrganic(id); break;
     case 'revolve': startRevolve(); break;
@@ -1498,6 +1500,7 @@ function editFeature(i) {
     case 'fillet': case 'chamfer': startEdgeMod(f.type, i, ef); break;
     case 'blob': case 'skin': case 'sweep': case 'loft': case 'deform': case 'lattice': case 'softmove': case 'subdiv': case 'sculpt': case 'remesh':
     case 'hollow': case 'flatbase': case 'pegsplit': case 'articulate': startOrganic(f.type, i, ef); break;
+    case 'buckle': startBuckle(i, ef); break;
     case 'combine': startCombine(i, ef); break;
     case 'move': startMove(i, ef); break;
     case 'rotate': startRotate(i, ef); break;
@@ -7267,20 +7270,22 @@ const ORG_MODS = {
     prompt: 'Spodek tělesa se zarovná do roviny, aby postavička stála a dobře se tiskla'
   },
   articulate: {
-    defaults: () => ({ style: 'disc', axis: 'x', cnt: 4, gap: 0.4, angle: 30 }),
-    load: f => ({ style: f.style || 'disc', axis: f.axis || 'x', cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30 }),
+    defaults: () => ({ style: 'disc', axis: 'x', cnt: 4, gap: 0.4, angle: 30, ends: false, bw: 0, bh: 0 }),
+    load: f => ({ style: f.style || 'disc', axis: f.axis || 'x', cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30, ends: f.ends === 'buckle', bw: f.bw || 0, bh: f.bh || 0 }),
     fields: v => [{ k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['chain', 'Očka']], value: v.style },
       { k: 'seg', id: 'axis', label: 'Řetěz podél osy', options: [['x', 'X'], ['y', 'Y']], value: v.axis },
       { k: 'num', id: 'cnt', label: 'Počet kloubů', unit: 'ks', value: v.cnt, range: [1, 20, 1] },
       { k: 'num', id: 'gap', label: 'Vůle v kloubu', value: v.gap }, { k: 'num', id: 'angle', label: 'Natočení kloubu', unit: '°', value: v.angle, range: [10, 60, 1] },
+      { k: 'chk', id: 'ends', label: 'Spona na koncích (řemínek): na začátku samice, na konci samec', value: v.ends },
+      { k: 'num', id: 'bw', label: 'Šířka spony (0 = jako řemínek)', value: v.bw }, { k: 'num', id: 'bh', label: 'Výška spony (0 = automaticky)', value: v.bh },
       { k: 'note', id: 'tip' }],
-    feature: v => ({ style: v.style, axis: v.axis, n: Math.max(1, Math.round(v.cnt)), gap: v.gap, angle: v.angle }),
+    feature: v => ({ style: v.style, axis: v.axis, n: Math.max(1, Math.round(v.cnt)), gap: v.gap, angle: v.angle, ...(v.ends ? { ends: 'buckle', bw: v.bw || 0, bh: v.bh || 0 } : {}) }),
     layout(c) {
-      dlg.show('angle', c.v.style === 'disc');
+      dlg.show('bw', !!c.v.ends); dlg.show('bh', !!c.v.ends);
       dlg.set('tip', {
         disc: 'Kotouč: jeden článek končí kulatým kloubem, druhý do něj zasahuje jazýčkem s kotoučem. Klouby se otáčejí kolem svislé osy, články se ohýbají do stran (had, drak, ještěrka).',
-        hinge: 'Pant: klouby nad sebou jako u dveřního pantu, drží je kuželové čepy. Otáčí se kolem svislé osy, články se ohýbají do stran.',
-        chain: 'Očka: dvě do sebe provlečená očka jako článek řetězu. Spoj je volnější, články se ohýbají do stran i nahoru a dolů.'
+        hinge: 'Pant: tři klouby nad sebou jako u dveřního pantu, krajní drží svislý čep procházející prostředním. Otáčí se kolem svislé osy, články se ohýbají do stran.',
+        chain: 'Očka: dvě do sebe provlečená oblá očka jako články řetězu, jedno podél, druhé napříč; každé se uzavírá krátkým mostem mezi sloupky na podložce. Spoj má vůli, články se ohýbají do stran i trochu nahoru a dolů.'
       }[c.v.style] + ' Tiskne se vcelku bez podpěr; po tisku klouby rozhýbejte.');
     },
     preview(polys, f) {
@@ -7545,6 +7550,46 @@ function startPrintCheck() {
     },
     ok() { endCmd(false); return null; },
     cleanup() { clearTimeout(this.timer); clearGroup(G.preview); }
+  };
+  beginCmd(c); c.init();
+}
+/* ---------- Spona (side release buckle), two halves printed flat ---------- */
+function startBuckle(editIndex, f) {
+  const c = {
+    editIndex, v: f ? { w: f.w, h: f.h, gap: f.gap, slot: f.slot !== false } : { w: 25, h: 8, gap: 0.3, slot: true }, pos: f ? f.pos.slice() : [0, 0, 0], tool: null,
+    init() {
+      openDialog({ title: 'Spona', icon: 'buckle',
+        fields: [{ k: 'num', id: 'w', label: 'Šířka spony', value: this.v.w }, { k: 'num', id: 'h', label: 'Výška spony', value: this.v.h },
+          { k: 'num', id: 'gap', label: 'Vůle', value: this.v.gap }, { k: 'chk', id: 'slot', label: 'Průvlek pro popruh', value: this.v.slot },
+          { k: 'xyz', id: 'pos', label: 'Poloha', value: this.pos }, { k: 'note', id: 'tip' }, { k: 'note', id: 'n' }],
+        onChange: id => {
+          if (id === 'slot') this.v.slot = dlg.get('slot');
+          else if (id === 'pos') this.pos = dlg.get('pos');
+          else { const x = dlg.get(id); if (x > 0) this.v[id] = x; }
+          this.update();
+        } });
+      setPrompt('Klepnutím do pohledu sponu umístíte; obě poloviny se tisknou naplocho');
+      this.update();
+    },
+    feature() { return { id: f ? f.id : 'tmp', type: 'buckle', ...this.v, pos: this.pos.slice() }; },
+    update() {
+      clearGroup(G.preview); this.tool = null;
+      try {
+        const B = Engine.buckleParts(this.v), p = this.pos;
+        this.tool = [K.translate(B.female, [p[0], p[1] - B.Wf / 2 - 3, p[2]]), K.translate(B.male, [p[0], p[1] + B.Wf / 2 + 3, p[2]])];
+        for (const t of this.tool) G.preview.add(previewMesh(t, 'new'));
+        const ws = Math.max(1.6, Math.min(3, this.v.w * 0.08));
+        dlg.set('tip', 'Samice (vlevo) a samec (vpravo). Háčky samce zapadnou do bočních okének samice; spona se rozepne stisknutím háčků v okénkách.' + (this.v.slot ? ` Popruh do šířky ${fmtc(this.v.w - 2 * ws - 1, 1)} mm a tloušťky 3,5 mm.` : ''));
+        dlg.set('n', ''); dlg.okEnabled(true);
+      } catch (e) { dlg.set('n', '!' + e.message); dlg.okEnabled(false); }
+      requestRender();
+    },
+    onClick(ev) {
+      const h = hitBodies(ev); let p;
+      if (h) p = h.point; else { ray.setFromCamera(evNdc(ev), cam()); p = ray.ray.intersectPlane(new THREE.Plane(new V3(0, 0, 1), 0), new V3()); }
+      if (!p) return; this.pos = [snapV(p.x), snapV(p.y), r3(p.z)]; dlg.set('pos', this.pos); this.update();
+    },
+    ok() { if (!this.tool) return null; const o = this.feature(); o.id = f ? f.id : newId(); return o; }
   };
   beginCmd(c); c.init();
 }

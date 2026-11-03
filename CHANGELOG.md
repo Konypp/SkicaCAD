@@ -1,5 +1,14 @@
 # Changelog
 
+## Beta 1.69
+- **Spona** (TĚLESO › Součásti): boční rozepínací spona jako na batozích – samice (plochý pouzdro s bočními okénky) a samec (středový jazyk a dvě pružná ramena s háčky, které zapadnou do okének; rozepne se stisknutím háčků). Obě poloviny se tisknou naplocho, ramena pruží v rovině podložky. Šířka, výška, vůle a volitelný průvlek pro popruh.
+- **Kloubový model: Spona na koncích (řemínek)** – na začátek řetězu se připojí samice, na konec samec, obě míří ven; šířka a výška se samy přizpůsobí konci řemínku (nebo se zadají).
+## Beta 1.68
+- **Kloubový model podle osvědčených tištěných kloubů:**
+  - *Očka* přepracována jako skutečné články řetězu: dvě oblá očka střídavě podél a napříč, každé uzavřené krátkým mostem mezi sloupky stojícími na podložce; očko napříč je zvednuté nad spodní příčkou druhého, takže nic nevisí ve vzduchu ani se nedotýká. Očka mají místo na natočení (sloupky dál od sebe, delší očko).
+  - *Pant* má místo kuželů průchozí svislý čep (tři klouby, lichý počet – bez axiální vůle; čep i otvor jsou v každé vrstvě kulaté).
+  - *Kotouč* drží jistěji: krk jazýčku je užší než ústí štěrbiny i při plném natočení.
+  - U všech typů jsou konce článků zkosené do klínu podle natočení kloubu, takže se články opravdu otočí o zadaný úhel (dřív se zasekly už kolem 10°). Na tenkém tělese se natočení samo zmenší, místo aby kloub nešel vytvořit.
 ## Beta 1.67
 - **Kloubový model – typ kloubu:** k dosavadnímu *Kotouči* přibyl *Pant* (klouby nad sebou jako u dveřního pantu, drží je kuželové čepy, svislá osa) a *Očka* (dvě do sebe provlečená očka jako článek řetězu – volnější spoj, ohýbá se do stran i nahoru a dolů). Všechny se tisknou vcelku.
 ## Beta 1.66

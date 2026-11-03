@@ -7,7 +7,7 @@ const PLANES = {
   XZ: { o: [0, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] },
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
-const FEATURE_LABEL = { articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Díly s kolíky', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
+const FEATURE_LABEL = { buckle: 'Spona', articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Díly s kolíky', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
   fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
@@ -1402,6 +1402,51 @@ function sectionAt(polys, a, x) {
   }
   return any ? { min: mn, max: mx } : null;
 }
+/* ---------- Spona: a side release buckle (like on backpacks), both halves printed flat ----------
+   Local frame: along +x from the back (x = 0, where a strap or webbing joins) to the front, bottom on z = 0, centred on
+   y = 0. The female is a flat sleeve with windows in its sides near the back of the cavity; the male has a centre
+   tongue and two springy prongs whose hooks snap into the windows (press them to release). The prongs bend in the
+   bed's plane, which is how printed layers flex best; the sleeve's roof is one bridge. */
+function buckleParts(f) {
+  const Wf = Math.max(12, Number(f.w) || 25), H = Math.max(6, Number(f.h) || 8), g = Math.max(0.15, Number(f.gap) || 0.3);
+  const ws = Math.max(1.6, Math.min(3, Wf * 0.08)), tw = Math.max(1.2, Math.min(2, H * 0.16));
+  const Wc = Wf - 2 * ws, Hc = H - 2 * tw, hm = Hc - 2 * g, zoff = tw + g;
+  if (hm < 1.6) throw new Error('Spona je příliš nízká; zvyšte výšku spony');
+  const Li = Wf * 0.75, Lc = Li + g, lh = Math.max(3, Wf * 0.22), pw = Math.max(1.6, Math.min(3, Wf * 0.1)), hk = Math.min(ws * 0.85, 2);
+  const tc = Wc - 2 * (g + pw + hk + 0.8);
+  if (tc < 2) throw new Error('Spona je příliš úzká; zvětšete šířku spony');
+  const slot = !!f.slot, sl = 3.5, sz = slot ? sl + 2 * 2.2 : 0; /* webbing slot zone at the back */
+  const bw = 2.5, Lf = sz + bw + Lc, Lb = sz + 4;
+  const box = (x0, x1, y0, y1, z0, z1) => KK.translate(KK.primitive('box', { w: x1 - x0, d: y1 - y0, h: z1 - z0 }), [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2]);
+  const prism = (pts, z0, z1) => KK.extrudeProfiles([{ pts: KK.area2D(pts) < 0 ? pts.slice().reverse() : pts, closed: true }], { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] }, z0, z1);
+  const rounded = (x0, x1, y0, y1, z0, z1, r) => prism(KK.profilePoints({ t: 'rect', x: x0, y: y0, w: x1 - x0, h: y1 - y0, fr: r }), z0, z1);
+  /* female */
+  let fem = rounded(0, Lf, -Wf / 2, Wf / 2, 0, H, Math.min(3, Wf * 0.12));
+  fem = KK.boolean(fem, box(Lf - Lc, Lf + 1, -Wc / 2, Wc / 2, tw, H - tw), 'subtract');
+  const wx0 = Lf - Lc, wx1 = Lf - Li + lh + g;
+  for (const sg of [-1, 1]) fem = KK.boolean(fem, box(wx0, wx1, sg < 0 ? -Wf / 2 - 1 : Wc / 2 - 0.1, sg < 0 ? -Wc / 2 + 0.1 : Wf / 2 + 1, tw, H - tw), 'subtract');
+  /* male: base, tongue, two prongs with hooks */
+  let mal = rounded(0, Lb, -Wf / 2, Wf / 2, 0, H, Math.min(3, Wf * 0.12));
+  mal = KK.boolean(mal, box(Lb - 0.5, Lb + Li - 1, -tc / 2, tc / 2, zoff, zoff + hm), 'union');
+  const xt = Lb + Li, xc = xt - lh;
+  for (const sg of [-1, 1]) {
+    const yo = Wc / 2 - g, yi = yo - pw;
+    mal = KK.boolean(mal, box(Lb - 0.5, xt, sg < 0 ? -yo : yi, sg < 0 ? -yi : yo, zoff, zoff + hm), 'union');
+    /* hook: flat catch facing the base, a ramp towards the tip */
+    const hp = [[xc, yo - 0.3], [xc, yo + hk], [xc + lh * 0.4, yo + hk], [xt, yo - 0.3]].map(([x, y]) => [x, sg * y]);
+    mal = KK.boolean(mal, prism(hp, zoff, zoff + hm), 'union');
+  }
+  if (slot) for (const part of ['f', 'm']) {
+    const hole = box(2.2, 2.2 + sl, -(Wc / 2 - 0.5), Wc / 2 - 0.5, -1, H + 1);
+    if (part === 'f') fem = KK.boolean(fem, hole, 'subtract'); else mal = KK.boolean(mal, hole, 'subtract');
+  }
+  return { female: fem, male: mal, Lf, Lb, H, Wf };
+}
+/* place a buckle half: local +x along dir (unit vector in the bed's plane), back at point o (z of the bed at o[2]) */
+function placeLocal(polys, o, dir) {
+  const c = dir[0], s2 = dir[1];
+  return KK.transform(polys, [c, s2, 0, 0, -s2, c, 0, 0, 0, 0, 1, 0, o[0], o[1], o[2], 1]);
+}
 function articulate(polys, f) {
   const a = f.axis === 'y' ? 1 : 0, sAx = 1 - a, bb = KK.bbox(polys), g = Math.max(0.15, Number(f.gap) || 0.4);
   const L = bb.max[a] - bb.min[a], n = Math.max(1, Math.min(40, Math.round(Number(f.n) || 4))), th = Math.max(5, Math.min(60, Number(f.angle) || 30)) * Math.PI / 180;
@@ -1417,6 +1462,20 @@ function articulate(polys, f) {
   /* a box given per axis: [chain axis range], [side axis range], [z range] */
   const boxAS = (ar, sr, zr) => { const lo = [0, 0, 0], hi = [0, 0, 0]; lo[a] = ar[0]; hi[a] = ar[1]; lo[sAx] = sr[0]; hi[sAx] = sr[1]; lo[2] = zr[0]; hi[2] = zr[1]; return box(lo, hi); };
   const style = f.style || 'disc';
+  /* room to swing: each segment keeps only a wedge of half-angle 90° − θ/2 around the chain axis at the joint (outside
+     the knuckle), so the two can turn ±θ without touching */
+  const ea = [0, 0, 0], es = [0, 0, 0]; ea[a] = 1; es[sAx] = 1;
+  const XY = { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] };
+  const wedge = (P, dirSign, alpha) => {
+    const pts = [[P[0], P[1]]], M = 24;
+    for (let i = 0; i <= M; i++) {
+      const ang = -alpha + 2 * alpha * i / M, u = Math.cos(ang) * dirSign * BIG, v = Math.sin(ang) * BIG;
+      pts.push([P[0] + ea[0] * u + es[0] * v, P[1] + ea[1] * u + es[1] * v]);
+    }
+    if (KK.area2D(pts) < 0) pts.reverse();
+    return KK.extrudeProfiles([{ pts, closed: true }], XY, KK.bbox(polys).min[2] - BIG, KK.bbox(polys).max[2] + BIG);
+  };
+  const alpha = Math.PI / 2 - th / 2 - 2 * Math.PI / 180;
   for (const xp of at) {
     const sec = sectionAt(rest, a, xp);
     if (!sec) throw new Error('Kloub mimo těleso');
@@ -1425,41 +1484,63 @@ function articulate(polys, f) {
     const z0 = zc - BIG / 2, z1 = zc + BIG / 2, far = BIG / 2;
     let A, B;
     if (style === 'chain') {
-      /* two interlocked eyes: an upright ring of the left segment along the chain, and an upright ring of the right
-         segment across it; legs stand on the bed, the bars across are short bridges */
-      const zb = sec.min[2], w = Math.max(1.2, Math.min(4, zs * 0.14)), t = Math.max(1.2, Math.min(4, hw * 0.36));
-      const zA1 = zb + zs * 0.62, zbb = zb + w + g, zb1 = zb + zs * 0.95, sbi = t / 2 + g + 0.3, tb = w;
-      if (zbb + w + g > zA1 - w || zA1 + g > zb1 - w || sbi + w > hw) throw new Error('Těleso je v místě kloubu na očka příliš malé; použijte méně kloubů nebo jiný typ');
-      const aA = xp - tb / 2 - g - w, aR0 = xp + tb / 2 + g, aR1 = aR0 + w, aB = aR1 + g;
-      /* left eye (in the plane along the chain): bottom bar, top bar, right leg, joined to the left segment */
-      let eyeA = U(U(boxAS([aA - 1, aR1], [sc - t / 2, sc + t / 2], [zb, zb + w]), boxAS([aA - 1, aR1], [sc - t / 2, sc + t / 2], [zA1 - w, zA1])), boxAS([aR0, aR1], [sc - t / 2, sc + t / 2], [zb, zA1]));
-      eyeA = U(eyeA, boxAS([aA - 1, aA + 0.01], [sc - t / 2, sc + t / 2], [zb, zA1]));
-      /* right eye (across the chain): two legs, a top bar reaching back to the right segment and a raised bottom bar */
-      let eyeB = boxAS([xp - tb / 2, xp + tb / 2], [sc - sbi - w, sc + sbi + w], [zbb, zbb + w]);
-      for (const sg of [-1, 1]) eyeB = U(eyeB, boxAS([xp - tb / 2, aB + 1], sg < 0 ? [sc - sbi - w, sc - sbi] : [sc + sbi, sc + sbi + w], [zb, zb1]));
-      eyeB = U(eyeB, boxAS([xp - tb / 2, aB + 1], [sc - sbi - w, sc + sbi + w], [zb1 - w, zb1]));
-      A = U(I(rest, boxAS([xp - far * 2, aA], [sc - far, sc + far], [z0, z1])), eyeA);
-      B = U(I(rest, boxAS([aB, xp + far * 2], [sc - far, sc + far], [z0, z1])), eyeB);
+      /* two interlocked eyes, like chain links printed flat: an upright ring of the left segment along the chain and an
+         upright ring of the right segment across it, alternating orientation. Every bar that closes a ring is a short
+         bridge between two posts standing on the bed, and the ring of the right segment is lifted over the bottom bar of
+         the left one, so nothing hangs in the air and nothing touches. Heights: 4 bars and 3 gaps fill the section. */
+      const zb = sec.min[2], w = Math.max(1, Math.min(3.5, (zs * 0.92 - 3 * g) / 4)), t = w;
+      const zbb = zb + w + g, zA1 = zbb + 2 * w + g, zb1 = zA1 + g + w;
+      /* room for the swing: the left eye is long enough for the crossing eye to tilt either way, and the posts of the
+         crossing eye stand far enough apart for the left eye's end to swing between them */
+      const tb = w; let SI = 0, SO = 0, e = 0, aR1 = 0;
+      for (let tc = Math.min(th, 25 * Math.PI / 180); ; tc -= 2.5 * Math.PI / 180) { /* less swing on a narrow body */
+        const sn = Math.sin(Math.max(0, tc)); SI = t / 2 + g + 0.3; SO = SI + w;
+        for (let it = 0; it < 3; it++) { e = SO * sn; aR1 = xp + tb / 2 + g + e + w; SI = t / 2 + g + 0.3 + (aR1 - xp) * sn; SO = SI + w; }
+        if (SO <= hw || tc <= 0) break;
+      }
+      if (w < 1 || SO > hw || zb1 > sec.max[2] + 1e-6) throw new Error('Těleso je v místě kloubu na očka příliš malé; použijte méně kloubů, jiný typ nebo menší natočení');
+      const aA = xp - tb / 2 - g - e, aB = aR1 + g, fr = w * 0.9;
+      /* a rounded ring in a plane: outer and inner rounded rectangles, extruded by its thickness */
+      const ring = (Bp, ox, oy, ow, oh, ix, iy, iw, ih, d0, d1) => {
+        const outer = KK.extrudeProfiles([{ pts: KK.profilePoints({ t: 'rect', x: ox, y: oy, w: ow, h: oh, fr }), closed: true }], Bp, d0, d1);
+        const inner = KK.extrudeProfiles([{ pts: KK.profilePoints({ t: 'rect', x: ix, y: iy, w: iw, h: ih, fr: Math.min(fr * 0.5, iw / 3, ih / 3) }), closed: true }], Bp, d0 - 1, d1 + 1);
+        return S(outer, inner);
+      };
+      const ea = [0, 0, 0], es = [0, 0, 0], ez = [0, 0, 1]; ea[a] = 1; es[sAx] = 1;
+      /* left eye: in the plane along the chain (u = chain axis, v = up), thickness t across */
+      const nA = KK.cross(ea, ez), oA = [0, 0, 0]; oA[sAx] = sc; const BA = { o: oA, u: ea, v: ez, n: nA };
+      const eyeA = ring(BA, aA - 1.5, zb, aR1 - aA + 1.5, zA1 - zb, aA, zb + w, aR1 - w - aA, zA1 - zb - 2 * w, -t / 2, t / 2);
+      /* right eye: in the plane across the chain (u = side axis, v = up), lifted bottom bar, open below it */
+      const nB = KK.cross(es, ez), oB = [0, 0, 0]; oB[a] = xp; const BB = { o: oB, u: es, v: ez, n: nB };
+      let eyeB = ring(BB, sc - SO, zb, 2 * SO, zb1 - zb, sc - SI, zbb + w, 2 * SI, zb1 - w - zbb - w, -tb / 2, tb / 2);
+      eyeB = S(eyeB, boxAS([xp - tb, xp + tb], [sc - SI, sc + SI], [zb - 1, zbb]));
+      /* its two posts run back to the right segment */
+      for (const sg of [-1, 1]) eyeB = U(eyeB, boxAS([xp, aB + 1], sg < 0 ? [sc - SO, sc - SI] : [sc + SI, sc + SO], [zb, zb1 - fr]));
+      A = U(I(I(rest, boxAS([xp - far * 2, aA], [sc - far, sc + far], [z0, z1])), wedge(P, -1, alpha)), eyeA);
+      B = U(I(I(rest, boxAS([aB, xp + far * 2], [sc - far, sc + far], [z0, z1])), wedge(P, 1, alpha)), eyeB);
     } else if (style === 'hinge') {
-      /* stacked knuckles like a door hinge with an upright axis: the left segment holds the top and bottom knuckles with
-         cone pins, the right segment the middle knuckle with matching cone sockets */
+      /* a pin hinge with an upright axis, three knuckles (odd count, no axial play): the left segment holds the top and
+         bottom knuckles joined by a pin through the middle knuckle of the right segment. The pin and its bore stand
+         upright, so they are round in every layer; the top knuckle bridges between the pin and its segment. */
       const Rk = hw * 0.92, T = zs * 0.34, zl = zc - T / 2, zu = zc + T / 2;
-      if (Rk < 2 * g + 1.5 || zs < 6 * g + 2) throw new Error('Těleso je v místě kloubu na kloub příliš tenké; použijte méně kloubů');
+      if (Rk < 2 * g + 2 || zs < 6 * g + 2) throw new Error('Těleso je v místě kloubu na kloub příliš tenké; použijte méně kloubů');
       const cylR = vcyl(P, Rk, z0, z1), cylG = vcyl(P, Rk + g, z0, z1);
       const halfA = boxAS([xp - far * 2, xp - g / 2], [sc - far, sc + far], [z0, z1]), halfB = boxAS([xp + g / 2, xp + far * 2], [sc - far, sc + far], [z0, z1]);
       const below = boxAS([xp - far, xp + far], [sc - far, sc + far], [z0, zl - g]), above = boxAS([xp - far, xp + far], [sc - far, sc + far], [zu + g, z1]);
       const mid = boxAS([xp - far, xp + far], [sc - far, sc + far], [zl, zu]);
-      const rp = Math.max(0.6, Math.min(Rk * 0.45, T / 2 - 0.3));
+      const rp = Math.max(1, Math.min(Rk * 0.38, 3));
       const knA = I(rest, I(U(cylR, I(cylG, halfA)), U(below, above)));
-      A = U(I(rest, S(halfA, cylG)), knA);
-      A = U(U(A, coneX([P[0], P[1], zl - g].map((v, i) => (i === 2 ? v : P[i])), [0, 0, 1], rp, 0, rp)), coneX([P[0], P[1], zu + g], [0, 0, -1], rp, 0, rp));
+      A = U(U(I(rest, S(halfA, cylG)), knA), vcyl(P, rp, zl - g - 0.5, zu + g + 0.5));
       B = U(I(rest, S(halfB, cylG)), I(rest, I(U(cylR, I(cylG, halfB)), mid)));
-      const rs = rp + 1.5 * g;
-      B = S(S(B, coneX([P[0], P[1], zl - g], [0, 0, 1], rs, 0, rs)), coneX([P[0], P[1], zu + g], [0, 0, -1], rs, 0, rs));
+      B = S(B, vcyl(P, rp + g, zl - 1, zu + 1));
     } else {
       const Rk = hw * 0.92;
       if (Rk < 2 * g + 1.5 || zs < 6 * g + 1.5) throw new Error('Těleso je v místě kloubu na kloub příliš tenké; použijte méně kloubů');
-      const T = zs * 0.34, rd = Rk * 0.55, wn = rd * 0.9;
+      /* the neck must stay narrower than the mouth the disc would need to slip out, at full swing too */
+      /* (on a thin body the swing is reduced as needed rather than giving up) */
+      const T = zs * 0.34, rd = Rk * 0.6, thd = Math.min(th, Math.asin(Math.max(0.05, Math.min(1, (1.7 * rd - 2 * g - 1) / (2 * rd)))));
+      const wn = Math.min(rd * 0.9, 1.7 * rd - 2 * rd * Math.sin(thd) - 2 * g);
+      if (wn < 0.8) throw new Error('Těleso je v místě kloubu na kloub příliš tenké; použijte méně kloubů');
       const [la, ha] = span(a, xp - BIG, xp);
       const halfA = box(la, ha);
       A = S(I(rest, halfA), vcyl(P, Rk + g, z0, z1));
@@ -1472,14 +1553,31 @@ function articulate(polys, f) {
       /* slot in B's knuckle: the disc with clearance plus the room the neck sweeps when the joint turns */
       const sLo = neckLo.slice(), sHi = neckHi.slice(); sLo[a] = xp - Rk - 1; sLo[sAx] -= g; sHi[sAx] += g; sLo[2] -= g; sHi[2] += g; sHi[a] = xp;
       let slot = vcyl(P, rd + g, zc - T / 2 - g, zc + T / 2 + g);
-      const steps = Math.max(2, Math.ceil(th / (10 * Math.PI / 180)));
-      for (let i = -steps; i <= steps; i++) slot = U(slot, rotZ(box(sLo, sHi), P, th * i / steps));
+      const steps = Math.max(2, Math.ceil(thd / (10 * Math.PI / 180)));
+      for (let i = -steps; i <= steps; i++) slot = U(slot, rotZ(box(sLo, sHi), P, thd * i / steps));
       B = S(B, slot);
+    }
+    if (style !== 'chain') {
+      const keep = vcyl(P, hw * 0.92 + g, z0, z1);
+      A = U(I(A, wedge(P, -1, alpha)), I(A, keep));
+      B = U(I(B, wedge(P, 1, alpha)), I(B, keep));
     }
     if (!A.length || !B.length) throw new Error('Kloub se nepodařilo vytvořit');
     out.push(A); rest = B;
   }
   out.push(rest);
+  /* a strap: the female buckle at the start, the male at the end, both pointing outwards */
+  if (f.ends === 'buckle') {
+    const ends = [[0, bb.min[a], -1], [out.length - 1, bb.max[a], 1]];
+    for (const [k, xe, sg] of ends) {
+      const sec = sectionAt(out[k], a, xe - sg * 0.6) || { min: bb.min, max: bb.max };
+      const wEnd = sec.max[sAx] - sec.min[sAx], hEnd = sec.max[2] - sec.min[2];
+      const B = buckleParts({ w: Number(f.bw) || Math.max(14, wEnd), h: Number(f.bh) || Math.max(7, hEnd), gap: f.bgap || 0.3 });
+      const o = [0, 0, sec.min[2]]; o[a] = xe - sg * 1; o[sAx] = (sec.min[sAx] + sec.max[sAx]) / 2;
+      const dir = [0, 0]; dir[a] = sg;
+      out[k] = KK.boolean(out[k], placeLocal(k === 0 ? B.female : B.male, o, dir), 'union');
+    }
+  }
   return out;
 }
 function step(state, f) {
@@ -1781,6 +1879,12 @@ function step(state, f) {
         .concat(segs.slice(1).map((p, i) => ({ id: f.id + (i ? '_' + i : ''), name: base + ' – článek ' + (i + 2), polys: p, from: f.id })));
       break;
     }
+    case 'buckle': {
+      const B = buckleParts(f), p0 = (f.pos || [0, 0, 0]).map(Number);
+      out = bodies.concat([{ id: f.id, name: 'Spona – samice', polys: KK.translate(B.female, [p0[0], p0[1] - B.Wf / 2 - 3, p0[2]]), from: f.id },
+        { id: f.id + '_m', name: 'Spona – samec', polys: KK.translate(B.male, [p0[0], p0[1] + B.Wf / 2 + 3, p0[2]]), from: f.id }]);
+      break;
+    }
     case 'pegsplit': {
       const b = bodies.find(x => x.id === f.body);
       if (!b) throw new Error('Těleso neexistuje');
@@ -1827,7 +1931,7 @@ function makeRebuilder() {
   };
 }
 
-return { articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 
