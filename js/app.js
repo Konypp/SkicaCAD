@@ -7086,6 +7086,8 @@ function startSweep(editIndex, f) {
       setPrompt('Dráhu a průřez vyberte v dialogu; průřez se postaví kolmo na začátek dráhy');
       this.update();
     },
+    /* like Vysunutí: the sketches used are hidden afterwards (they stay in the browser) */
+    after(out) { if (out.path) doc.vis[out.path.sketch] = false; if (out.prof) doc.vis[out.prof.sketch] = false; },
     feature() { const o = { id: f ? f.id : 'tmp', type: 'sweep', path: this.path, twist: this.twist, scale: this.scale, op: this.op }; if (this.prof) o.prof = this.prof; else o.d = this.d; return o; },
     update() {
       dlg.show('d', !this.prof);
@@ -7124,6 +7126,7 @@ function startLoft(editIndex, f) {
       setPrompt('Profily vyberte v dialogu v pořadí, jak jdou za sebou');
       this.update();
     },
+    after(out) { for (const r of out.secs || []) doc.vis[r.sketch] = false; },
     feature() { return { id: f ? f.id : 'tmp', type: 'loft', secs: clone(this.secs), smooth: this.smooth, op: this.op }; },
     update() {
       clearGroup(G.overlay); clearGroup(G.preview); this.tool = null;
@@ -7264,13 +7267,22 @@ const ORG_MODS = {
     prompt: 'Spodek tělesa se zarovná do roviny, aby postavička stála a dobře se tiskla'
   },
   articulate: {
-    defaults: () => ({ axis: 'x', cnt: 4, gap: 0.4, angle: 30 }),
-    load: f => ({ axis: f.axis || 'x', cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30 }),
-    fields: v => [{ k: 'seg', id: 'axis', label: 'Řetěz podél osy', options: [['x', 'X'], ['y', 'Y']], value: v.axis },
+    defaults: () => ({ style: 'disc', axis: 'x', cnt: 4, gap: 0.4, angle: 30 }),
+    load: f => ({ style: f.style || 'disc', axis: f.axis || 'x', cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30 }),
+    fields: v => [{ k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['chain', 'Očka']], value: v.style },
+      { k: 'seg', id: 'axis', label: 'Řetěz podél osy', options: [['x', 'X'], ['y', 'Y']], value: v.axis },
       { k: 'num', id: 'cnt', label: 'Počet kloubů', unit: 'ks', value: v.cnt, range: [1, 20, 1] },
       { k: 'num', id: 'gap', label: 'Vůle v kloubu', value: v.gap }, { k: 'num', id: 'angle', label: 'Natočení kloubu', unit: '°', value: v.angle, range: [10, 60, 1] },
-      { k: 'note', id: 'tip', value: 'Klouby se otáčejí kolem svislé osy: model leží na podložce a články se ohýbají do stran (had, drak, ještěrka). Tiskne se vcelku bez podpěr; po tisku klouby rozhýbejte.' }],
-    feature: v => ({ axis: v.axis, n: Math.max(1, Math.round(v.cnt)), gap: v.gap, angle: v.angle }),
+      { k: 'note', id: 'tip' }],
+    feature: v => ({ style: v.style, axis: v.axis, n: Math.max(1, Math.round(v.cnt)), gap: v.gap, angle: v.angle }),
+    layout(c) {
+      dlg.show('angle', c.v.style === 'disc');
+      dlg.set('tip', {
+        disc: 'Kotouč: jeden článek končí kulatým kloubem, druhý do něj zasahuje jazýčkem s kotoučem. Klouby se otáčejí kolem svislé osy, články se ohýbají do stran (had, drak, ještěrka).',
+        hinge: 'Pant: klouby nad sebou jako u dveřního pantu, drží je kuželové čepy. Otáčí se kolem svislé osy, články se ohýbají do stran.',
+        chain: 'Očka: dvě do sebe provlečená očka jako článek řetězu. Spoj je volnější, články se ohýbají do stran i nahoru a dolů.'
+      }[c.v.style] + ' Tiskne se vcelku bez podpěr; po tisku klouby rozhýbejte.');
+    },
     preview(polys, f) {
       const segs = Engine.articulate(polys, f);
       return { polys: segs[0], extra: segs.slice(1), alt: true, note: `${segs.length} článků · kloubů ${segs.length - 1}` };

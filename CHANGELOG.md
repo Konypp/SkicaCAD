@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 1.67
+- **Kloubový model – typ kloubu:** k dosavadnímu *Kotouči* přibyl *Pant* (klouby nad sebou jako u dveřního pantu, drží je kuželové čepy, svislá osa) a *Očka* (dvě do sebe provlečená očka jako článek řetězu – volnější spoj, ohýbá se do stran i nahoru a dolů). Všechny se tisknou vcelku.
+## Beta 1.66
+- **Tažení po křivce a Přechod profilů skryjí použité skici** stejně jako Vysunutí (dráhu, průřez, profily). Skici zůstávají v prohlížeči a jdou kdykoli zobrazit.
 ## Beta 1.65
 - **Kloubový model** (ORGANICKÉ › Pro tisk): těleso se rozdělí na články spojené klouby tištěnými vcelku – kulatý kloub na jednom článku, jazýček s kotoučem uvězněný ve štěrbině, vůle kolem dokola. Klouby se otáčejí kolem svislé osy (had, drak, ještěrka ležící na podložce). Nastavení: osa řetězu, počet kloubů, vůle (výchozí 0,4 mm), natočení kloubu.
 - **Vytvořit skicu: Odsazení roviny** – skica se posune kolmo od vybrané roviny nebo plochy o zadanou vzdálenost (např. skici nad sebou pro Přechod profilů). Hodnota se pamatuje pro další skicu.

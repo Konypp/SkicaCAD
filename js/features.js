@@ -1413,30 +1413,69 @@ function articulate(polys, f) {
   const rotZ = (polysR, P, ang) => { const c = Math.cos(ang), sn = Math.sin(ang); return KK.transform(polysR, [c, sn, 0, 0, -sn, c, 0, 0, 0, 0, 1, 0, P[0] - c * P[0] + sn * P[1], P[1] - sn * P[0] - c * P[1], 0, 1]); };
   const at = Array.isArray(f.at) && f.at.length ? f.at.map(Number).sort((p, q) => p - q) : Array.from({ length: n }, (_, i) => bb.min[a] + L * (i + 1) / (n + 1));
   const out = []; let rest = polys;
+  const I = (p, q) => KK.boolean(p, q, 'intersect'), U = (p, q) => KK.boolean(p, q, 'union'), S = (p, q) => KK.boolean(p, q, 'subtract');
+  /* a box given per axis: [chain axis range], [side axis range], [z range] */
+  const boxAS = (ar, sr, zr) => { const lo = [0, 0, 0], hi = [0, 0, 0]; lo[a] = ar[0]; hi[a] = ar[1]; lo[sAx] = sr[0]; hi[sAx] = sr[1]; lo[2] = zr[0]; hi[2] = zr[1]; return box(lo, hi); };
+  const style = f.style || 'disc';
   for (const xp of at) {
     const sec = sectionAt(rest, a, xp);
     if (!sec) throw new Error('Kloub mimo těleso');
-    const sc = (sec.min[sAx] + sec.max[sAx]) / 2, zc = (sec.min[2] + sec.max[2]) / 2, zs = sec.max[2] - sec.min[2];
-    const Rk = (sec.max[sAx] - sec.min[sAx]) / 2 * 0.92;
-    if (Rk < 2 * g + 1.5 || zs < 6 * g + 1.5) throw new Error('Těleso je v místě kloubu na kloub příliš tenké; použijte méně kloubů');
+    const sc = (sec.min[sAx] + sec.max[sAx]) / 2, zc = (sec.min[2] + sec.max[2]) / 2, zs = sec.max[2] - sec.min[2], hw = (sec.max[sAx] - sec.min[sAx]) / 2;
     const P = [0, 0, 0]; P[a] = xp; P[sAx] = sc;
-    const T = zs * 0.34, rd = Rk * 0.55, wn = rd * 0.9, z0 = zc - BIG / 2, z1 = zc + BIG / 2;
-    const [la, ha] = span(a, xp - BIG, xp);
-    const halfA = box(la, ha);
-    let A = KK.boolean(KK.boolean(rest, halfA, 'intersect'), vcyl(P, Rk + g, z0, z1), 'subtract');
-    let B = KK.boolean(rest, KK.boolean(halfA, vcyl(P, Rk, z0, z1), 'subtract'), 'subtract');
-    /* tongue of A: disc around the axis on a neck towards A, in the middle of the height */
-    const neckLo = [0, 0, 0], neckHi = [0, 0, 0];
-    neckLo[a] = xp - Rk - g - 2; neckHi[a] = xp; neckLo[sAx] = sc - wn / 2; neckHi[sAx] = sc + wn / 2; neckLo[2] = zc - T / 2; neckHi[2] = zc + T / 2;
-    let tongue = KK.boolean(vcyl(P, rd, zc - T / 2, zc + T / 2), box(neckLo, neckHi), 'union');
-    tongue = KK.boolean(tongue, rest, 'intersect');
-    A = KK.boolean(A, tongue, 'union');
-    /* slot in B's knuckle: the disc with clearance plus the room the neck sweeps when the joint turns */
-    const sLo = neckLo.slice(), sHi = neckHi.slice(); sLo[a] = xp - Rk - 1; sLo[sAx] -= g; sHi[sAx] += g; sLo[2] -= g; sHi[2] += g; sHi[a] = xp;
-    let slot = vcyl(P, rd + g, zc - T / 2 - g, zc + T / 2 + g);
-    const steps = Math.max(2, Math.ceil(th / (10 * Math.PI / 180)));
-    for (let i = -steps; i <= steps; i++) slot = KK.boolean(slot, rotZ(box(sLo, sHi), P, th * i / steps), 'union');
-    B = KK.boolean(B, slot, 'subtract');
+    const z0 = zc - BIG / 2, z1 = zc + BIG / 2, far = BIG / 2;
+    let A, B;
+    if (style === 'chain') {
+      /* two interlocked eyes: an upright ring of the left segment along the chain, and an upright ring of the right
+         segment across it; legs stand on the bed, the bars across are short bridges */
+      const zb = sec.min[2], w = Math.max(1.2, Math.min(4, zs * 0.14)), t = Math.max(1.2, Math.min(4, hw * 0.36));
+      const zA1 = zb + zs * 0.62, zbb = zb + w + g, zb1 = zb + zs * 0.95, sbi = t / 2 + g + 0.3, tb = w;
+      if (zbb + w + g > zA1 - w || zA1 + g > zb1 - w || sbi + w > hw) throw new Error('Těleso je v místě kloubu na očka příliš malé; použijte méně kloubů nebo jiný typ');
+      const aA = xp - tb / 2 - g - w, aR0 = xp + tb / 2 + g, aR1 = aR0 + w, aB = aR1 + g;
+      /* left eye (in the plane along the chain): bottom bar, top bar, right leg, joined to the left segment */
+      let eyeA = U(U(boxAS([aA - 1, aR1], [sc - t / 2, sc + t / 2], [zb, zb + w]), boxAS([aA - 1, aR1], [sc - t / 2, sc + t / 2], [zA1 - w, zA1])), boxAS([aR0, aR1], [sc - t / 2, sc + t / 2], [zb, zA1]));
+      eyeA = U(eyeA, boxAS([aA - 1, aA + 0.01], [sc - t / 2, sc + t / 2], [zb, zA1]));
+      /* right eye (across the chain): two legs, a top bar reaching back to the right segment and a raised bottom bar */
+      let eyeB = boxAS([xp - tb / 2, xp + tb / 2], [sc - sbi - w, sc + sbi + w], [zbb, zbb + w]);
+      for (const sg of [-1, 1]) eyeB = U(eyeB, boxAS([xp - tb / 2, aB + 1], sg < 0 ? [sc - sbi - w, sc - sbi] : [sc + sbi, sc + sbi + w], [zb, zb1]));
+      eyeB = U(eyeB, boxAS([xp - tb / 2, aB + 1], [sc - sbi - w, sc + sbi + w], [zb1 - w, zb1]));
+      A = U(I(rest, boxAS([xp - far * 2, aA], [sc - far, sc + far], [z0, z1])), eyeA);
+      B = U(I(rest, boxAS([aB, xp + far * 2], [sc - far, sc + far], [z0, z1])), eyeB);
+    } else if (style === 'hinge') {
+      /* stacked knuckles like a door hinge with an upright axis: the left segment holds the top and bottom knuckles with
+         cone pins, the right segment the middle knuckle with matching cone sockets */
+      const Rk = hw * 0.92, T = zs * 0.34, zl = zc - T / 2, zu = zc + T / 2;
+      if (Rk < 2 * g + 1.5 || zs < 6 * g + 2) throw new Error('Těleso je v místě kloubu na kloub příliš tenké; použijte méně kloubů');
+      const cylR = vcyl(P, Rk, z0, z1), cylG = vcyl(P, Rk + g, z0, z1);
+      const halfA = boxAS([xp - far * 2, xp - g / 2], [sc - far, sc + far], [z0, z1]), halfB = boxAS([xp + g / 2, xp + far * 2], [sc - far, sc + far], [z0, z1]);
+      const below = boxAS([xp - far, xp + far], [sc - far, sc + far], [z0, zl - g]), above = boxAS([xp - far, xp + far], [sc - far, sc + far], [zu + g, z1]);
+      const mid = boxAS([xp - far, xp + far], [sc - far, sc + far], [zl, zu]);
+      const rp = Math.max(0.6, Math.min(Rk * 0.45, T / 2 - 0.3));
+      const knA = I(rest, I(U(cylR, I(cylG, halfA)), U(below, above)));
+      A = U(I(rest, S(halfA, cylG)), knA);
+      A = U(U(A, coneX([P[0], P[1], zl - g].map((v, i) => (i === 2 ? v : P[i])), [0, 0, 1], rp, 0, rp)), coneX([P[0], P[1], zu + g], [0, 0, -1], rp, 0, rp));
+      B = U(I(rest, S(halfB, cylG)), I(rest, I(U(cylR, I(cylG, halfB)), mid)));
+      const rs = rp + 1.5 * g;
+      B = S(S(B, coneX([P[0], P[1], zl - g], [0, 0, 1], rs, 0, rs)), coneX([P[0], P[1], zu + g], [0, 0, -1], rs, 0, rs));
+    } else {
+      const Rk = hw * 0.92;
+      if (Rk < 2 * g + 1.5 || zs < 6 * g + 1.5) throw new Error('Těleso je v místě kloubu na kloub příliš tenké; použijte méně kloubů');
+      const T = zs * 0.34, rd = Rk * 0.55, wn = rd * 0.9;
+      const [la, ha] = span(a, xp - BIG, xp);
+      const halfA = box(la, ha);
+      A = S(I(rest, halfA), vcyl(P, Rk + g, z0, z1));
+      B = S(rest, S(halfA, vcyl(P, Rk, z0, z1)));
+      /* tongue of A: disc around the axis on a neck towards A, in the middle of the height */
+      const neckLo = [0, 0, 0], neckHi = [0, 0, 0];
+      neckLo[a] = xp - Rk - g - 2; neckHi[a] = xp; neckLo[sAx] = sc - wn / 2; neckHi[sAx] = sc + wn / 2; neckLo[2] = zc - T / 2; neckHi[2] = zc + T / 2;
+      const tongue = I(U(vcyl(P, rd, zc - T / 2, zc + T / 2), box(neckLo, neckHi)), rest);
+      A = U(A, tongue);
+      /* slot in B's knuckle: the disc with clearance plus the room the neck sweeps when the joint turns */
+      const sLo = neckLo.slice(), sHi = neckHi.slice(); sLo[a] = xp - Rk - 1; sLo[sAx] -= g; sHi[sAx] += g; sLo[2] -= g; sHi[2] += g; sHi[a] = xp;
+      let slot = vcyl(P, rd + g, zc - T / 2 - g, zc + T / 2 + g);
+      const steps = Math.max(2, Math.ceil(th / (10 * Math.PI / 180)));
+      for (let i = -steps; i <= steps; i++) slot = U(slot, rotZ(box(sLo, sHi), P, th * i / steps));
+      B = S(B, slot);
+    }
     if (!A.length || !B.length) throw new Error('Kloub se nepodařilo vytvořit');
     out.push(A); rest = B;
   }
