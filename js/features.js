@@ -1659,7 +1659,25 @@ function articulateFold(polys, f) {
   out.foldAxis = { Q, es, angle: (KK.vdot(KK.cross(es, ez), ea) > 0 ? -1 : 1) * Math.PI / 2 };
   return out;
 }
+/* joints along drawn cuts may be oblique (f.tilt: the turn of each joint's plane about the vertical, in degrees, paired
+   with f.at): they are made one by one, each with the rest of the body turned so that its cut is square to the axis */
+function articulateOblique(polys, f) {
+  const a = f.axis === 'y' ? 1 : 0, s = 1 - a, bb = KK.bbox(polys), m = [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2);
+  const pairs = f.at.map((x, i) => [Number(x), Math.max(-60, Math.min(60, Number(f.tilt[i]) || 0))]).filter(p => p[0] > bb.min[a] + 1 && p[0] < bb.max[a] - 1).sort((p, q) => p[0] - q[0]);
+  if (!pairs.length) throw new Error('Žádný z řezů neprotíná článkovanou část tělesa');
+  const rotZ = (P, Q, deg) => { const t = deg * Math.PI / 180, c = Math.cos(t), sn = Math.sin(t); return KK.transform(P, [c, sn, 0, 0, -sn, c, 0, 0, 0, 0, 1, 0, Q[0] - c * Q[0] + sn * Q[1], Q[1] - sn * Q[0] - c * Q[1], 0, 1]); };
+  const out = []; let rest = polys;
+  for (const [x, t] of pairs) {
+    const Q = m.slice(); Q[a] = x;
+    const segs = articulateCore(rotZ(rest, Q, -t), { ...f, at: [x], tilt: undefined, n: 1 });
+    if (segs.length !== 2) throw new Error('Kloub se nepodařilo vytvořit');
+    out.push(rotZ(segs[0], Q, t)); rest = rotZ(segs[1], Q, t);
+  }
+  out.push(rest);
+  return out;
+}
 function articulateCore(polys, f) {
+  if (Array.isArray(f.tilt) && Array.isArray(f.at) && f.tilt.some(t => Math.abs(Number(t) || 0) > 0.5)) return articulateOblique(polys, f);
   const a = f.axis === 'y' ? 1 : 0, sAx = 1 - a, bb = KK.bbox(polys), g = Math.max(0.15, Number(f.gap) || 0.4);
   const L = bb.max[a] - bb.min[a], n = Math.max(1, Math.min(40, Math.round(Number(f.n) || 4))), th = Math.max(5, Math.min(60, Number(f.angle) || 30)) * Math.PI / 180;
   const BIG = 4 * Math.max(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]) + 100;
@@ -1702,7 +1720,33 @@ function articulateCore(polys, f) {
     const P = [0, 0, 0]; P[a] = xp; P[sAx] = sc;
     const z0 = zc - BIG / 2, z1 = zc + BIG / 2, far = BIG / 2;
     let A, B;
-    if (style === 'chain') {
+    if (style === 'ring') {
+      /* Očka (like printed chain toys): two round rings interlocked like chain links, the left segment's lying flat
+         (axis upright), the right segment's standing along the chain on the bed (axis across). Each ring passes through
+         the other's centre, so the right segment turns about the upright axis through the flat ring's centre PA (bends
+         sideways) and about the axis across through the standing ring's centre PB (bends up and down); both turn the
+         rings within themselves, so only the bodies' faces limit the swing. The left segment ends at PA, the right
+         one starts at PB; a slot round PA and a diamond (45°, prints without supports) round PB give the rings room. */
+      const zmin = sec.min[2];
+      const r = Math.min((hw - 2 * g - 1.1) / 3, (zs / 2 - g - 0.3) / 3, 2.2);
+      if (!(r >= 0.7)) throw new Error('Těleso je v místě kloubu na očka příliš malé; použijte méně kloubů nebo jiný typ');
+      const R = 2 * r + g + 0.3, zr = zmin + R + r, cl = r + g + 0.5;
+      const PA = [0, 0, zr], PB = [0, 0, zr]; PA[a] = xp - R / 2; PA[sAx] = sc; PB[a] = xp + R / 2; PB[sAx] = sc;
+      const ringA = KK.translate(KK.primitive('torus', { R, t: r }), PA);
+      const ringB = KK.translate(rotAbout(KK.primitive('torus', { R, t: r }), [0, 0, 0], ea, Math.PI / 2), PB);
+      const nV = KK.cross(ea, [0, 0, 1]), PV = { o: [0, 0, 0], u: ea, v: [0, 0, 1], n: nV }, sv = KK.vdot(PA, nV);
+      const wedgeV = (Q, dirSign) => { /* the same wedge in the upright plane along the chain, about the axis across */
+        const pts = [[Q[a], Q[2]]], M = 24;
+        for (let i = 0; i <= M; i++) { const ang = -alpha + 2 * alpha * i / M; pts.push([Q[a] + Math.cos(ang) * dirSign * BIG, Q[2] + Math.sin(ang) * BIG]); }
+        if (KK.area2D(pts) < 0) pts.reverse();
+        return KK.extrudeProfiles([{ pts, closed: true }], PV, sv - BIG, sv + BIG);
+      };
+      const D = cl * Math.SQRT2, dia = KK.extrudeProfiles([{ pts: [[PB[a] - D, zr], [PB[a], zr - D], [PB[a] + D, zr], [PB[a], zr + D]], closed: true }], PV, sv - (R + r + g), sv + (R + r + g));
+      A = I(I(I(rest, boxAS([xp - far * 2, xp], [sc - far, sc + far], [z0, z1])), wedge(PA, -1, alpha)), wedgeV(PB, -1));
+      A = U(S(A, vcyl(PA, cl, sec.min[2] - 1, sec.max[2] + 1)), ringA);
+      B = I(I(I(rest, boxAS([xp, xp + far * 2], [sc - far, sc + far], [z0, z1])), wedge(PA, 1, alpha)), wedgeV(PB, 1));
+      B = U(S(B, KK.fixOrientation(dia)), ringB);
+    } else if (style === 'chain') {
       /* two interlocked eyes, like chain links printed flat: an upright ring of the left segment along the chain and an
          upright ring of the right segment across it, alternating orientation. Every bar that closes a ring is a short
          bridge between two posts standing on the bed, and the ring of the right segment is lifted over the bottom bar of

@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 1.77
+- **Řez tažením myší:** v Konektorech (Způsob řezu › Řez) i v Kloubovém modelu (Rozmístění kloubů › Řezy) se řez kreslí stisknutím levého tlačítka a tažením přes model; po puštění se řez provede. Pohled se v tu chvíli otáčí pravým tlačítkem.
+- **Šikmé řezy u Kloubového modelu:** každý řez může vést šikmo (až 60°), kloub se natočí podle něj. Řez se kreslí na vodorovnou rovinu středem tělesa, takže stojí svisle bez ohledu na pohled. Konektory řežou šikmo podle čáry ve směru pohledu.
+- **Kloubový model – typ Očka** (podle tištěných řetízkových hraček): ležaté kulaté očko jednoho článku je provlečené stojatým očkem druhého, každé prochází středem druhého. Články se ohýbají do stran i nahoru a dolů (ověřeno ±30°), v tahu drží. Stojaté očko stojí na podložce, ležaté vede štěrbina a kosočtverečná dutina pod 45°, tiskne se bez podpěr. Velikost oček se řídí průřezem (šířka asi od 8 mm, výška od 6 mm). Původní „Očka“ s můstky zůstávají jen u starších modelů.
 ## Beta 1.76
 - **Díly s kolíky → Konektory.** Řez lze zadat kolmo na osu jako dřív, nebo **nakreslit čáru přes model** (dva body; rovina řezu jde čarou ve směru pohledu, takže řežete šikmo i napříč). Typy spoje:
   - **Kolík** – jako dosud, na spodním dílu nebo samostatné.
