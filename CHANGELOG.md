@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 1.80
+- **Soubor › Exportovat 3MF – jeden objekt s díly:** všechna viditelná tělesa se uloží jako díly jednoho objektu. V Bambu Studiu (i PrusaSliceru) je tak třeba kloubový řemínek jeden objekt složený na svém místě, jednotlivé články jsou jeho díly a každému lze dát jiný filament; Rozmístit je od sebe nerozhází. Původní Exportovat 3MF dál ukládá každé těleso jako samostatný objekt.
 ## Beta 1.79
 - **Očka šikmo pod 45°** (podle zaslaného řetízku): kde to průřez dovolí (zhruba čtvercový nebo kulatý, asi od 8 × 7 mm), stojí obě očka šikmo pod 45° na opačné strany a žádné neleží naplocho, takže nic nevisí ve vzduchu. Spoj se dál ohýbá do stran i nahoru a dolů (kolem os oček ±40° a ±30°, šikmou kombinací do stran i nahoru a dolů nejméně ±20°) a v tahu drží. U plochých řemínků zůstává ležaté a stojaté očko.
 ## Beta 1.78

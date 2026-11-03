@@ -6488,7 +6488,10 @@ function objText() {
   return s;
 }
 /* 3MF (3D Manufacturing Format): a zip with the model XML; one object per visible body, units mm */
-function threeMfBytes() {
+/* asParts: every visible body becomes a part of one object (in Bambu Studio / PrusaSlicer a single object whose parts
+   keep their places and can each get their own filament, e.g. the links of an articulated strap); otherwise each body is
+   an object of its own */
+function threeMfBytes(asParts) {
   const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const objs = [], items = []; let id = 1;
   for (const b of cur.bodies) {
@@ -6501,6 +6504,10 @@ function threeMfBytes() {
     items.push(`<item objectid="${id}"/>`); id++;
   }
   if (!objs.length) return null;
+  if (asParts && objs.length > 1) {
+    objs.push(`<object id="${id}" name="${esc(doc.name || 'model')}" type="model"><components>${items.map(t => t.replace('<item ', '<component ')).join('')}</components></object>`);
+    items.length = 0; items.push(`<item objectid="${id}"/>`);
+  }
   const model = `<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="cs-CZ" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><metadata name="Title">${esc(doc.name || 'model')}</metadata><metadata name="Application">${esc(SKICA.full)}</metadata><resources>${objs.join('')}</resources><build>${items.join('')}</build></model>`;
   const types = '<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>';
   const rels = '<?xml version="1.0" encoding="UTF-8"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>';
@@ -6530,14 +6537,14 @@ function makeZip(files) {
   end.setUint32(12, central.reduce((s, p) => s + p.length, 0), true); end.setUint32(16, off, true);
   return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type: 'application/zip' });
 }
-/* kind: 'stl' | 'obj' | 'zip' (STL + OBJ + design) */
+/* kind: 'stl' | 'obj' | '3mf' | '3mfparts' (one object, the bodies as its parts) | 'zip' (STL + OBJ + design) */
 function exportMesh(kind = 'zip') {
   const tris = exportTris();
   if (!tris.length) { toast('Není co exportovat, model neobsahuje viditelná tělesa.'); return; }
   const n = fileBase();
   if (kind === 'stl') saveFile(n + '.stl', stlBytes(tris), 'STL uloženo');
   else if (kind === 'obj') saveFile(n + '.obj', objText(), 'OBJ uloženo');
-  else if (kind === '3mf') { const z = threeMfBytes(); if (z) saveFile(n + '.3mf', z, '3MF uloženo'); }
+  else if (kind === '3mf' || kind === '3mfparts') { const z = threeMfBytes(kind === '3mfparts'); if (z) saveFile(n + '.3mf', z, '3MF uloženo'); }
   else saveFile(n + '.zip', exportZip(tris, n), 'Uloženo. Archiv otevřete znovu ve SkicaCAD přetažením do okna nebo přes Soubor › Otevřít návrh.');
 }
 function exportZip(tris, n) {
@@ -6705,6 +6712,7 @@ $('#m-export').addEventListener('click', () => { closeMenu(); exportMesh('zip');
 $('#m-export-stl').addEventListener('click', () => { closeMenu(); exportMesh('stl'); });
 $('#m-export-obj').addEventListener('click', () => { closeMenu(); exportMesh('obj'); });
 $('#m-export-3mf').addEventListener('click', () => { closeMenu(); exportMesh('3mf'); });
+$('#m-export-3mfp').addEventListener('click', () => { closeMenu(); exportMesh('3mfparts'); });
 $('#fileinput').addEventListener('change', e => {
   const file = e.target.files && e.target.files[0]; if (!file) return;
   e.target.value = '';
