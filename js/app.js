@@ -1202,7 +1202,7 @@ const RIBBON = {
     ['Tvořit', [['blob', 'Měkké spojení'], ['skin', 'Kostra'], ['sweep', 'Tažení po křivce'], ['loft', 'Přechod profilů']]],
     ['Deformovat', [['deform', 'Deformace'], ['lattice', 'Mřížka'], ['softmove', 'Měkký posun'], ['subdiv', 'Vyhladit dělením']]],
     ['Sochat', [['sculpt', 'Sochat'], ['remesh', 'Přesíťovat']]],
-    ['Pro tisk', [['articulate', 'Kloubový model'], ['flatbase', 'Plochá podstava'], ['pegsplit', 'Díly s kolíky'], ['hollow', 'Vydutit'], ['printcheck', 'Kontrola tisku']]]
+    ['Pro tisk', [['articulate', 'Kloubový model'], ['flatbase', 'Plochá podstava'], ['pegsplit', 'Konektory'], ['hollow', 'Vydutit'], ['printcheck', 'Kontrola tisku']]]
   ],
   sketch: [
     ['Vytvořit', [['line', 'Čára', 'L'], ['spline', 'Křivka', 'K'], ['rect', 'Obdélník', 'R'], ['circle', 'Kružnice', 'C'],
@@ -1400,6 +1400,7 @@ function openDialog(spec) {
     okEnabled(on) { $('[data-act="ok"]', el).disabled = !on; },
     setOptions(id, options, value) { const sel = $('#dlg-' + id); sel.innerHTML = options.map(([v, l]) => `<option value="${v}">${l}</option>`).join(''); if (value !== undefined) sel.value = String(value); },
     show(id, on) { const r = $(`#dialog [data-row="${id}"]`); if (r) r.hidden = !on; const r2 = $(`#dialog [data-row="${id}-r"]`); if (r2) r2.hidden = !on; },
+    label(id, t) { const l = $(`#dialog [data-row="${id}"] label, #dialog [data-row="${id}"] .fl`); if (l && t) l.textContent = t; },
     okLabel(t) { $('[data-act="ok"]', el).textContent = t; }
   };
   spec.fields.forEach(f => { if (f.value !== undefined) dlg.set(f.id, f.value); });
@@ -7270,17 +7271,47 @@ const ORG_MODS = {
     prompt: 'Spodek tělesa se zarovná do roviny, aby postavička stála a dobře se tiskla'
   },
   articulate: {
-    defaults: () => ({ style: 'disc', axis: 'x', cnt: 4, gap: 0.4, angle: 30, ends: 'none', bw: 0, bh: 0 }),
-    load: f => ({ style: f.style || 'disc', axis: f.axis || 'x', cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30, ends: f.ends || 'none', bw: f.bw || 0, bh: f.bh || 0 }),
+    defaults: () => ({ style: 'disc', axis: 'x', place: 'even', lines: [], cnt: 4, gap: 0.4, angle: 30, ends: 'none', bw: 0, bh: 0 }),
+    load: f => ({ style: f.style || 'disc', axis: f.axis || 'x', place: f.lines && f.lines.length ? 'lines' : 'even', lines: (f.lines || []).slice(), cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30, ends: f.ends || 'none', bw: f.bw || 0, bh: f.bh || 0 }),
     fields: v => [{ k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů']].concat(v.style === 'chain' ? [['chain', 'Očka']] : []), value: v.style }, /* Očka only for older models that use them */
       { k: 'seg', id: 'axis', label: 'Řetěz podél osy', options: [['x', 'X'], ['y', 'Y']], value: v.axis },
+      { k: 'seg', id: 'place', label: 'Rozmístění kloubů', options: [['even', 'Rovnoměrně'], ['lines', 'Čarami přes model']], value: v.place },
+      { k: 'sel', id: 'jl', label: 'Čáry kloubů' }, { k: 'btns', id: 'jb', label: '', options: [['undo', 'Zpět o čáru'], ['clear', 'Smazat vše']] },
       { k: 'num', id: 'cnt', label: 'Počet kloubů', unit: 'ks', value: v.cnt, range: [1, 20, 1] },
       { k: 'num', id: 'gap', label: 'Vůle v kloubu', value: v.gap }, { k: 'num', id: 'angle', label: 'Natočení kloubu', unit: '°', value: v.angle, range: [10, 60, 1] },
       { k: 'seg', id: 'ends', label: 'Zapínání na koncích (řemínek)', options: [['none', 'Žádné'], ['buckle', 'Spona'], ['fold', 'Spona sklápěcí']].concat(v.ends === 'tongue' ? [['tongue', 'Jazyk a poutko']] : []), value: v.ends },
       { k: 'num', id: 'bw', label: 'Šířka spony (0 = jako řemínek)', value: v.bw }, { k: 'num', id: 'bh', label: 'Výška spony (0 = automaticky)', value: v.bh },
       { k: 'note', id: 'tip' }],
-    feature: v => ({ style: v.style, axis: v.axis, n: Math.max(1, Math.round(v.cnt)), gap: v.gap, angle: v.angle, ...(v.ends && v.ends !== 'none' ? { ends: v.ends, bw: v.bw || 0, bh: v.bh || 0 } : {}) }),
+    feature: v => {
+      const L = v.place === 'lines' ? v.lines : [], a = v.axis === 'y' ? 1 : 0;
+      return { style: v.style, axis: v.axis, n: L.length || Math.max(1, Math.round(v.cnt)), ...(L.length ? { at: L.map(l => l.at !== undefined ? l.at : r3((l.a[a] + l.b[a]) / 2)), lines: L } : {}), gap: v.gap, angle: v.angle, ...(v.ends && v.ends !== 'none' ? { ends: v.ends, bw: v.bw || 0, bh: v.bh || 0 } : {}) };
+    },
+    ready: v => v.place !== 'lines' || v.lines.length > 0,
+    pointsFirst: true,
+    click(c, ev) {
+      if (c.v.place !== 'lines' || !c.body) return false;
+      const p = cutLinePoint(c, ev); if (!p) return false;
+      if (!c.lp) { c.lp = p; return true; }
+      if (Math.hypot(p[0] - c.lp[0], p[1] - c.lp[1], p[2] - c.lp[2]) < 0.5) return true;
+      if (!c.v.lines.length) { /* the chain runs across the first line */
+        const ax = Math.abs(p[0] - c.lp[0]) < Math.abs(p[1] - c.lp[1]) ? 'x' : 'y';
+        if (ax !== c.v.axis) { c.v.axis = ax; dlg.set('axis', ax); }
+      }
+      /* the joint goes where the plane through the line (along the view) crosses the chain's axis through the body */
+      const b = bodyById(c.body), bb = K.bbox(b.polys), m = [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2), d = viewDir(c.lp, p), ai = c.v.axis === 'y' ? 1 : 0;
+      const e = [p[0] - c.lp[0], p[1] - c.lp[1], p[2] - c.lp[2]], n = [e[1] * d[2] - e[2] * d[1], e[2] * d[0] - e[0] * d[2], e[0] * d[1] - e[1] * d[0]];
+      if (Math.abs(n[ai]) < 1e-6 * Math.hypot(...n)) return true; /* a line along the chain makes no joint */
+      const at = m[ai] + (n[0] * (c.lp[0] - m[0]) + n[1] * (c.lp[1] - m[1]) + n[2] * (c.lp[2] - m[2])) / n[ai];
+      c.v.lines.push({ a: c.lp, b: p, at: r3(at) }); c.lp = null; c.hov = null; return true;
+    },
+    move(c, ev) { if (c.v.place === 'lines' && c.lp) { c.hov = cutLinePoint(c, ev); this.layout(c); requestRender(); } },
+    btn(c, id, v) { if (id !== 'jb') return; c.lp = null; if (v === 'undo') c.v.lines.pop(); else c.v.lines = []; },
+    change(c, id) { if (id === 'place') c.lp = null; },
     layout(c) {
+      const ln = c.v.place === 'lines', k = c.v.lines.length;
+      dlg.show('jl', ln); dlg.show('jb', ln && k > 0); dlg.show('cnt', !ln);
+      dlg.set('jl', { text: c.lp ? 'Klepněte na druhý konec čáry' : k ? `${k} ${k === 1 ? 'čára' : k < 5 ? 'čáry' : 'čar'} – klepnutím přidáte další` : 'Nakreslete čáru přes model (dva body)', has: k > 0, active: ln && !!c.body });
+      clearGroup(c.dots); if (ln) drawCutLines(c.dots, c.v.lines, c.lp, c.hov);
       dlg.show('bw', c.v.ends !== 'none'); dlg.show('bh', c.v.ends === 'buckle');
       const endsTip = c.v.ends === 'fold' ? ' Spona sklápěcí: samice se tiskne nastojato na začátku řemínku (tenká dutina tak nepotřebuje most) a po tisku se v kloubu sklopí o 90° ven, ústím od řemínku; samec leží naplocho na konci. Spona je jen o málo silnější než řemínek.' : '';
       dlg.set('tip', {
@@ -7297,26 +7328,90 @@ const ORG_MODS = {
     prompt: 'Těleso se rozdělí na články spojené klouby, které se tisknou vcelku (vůle 0,3–0,5 mm podle tiskárny)'
   },
   pegsplit: {
-    defaults: () => ({ axis: 'z', at: null, n: 1, d: 5, len: 10, tol: 0.2, style: 'attached' }),
-    fields: v => [{ k: 'seg', id: 'axis', label: 'Řez kolmo na osu', options: AXSEG, value: v.axis }, { k: 'num', id: 'at', label: 'Poloha řezu', value: v.at || 0, range: [0, 100, 0.1] },
-      { k: 'seg', id: 'pn', label: 'Počet kolíků', options: [['1', '1'], ['2', '2'], ['3', '3']], value: String(v.n) },
-      { k: 'num', id: 'd', label: 'Průměr kolíku', value: v.d }, { k: 'num', id: 'len', label: 'Délka kolíku', value: v.len }, { k: 'num', id: 'tol', label: 'Vůle v otvoru', value: v.tol },
-      { k: 'seg', id: 'style', label: 'Kolíky', options: [['attached', 'Na spodním dílu'], ['loose', 'Samostatné']], value: v.style }],
-    feature: v => ({ axis: v.axis, at: v.at, n: Number(v.n), d: v.d, len: v.len, tol: v.tol, style: v.style }),
+    defaults: () => ({ kind: 'peg', mode: 'axis', axis: 'z', at: null, cut: null, n: 1, d: 5, len: 10, tol: 0.2, style: 'attached', angle: 30, dir: 'long' }),
+    load: f => ({ ...ORG_MODS.pegsplit.defaults(), ...Object.fromEntries(Object.entries(f).filter(([k]) => !['id', 'type', 'body'].includes(k))), kind: f.kind || 'peg', mode: f.cut ? 'line' : 'axis' }),
+    fields: v => [{ k: 'opt', id: 'kind', label: 'Typ spoje', options: CONN_KINDS, value: v.kind },
+      { k: 'seg', id: 'mode', label: 'Řez', options: [['axis', 'Kolmo na osu'], ['line', 'Čarou přes model']], value: v.mode },
+      { k: 'seg', id: 'axis', label: 'Řez kolmo na osu', options: AXSEG, value: v.axis }, { k: 'num', id: 'at', label: 'Poloha řezu', value: v.at || 0, range: [0, 100, 0.1] },
+      { k: 'sel', id: 'cl', label: 'Čára řezu' },
+      { k: 'seg', id: 'pn', label: 'Počet', options: [['1', '1'], ['2', '2'], ['3', '3']], value: String(v.n) },
+      { k: 'num', id: 'd', label: 'Průměr kolíku', value: v.d }, { k: 'num', id: 'len', label: 'Délka spoje', value: v.len }, { k: 'num', id: 'tol', label: 'Vůle', value: v.tol },
+      { k: 'seg', id: 'style', label: 'Kolíky', options: [['attached', 'Na spodním dílu'], ['loose', 'Samostatné']], value: v.style },
+      { k: 'num', id: 'angle', label: 'Natočení kloubu', unit: '°', value: v.angle, range: [10, 60, 1] },
+      { k: 'seg', id: 'dir', label: 'Směr', options: [['long', 'Podél řezu'], ['cross', 'Napříč']], value: v.dir },
+      { k: 'note', id: 'tip' }],
+    feature: v => {
+      const o = { kind: v.kind, ...(v.mode === 'line' && v.cut ? { cut: v.cut } : { axis: v.axis, at: v.at }), d: v.d, tol: v.tol };
+      if (v.kind === 'peg' || v.kind === 'snap') { o.n = Number(v.n); o.len = v.len; }
+      if (v.kind === 'peg') o.style = v.style;
+      if (v.kind === 'dovetail') { o.len = v.len; o.dir = v.dir; }
+      if (v.kind === 'ball' || v.kind === 'pin') o.angle = v.angle;
+      if (v.kind === 'pin') o.dir = v.dir;
+      return o;
+    },
+    ready: v => v.mode !== 'line' || !!v.cut,
     bodyChosen(c) { this.range(c, true); },
     range(c, reset) {
       const b = bodyById(c.body); if (!b) return; const a = { x: 0, y: 1, z: 2 }[c.v.axis], bb = K.bbox(b.polys), r = $('#dlg-at-r');
       if (r) { r.min = String(r3(bb.min[a] + 0.5)); r.max = String(r3(bb.max[a] - 0.5)); }
       if (reset || !(c.v.at > bb.min[a] && c.v.at < bb.max[a])) { c.v.at = r3((bb.min[a] + bb.max[a]) / 2); dlg.set('at', c.v.at); }
     },
-    change(c, id) { if (id === 'axis') { c.v.axis = dlg.get('axis'); this.range(c, true); } if (id === 'pn') c.v.n = Number(dlg.get('pn')); },
-    preview(polys, f) {
-      const r = Engine.pegSplit(polys, f), sh = [0, 0, 0]; sh[{ x: 0, y: 1, z: 2 }[f.axis]] = 6;
-      return { polys: r.lower, extra: [K.translate(r.upper, sh), ...r.pegs.map((p, i) => K.translate(p, [K.bbox(polys).max[0] + 8 + i * (f.d + 4), 0, 0]))], note: 'Náhled je rozložený; po potvrzení díly zůstanou na místě, samostatné kolíky leží vedle.' };
+    change(c, id) { if (id === 'axis') { c.v.axis = dlg.get('axis'); this.range(c, true); } if (id === 'pn') c.v.n = Number(dlg.get('pn')); if (id === 'mode') c.lp = null; },
+    layout(c) {
+      const k = c.v.kind, line = c.v.mode === 'line';
+      dlg.show('axis', !line); dlg.show('at', !line); dlg.show('cl', line);
+      dlg.show('pn', k === 'peg' || k === 'snap'); dlg.show('len', k === 'peg' || k === 'snap' || k === 'dovetail'); dlg.show('style', k === 'peg');
+      dlg.show('angle', k === 'ball' || k === 'pin'); dlg.show('dir', k === 'pin' || k === 'dovetail');
+      dlg.label('d', { peg: 'Průměr kolíku', snap: 'Průměr západky', dovetail: 'Šířka rybiny', ball: 'Průměr koule', pin: 'Průměr čepu' }[k]);
+      dlg.label('len', k === 'dovetail' ? 'Výška rybiny × 2' : 'Délka spoje');
+      dlg.set('cl', { text: c.lp ? 'Klepněte na druhý konec čáry' : c.v.cut ? 'Čára nakreslena – klepnutím kreslíte znovu' : 'Klepněte na dva body přes model', has: !!c.v.cut, active: line && !!c.body });
+      dlg.set('tip', CONN_TIP[k] + (line ? ' Rovina řezu prochází nakreslenou čarou ve směru pohledu.' : ''));
+      clearGroup(c.dots); if (line) drawCutLines(c.dots, c.v.cut ? [c.v.cut] : [], c.lp, c.hov);
     },
-    prompt: 'Těleso se rozřízne rovinou; kolíky drží díly pohromadě (díly se tisknou zvlášť)'
+    pointsFirst: true,
+    click(c, ev) {
+      if (c.v.mode !== 'line' || !c.body) return false;
+      const p = cutLinePoint(c, ev); if (!p) return false;
+      if (!c.lp) { c.lp = p; return true; }
+      if (Math.hypot(p[0] - c.lp[0], p[1] - c.lp[1], p[2] - c.lp[2]) < 0.5) return true;
+      c.v.cut = { a: c.lp, b: p, d: viewDir(c.lp, p) }; c.lp = null; c.hov = null; return true;
+    },
+    move(c, ev) { if (c.v.mode === 'line' && c.lp) { c.hov = cutLinePoint(c, ev); this.layout(c); requestRender(); } },
+    preview(polys, f) {
+      const r = Engine.pegSplit(polys, f), sh = r.n.map(x => x * 6), bb = K.bbox(polys);
+      return { polys: r.lower, extra: [K.translate(r.upper, sh), ...r.pegs.map((p, i) => K.translate(p, [bb.max[0] + 8 + i * (f.d + 4), (bb.min[1] + bb.max[1]) / 2, bb.min[2]]))], note: 'Náhled je rozložený; po potvrzení díly zůstanou na místě, samostatné díly leží vedle.' };
+    },
+    prompt: 'Těleso se rozřízne a díly spojí zvolený spoj (díly se tisknou zvlášť)'
   }
 };
+const CONN_KINDS = [['peg', 'Kolík'], ['snap', 'Snap-fit (západka)'], ['dovetail', 'Rybina (dovetail)'], ['ball', 'Kulový kloub'], ['pin', 'Čepový kloub']];
+const CONN_TIP = {
+  peg: 'Kolík: válcové kolíky na spodním dílu zapadnou do otvorů v horním dílu (nebo samostatné kolíky do otvorů v obou dílech).',
+  snap: 'Snap-fit: rozříznutý kolík se zobáčkem projde zúženým otvorem a zacvakne za osazení; díly drží bez lepidla.',
+  dovetail: 'Rybina: lichoběžníkový výstupek na spodním dílu, horní díl se na něj nasune z boku a tahem nejde oddělit.',
+  ball: 'Kulový kloub: koule na krčku zacvakne do jamky s užším ústím; díl se otáčí dokola a naklání (hlava, ramena, kyčle postaviček).',
+  pin: 'Čepový kloub: očka obou dílů se střídají kolem osy ležící v řezu a drží je čep (vytiskne se zvlášť, nebo použijte kus filamentu); díly se ohýbají jako koleno.'
+};
+/* a point for a cut line: where the view ray meets the plane through the body's centre facing the camera */
+function cutLinePoint(c, ev) {
+  const b = bodyById(c.body); if (!b) return null;
+  const bb = K.bbox(b.polys), p = rayOnViewPlane(ev, [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2));
+  return p ? [p.x, p.y, p.z].map(r3) : null;
+}
+/* the direction a drawn line's cutting plane runs in: the view direction, or with perspective the direction from the eye
+   to the line's middle (so the plane goes through the eye and shows edge-on, exactly along the drawn line) */
+function viewDir(a, b) {
+  const C = cam(), n = new V3();
+  if (C.isPerspectiveCamera && a && b) n.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2).sub(C.position).normalize();
+  else C.getWorldDirection(n);
+  return [n.x, n.y, n.z].map(x => Math.round(x * 1e5) / 1e5);
+}
+function drawCutLines(group, lines, pending, hover) {
+  const seg = [];
+  for (const l of lines) { seg.push(...l.a, ...l.b); group.add(orgDot(l.a, false)); group.add(orgDot(l.b, false)); }
+  if (pending) { group.add(orgDot(pending, true)); if (hover) seg.push(...pending, ...hover); }
+  if (seg.length) { const m = noRay(new THREE.LineSegments(lineGeo(seg), new THREE.LineBasicMaterial({ color: tok.org, depthTest: false, transparent: true }))); m.renderOrder = 12; group.add(m); }
+}
 function startOrgMod(type, editIndex, f) {
   const S = ORG_MODS[type], pivot = new THREE.Object3D(); scene.add(pivot);
   const plain = { body: 1, id: 1, type: 1 };
@@ -7381,7 +7476,7 @@ function startOrgMod(type, editIndex, f) {
       }, live ? 150 : 250);
     },
     onFrame() { if (this.dots) orgDotsScale(this.dots); },
-    onMove(ev) { const h = hitBodies(ev); dom.style.cursor = h ? 'pointer' : ''; },
+    onMove(ev) { const h = hitBodies(ev); dom.style.cursor = h ? 'pointer' : ''; if (S.move) S.move(this, ev); },
     onClick(ev) {
       if (this.body && S.pointsFirst && S.click(this, ev, null)) { this.layout(); this.schedule(); return; } /* a control point */
       ray.setFromCamera(evNdc(ev), cam());

@@ -7,7 +7,7 @@ const PLANES = {
   XZ: { o: [0, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] },
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
-const FEATURE_LABEL = { buckle: 'Spona', articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Díly s kolíky', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
+const FEATURE_LABEL = { buckle: 'Spona', articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Konektory', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
   fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
@@ -1337,55 +1337,148 @@ function orgModify(polys, f) {
   }
   throw new Error('Neznámý prvek');
 }
-/* Díly s kolíky: cut by a plane across one axis; pegs on one part fit into holes in the other (or loose pegs and holes
-   in both parts) */
-function pegSplit(polys, f) {
+/* Konektory: the body is cut by a plane (across one axis, or along a line drawn over the model) and the two parts are
+   joined by a printed connector: kolík (pegs, on the lower part or loose), snap-fit (slit pins with a barb that clicks
+   into an undercut), rybina (dovetail tongue that slides into a groove), kulový kloub (ball on a neck in a socket) or
+   čepový kloub (knuckles round a pin, the parts swing about an axis lying in the cut). Local frame at the centroid c of
+   the cut: u = the long direction across the cut, v = across it, n = the plane's normal (towards the upper part). */
+function connectorPlane(polys, f) {
+  const bb = KK.bbox(polys);
+  if (f.cut && f.cut.a && f.cut.b && f.cut.d) {
+    const a = f.cut.a.map(Number), b = f.cut.b.map(Number), d = KK.vnorm(f.cut.d.map(Number));
+    let n = KK.cross(KK.vsub(b, a), d); const ln = Math.hypot(...n);
+    if (!(ln > 1e-6)) throw new Error('Čára řezu je příliš krátká');
+    n = KK.vmul(n, 1 / ln);
+    let m = 0; for (let k = 1; k < 3; k++) if (Math.abs(n[k]) > Math.abs(n[m]) + 1e-9) m = k;
+    if (n[m] < 0) n = KK.vmul(n, -1);
+    return { n, w: KK.vdot(n, a), bb };
+  }
   const a = { x: 0, y: 1, z: 2 }[f.axis] === undefined ? 2 : { x: 0, y: 1, z: 2 }[f.axis];
   const n = [0, 0, 0]; n[a] = 1;
-  const bb = KK.bbox(polys), at = f.at === undefined || f.at === null ? (bb.min[a] + bb.max[a]) / 2 : Number(f.at);
+  const at = f.at === undefined || f.at === null ? (bb.min[a] + bb.max[a]) / 2 : Number(f.at);
   if (!(at > bb.min[a] + 1e-3 && at < bb.max[a] - 1e-3)) throw new Error('Rovina řezu těleso neprotíná');
-  const hs = cutTool({}, n, at, bb);
+  return { n, w: at, bb };
+}
+function pegSplit(polys, f) {
+  const { n, w, bb } = connectorPlane(polys, f), kind = f.kind || 'peg';
+  const hs = cutTool({}, n, w, bb);
   const top = KK.boolean(polys, hs, 'intersect'), bot = KK.boolean(polys, hs, 'subtract');
   if (!top.length || !bot.length) throw new Error('Rovina řezu těleso neprotíná');
-  /* the cut face on the lower part: area centroid and the main direction across it */
-  const cap = bot.filter(p => p.n[a] > 0.999 && Math.abs(p.w - at) < 1e-3);
+  const cap = bot.filter(p => KK.vdot(p.n, n) > 0.999 && Math.abs(p.w - w) < 1e-3);
   if (!cap.length) throw new Error('Řez se nepodařilo najít');
   let A = 0; const c = [0, 0, 0];
   for (const p of cap) for (let i = 1; i < p.v.length - 1; i++) { const t = [p.v[0], p.v[i], p.v[i + 1]], ar = 0.5 * Math.hypot(...KK.cross(KK.vsub(t[1], t[0]), KK.vsub(t[2], t[0]))); A += ar; for (let k = 0; k < 3; k++) c[k] += ar * (t[0][k] + t[1][k] + t[2][k]) / 3; }
   for (let k = 0; k < 3; k++) c[k] /= A || 1;
-  const b = (a + 1) % 3, cc = (a + 2) % 3;
+  /* main direction across the cut */
+  const B0 = basisFromPlane(n, w);
   let sbb = 0, scc = 0, sbc = 0;
-  for (const p of cap) for (const q of p.v) { const x = q[b] - c[b], y = q[cc] - c[cc]; sbb += x * x; scc += y * y; sbc += x * y; }
-  const ang = 0.5 * Math.atan2(2 * sbc, sbb - scc), dir = [0, 0, 0]; dir[b] = Math.cos(ang); dir[cc] = Math.sin(ang);
-  const d = Math.max(1, Number(f.d) || 4), len = Math.max(2, Number(f.len) || 8), tol = Math.max(0, Number(f.tol) || 0.2), cnt = Math.max(1, Math.min(3, Math.round(Number(f.n) || 1)));
+  for (const p of cap) for (const q of p.v) { const r = KK.vsub(q, c), x = KK.vdot(r, B0.u), y = KK.vdot(r, B0.v); sbb += x * x; scc += y * y; sbc += x * y; }
+  const ang = 0.5 * Math.atan2(2 * sbc, sbb - scc);
+  let u = KK.vnorm(KK.vadd(KK.vmul(B0.u, Math.cos(ang)), KK.vmul(B0.v, Math.sin(ang)))), v = KK.cross(n, u);
+  if (f.dir === 'cross') { const t = u; u = v; v = KK.vmul(t, -1); }
+  const P = (s, t, h) => [c[0] + u[0] * s + v[0] * t + n[0] * h, c[1] + u[1] * s + v[1] * t + n[1] * h, c[2] + u[2] * s + v[2] * t + n[2] * h];
   const inCap = q => cap.some(p => KK.pointInConvex(q, p, 1e-4));
-  const okAt = q => { for (let i = 0; i < 12; i++) { const t = i / 12 * 2 * Math.PI, r = d / 2 + 0.8, p = q.slice(); p[b] += r * Math.cos(t); p[cc] += r * Math.sin(t); if (!inCap(p)) return false; } return inCap(q); };
-  /* spread pegs along the main direction, as far apart as the cut allows */
-  const spots = [];
-  if (cnt === 1) spots.push(c.slice());
-  else {
-    let ext = 0; for (const p of cap) for (const q of p.v) ext = Math.max(ext, Math.abs((q[b] - c[b]) * dir[b] + (q[cc] - c[cc]) * dir[cc]));
-    for (let s = 0.7; s > 0.05 && spots.length < cnt; s -= 0.05) {
-      spots.length = 0;
-      for (let i = 0; i < cnt; i++) { const u = cnt === 1 ? 0 : (i / (cnt - 1) - 0.5) * 2 * s * ext, q = c.slice(); q[b] += dir[b] * u; q[cc] += dir[cc] * u; if (okAt(q)) spots.push(q); }
-      if (spots.length !== cnt) spots.length = 0;
+  /* how far the cut reaches from c along a direction in it, and how thick each part is above / below the cut */
+  const reach = (du, dv) => { let lo = 0; while (lo < 1e4 && inCap(P(du * (lo + 0.25), dv * (lo + 0.25), 0))) lo += 0.25; return lo; };
+  let hUp = 0, hDn = 0; for (const p of top) for (const q of p.v) hUp = Math.max(hUp, KK.vdot(q, n) - w); for (const p of bot) for (const q of p.v) hDn = Math.max(hDn, w - KK.vdot(q, n));
+  const d = Math.max(1, Number(f.d) || 5), len = Math.max(2, Number(f.len) || 10), tol = Math.max(0, f.tol === undefined ? 0.2 : Number(f.tol)), cnt = Math.max(1, Math.min(3, Math.round(Number(f.n) || 1)));
+  const cylN = (q, r, z0, z1) => cylAlong(KK.vadd(q, KK.vmul(n, z0)), n, r, z1 - z0);
+  const plane = { o: c, u, v, n }, side = { o: c, u: v, v: n, n: u }; /* side: profile in (v, n), extruded along u */
+  const lbox = (s0, s1, t0, t1, z0, z1) => KK.extrudeProfiles([{ t: 'poly', pts: [[s0, t0], [s1, t0], [s1, t1], [s0, t1]] }], plane, z0, z1);
+  const sprism = (pts, s0, s1) => KK.extrudeProfiles([{ t: 'poly', pts: KK.area2D(pts) < 0 ? pts.slice().reverse() : pts }], side, s0, s1);
+  let lower = bot, upper = top; const extra = [];
+  const need = (h, what) => { if (h > hUp - 0.8 || h > hDn + 50) throw new Error(what + ' je delší než horní díl; zkraťte ho'); };
+  if (kind === 'peg' || kind === 'snap') {
+    const okAt = q => { for (let i = 0; i < 12; i++) { const t = i / 12 * 2 * Math.PI, r = d / 2 + 0.8 + (kind === 'snap' ? 0.6 : 0); if (!inCap(KK.vadd(q, KK.vadd(KK.vmul(u, r * Math.cos(t)), KK.vmul(v, r * Math.sin(t)))))) return false; } return inCap(q); };
+    const spots = [];
+    if (cnt > 1) {
+      let ext = 0; for (const p of cap) for (const q of p.v) ext = Math.max(ext, Math.abs(KK.vdot(KK.vsub(q, c), u)));
+      for (let s = 0.7; s > 0.05 && !spots.length; s -= 0.05) {
+        for (let i = 0; i < cnt; i++) { const q = P((i / (cnt - 1) - 0.5) * 2 * s * ext, 0, 0); if (okAt(q)) spots.push(q); }
+        if (spots.length !== cnt) spots.length = 0;
+      }
     }
     if (!spots.length) spots.push(c.slice());
-  }
-  if (!okAt(spots[0])) throw new Error('Kolík se do řezu nevejde, zmenšete průměr');
-  const cyl = (q, r, z0, z1) => { const ax = [0, 0, 0]; ax[a] = 1; const o = q.slice(); o[a] = z0; return cylAlong(o, ax, r, z1 - z0); };
-  let lower = bot, upper = top; const pegs = [];
-  for (const q of spots) {
-    if (f.style === 'loose') { /* holes in both parts, separate pegs */
-      lower = KK.boolean(lower, cyl(q, d / 2 + tol, at - len / 2 - 0.3, at + 0.01), 'subtract');
-      upper = KK.boolean(upper, cyl(q, d / 2 + tol, at - 0.01, at + len / 2 + 0.3), 'subtract');
-      pegs.push(cyl([q[0], q[1], q[2]].map((v, i) => (i === a ? 0 : v)), d / 2, 0, len));
-    } else {
-      lower = KK.boolean(lower, cyl(q, d / 2, at - 0.5, at + len / 2), 'union');
-      upper = KK.boolean(upper, cyl(q, d / 2 + tol, at - 0.01, at + len / 2 + 0.3), 'subtract');
+    if (!okAt(spots[0])) throw new Error((kind === 'snap' ? 'Západka' : 'Kolík') + ' se do řezu nevejde, zmenšete průměr');
+    const r = d / 2, Lp = len / 2;
+    need(Lp + 0.3, kind === 'snap' ? 'Západka' : 'Kolík');
+    if (kind === 'peg') for (const q of spots) {
+      if (f.style === 'loose') {
+        lower = KK.boolean(lower, cylN(q, r + tol, -Lp - 0.3, 0.01), 'subtract');
+        upper = KK.boolean(upper, cylN(q, r + tol, -0.01, Lp + 0.3), 'subtract');
+        extra.push({ name: 'Kolík', polys: cylAlong([0, 0, 0], [0, 0, 1], r, len) });
+      } else {
+        lower = KK.boolean(lower, cylN(q, r, -0.5, Lp), 'union');
+        upper = KK.boolean(upper, cylN(q, r + tol, -0.01, Lp + 0.3), 'subtract');
+      }
     }
-  }
-  return { lower, upper, pegs, n, at };
+    else {
+      /* snap-fit: a pin split by a slit into two springy halves, a conical barb at the tip; the hole has a narrow throat
+         and an undercut chamber that the barb clicks into (the barb's flat ledge holds the parts together) */
+      const e = Math.max(0.3, Math.min(0.6, d * 0.1)), hb = Math.max(1.2, Math.min(Lp * 0.35, 3)), sw = Math.max(0.8, d * 0.25);
+      if (Lp < hb + 1) throw new Error('Západka je příliš krátká; prodlužte ji');
+      for (const q of spots) {
+        let pin = KK.boolean(cylN(q, r, -0.5, Lp - hb), coneX(KK.vadd(q, KK.vmul(n, Lp - hb)), n, r + e, r * 0.7, hb), 'union');
+        pin = KK.boolean(pin, KK.extrudeProfiles([{ t: 'poly', pts: [[-sw / 2, -r - e - 1], [sw / 2, -r - e - 1], [sw / 2, r + e + 1], [-sw / 2, r + e + 1]].map(([s, t]) => [s + KK.vdot(KK.vsub(q, c), u), t + KK.vdot(KK.vsub(q, c), v)]) }], plane, Lp * 0.3, Lp + 1), 'subtract');
+        lower = KK.boolean(lower, pin, 'union');
+        let hole = KK.boolean(cylN(q, r + tol, -0.01, Lp - hb + 0.01), cylN(q, r + e + tol, Lp - hb, Lp + tol + 0.3), 'union');
+        hole = KK.boolean(hole, coneX(KK.vadd(q, KK.vmul(n, Lp + tol + 0.29)), n, r + e + tol, r * 0.5, r + e), 'union');
+        upper = KK.boolean(upper, hole, 'subtract');
+      }
+    }
+  } else if (kind === 'dovetail') {
+    /* rybina: a tongue widening upwards at 20° runs along u right across the cut; the upper part has the matching
+       groove with clearance and slides on from the side */
+    const hgt = Math.max(1.5, Math.min(len / 2, hUp - 1.5)), wb = d, wt = d + 2 * hgt * Math.tan(20 * Math.PI / 180);
+    const half = Math.min(reach(0, 1), reach(0, -1));
+    if (wt / 2 + tol + 0.8 > half) throw new Error('Rybina se do řezu nevejde, zmenšete šířku');
+    let E = 0; for (const p of cap) for (const q of p.v) E = Math.max(E, Math.abs(KK.vdot(KK.vsub(q, c), u)));
+    E += 2;
+    const tongue = KK.boolean(sprism([[-wb / 2, -0.5], [wb / 2, -0.5], [wb / 2, 0], [wt / 2, hgt], [-wt / 2, hgt], [-wb / 2, 0]], -E, E), top, 'intersect');
+    lower = KK.boolean(lower, tongue, 'union');
+    upper = KK.boolean(upper, sprism([[-wb / 2 - tol, -0.01], [wb / 2 + tol, -0.01], [wt / 2 + tol, hgt + tol], [-wt / 2 - tol, hgt + tol]], -E - 1, E + 1), 'subtract');
+  } else if (kind === 'ball') {
+    /* kulový kloub: ball on a neck on the lower part; the upper part has a spherical socket whose mouth is a little
+       narrower than the ball (it snaps in), flared below so the neck can tilt; a gap between the parts lets them turn */
+    const rb = d / 2, R = rb + tol, ro = rb - 0.25, z0 = 0.8, gp = Math.max(0.8, d * 0.12), rn = Math.max(1, rb * 0.55);
+    const zb = z0 + Math.sqrt(R * R - ro * ro);
+    if (Math.min(reach(1, 0), reach(-1, 0), reach(0, 1), reach(0, -1)) < z0 + ro + 1) throw new Error('Kulový kloub se do řezu nevejde, zmenšete průměr');
+    need(zb + R + 0.8, 'Kulový kloub');
+    if (hDn < gp + 1) throw new Error('Spodní díl je na kloub příliš tenký');
+    lower = KK.boolean(bot, cutTool({}, n, w - gp, bb), 'subtract');
+    /* both faces at the joint slope away from the ball a little (a shallow cone), so the parts can tilt */
+    const beta = Math.max(0, Math.min(25, (Number(f.angle) || 30) / 2 - 2)) * Math.PI / 180;
+    if (beta > 0.01) {
+      const Rb = Math.max(reach(1, 0), reach(-1, 0), reach(0, 1), reach(0, -1)) + 5, H = Rb * Math.tan(beta);
+      lower = KK.boolean(lower, KK.boolean(lbox(-Rb, Rb, -Rb, Rb, -gp - H, -gp + 0.01), coneX(P(0, 0, -gp - H), n, Rb, 0.01, H), 'subtract'), 'subtract');
+      upper = KK.boolean(upper, KK.boolean(lbox(-Rb, Rb, -Rb, Rb, -0.01, H), coneX(P(0, 0, 0), n, 0.01, Rb, H), 'subtract'), 'subtract');
+    }
+    lower = KK.boolean(lower, KK.boolean(cylN(c, rn, -gp - 0.5, zb), KK.translate(KK.primitive('sphere', { r: rb }), P(0, 0, zb)), 'union'), 'union');
+    upper = KK.boolean(upper, coneX(P(0, 0, -0.01), n, ro + z0 + 0.01, ro - 0.4, z0 + 0.41), 'subtract');
+    upper = KK.boolean(upper, KK.translate(KK.primitive('sphere', { r: R }), P(0, 0, zb)), 'subtract');
+  } else if (kind === 'pin') {
+    /* čepový kloub: knuckles round an axis along u lying in the cut (like a knee): the outer ones belong to the upper
+       part, the middle one to the lower; a pin goes through all of them; V-shaped relief on both sides of the cut lets
+       the parts swing by the given angle either way */
+    const s0 = -reach(-1, 0), s1 = reach(1, 0), L = s1 - s0;
+    let R = Math.min(reach(0, 1), reach(0, -1), hUp - 0.5, hDn - 0.5) * 0.97;
+    const g = tol + 0.15, gk = tol + 0.2, rp = Math.min(d / 2, R * 0.45);
+    if (R < 2 || L < 6 * gk + 3) throw new Error('Řez je na čepový kloub příliš malý');
+    if (rp < 0.8) throw new Error('Čep je příliš tenký');
+    const xa = s0 + L * 0.3, xb = s1 - L * 0.3, h = gk / 2, E = L + 10;
+    const C = (a, b, r) => cylAlong(P(a, 0, 0), u, r, b - a);
+    const beta = Math.max(5, Math.min(60, Number(f.angle) || 30)) / 2 * Math.PI / 180, Y = Math.max(reach(0, 1), reach(0, -1)) + 5, tz = Y * Math.tan(beta);
+    const wedge = sg => KK.boolean(sprism([[0, -sg * 0.01], [Y, -sg * 0.01], [Y, sg * tz]], -E, E), sprism([[0, -sg * 0.01], [-Y, sg * tz], [-Y, -sg * 0.01]], -E, E), 'union');
+    let up = KK.boolean(top, C(xa - h, xb + h, R + g), 'subtract'); up = KK.boolean(up, wedge(1), 'subtract');
+    up = KK.boolean(up, KK.boolean(KK.boolean(C(s0 - 1, xa - h, R), C(xb + h, s1 + 1, R), 'union'), polys, 'intersect'), 'union');
+    let lo = KK.boolean(bot, KK.boolean(C(s0 - 1, xa + h, R + g), C(xb - h, s1 + 1, R + g), 'union'), 'subtract'); lo = KK.boolean(lo, wedge(-1), 'subtract');
+    lo = KK.boolean(lo, KK.boolean(C(xa + h, xb - h, R), polys, 'intersect'), 'union');
+    const hole = C(s0 - 2, s1 + 2, rp + tol);
+    upper = KK.boolean(up, hole, 'subtract'); lower = KK.boolean(lo, hole, 'subtract');
+    extra.push({ name: 'Čep', polys: cylAlong([0, 0, 0], [0, 0, 1], rp, Math.max(2, L - 0.6)) });
+  } else throw new Error('Neznámý typ konektoru');
+  if (!lower.length || !upper.length) throw new Error('Konektor se nepodařilo vytvořit');
+  return { lower, upper, pegs: extra.map(x => x.polys), extra, n, w, c, u, v };
 }
 /* ---------- Kloubový model: a body cut into segments joined by print-in-place hinges ----------
    The segments swing about vertical axes (they lie on the bed and move in the bed's plane, like an articulated snake or
@@ -1581,7 +1674,8 @@ function articulateCore(polys, f) {
     return KK.transform(polysR, [Rm[0][0], Rm[1][0], Rm[2][0], 0, Rm[0][1], Rm[1][1], Rm[2][1], 0, Rm[0][2], Rm[1][2], Rm[2][2], 0, tr[0], tr[1], tr[2], 1]);
   };
   const rotZ = (polysR, P, ang) => { const c = Math.cos(ang), sn = Math.sin(ang); return KK.transform(polysR, [c, sn, 0, 0, -sn, c, 0, 0, 0, 0, 1, 0, P[0] - c * P[0] + sn * P[1], P[1] - sn * P[0] - c * P[1], 0, 1]); };
-  const at = Array.isArray(f.at) && f.at.length ? f.at.map(Number).sort((p, q) => p - q) : Array.from({ length: n }, (_, i) => bb.min[a] + L * (i + 1) / (n + 1));
+  const at = Array.isArray(f.at) && f.at.length ? f.at.map(Number).filter(x => x > bb.min[a] + 1 && x < bb.max[a] - 1).sort((p, q) => p - q) : Array.from({ length: n }, (_, i) => bb.min[a] + L * (i + 1) / (n + 1));
+  if (!at.length) throw new Error('Žádná z čar neprotíná článkovanou část tělesa');
   const out = []; let rest = polys;
   const I = (p, q) => KK.boolean(p, q, 'intersect'), U = (p, q) => KK.boolean(p, q, 'union'), S = (p, q) => KK.boolean(p, q, 'subtract');
   /* a box given per axis: [chain axis range], [side axis range], [z range] */
@@ -2037,7 +2131,7 @@ function step(state, f) {
       const b = bodies.find(x => x.id === f.body);
       if (!b) throw new Error('Těleso neexistuje');
       const r = pegSplit(b.polys, f), added = [{ id: f.id, name: (b.name || 'Těleso') + ' – horní díl', polys: r.upper, from: f.id }];
-      r.pegs.forEach((p, i) => added.push({ id: f.id + '_k' + (i + 1), name: 'Kolík ' + (i + 1), polys: KK.translate(p, [0, 0, 0]), from: f.id }));
+      r.extra.forEach((p, i) => added.push({ id: f.id + '_k' + (i + 1), name: p.name + (r.extra.length > 1 ? ' ' + (i + 1) : ''), polys: p.polys, from: f.id }));
       /* loose pegs lie beside the model */
       const bb = KK.bbox(b.polys); let x = bb.max[0] + 6;
       for (const q of added.slice(1)) { const pb = KK.bbox(q.polys); q.polys = KK.translate(q.polys, [x - pb.min[0], bb.min[1] - pb.min[1], -pb.min[2] + bb.min[2]]); x += (pb.max[0] - pb.min[0]) + 4; }

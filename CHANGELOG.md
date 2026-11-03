@@ -1,5 +1,13 @@
 # Changelog
 
+## Beta 1.76
+- **Díly s kolíky → Konektory.** Řez lze zadat kolmo na osu jako dřív, nebo **nakreslit čáru přes model** (dva body; rovina řezu jde čarou ve směru pohledu, takže řežete šikmo i napříč). Typy spoje:
+  - **Kolík** – jako dosud, na spodním dílu nebo samostatné.
+  - **Snap-fit** – rozříznutý kolík se zobáčkem projde zúženým otvorem a zacvakne za osazení v dutině.
+  - **Rybina (dovetail)** – lichoběžníkový výstupek přes celý řez (20°), horní díl se nasune z boku; volba směru podél/napříč.
+  - **Kulový kloub** – koule na krčku zacvakne do jamky s ústím o 0,25 mm užším; mezera a mírně kuželové plochy u spoje dovolí natočení i náklon (podle Natočení kloubu).
+  - **Čepový kloub** – střídající se očka kolem osy v rovině řezu, otvor pro čep (čep se přidá jako samostatné těleso, nebo použijte filament), V odlehčení pro ohyb o zadaný úhel.
+- **Kloubový model – Rozmístění kloubů: Čarami přes model.** Každá nakreslená čára (dva body) určí místo jednoho kloubu; osa řetězu se podle první čáry nastaví sama. Tlačítka Zpět o čáru / Smazat vše.
 ## Beta 1.75
 - **Samec spony se tiskne bez podpěr:** jazyk a pružná ramena s háčky leží na podložce (dřív visela 1,5 mm nad ní, jen přichycená k základně, a bez podpěr by se prověsila). Platí pro samostatnou Sponu i pro spony na koncích řemínku; do samice zapadne stejně.
 ## Beta 1.74
