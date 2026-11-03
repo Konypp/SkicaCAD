@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 1.78
+- **Kloubový model Nahoru/dolů – kuželové čepy:** místo kosočtverečných čepů v drážkách poskládaných po 10° má jazýček na bocích kuželové čepy a ramena kuželové důlky (vše pod 45°, tiskne se bez podpěr). Kloub je kulatý kolem osy, takže se otáčí hladce a bez drhnutí; rozsah ohybu omezují jen tvary článků.
+- **Tisknout po dílech a zacvaknout** (jen u typu Nahoru/dolů, ne se sponou sklápěcí): články se rozloží vedle sebe a tisknou se zvlášť, třeba každý jinou barvou. Čepy jsou nižší a z čela ramen k důlkům vede mělký náběh; jazýček se zasune mezi ramena, ta se rozevřou asi o 0,4 mm a čepy zacvaknou.
+- Ostatní typy kloubů beze změny.
 ## Beta 1.77
 - **Řez tažením myší:** v Konektorech (Způsob řezu › Řez) i v Kloubovém modelu (Rozmístění kloubů › Řezy) se řez kreslí stisknutím levého tlačítka a tažením přes model; po puštění se řez provede. Pohled se v tu chvíli otáčí pravým tlačítkem.
 - **Šikmé řezy u Kloubového modelu:** každý řez může vést šikmo (až 60°), kloub se natočí podle něj. Řez se kreslí na vodorovnou rovinu středem tělesa, takže stojí svisle bez ohledu na pohled. Konektory řežou šikmo podle čáry ve směru pohledu.

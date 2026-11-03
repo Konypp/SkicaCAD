@@ -7271,9 +7271,10 @@ const ORG_MODS = {
     prompt: 'Spodek tělesa se zarovná do roviny, aby postavička stála a dobře se tiskla'
   },
   articulate: {
-    defaults: () => ({ style: 'disc', axis: 'x', place: 'even', lines: [], cnt: 4, gap: 0.4, angle: 30, ends: 'none', bw: 0, bh: 0 }),
-    load: f => ({ style: f.style || 'disc', axis: f.axis || 'x', place: f.lines && f.lines.length ? 'lines' : 'even', lines: (f.lines || []).slice(), cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30, ends: f.ends || 'none', bw: f.bw || 0, bh: f.bh || 0 }),
+    defaults: () => ({ style: 'disc', axis: 'x', place: 'even', lines: [], snap: false, cnt: 4, gap: 0.4, angle: 30, ends: 'none', bw: 0, bh: 0 }),
+    load: f => ({ style: f.style || 'disc', snap: !!f.snap, axis: f.axis || 'x', place: f.lines && f.lines.length ? 'lines' : 'even', lines: (f.lines || []).slice(), cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30, ends: f.ends || 'none', bw: f.bw || 0, bh: f.bh || 0 }),
     fields: v => [{ k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů'], ['ring', 'Očka']].concat(v.style === 'chain' ? [['chain', 'Očka (starší)']] : []), value: v.style }, /* the older bridged eyes only for models that use them */
+      { k: 'chk', id: 'snap', label: 'Tisknout po dílech a zacvaknout', value: v.snap },
       { k: 'seg', id: 'axis', label: 'Řetěz podél osy', options: [['x', 'X'], ['y', 'Y']], value: v.axis },
       { k: 'seg', id: 'place', label: 'Rozmístění kloubů', options: [['even', 'Rovnoměrně'], ['lines', 'Řezy']], value: v.place },
       { k: 'sel', id: 'jl', label: 'Řezy' }, { k: 'btns', id: 'jb', label: '', options: [['undo', 'Zpět o řez'], ['clear', 'Smazat vše']] },
@@ -7284,7 +7285,7 @@ const ORG_MODS = {
       { k: 'note', id: 'tip' }],
     feature: v => {
       const L = v.place === 'lines' ? v.lines : [], a = v.axis === 'y' ? 1 : 0;
-      return { style: v.style, axis: v.axis, n: L.length || Math.max(1, Math.round(v.cnt)), ...(L.length ? { at: L.map(l => l.at !== undefined ? l.at : r3((l.a[a] + l.b[a]) / 2)), ...(L.some(l => l.tilt) ? { tilt: L.map(l => l.tilt || 0) } : {}), lines: L } : {}), gap: v.gap, angle: v.angle, ...(v.ends && v.ends !== 'none' ? { ends: v.ends, bw: v.bw || 0, bh: v.bh || 0 } : {}) };
+      return { style: v.style, ...(v.snap && v.style === 'flex' && v.ends !== 'fold' ? { snap: true } : {}), axis: v.axis, n: L.length || Math.max(1, Math.round(v.cnt)), ...(L.length ? { at: L.map(l => l.at !== undefined ? l.at : r3((l.a[a] + l.b[a]) / 2)), ...(L.some(l => l.tilt) ? { tilt: L.map(l => l.tilt || 0) } : {}), lines: L } : {}), gap: v.gap, angle: v.angle, ...(v.ends && v.ends !== 'none' ? { ends: v.ends, bw: v.bw || 0, bh: v.bh || 0 } : {}) };
     },
     ready: v => v.place !== 'lines' || v.lines.length > 0,
     drawing: c => c.v.place === 'lines',
@@ -7308,6 +7309,7 @@ const ORG_MODS = {
     btn(c, id, v) { if (id !== 'jb') return; if (v === 'undo') c.v.lines.pop(); else c.v.lines = []; },
     layout(c) {
       const ln = c.v.place === 'lines', k = c.v.lines.length;
+      dlg.show('snap', c.v.style === 'flex' && c.v.ends !== 'fold');
       dlg.show('jl', ln); dlg.show('jb', ln && k > 0); dlg.show('cnt', !ln);
       dlg.set('jl', { text: k ? `${k} ${k === 1 ? 'řez' : k < 5 ? 'řezy' : 'řezů'} – tažením přidáte další` : 'Táhněte myší přes model', has: k > 0, active: ln && !!c.body });
       clearGroup(c.dots); if (ln) drawCutLines(c.dots, c.v.lines, c.lp, c.hov);
@@ -7316,16 +7318,16 @@ const ORG_MODS = {
       dlg.set('tip', {
         disc: 'Kotouč: jeden článek končí kulatým kloubem, druhý do něj zasahuje jazýčkem s kotoučem. Klouby se otáčejí kolem svislé osy, články se ohýbají do stran (had, drak, ještěrka).',
         hinge: 'Pant: tři klouby nad sebou jako u dveřního pantu, krajní drží svislý čep procházející prostředním. Otáčí se kolem svislé osy, články se ohýbají do stran.',
-        flex: 'Nahoru/dolů: jako tištěný řemínek hodinek – jazýček článku mezi dvěma rameny sousedního, na bocích kosočtverečné čepy ve V drážkách (vše pod 45°). Články se ohýbají nahoru a dolů, třeba kolem zápěstí; konce jsou z boku kulaté.',
+        flex: 'Nahoru/dolů: jako tištěný řemínek hodinek – jazýček článku mezi dvěma rameny sousedního, na bocích kuželové čepy v kuželových důlcích (vše pod 45°), takže se otáčí hladce. Články se ohýbají nahoru a dolů, třeba kolem zápěstí; konce jsou z boku kulaté.',
         ring: 'Očka: jako tištěné řetízkové hračky – ležaté kulaté očko jednoho článku je provlečené stojatým očkem druhého, každé prochází středem toho druhého. Článek se ohýbá do stran i nahoru a dolů; stojaté očko stojí na podložce, ležaté vede štěrbina a šikmá kosočtverečná dutina.',
         chain: 'Očka: dvě do sebe provlečená oblá očka jako články řetězu, jedno podél, druhé napříč; každé se uzavírá krátkým mostem mezi sloupky na podložce. Spoj má vůli, články se ohýbají do stran i trochu nahoru a dolů.'
-      }[c.v.style] + ' Tiskne se vcelku bez podpěr; po tisku klouby rozhýbejte.' + endsTip + (ln ? ' Řezy: táhněte myší přes model, každý řez určí jeden kloub a může být i šikmý (nejvýš 60°); pohled otočíte pravým tlačítkem.' : ''));
+      }[c.v.style] + (c.v.snap && c.v.style === 'flex' && c.v.ends !== 'fold' ? ' Po dílech: články se rozloží vedle sebe a tisknou se zvlášť (třeba každý jinou barvou), bez podpěr; jazýček pak zasuňte mezi ramena sousedního článku, až kuželové čepy zacvaknou.' : ' Tiskne se vcelku bez podpěr; po tisku klouby rozhýbejte.') + endsTip + (ln ? ' Řezy: táhněte myší přes model, každý řez určí jeden kloub a může být i šikmý (nejvýš 60°); pohled otočíte pravým tlačítkem.' : ''));
     },
     preview(polys, f) {
       const segs = Engine.articulate(polys, f);
       return { polys: segs[0], extra: segs.slice(1), alt: true, note: `${segs.length} článků · kloubů ${segs.length - 1}` };
     },
-    prompt: 'Těleso se rozdělí na články spojené klouby, které se tisknou vcelku (vůle 0,3–0,5 mm podle tiskárny)'
+    prompt: c => (c.v.snap && c.v.style === 'flex' && c.v.ends !== 'fold' ? 'Těleso se rozdělí na články, které se tisknou zvlášť a po tisku se zacvaknou do sebe' : 'Těleso se rozdělí na články spojené klouby, které se tisknou vcelku (vůle 0,3–0,5 mm podle tiskárny)')
   },
   pegsplit: {
     defaults: () => ({ kind: 'peg', mode: 'axis', axis: 'z', at: null, cut: null, n: 1, d: 5, len: 10, tol: 0.2, style: 'attached', angle: 30, dir: 'long' }),
@@ -7446,7 +7448,7 @@ function startOrgMod(type, editIndex, f) {
       if (S.layout) S.layout(this);
       const drawing = !!(this.body && S.drawing && S.drawing(this));
       controls.mouseButtons.RIGHT = drawing ? THREE.MOUSE.ROTATE : THREE.MOUSE.PAN; /* the left button draws the cut */
-      setPrompt(this.body ? (drawing ? 'Táhněte myší přes model – vznikne řez; pohled otočíte pravým tlačítkem' : S.prompt) : 'Klepněte na těleso');
+      setPrompt(this.body ? (drawing ? 'Táhněte myší přes model – vznikne řez; pohled otočíte pravým tlačítkem' : typeof S.prompt === 'function' ? S.prompt(this) : S.prompt) : 'Klepněte na těleso');
       if (!this.body) dlg.okEnabled(false);
       requestRender();
     },

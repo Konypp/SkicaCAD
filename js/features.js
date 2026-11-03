@@ -1576,6 +1576,13 @@ function placeLocal(polys, o, dir) {
 /* the clasp halves replace the ends of the strap (the strap keeps its length): the body is shortened at both ends by
    the length of the clasp parts, jointed, and the parts are joined on, the female at the start, the male at the end */
 function articulate(polys, f) {
+  const out = articulateParts(polys, f);
+  if (!f.snap || f.style !== 'flex' || f.ends === 'fold') return out;
+  /* printed in parts: the links are laid out apart along the chain, to be snapped together after printing */
+  const a = f.axis === 'y' ? 1 : 0; let edge = -Infinity;
+  return out.map(p => { const bb = KK.bbox(p), d = [0, 0, 0]; d[a] = edge === -Infinity ? 0 : Math.max(0, edge + 4 - bb.min[a]); edge = bb.max[a] + d[a]; return d[a] ? KK.translate(p, d) : p; });
+}
+function articulateParts(polys, f) {
   if (f.ends === 'fold') return articulateFold(polys, f);
   if (f.ends !== 'buckle' && f.ends !== 'tongue') return articulateCore(polys, f);
   const a = f.axis === 'y' ? 1 : 0, sAx = 1 - a, bb = KK.bbox(polys);
@@ -1796,25 +1803,21 @@ function articulateCore(polys, f) {
       const outer = S(boxAS([xp - far, xp + far], [sc - far, sc + far], [z0, z1]), boxAS([xp - far, xp + far], [sc - st - g, sc + st + g], [z0, z1]));
       A = I(rest, U(S(halfA, cylG), I(U(cylR, I(cylG, halfA)), outer)));
       B = I(rest, U(S(halfB, cylG), I(U(cylR, I(cylG, halfB)), inner)));
-      /* diamond lugs on the tongue, V grooves in the arms (swept by the swing so the joint turns) */
-      const dp = dp0, pd = Math.min(wa * 0.55, 1.4);
-      const diamond = (h, s0, s1) => {
-        const pts = [[xp - h, zcc], [xp, zcc - h], [xp + h, zcc], [xp, zcc + h]];
-        const Bp = { o: [0, 0, 0], u: ea, v: [0, 0, 1], n: KK.cross(ea, [0, 0, 1]) };
-        const sg = KK.vdot(Bp.n, es) > 0 ? 1 : -1, q = pts.map(([x, z]) => [x, z]);
-        return KK.extrudeProfiles([{ pts: KK.area2D(q) < 0 ? q.slice().reverse() : q, closed: true }], Bp, sg * (s0 - (a === 0 ? 0 : 0)), sg * s1);
-      };
-      const sideBox = (sg, s0, s1) => (sg < 0 ? [sc - s1, sc - s0] : [sc + s0, sc + s1]);
-      const steps = Math.max(2, Math.ceil(th / (10 * Math.PI / 180)));
+      /* cone lugs on the tongue's sides sit in conical seats in the arms: round about the axis, so the joint turns
+         smoothly through any angle, and every face is at 45°, so it prints flat without supports. Printed in parts
+         (f.snap) the lugs are lower and a shallow channel leads from the arms' front ends to the seats: the tongue is
+         pushed in between the arms, which spread a little until the cones click into their seats. */
+      const rb = Math.min(dp0 + 0.2, hz - g * 1.42 - 0.25), rs = rb + g * Math.SQRT2;
+      const pd = Math.min(f.snap ? Math.min(0.8, wa * 0.4) : Math.min(wa * 0.55, 1.4), rb - g - 0.2);
+      if (pd < 0.35) throw new Error('Těleso je v místě kloubu na ohybový kloub příliš malé; použijte méně kloubů');
       for (const sg of [-1, 1]) {
-        const [l0, l1] = sideBox(sg, st - 0.3, st + g + pd);
-        /* a diamond prism placed by its side-axis range */
-        const lug = (h, lo, hi) => { let d = diamond(h, 0, 1); const bbd = KK.bbox(d); const sc0 = bbd.min[sAx], sc1 = bbd.max[sAx]; const m = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]; m[sAx * 5] = (hi - lo) / (sc1 - sc0 || 1); m[12 + sAx] = lo - sc0 * m[sAx * 5]; return KK.transform(d, m); };
-        B = U(B, lug(dp, l0, l1));
-        const [g0, g1] = sideBox(sg, st, st + g + pd + g);
-        let groove = lug(dp + g * 1.42, g0, g1);
-        for (let i = -steps; i <= steps; i++) if (i) groove = U(groove, rotAbout(lug(dp + g * 1.42, g0, g1), Q, es, th * i / steps));
-        A = S(A, groove);
+        const at = s0 => { const o = Q.slice(); o[sAx] = sc + sg * s0; return o; }, dir = es.map(v => v * sg);
+        B = U(B, coneX(at(st - 0.3), dir, rb + 0.3, rb - g - pd, 0.3 + g + pd));
+        A = S(A, coneX(at(st - 0.01), dir, rs + 0.01, rs - 2 * g - pd, 2 * g + pd + 0.01));
+        if (f.snap) { /* lead-in channel, half as deep as the seat */
+          const s0 = st + g - 0.01, s1 = st + g + pd / 2;
+          A = S(A, boxAS([xp, xp + Rr + g + 2], sg < 0 ? [sc - s1, sc - s0] : [sc + s0, sc + s1], [zcc - rs, zcc + rs]));
+        }
       }
     } else if (style === 'hinge') {
       /* a pin hinge with an upright axis, three knuckles (odd count, no axial play): the left segment holds the top and
