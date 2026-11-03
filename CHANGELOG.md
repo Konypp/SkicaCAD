@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 1.82
+- **Očka podle tištěného řetízku:** očko jednoho článku je skloněné o 40° dozadu, očko dalšího stojí podél řetězu a jeho spodek je zploštělý na podložce (jako u zaslaného modelu, změřeno z něj). Výřezy jako na modelu: vpředu svislý výřez do V, kam zapadá stojaté očko, vzadu vodorovná drážka do V pro skloněné očko; přední čelo článku je svislé. Ohyb do stran ±30°, nahoru a dolů ±40°, v tahu drží. U nízkých plochých řemínků zůstává první očko ležaté.
 ## Beta 1.81
 - **Mřížka už neprosvítá tělesy:** při pohledu zespodu (nebo ze šikmého pohledu na spodní plochu ležící na podložce) se čáry mřížky a osy X/Y kreslily přes spodní plochu tělesa, nejvíc to bylo vidět na vybraném tělese. Mřížka a osy se teď kreslí pod tělesy, takže je tělesa vždy zakryjí.
 ## Beta 1.80

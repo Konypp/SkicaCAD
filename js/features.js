@@ -1728,41 +1728,48 @@ function articulateCore(polys, f) {
     const z0 = zc - BIG / 2, z1 = zc + BIG / 2, far = BIG / 2;
     let A, B;
     if (style === 'ring') {
-      /* Očka (like printed chain toys): two round rings interlocked like chain links, both in planes along the chain and
-         at right angles to each other. Each passes through the other's centre, so the right segment turns about the
-         axis of the left ring (through its centre PA) and about the axis of the right ring (through PB); both turns
-         spin the rings within themselves, so only the bodies' faces limit the swing. Where the section allows, both
-         rings stand tilted 45° to the sides (like the printed chains: no ring lies flat, every face prints without
-         supports); on flat straps one ring lies flat and the other stands on the bed. The left segment ends at PA, the
-         right one starts at PB; a bore round PA and a diamond (45°) round PB give the rings room. */
-      const zmin = sec.min[2], m = Math.min(hw, zs / 2);
-      const r45 = Math.min(((m - 0.3) / Math.SQRT1_2 - g - 0.3) / 4, 2.2), tilted = r45 >= 0.8;
-      const r = tilted ? r45 : Math.min((hw - 2 * g - 1.1) / 3, (zs / 2 - g - 0.3) / 3, 2.2);
+      /* Očka (after the printed chain toys): two round rings interlocked like chain links at right angles; each passes
+         through the other's centre. The left segment's ring A leans back 40° (its plane holds the axis across), the
+         right segment's ring B stands upright along the chain, its bottom flattened on the bed; on flat straps that
+         are too low for that, A lies flat instead. The right segment turns about A's axis through A's centre PA (bends
+         sideways) and about the axis across through B's centre PB (bends up and down); both turns spin the rings within
+         themselves, so only the bodies' faces limit the swing. The cut-outs are as on the toys, all faces at 45° or
+         steeper: a V notch in the front of the left segment along A's axis, where B passes, and a V groove across the
+         back of the right segment, where A passes. */
+      const zmin = sec.min[2];
+      let r = Math.min((hw - g - 0.6) / 3, (zs - 2 * g - 0.6) / 5.5, 2.2), lean = r >= 0.75;
+      if (!lean) r = Math.min((hw - 2 * g - 1.1) / 3, (zs / 2 - g - 0.3) / 3, 2.2);
       if (!(r >= 0.7)) throw new Error('Těleso je v místě kloubu na očka příliš malé; použijte méně kloubů nebo jiný typ');
-      const R = 2 * r + g + 0.3, zr = tilted ? zc : zmin + R + r, cl = r + g + 0.5;
-      const PA = [0, 0, zr], PB = [0, 0, zr]; PA[a] = xp - R / 2; PA[sAx] = sc; PB[a] = xp + R / 2; PB[sAx] = sc;
-      /* the axes: of the left ring e1 (upright, or tilted 45°), of the right ring e2 (across, or tilted the other way) */
-      const q = tilted ? Math.PI / 4 : 0, ez = [0, 0, 1];
-      const e1 = [0, 1, 2].map(k => ez[k] * Math.cos(q) + es[k] * Math.sin(q)), e2 = [0, 1, 2].map(k => es[k] * Math.cos(q) - ez[k] * Math.sin(q));
+      const R = 2 * r + g + 0.3, cl = r + g + 0.4, be = lean ? 40 * Math.PI / 180 : 0, ez = [0, 0, 1];
+      const u = [0, 1, 2].map(k => ea[k] * Math.cos(be) + ez[k] * Math.sin(be)); /* from PA to PB */
+      const e1 = [0, 1, 2].map(k => ez[k] * Math.cos(be) - ea[k] * Math.sin(be)), e2 = es;
+      const PB = [0, 0, zmin + R + (lean ? 0.5 : 1) * r]; PB[a] = xp + R * Math.cos(be) / 2; PB[sAx] = sc;
+      const PA = PB.map((v, k) => v - R * u[k]);
       const toAxis = (P, ax) => { /* a torus about axis ax */
         const t = KK.primitive('torus', { R, t: r }), c = KK.cross([0, 0, 1], ax), sn = Math.hypot(...c), cs = ax[2];
         return KK.translate(sn < 1e-9 ? t : rotAbout(t, [0, 0, 0], c.map(v => v / sn), Math.atan2(sn, cs)), P);
       };
-      const ringA = toAxis(PA, e1), ringB = toAxis(PB, e2);
-      const planeAbout = ax => ({ o: [0, 0, 0], u: ea, v: KK.cross(ax, ea), n: ax });
-      const wedgeAx = (Q, ax, dirSign) => { /* keeps the side of dirSign within ±alpha of the chain about axis ax */
-        const B0 = planeAbout(ax), qu = KK.vdot(Q, B0.u), qv = KK.vdot(Q, B0.v), qn = KK.vdot(Q, B0.n), pts = [[qu, qv]], M = 24;
-        for (let i = 0; i <= M; i++) { const ang = -alpha + 2 * alpha * i / M; pts.push([qu + Math.cos(ang) * dirSign * BIG, qv + Math.sin(ang) * BIG]); }
-        if (KK.area2D(pts) < 0) pts.reverse();
-        return KK.extrudeProfiles([{ pts, closed: true }], B0, qn - BIG, qn + BIG);
+      const bed = boxAS([xp - far, xp + far], [sc - far, sc + far], [zmin, z1]);
+      const ringA = I(toAxis(PA, e1), bed), ringB = I(toAxis(PB, e2), bed);
+      const frame = (ax, dir) => ({ o: [0, 0, 0], u: dir, v: KK.cross(ax, dir), n: ax });
+      const prism = (B0, Q, pts, h) => { /* a prism of a 2D outline around Q in frame B0, h along its normal both ways */
+        const qu = KK.vdot(Q, B0.u), qv = KK.vdot(Q, B0.v), qn = KK.vdot(Q, B0.n), P2 = pts.map(([x, y]) => [qu + x, qv + y]);
+        return KK.extrudeProfiles([{ pts: KK.area2D(P2) < 0 ? P2.reverse() : P2, closed: true }], B0, qn - h, qn + h);
       };
-      const B2 = planeAbout(e2), D = cl * Math.SQRT2, du = KK.vdot(PB, B2.u), dv = KK.vdot(PB, B2.v), dn = KK.vdot(PB, B2.n);
-      const dia = KK.extrudeProfiles([{ pts: [[du - D, dv], [du, dv - D], [du + D, dv], [du, dv + D]], closed: true }], B2, dn - (R + r + g), dn + (R + r + g));
-      const bore = cylAlong(PA.map((v, k) => v - e1[k] * BIG / 2), e1, cl, BIG);
-      A = I(I(I(rest, boxAS([xp - far * 2, xp], [sc - far, sc + far], [z0, z1])), wedgeAx(PA, e1, -1)), wedgeAx(PB, e2, -1));
-      A = U(S(A, bore), ringA);
-      B = I(I(I(rest, boxAS([xp, xp + far * 2], [sc - far, sc + far], [z0, z1])), wedgeAx(PA, e1, 1)), wedgeAx(PB, e2, 1));
-      B = U(S(B, KK.fixOrientation(dia)), ringB);
+      const wedgeAx = (Q, ax, dirSign) => { /* keeps the side dirSign within ±alpha of the chain, about axis ax */
+        const pts = [[0, 0]], M = 24;
+        for (let i = 0; i <= M; i++) { const t = -alpha + 2 * alpha * i / M; pts.push([Math.cos(t) * dirSign * BIG, Math.sin(t) * BIG]); }
+        return prism(frame(ax, Math.abs(KK.vdot(ax, u)) < 1e-6 ? u : ea), Q, pts, BIG);
+      };
+      const V = (B0, Q, dist, open, h) => prism(B0, Q, [[-dist * open, 0], [-dist * open + open * BIG, BIG], [-dist * open + open * BIG, -BIG]], h);
+      /* the left segment's front is upright (as on the toys): ring B reaches back past PA by R(1 − cos 40°) at most */
+      const back = R * (1 - Math.cos(be)), PF = PA.slice(); PF[a] -= back;
+      const notch = V(frame(ez, ea), PF, cl * Math.SQRT2, 1, BIG);       /* apex behind PA, open forwards, upright */
+      const groove = V(frame(es, ea), PB, cl * Math.SQRT2, -1, R + r + g + 0.5); /* apex ahead of PB, open backwards */
+      A = I(I(I(rest, boxAS([xp - far * 2, xp], [sc - far, sc + far], [z0, z1])), wedgeAx(PF, ez, -1)), wedgeAx(PB, e2, -1));
+      A = U(S(A, notch), ringA);
+      B = I(I(I(rest, boxAS([xp, xp + far * 2], [sc - far, sc + far], [z0, z1])), wedgeAx(PF, ez, 1)), wedgeAx(PB, e2, 1));
+      B = U(S(B, groove), ringB);
     } else if (style === 'chain') {
       /* two interlocked eyes, like chain links printed flat: an upright ring of the left segment along the chain and an
          upright ring of the right segment across it, alternating orientation. Every bar that closes a ring is a short
