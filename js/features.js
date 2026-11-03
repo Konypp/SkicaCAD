@@ -23,7 +23,7 @@ function libPolys(f) {
 }
 /* ready-made joints: a short bar (a block or a lying cylinder) cut in the middle by the chosen joint of the jointed
    model, printed in place; the user joins each half to a model of their own */
-const JOINT_PARTS = { disc: 'Kotoučový kloub', hinge: 'Pantový kloub', flex: 'Kloub nahoru/dolů', ball: 'Kulový kloub', flexi: 'Kloub Flexi' };
+const JOINT_PARTS = { disc: 'Kotoučový kloub', hinge: 'Pantový kloub', flex: 'Kloub nahoru/dolů', ball: 'Kulový kloub', flexi: 'Kloub Flexi', loop: 'Očka' };
 const jointCache = new Map();
 function jointParts(f) {
   const style = f.style in JOINT_PARTS ? f.style : 'disc', round = f.shape === 'round';
@@ -1847,6 +1847,8 @@ function articulateOblique(polys, f) {
 }
 /* the FlexiJoint cutter with its flat faces rebuilt as whole polygons (the mesh had vertices inside them, which then
    stayed in the cut faces and folded when a neighbouring face was moved) */
+let loopCache = null;
+function loopParts() { return loopCache || (loopCache = { a: libPolys({ key: 'loopA' }), b: libPolys({ key: 'loopB' }) }); }
 let flexiCache = null;
 const FLEXI_LOW = -7.7; /* the cup's lowest point below the cutter's centre: it is put 0.3 mm (scaled) under the bed, so the upright eye stands on the bed, coming out of the bottom wall */
 function flexiTool() {
@@ -1914,7 +1916,41 @@ function articulateCore(polys, f) {
     const P = [0, 0, 0]; P[a] = xp; P[sAx] = sc;
     const z0 = zc - BIG / 2, z1 = zc + BIG / 2, far = BIG / 2;
     let A, B;
-    if (style === 'flexi') {
+    if (style === 'loop') {
+      /* Očka (after the printed flexi toys the user sent): the left segment's front has an upright V notch (45°) and a
+         handle – an arc lying across the notch's mouth, rising slightly forwards; the right segment's back has a level V
+         groove (45°) and a staple – an upright bar in the notch joined at the bed and at the top to the right segment.
+         The handle and the staple are taken from that model (js/partslib.js, loopA and loopB, in its frame: the left
+         face at x = 0, the bed at z = 0), the notch and groove are made here; all of it scaled to the section and
+         standing on the bed. The handle passes round the bar and through the groove, so the joint bends both ways. */
+      const zb = sec.min[2], ez = [0, 0, 1], ey = KK.cross(ez, ea), parts = loopParts();
+      const at = (k, Pc) => [ea[0] * k, ea[1] * k, ea[2] * k, 0, ey[0] * k, ey[1] * k, ey[2] * k, 0, 0, 0, k, 0, Pc[0], Pc[1], Pc[2], 1];
+      const O = [0, 0, zb]; O[a] = xp; O[sAx] = sc;
+      const make = k => {
+        const M = at(k, O), arc = KK.transform(parts.a, M), staple = KK.transform(parts.b, M);
+        const Q = O.slice(); Q[a] = xp - 2.09 * k;
+        const notch = wedge(Q, 1, Math.PI / 4);
+        const G = O.slice(); G[a] = xp + 3.63 * k; G[2] = zb + 2.97 * k;
+        const XZ = { o: [0, 0, 0], u: ea, v: ez, n: KK.cross(ea, ez) };
+        const gp = [[G[a], G[2]], [G[a] - BIG, G[2] + BIG], [G[a] - BIG, G[2] - BIG]], nv = KK.vdot(XZ.n, G);
+        const groove = KK.fixOrientation(KK.extrudeProfiles([{ pts: KK.area2D(gp) < 0 ? gp.reverse() : gp, closed: true }], XZ, nv - BIG, nv + BIG));
+        return { arc, staple, notch, groove };
+      };
+      /* largest size (up to 2×) whose handle and staple lie wholly inside the body */
+      let k = Math.min(2, zs / 7.22, hw / 4.37), J = null;
+      for (; k >= 0.6; k *= 0.92) {
+        const T = make(k), va = KK.signedVolume(T.arc), vb = KK.signedVolume(T.staple);
+        const ia = I(T.arc, rest), ib = I(T.staple, rest);
+        if (ia.length && ib.length && KK.signedVolume(ia) > 0.995 * va && KK.signedVolume(ib) > 0.995 * vb) { J = T; J.arc = ia; J.staple = ib; break; }
+      }
+      if (!J) throw new Error('Těleso je v místě kloubu na očka příliš malé; použijte méně kloubů nebo jiný typ');
+      if (Array.isArray(f._dbg)) f._dbg.push({ k, O });
+      A = U(S(I(rest, boxAS([xp - far * 2, xp], [sc - far, sc + far], [z0, z1])), J.notch), J.arc);
+      /* room to bend sideways: the left segment's front is cut back in a V about the staple's bar, outside the handle */
+      const Pb = O.slice(); Pb[a] = xp - 0.25 * k; Pb[2] = 0;
+      A = S(A, S(wedge(Pb, 1, Math.PI / 2 + th + 2 * Math.PI / 180), vcyl(Pb, 3.3 * k, z0, z1)));
+      B = U(S(I(rest, boxAS([xp + 1.07 * k, xp + far * 2], [sc - far, sc + far], [z0, z1])), J.groove), J.staple);
+    } else if (style === 'flexi') {
       /* Flexi: the cutter of the FlexiJoint maker (js/partslib.js, flexneg) is taken away from the body at the joint: a
          thin disc (the gap between the segments) with a cup round a ball in its middle, so what is left is two segments
          held together by the ball in the cup, printed in one piece. The cutter stands across the chain at the joint,
@@ -2215,7 +2251,7 @@ function articulateCore(polys, f) {
          across the body's surface, which showed as dark streaks on round bodies */
       const keep = vcyl(P, hw * 0.92 + g, z0, z1), cutV = (sg, al) => S(wedge(P, sg, Math.PI - al), keep);
       A = S(A, cutV(1, Math.PI / 2 - th - 2 * Math.PI / 180));
-    } else if (style !== 'chain' && style !== 'flex' && style !== 'ball' && style !== 'flexi') {
+    } else if (style !== 'chain' && style !== 'flex' && style !== 'ball' && style !== 'flexi' && style !== 'loop') {
       const keep = vcyl(P, hw * 0.92 + g, z0, z1), cutV = (sg, al) => S(wedge(P, sg, Math.PI - al), keep);
       A = S(A, cutV(1, alpha));
       B = S(B, cutV(-1, alpha));
