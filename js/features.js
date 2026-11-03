@@ -1848,15 +1848,20 @@ function articulateCore(polys, f) {
       };
       let L = null;
       const r0 = Math.min((hw - g - 0.6) / 3, (zs - 2 * g - 0.6) / 5.5, 2.2), r1 = Math.min((hw - 2 * g - 1.1) / 3, (zs / 2 - g - 0.3) / 3, 2.2);
-      for (const [lean, rmax] of [[true, r0], [false, r1]]) {
-        for (let rt = rmax; !L && rt >= 0.7; rt *= 0.88) for (const mid of [false, true]) {
-          const T = layout(lean, rt, mid);
-          if (ringFits(T.PA, T.e1, T.R, rt) && ringFits(T.PB, es, T.R, rt)) { L = T; break; }
+      /* first with the standing ring on the bed (as on the toys), only then lifted to the widest height */
+      for (const mid of [false, true]) {
+        for (const [lean, rmax] of [[true, r0], [false, r1]]) {
+          for (let rt = rmax; !L && rt >= 0.7; rt *= 0.88) {
+            const T = layout(lean, rt, mid);
+            if (ringFits(T.PA, T.e1, T.R, rt) && ringFits(T.PB, es, T.R, rt)) L = T;
+          }
+          if (L) break;
         }
         if (L) break;
       }
       if (!L) throw new Error('Těleso je v místě kloubu na očka příliš malé; použijte méně kloubů nebo jiný typ');
       const { R, r, be, u, e1, PA, PB } = L, e2 = es, cl = r + g + 0.4;
+      if (Array.isArray(f._dbg)) f._dbg.push(L);
       const toAxis = (P, ax) => { /* a torus about axis ax */
         const t = KK.primitive('torus', { R, t: r }), c = KK.cross([0, 0, 1], ax), sn = Math.hypot(...c), cs = ax[2];
         return KK.translate(sn < 1e-9 ? t : rotAbout(t, [0, 0, 0], c.map(v => v / sn), Math.atan2(sn, cs)), P);
@@ -1871,7 +1876,7 @@ function articulateCore(polys, f) {
       const wedgeAx = (Q, ax, dirSign) => { /* keeps the side dirSign within ±alpha of the chain, about axis ax */
         const pts = [[0, 0]], M = 24;
         for (let i = 0; i <= M; i++) { const t = -alpha + 2 * alpha * i / M; pts.push([Math.cos(t) * dirSign * BIG, Math.sin(t) * BIG]); }
-        return prism(frame(ax, Math.abs(KK.vdot(ax, u)) < 1e-6 ? u : ea), Q, pts, BIG);
+        return prism(frame(ax, ea), Q, pts, BIG); /* the gap's bisector runs along the chain (level), not along u */
       };
       const V = (B0, Q, dist, open, h) => prism(B0, Q, [[-dist * open, 0], [-dist * open + open * BIG, BIG], [-dist * open + open * BIG, -BIG]], h);
       /* the left segment's front is upright (as on the toys): ring B reaches back past PA by R(1 − cos 40°) at most */

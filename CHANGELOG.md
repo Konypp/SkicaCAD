@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 1.85
+- **Očka bez velkých ořezů:** spára mezi články se už neotevírá šikmo podle skloněného očka (to ořezávalo velký klín ze spodku jednoho a z vrchu druhého článku), ale vodorovně a jen o úhel natočení – z modelu zůstanou jen výřezy pro očka a pro ohyb. Stojaté očko se přednostně opírá o podložku (zploštělý spodek); výš se zvedne jen tam, kde by jinak vylezlo z tělesa. Ohyb ±30° do stran i nahoru a dolů, v tahu drží.
 ## Beta 1.84
 - **Očka už nepřesahují model:** velikost a výška oček se volí podle skutečného průřezu tělesa – vyzkouší se několik rozložení od největšího a vezme se první, při kterém obě očka (i se stěnou 0,3 mm) leží celá uvnitř tělesa. U kulatých těles (ležící válec, had) se očka zmenší nebo posunou do výšky, kde je těleso nejširší.
 ## Beta 1.83
