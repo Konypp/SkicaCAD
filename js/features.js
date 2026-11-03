@@ -7,7 +7,7 @@ const PLANES = {
   XZ: { o: [0, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] },
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
-const FEATURE_LABEL = { buckle: 'Spona', articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Konektory', libpart: 'Vložený díl', curvecut: 'Rozříznout křivkou', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
+const FEATURE_LABEL = { buckle: 'Spona', articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Konektory', libpart: 'Vložený díl', jointpart: 'Kloubový spoj', curvecut: 'Rozříznout křivkou', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
   fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
@@ -20,6 +20,26 @@ function libPolys(f) {
   if (!base) { const L = typeof PARTS_LIB !== 'undefined' ? PARTS_LIB : (typeof window !== 'undefined' ? window.PARTS_LIB : null); if (!L || !L[key]) throw new Error('Knihovna dílů chybí'); base = KK.unpack(L[key]); libCache.set(key, base); }
   const s = (Number(f.scale) > 0 ? Number(f.scale) : 100) / 100, a = (Number(f.rot) || 0) * Math.PI / 180, c = Math.cos(a) * s, sn = Math.sin(a) * s, p = (f.pos || [0, 0, 0]).map(Number);
   return KK.transform(base, [c, sn, 0, 0, -sn, c, 0, 0, 0, 0, s, 0, p[0], p[1], p[2], 1]);
+}
+/* ready-made joints: a short bar (a block or a lying cylinder) cut in the middle by the chosen joint of the jointed
+   model, printed in place; the user joins each half to a model of their own */
+const JOINT_PARTS = { disc: 'Kotoučový kloub', hinge: 'Pantový kloub', flex: 'Kloub nahoru/dolů', ball: 'Kulový kloub' };
+const jointCache = new Map();
+function jointParts(f) {
+  const style = f.style in JOINT_PARTS ? f.style : 'disc', round = f.shape === 'round';
+  const L = Math.max(10, Math.min(400, Number(f.len) || 60)), H = Math.max(3, Math.min(200, Number(f.h) || 14)), W = round ? H : Math.max(3, Math.min(200, Number(f.w) || 20));
+  const opt = { style, axis: 'x', n: 1, at: [0], gap: Number(f.gap) || 0.4, angle: Number(f.angle) || 30, ...(f.snap && style === 'flex' ? { snap: true } : {}) };
+  const key = JSON.stringify([round, L, W, H, opt]);
+  let segs = jointCache.get(key);
+  if (!segs) {
+    const bar = round ? KK.transform(KK.primitive('cylinder', { r: H / 2, h: L }), [0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, H / 2, 1])
+      : KK.translate(KK.primitive('box', { w: L, d: W, h: H }), [0, 0, H / 2]);
+    segs = articulate(bar, opt);
+    if (jointCache.size > 24) jointCache.clear();
+    jointCache.set(key, segs);
+  }
+  const a = (Number(f.rot) || 0) * Math.PI / 180, c = Math.cos(a), sn = Math.sin(a), p = (f.pos || [0, 0, 0]).map(Number);
+  return segs.map(P => KK.transform(P, [c, sn, 0, 0, -sn, c, 0, 0, 0, 0, 1, 0, p[0], p[1], p[2], 1]));
 }
 function blobPolys(id) {
   if (blobCache.has(id)) return blobCache.get(id);
@@ -1825,6 +1845,11 @@ function articulateOblique(polys, f) {
   out.push(rest);
   return out;
 }
+/* a point-in-solid test by ray parity (one fixed skew direction) */
+function insideTest(polys) {
+  const dir = KK.vnorm([0.5773, 0.6131, 0.5401]), list = polys.map(p => ({ p, dn: KK.vdot(p.n, dir) }));
+  return q => { let k = 0; for (const { p, dn } of list) { if (Math.abs(dn) < 1e-12) continue; const t = (p.w - KK.vdot(p.n, q)) / dn; if (t <= 1e-9) continue; if (KK.pointInConvex([q[0] + t * dir[0], q[1] + t * dir[1], q[2] + t * dir[2]], p, 1e-9)) k++; } return k % 2 === 1; };
+}
 function articulateCore(polys, f) {
   if (Array.isArray(f.at) && (Array.isArray(f.atS) || (Array.isArray(f.tilt) && f.tilt.some(t => Math.abs(Number(t) || 0) > 0.5)))) return articulateOblique(polys, f);
   const a = f.axis === 'y' ? 1 : 0, sAx = 1 - a, bb = KK.bbox(polys), g = Math.max(0.15, Number(f.gap) || 0.4);
@@ -1874,17 +1899,41 @@ function articulateCore(polys, f) {
          clearance all round, so the right segment turns about every axis (sideways, up and down, and twists). The
          socket's roof is a 45° tent, the ball has a small flat underside just above the socket's floor, the neck is a
          diamond (45° faces) and the mouth a cone, so it prints without supports; the mouth is narrower than the ball. */
-      const rb = Math.min(hw - g - 1.6, (zs - 2.4) / (1 + Math.SQRT2) - g, 12);
-      if (!(rb >= 2)) throw new Error('Těleso je v místě kloubu na kulový kloub příliš malé; použijte méně kloubů nebo jiný typ');
-      const R = rb + g, C = [0, 0, sec.min[2] + 1.2 + R]; C[a] = xp + R + 1.2; C[sAx] = sc;
       /* the swing of a ball joint is held to 25°: the mouth must stay narrower than the ball while the neck sweeps it */
-      const thB = Math.min(th, 25 * Math.PI / 180), dirA = ea.map(v => -v), rn = 0.28 * rb;
+      const thB = Math.min(th, 25 * Math.PI / 180), dirA = ea.map(v => -v), sw = thB + Math.PI / 180;
+      /* the socket (with a wall round it) must lie wholly inside the body: on a round body (cylinder, sphere) the section
+         narrows away from its middle, so sizes and heights are tried, largest first, until the socket, its roof and the
+         mouth on the face all keep inside */
+      const inside = insideTest(rest), wall = 0.9;
+      const fits = (C, R, rn) => {
+        const del = (rn + g) / Math.sin(sw), D = [];
+        for (let i = 0; i < 16; i++) for (let j = 1; j < 8; j++) { const t = i / 16 * 2 * Math.PI, f2 = j / 8 * Math.PI, r = R + wall; D.push([r * Math.sin(f2) * Math.cos(t), r * Math.sin(f2) * Math.sin(t), r * Math.cos(f2)]); }
+        D.push([0, 0, R * Math.SQRT2 + wall], [0, 0, -R - wall]);
+        for (const d of D) { const q = [C[0] + d[0], C[1] + d[1], C[2] + d[2]]; if (!inside(q)) return false; }
+        /* the mouth where it meets the face, and half-way to the socket */
+        for (const xf of [xp + 0.05, (xp + C[a] - R) / 2]) {
+          const rf = (del + C[a] - xf) * Math.tan(sw) + wall;
+          for (let i = 0; i < 16; i++) { const t = i / 16 * 2 * Math.PI, q = [0, 0, C[2] + rf * Math.sin(t)]; q[a] = xf; q[sAx] = sc + rf * Math.cos(t); if (!inside(q)) return false; }
+        }
+        return true;
+      };
+      let rb = Math.min(hw - g - 1.6, (zs - 2.4) / (1 + Math.SQRT2) - g, 12), R = 0, C = null;
+      for (; rb >= 2 && !C; rb *= 0.93) {
+        R = rb + g;
+        for (const cz of [zc - (Math.SQRT2 - 1) * R / 2, sec.min[2] + 1.2 + R]) {
+          const T = [0, 0, cz]; T[a] = xp + R + 1.2; T[sAx] = sc;
+          if (fits(T, R, 0.28 * rb)) { C = T; break; }
+        }
+        if (C) break;
+      }
+      if (!C) throw new Error('Těleso je v místě kloubu na kulový kloub příliš malé; použijte méně kloubů nebo jiný typ');
+      const rn = 0.28 * rb;
       /* socket: sphere, 45° tent above it, a cone mouth towards the left segment */
       const tentH = R * Math.SQRT1_2;
       let sock = KK.translate(KK.primitive('sphere', { r: R }), C);
       sock = U(sock, KK.translate(KK.primitive('cone', { r: R * Math.SQRT1_2 + 0.01, rt: 0.01, h: tentH + 0.01 }), [C[0], C[1], C[2] + tentH + (tentH + 0.01) / 2]));
       /* the mouth: the cone the neck sweeps, i.e. of half-angle = swing, its apex moved back so the neck's thickness fits */
-      const sw = thB + Math.PI / 180, del = (rn + g) / Math.sin(sw), mouthLen = del + (C[a] - xp) + 2;
+      const del = (rn + g) / Math.sin(sw), mouthLen = del + (C[a] - xp) + 2;
       const mouth = coneX(C.map((v, k) => v + ea[k] * del), dirA, 0.01, mouthLen * Math.tan(sw), mouthLen);
       sock = U(sock, mouth);
       /* ball (flat underside near the floor) and the diamond neck back into the left segment */
@@ -2187,6 +2236,11 @@ function step(state, f) {
       else out = bodies.concat([{ id: f.id, name, polys: libPolys(f), from: f.id }]);
       break;
     }
+    case 'jointpart': {
+      const name = JOINT_PARTS[f.style] || JOINT_PARTS.disc;
+      out = bodies.concat(jointParts(f).map((polys, i) => ({ id: f.id + (i ? '_' + i : ''), name: name + ' – díl ' + (i + 1), polys, from: f.id })));
+      break;
+    }
     case 'import':
       out = applyTool(bodies, f, importPolys(f), polys => ({ id: f.id, name: f.name || ('Import ' + (++n)), polys, from: f.id })); break;
     case 'mirror': case 'pattern': {
@@ -2471,7 +2525,7 @@ function makeRebuilder() {
   };
 }
 
-return { LIB_PARTS, libPolys, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

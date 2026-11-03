@@ -1119,7 +1119,7 @@ function featureTitle(i) {
   let n = 0; for (let j = 0; j <= i; j++) if (doc.features[j].type === f.type) n++;
   return Engine.FEATURE_LABEL[f.type] + ' ' + n;
 }
-const TL_ICON = { buckle: 'buckle', libpart: 'articulate', articulate: 'articulate', blob: 'blob', skin: 'skin', sweep: 'sweep', loft: 'loft', deform: 'deform', lattice: 'lattice', softmove: 'softmove', subdiv: 'subdiv', sculpt: 'sculpt', remesh: 'remesh', hollow: 'hollow', flatbase: 'flatbase', pegsplit: 'pegsplit', text3d: 'sktext', movefaces: 'pressface', shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', curvecut: 'curvecut', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
+const TL_ICON = { buckle: 'buckle', libpart: 'articulate', jointpart: 'articulate', articulate: 'articulate', blob: 'blob', skin: 'skin', sweep: 'sweep', loft: 'loft', deform: 'deform', lattice: 'lattice', softmove: 'softmove', subdiv: 'subdiv', sculpt: 'sculpt', remesh: 'remesh', hollow: 'hollow', flatbase: 'flatbase', pegsplit: 'pegsplit', text3d: 'sktext', movefaces: 'pressface', shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', curvecut: 'curvecut', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
 function renderTimeline() {
   const tr = $('#tltrack'); tr.innerHTML = '';
   const m = viewMarker === null ? doc.marker : viewMarker;
@@ -1195,7 +1195,7 @@ const RIBBON = {
   solid: [
     ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'],
       { menu: 'prim', label: 'Základní tělesa', items: [['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus'], ['text3d', 'Text']] },
-      { menu: 'parts', label: 'Součásti', items: [['bolt', 'Šroub'], ['nut', 'Matice'], ['hinge', 'Pant'], ['latch', 'Západka'], ['buckle', 'Spona'], ['libpart', 'Kloubové díly']] }]],
+      { menu: 'parts', label: 'Součásti', items: [['bolt', 'Šroub'], ['nut', 'Matice'], ['hinge', 'Pant'], ['latch', 'Západka'], ['buckle', 'Spona'], ['jointpart', 'Kloubový spoj'], ['libpart', 'Kloubové díly']] }]],
     ['Upravit', [{ menu: 'edge', label: 'Hrany', items: [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení']] }, ['hole', 'Díra', 'H'], ['shell', 'Skořepina'], ['move', 'Přesunout', 'M'], ['scale', 'Měřítko'], ['rotate', 'Otočit', 'R'], ['facemode', 'Plochy', 'G'],
       { menu: 'shape', label: 'Tvar', items: [['combine', 'Kombinovat'], ['splitbody', 'Rozříznout'], ['curvecut', 'Rozříznout křivkou']] },
       { menu: 'xform', label: 'Uspořádat', items: [['center', 'Zarovnat'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole']] },
@@ -1290,6 +1290,7 @@ function runCommand(id) {
     case 'pressface': startPressFace(); break;
     case 'buckle': startBuckle(); break;
     case 'libpart': startLibPart(); break;
+    case 'jointpart': startJointPart(); break;
     case 'blob': case 'skin': case 'sweep': case 'loft': case 'deform': case 'lattice': case 'softmove': case 'subdiv': case 'sculpt': case 'remesh':
     case 'hollow': case 'flatbase': case 'pegsplit': case 'articulate': case 'printcheck': case 'curvecut': startOrganic(id); break;
     case 'revolve': startRevolve(); break;
@@ -1508,6 +1509,7 @@ function editFeature(i) {
     case 'hollow': case 'flatbase': case 'pegsplit': case 'articulate': case 'curvecut': startOrganic(f.type, i, ef); break;
     case 'buckle': startBuckle(i, ef); break;
     case 'libpart': startLibPart(i, ef); break;
+    case 'jointpart': startJointPart(i, ef); break;
     case 'combine': startCombine(i, ef); break;
     case 'move': startMove(i, ef); break;
     case 'rotate': startRotate(i, ef); break;
@@ -7841,6 +7843,62 @@ function startLibPart(editIndex, f) {
       if (!p) return; this.pos = [snapV(p.x), snapV(p.y), r3(p.z)]; dlg.set('pos', this.pos); this.update();
     },
     ok() { if (!this.tool) return null; const o = this.feature(); o.id = f ? f.id : newId(); return o; }
+  };
+  beginCmd(c); c.init();
+}
+const JOINT_TIP = {
+  disc: 'Kotoučový kloub: ohýbá se do stran. Oba díly jsou už spojené a tisknou se vcelku bez podpěr; každý připojte k vlastnímu modelu (Kombinovat › Sjednotit).',
+  hinge: 'Pantový kloub: svislý čep ve třech kloubech, ohýbá se do stran. Oba díly jsou už spojené a tisknou se vcelku bez podpěr; každý připojte k vlastnímu modelu (Kombinovat › Sjednotit).',
+  flex: 'Kloub nahoru/dolů: jazyk mezi dvěma rameny s kuželovými čepy, ohýbá se nahoru a dolů. Oba díly jsou už spojené a tisknou se vcelku bez podpěr; každý připojte k vlastnímu modelu (Kombinovat › Sjednotit).',
+  ball: 'Kulový kloub: koule v jamce, natáčí se do všech stran i kolem osy. Oba díly jsou už spojené a tisknou se vcelku bez podpěr; každý připojte k vlastnímu modelu (Kombinovat › Sjednotit).'
+};
+function startJointPart(editIndex, f) {
+  const c = {
+    editIndex, v: f ? { style: f.style || 'disc', shape: f.shape || 'box', w: f.w || 20, h: f.h || 14, len: f.len || 60, gap: f.gap || 0.4, angle: f.angle || 30, snap: !!f.snap, rot: f.rot || 0 }
+      : { style: 'disc', shape: 'box', w: 20, h: 14, len: 60, gap: 0.4, angle: 30, snap: false, rot: 0 }, pos: f ? f.pos.slice() : [0, 0, 0], tool: null, timer: 0,
+    init() {
+      openDialog({ title: 'Kloubový spoj', icon: 'articulate',
+        fields: [{ k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů'], ['ball', 'Kulový']], value: this.v.style },
+          { k: 'chk', id: 'snap', label: 'Tisknout po dílech a zacvaknout', value: this.v.snap },
+          { k: 'seg', id: 'shape', label: 'Tvar', options: [['box', 'Hranol'], ['round', 'Válec']], value: this.v.shape },
+          { k: 'num', id: 'len', label: 'Délka', value: this.v.len, range: [10, 400, 1] }, { k: 'num', id: 'w', label: 'Šířka', value: this.v.w, range: [3, 200, 1] },
+          { k: 'num', id: 'h', label: 'Výška', value: this.v.h, range: [3, 200, 1] },
+          { k: 'num', id: 'gap', label: 'Vůle v kloubu', value: this.v.gap }, { k: 'num', id: 'angle', label: 'Natočení kloubu', unit: '°', value: this.v.angle, range: [10, 60, 1] },
+          { k: 'num', id: 'rot', label: 'Otočení', unit: '°', value: this.v.rot, range: [-180, 180, 15] },
+          { k: 'xyz', id: 'pos', label: 'Poloha', value: this.pos }, { k: 'note', id: 'tip' }, { k: 'note', id: 'n' }],
+        onChange: id => {
+          if (id === 'style' || id === 'shape') this.v[id] = dlg.get(id);
+          else if (id === 'snap') this.v.snap = !!dlg.get('snap');
+          else if (id === 'pos') this.pos = dlg.get('pos');
+          else { const x = dlg.get(id); if (isFinite(x) && (id === 'rot' || x > 0)) this.v[id] = x; }
+          this.update();
+        } });
+      setPrompt('Klepnutím do pohledu nebo na těleso spoj umístíte');
+      this.update();
+    },
+    feature() { return { id: f ? f.id : 'tmp', type: 'jointpart', ...this.v, snap: this.v.style === 'flex' && this.v.snap, pos: this.pos.slice() }; },
+    update() {
+      const round = this.v.shape === 'round';
+      dlg.show('w', !round); dlg.label('h', round ? 'Průměr' : 'Výška'); dlg.show('snap', this.v.style === 'flex');
+      dlg.set('tip', JOINT_TIP[this.v.style] || ''); dlg.set('n', 'Počítám…'); dlg.okEnabled(false);
+      clearTimeout(this.timer);
+      this.timer = setTimeout(() => {
+        if (cmd !== this) return;
+        clearGroup(G.preview); this.tool = null;
+        try {
+          this.tool = Engine.jointParts(this.feature());
+          for (const t of this.tool) G.preview.add(previewMesh(t, 'new'));
+          dlg.set('n', ''); dlg.okEnabled(true);
+        } catch (e) { dlg.set('n', '!' + e.message); dlg.okEnabled(false); }
+        requestRender();
+      }, 200);
+    },
+    onClick(ev) {
+      const h = hitBodies(ev); let p;
+      if (h) p = h.point; else { ray.setFromCamera(evNdc(ev), cam()); p = ray.ray.intersectPlane(new THREE.Plane(new V3(0, 0, 1), 0), new V3()); }
+      if (!p) return; this.pos = [snapV(p.x), snapV(p.y), r3(p.z)]; dlg.set('pos', this.pos); this.update();
+    },
+    ok() { if (!this.tool) return null; clearTimeout(this.timer); const o = this.feature(); o.id = f ? f.id : newId(); return o; }
   };
   beginCmd(c); c.init();
 }

@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 1.94
+- **TĚLESO › Součásti › Kloubový spoj:** všechny typy kloubů kloubového modelu (Kotouč, Pant, Nahoru/dolů, Kulový) jako hotová součástka – dva díly už spojené v kloubu, tisknou se vcelku bez podpěr. Tvar Hranol (délka, šířka, výška) nebo Válec (délka, průměr), vůle, natočení, otočení a poloha (i klepnutím). Každý díl pak připojte k vlastnímu modelu (Kombinovat › Sjednotit). U typu Nahoru/dolů lze zvolit tisk po dílech a zacvaknutí.
+- **Kulový kloub na kulatých tělesech (válec, koule):** jamka i její ústí se teď vejdou celé do tělesa (velikost a výška koule se hledají podle skutečného průřezu), takže na povrchu nevzniká výsek.
+- **Zobrazení:** normály vrcholů se počítají váženě podle úhlů a nemíchají se s plochami jiného povrchu; zmizely tmavé pruhy podél válcových těles u kloubů (např. Kotouč).
 ## Beta 1.93
 - **Kloubový model – typ kloubu Kulový:** koule na kosočtverečném krčku jednoho článku sedí v kulové jamce sousedního s vůlí kolem dokola; tiskne se vcelku. Článek se otáčí ve všech osách – do stran, nahoru a dolů i kolem své osy (ověřeno ±28° v každé ose i kombinovaně), v tahu i do stran drží. Natočení je omezené na 25° (aby ústí jamky zůstalo užší než koule). Jamka má střechu pod 45°, ústí je kužel, krček má plochy pod 45°; jen malá plôška pod koulí se tiskne přes mezeru. Velikost koule se řídí průřezem tělesa.
 ## Beta 1.92

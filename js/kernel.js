@@ -961,14 +961,30 @@ function decimateTris(arr, target) {
 /* ---------- rendering helpers ---------- */
 function renderMesh(polys, crease) {
   const cs = crease === undefined ? Math.cos(35 * Math.PI / 180) : crease;
+  /* vertex normals weighted by each polygon's corner angle at the vertex: a smooth face cut by a boolean into many
+     thin pieces then counts as much as its uncut neighbour (plain averaging tilted the normals and showed as long dark
+     streaks along round bodies) */
   const vmap = new Map();
-  polys.forEach((p, i) => p.v.forEach(q => { const k = qk(q); let l = vmap.get(k); if (!l) vmap.set(k, l = []); l.push(i); }));
+  polys.forEach((p, i) => { const m = p.v.length; p.v.forEach((q, k) => {
+    const a = vsub(p.v[(k + m - 1) % m], q), b = vsub(p.v[(k + 1) % m], q), la = vlen(a), lb = vlen(b);
+    const w = la > 1e-12 && lb > 1e-12 ? Math.acos(Math.max(-1, Math.min(1, vdot(a, b) / (la * lb)))) : 0;
+    const key = qk(q); let l = vmap.get(key); if (!l) vmap.set(key, l = []); l.push(i, w); }); });
+  /* each polygon's own facet step (the smallest bend to a neighbour across an edge): a neighbour bent much more than that
+     belongs to another surface (e.g. a cylinder cut by another one nearly tangent to it) and is not smoothed in, else
+     its normal would be spread along the whole of a long facet */
+  const step = new Float64Array(polys.length).fill(-2);
+  if (crease === undefined) for (const e of edgeMapOf(polys).values()) if (e.ps.length === 2) {
+    const d = vdot(polys[e.ps[0]].n, polys[e.ps[1]].n);
+    if (d < 0.99996) for (const j of e.ps) if (d > step[j]) step[j] = d;
+  }
+  const lim = i => { if (crease !== undefined || step[i] < -1) return cs; const a = Math.acos(Math.min(1, step[i])) * 2.2; return Math.cos(Math.min(35 * Math.PI / 180, Math.max(12 * Math.PI / 180, a))); };
   const pos = [], nor = [], triPoly = [];
   polys.forEach((p, i) => {
+    const ci = lim(i);
     const nrm = p.v.map(q => {
       const l = vmap.get(qk(q)); let s = [0, 0, 0];
-      for (const j of l) { const nj = polys[j].n; if (vdot(nj, p.n) > cs) { s[0] += nj[0]; s[1] += nj[1]; s[2] += nj[2]; } }
-      return vnorm(s);
+      for (let t = 0; t < l.length; t += 2) { const nj = polys[l[t]].n, w = l[t + 1]; if (vdot(nj, p.n) > ci) { s[0] += nj[0] * w; s[1] += nj[1] * w; s[2] += nj[2] * w; } }
+      return vlen(s) > 1e-12 ? vnorm(s) : p.n;
     });
     for (let k = 1; k < p.v.length - 1; k++) {
       for (const idx of [0, k, k + 1]) { const q = p.v[idx]; pos.push(q[0], q[1], q[2]); const nn = nrm[idx]; nor.push(nn[0], nn[1], nn[2]); }
