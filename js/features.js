@@ -1416,7 +1416,7 @@ function buckleParts(f) {
   const tc = Wc - 2 * (g + pw + hk + 0.8);
   if (tc < 2) throw new Error('Spona je příliš úzká; zvětšete šířku spony');
   const slot = !!f.slot, sl = 3.5, sz = slot ? sl + 2 * 2.2 : 0; /* webbing slot zone at the back */
-  const bw = 2.5, Lf = sz + bw + Lc, Lb = sz + 4;
+  const bw = Math.max(2.5, Wf * 0.3), Lf = sz + bw + Lc, Lb = sz + 4; /* a solid back long enough for a broad waist */
   const box = (x0, x1, y0, y1, z0, z1) => KK.translate(KK.primitive('box', { w: x1 - x0, d: y1 - y0, h: z1 - z0 }), [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2]);
   const prism = (pts, z0, z1) => KK.extrudeProfiles([{ pts: KK.area2D(pts) < 0 ? pts.slice().reverse() : pts, closed: true }], { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] }, z0, z1);
   const rounded = (x0, x1, y0, y1, z0, z1, r) => prism(KK.profilePoints({ t: 'rect', x: x0, y: y0, w: x1 - x0, h: y1 - y0, fr: r }), z0, z1);
@@ -1425,6 +1425,14 @@ function buckleParts(f) {
   fem = KK.boolean(fem, box(Lf - Lc, Lf + 1, -Wc / 2, Wc / 2, tw, H - tw), 'subtract');
   const wx0 = Lf - Lc, wx1 = Lf - Li + lh + g;
   for (const sg of [-1, 1]) fem = KK.boolean(fem, box(wx0, wx1, sg < 0 ? -Wf / 2 - 1 : Wc / 2 - 0.1, sg < 0 ? -Wc / 2 + 0.1 : Wf / 2 + 1, tw, H - tw), 'subtract');
+  /* a broad scallop in each side over the window (the "waist" of a backpack buckle), so the hooks are easy to reach and
+     press with finger and thumb. It ends exactly at the window's front edge, where the full side wall catches the hooks,
+     and is a little deeper than the wall, so the hooks stand out of the scalloped side. */
+  if (f.scallop !== false) {
+    const hs = Math.max(3, Math.min((wx1 - wx0) * 1.1, (wx1 - sz - 1.5) / 2)), dm = ws + Math.min(1.2, hk), xs = wx1 - hs;
+    const Rs = (hs * hs + dm * dm) / (2 * dm);
+    for (const sg of [-1, 1]) fem = KK.boolean(fem, KK.translate(KK.primitive('cylinder', { r: Rs, h: H + 2 }), [xs, sg * (Wf / 2 + Rs - dm), H / 2]), 'subtract');
+  }
   /* male: base, tongue, two prongs with hooks */
   let mal = rounded(0, Lb, -Wf / 2, Wf / 2, 0, H, Math.min(3, Wf * 0.12));
   mal = KK.boolean(mal, box(Lb - 0.5, Lb + Li - 1, -tc / 2, tc / 2, zoff, zoff + hm), 'union');

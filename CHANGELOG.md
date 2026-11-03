@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 1.70
+- **Spona – samice s výrazným vykrojením po stranách:** široký oblouk nad okénky (jako „pas“ spony na batohu), hlubší než boční stěna, takže háčky samce z boku vystupují a jdou snadno zmáčknout palcem a ukazovákem. Vykrojení končí přesně u přední hrany okénka, kde plná stěna dál drží háčky. Samice je kvůli tomu o něco delší.
 ## Beta 1.69
 - **Spona** (TĚLESO › Součásti): boční rozepínací spona jako na batozích – samice (plochý pouzdro s bočními okénky) a samec (středový jazyk a dvě pružná ramena s háčky, které zapadnou do okének; rozepne se stisknutím háčků). Obě poloviny se tisknou naplocho, ramena pruží v rovině podložky. Šířka, výška, vůle a volitelný průvlek pro popruh.
 - **Kloubový model: Spona na koncích (řemínek)** – na začátek řetězu se připojí samice, na konec samec, obě míří ven; šířka a výška se samy přizpůsobí konci řemínku (nebo se zadají).
