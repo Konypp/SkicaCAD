@@ -41,6 +41,7 @@ const ICONS = {
   style: '<path class="b" d="M12 3 20 7.5v9L12 21l-8-4.5v-9z"/><path d="M12 3 20 7.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5 12 12l8-4.5M12 12v9"/>',
   grid: '<path d="M4 4v16M10 4v16M16 4v16M4 4h16M4 10h16M4 16h16M20 4v16M4 20h16"/>',
   snap: '<path d="M4 4v16M12 4v16M20 4v16M4 4h16M4 12h16M4 20h16" opacity=".5"/><circle class="b2" cx="12" cy="12" r="3"/>',
+  esnap: '<path d="M4 20 4 6M4 20h14" /><path d="M9 15l9-9" opacity=".5"/><circle class="b2" cx="4" cy="20" r="2.6"/><circle class="b2" cx="13.5" cy="10.5" r="2.2"/>',
   eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>',
   eyeoff: '<path d="M2.5 12S6 5.5 12 5.5c1.5 0 2.9.4 4.1 1M21.5 12S18 18.5 12 18.5c-1.5 0-2.9-.4-4.1-1M4 4l16 16"/>',
   doc: '<path class="b" d="M6 3h8l4 4v14H6z"/><path d="M6 3h8l4 4v14H6zM14 3v4h4"/>',
@@ -232,7 +233,7 @@ function planeFromPoly(p) {
 }
 
 /* ================= settings, document, history ================= */
-const settings = { snap: 1, gridSnap: true, style: 'se', grid: true };
+const settings = { snap: 1, gridSnap: true, edgeSnap: true, style: 'se', grid: true };
 try { Object.assign(settings, JSON.parse(localStorage.getItem(SKEY)) || {}); } catch (e) {}
 const saveSettings = () => { try { localStorage.setItem(SKEY, JSON.stringify(settings)); if (!syncQuiet) localStorage.setItem('skicacad-settings-t', String(Date.now())); } catch (e) {} syncNote(); };
 /* the account sync (js/sync.js, only outside the claude.ai preview) is told about every change of the library or settings */
@@ -1774,6 +1775,29 @@ function finishFreehand0() {
   }
   renderPalette(); redrawSketch(); $('#dim').hidden = true;
 }
+/* the model's corners, edge midpoints and circle centres (then its edges) in the sketch plane nearest the pointer, as a
+   sketch point; only bodies shown, only what lies in the plane */
+function modelSnap2D(P, mx, my, lim) {
+  const n = P.n, w = K.vdot(P.n, P.o), onPl = p => Math.abs(K.vdot(n, p) - w) < 1e-3;
+  let best = null, bd = lim;
+  for (const b of cur.bodies) {
+    const e = meshes.get(b.id); if (e && e.mesh && !e.mesh.visible) continue;
+    const t = measureTargets(b.polys);
+    for (const q of t.pts) { const a = q.p.toArray(); if (!onPl(a)) continue; const s = toPx(q.p), d = Math.hypot(s[0] - mx, s[1] - my) - (q.kind === 'v' ? 3 : 0); if (d < bd) { bd = d; best = a; } }
+  }
+  if (!best) {
+    bd = lim * 0.75;
+    for (const b of cur.bodies) {
+      const e = meshes.get(b.id); if (e && e.mesh && !e.mesh.visible) continue;
+      for (const ch of measureTargets(b.polys).chains) {
+        if (!ch.pts.every(onPl)) continue;
+        let prev = null, prevP = null;
+        for (const p of ch.pts) { const q = toPx(v3(p)); if (prev) { const [d, tt] = segDist(mx, my, prev, q); if (d < bd) { bd = d; best = v3(prevP).lerp(v3(p), tt).toArray(); } } prev = q; prevP = p; }
+      }
+    }
+  }
+  return best ? P2(P, v3(best)).map(v => Math.round(v * 1e4) / 1e4) : null;
+}
 function sketchPoint(ev) {
   const P = sk.f.plane;
   ray.setFromCamera(evNdc(ev), cam());
@@ -1788,9 +1812,11 @@ function sketchPoint(ev) {
   for (const q of pts) { const s = toPx(P3(P, q[0], q[1])); const d = Math.hypot(s[0] - mx, s[1] - my); if (d < bd) { bd = d; best = q; } }
   sk.snapMid = false;
   if (!best) { const m = nearMidpoint(ev, bd); if (m) { best = m; sk.snapMid = true; } }
+  /* corners, edge midpoints, circle centres and edges of the model lying in the sketch's plane (a model off the grid) */
+  if (!best && settings.edgeSnap !== false) { const m = modelSnap2D(P, mx, my, bd); if (m) { best = m; sk.snapMid = false; } }
   sk.snapPt = best;
   if (best) { sk.gridHot = null; return best.slice(); }
-  const c = crossNear(p); if (c) { sk.gridHot = c; return c; }
+  const c = settings.gridSnap ? crossNear(p) : null; if (c) { sk.gridHot = c; return c; }
   const q = [snapV(p[0]), snapV(p[1])]; sk.gridHot = onCross(q) ? q : null;
   return q;
 }
@@ -4732,10 +4758,10 @@ function startSplitFace(editIndex, f, face) {
       const pl = new THREE.Plane(v3(this.n), -this.w), x = new V3();
       if (!ray.ray.intersectPlane(pl, x)) return null;
       const [mx, my] = evPx(ev), onPl = p => Math.abs(K.vdot(this.n, p) - this.w) < 1e-3;
-      const t = measureTargets(P); let best = null, bd = R;
-      for (const q of t.pts) { if (!onPl(q.p.toArray())) continue; const sp = toPx(q.p), d = Math.hypot(sp[0] - mx, sp[1] - my) - (q.kind === 'v' ? 3 : 0); if (d < bd) { bd = d; best = { p: q.p.clone(), kind: q.kind }; } }
+      const t = measureTargets(P), es = settings.edgeSnap !== false; let best = null, bd = R;
+      if (es) for (const q of t.pts) { if (!onPl(q.p.toArray())) continue; const sp = toPx(q.p), d = Math.hypot(sp[0] - mx, sp[1] - my) - (q.kind === 'v' ? 3 : 0); if (d < bd) { bd = d; best = { p: q.p.clone(), kind: q.kind }; } }
       if (best) return best;
-      best = this.pickEdge(ev, R * 0.75);
+      best = es ? this.pickEdge(ev, R * 0.75) : null;
       /* on a straight edge the point moves in grid steps from the edge's start */
       if (best && best.ch.kind === 'line' && settings.gridSnap) {
         const a = v3(best.ch.line.p0), b = v3(best.ch.line.p1), L = a.distanceTo(b), st = settings.snap;
@@ -6500,6 +6526,7 @@ function applyNav() {
   G.grid.visible = settings.grid && !sk;
   $('#nav-grid').setAttribute('aria-pressed', String(settings.grid));
   $('#nav-snap').setAttribute('aria-pressed', String(settings.gridSnap));
+  $('#nav-esnap').setAttribute('aria-pressed', String(settings.edgeSnap !== false));
   $('#nav-step').value = String(settings.snap);
   $('#nav-style').title = 'Styl zobrazení: ' + STYLE_LABEL[settings.style];
   applySnapToGizmo(); styleBodies();
@@ -6508,7 +6535,8 @@ $('#nav-fit').addEventListener('click', () => fitView());
 $('#nav-proj').addEventListener('click', () => setProjection(!isOrtho));
 $('#nav-style').addEventListener('click', () => { settings.style = STYLES[(STYLES.indexOf(settings.style) + 1) % 3]; saveSettings(); applyNav(); toast(STYLE_LABEL[settings.style]); });
 $('#nav-grid').addEventListener('click', () => { settings.grid = !settings.grid; saveSettings(); applyNav(); });
-$('#nav-snap').addEventListener('click', () => { settings.gridSnap = !settings.gridSnap; saveSettings(); applyNav(); });
+$('#nav-snap').addEventListener('click', () => { settings.gridSnap = !settings.gridSnap; saveSettings(); applyNav(); toast(settings.gridSnap ? 'Přichytávání k mřížce zapnuto' : 'Přichytávání k mřížce vypnuto'); });
+$('#nav-esnap').addEventListener('click', () => { settings.edgeSnap = settings.edgeSnap === false; saveSettings(); applyNav(); toast(settings.edgeSnap ? 'Přichytávání k hranám a rohům modelu zapnuto' : 'Přichytávání k hranám a rohům modelu vypnuto'); });
 $('#nav-step').addEventListener('change', e => { settings.snap = parseFloat(e.target.value) || 1; saveSettings(); applyNav(); });
 
 /* ================= file menu, export ================= */

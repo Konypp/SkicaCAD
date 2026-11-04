@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.04
+- **Přichytávání k hranám a rohům modelu:** nové tlačítko v liště pohledu (pod přichytáváním k mřížce). Ve skice se body přichytí k rohům, středům hran a středům kružnic modelu ležícím v rovině skici a pak k jeho hranám – i když model neleží na mřížce. Platí i pro Rozdělit plochu. Tlačítkem se dá vypnout.
+- **Přichytávání k mřížce** se dá jako dosud vypnout svým tlačítkem; nově to potvrdí krátké hlášení a vypnuté přichytávání k mřížce ve skice vypne i přitahování k průsečíkům mřížky. Vypnete-li obojí, body se umisťují zcela volně.
 ## Beta 2.03
 - **Rozdělit plochu – Dělit: Čarou / Křivkou / Odsazením hrany.** Křivkou: klepejte body přes plochu, dělicí křivka jimi projde hladce. Odsazením hrany: klepněte na hranu plochy a zadejte Odsazení – hrana se posune dovnitř plochy a vznikne nová plocha (rovná hrana dá rovnou čáru, kruhová nebo oblouková hrana soustřednou křivku, např. okraj na víčku válce). Každou část pak vyberete v režimu Plochy a vysunete, posunete nebo z ní uděláte skicu.
 - **Kloub Flexi se i zvětšuje:** nástroj se řídí průřezem tělesa – na tenkém se zmenší, na velkém zvětší (nejvýš 4×) i s mezerami; dřív zůstával na velkých modelech v původní velikosti.
