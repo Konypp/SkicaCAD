@@ -7333,15 +7333,17 @@ function startLoft(editIndex, f) {
 const AXSEG = [['x', 'X'], ['y', 'Y'], ['z', 'Z']];
 const ORG_MODS = {
   deform: {
-    defaults: () => ({ mode: 'twist', axis: 'z', amount: 45, from: 0, to: 100, dir: 'b' }),
+    defaults: () => ({ mode: 'twist', axis: 'z', amount: 45, off: 0, from: 0, to: 100, dir: 'b' }),
     fields: v => [{ k: 'seg', id: 'mode', label: 'Deformace', options: [['twist', 'Zkroutit'], ['taper', 'Zúžit'], ['bend', 'Ohnout']], value: v.mode },
       { k: 'seg', id: 'axis', label: 'Osa', options: AXSEG, value: v.axis }, { k: 'num', id: 'amount', label: 'Úhel', unit: '°', value: v.amount },
+      { k: 'num', id: 'off', label: 'Odsazení osy', value: v.off || 0 },
       { k: 'opt', id: 'dir', label: 'Ohnout směrem', options: [['b', '+'], ['c', '+']], value: v.dir },
       { k: 'num', id: 'from', label: 'Od (% délky)', unit: '%', value: v.from, range: [0, 100, 1] }, { k: 'num', id: 'to', label: 'Do (% délky)', unit: '%', value: v.to, range: [0, 100, 1] }],
     layout(c) {
       const v = c.v, a = { x: 0, y: 1, z: 2 }[v.axis], L = 'XYZ';
       dlg.setOptions('dir', [['b', 'k ose ' + L[(a + 1) % 3]], ['c', 'k ose ' + L[(a + 2) % 3]]], v.dir);
-      dlg.show('dir', v.mode === 'bend');
+      dlg.show('dir', v.mode === 'bend' || (v.mode === 'twist' && Math.abs(v.off || 0) > 1e-9)); dlg.show('off', v.mode === 'twist');
+      dlg.label('dir', v.mode === 'twist' ? 'Posunout osu směrem' : 'Ohnout směrem');
       const lab = $('#dialog [data-row="amount"] label'), u = $('#dialog [data-row="amount"] .u');
       if (lab) lab.textContent = v.mode === 'taper' ? 'Velikost na konci' : v.mode === 'bend' ? 'Úhel ohnutí' : 'Úhel zkroucení';
       if (u) u.textContent = v.mode === 'taper' ? '%' : '°';
