@@ -458,20 +458,16 @@ function deformSimple(polys, f) {
   const a = AX[f.axis] === undefined ? 2 : AX[f.axis], b = (a + 1) % 3, c = (a + 2) % 3, bb = KK.bbox(polys);
   const L = bb.max[a] - bb.min[a]; if (L < 1e-6) throw new Error('Těleso je v ose deformace ploché');
   const diag = len3(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]);
-  const amt0 = Math.abs(Number(f.amount) || 0);
-  /* a strong twist needs a finer mesh along the axis (each edge turns at most ~6°) */
-  const M = refine(polys, Math.max(f.mode === 'twist' && amt0 > 0 ? Math.min(diag / 45, 6 * L / amt0) : diag / 45, 0.3));
+  const M = refine(polys, Math.max(diag / 45, 0.3));
   const cb = (bb.min[b] + bb.max[b]) / 2, cc = (bb.min[c] + bb.max[c]) / 2;
-  /* twist about an axis moved off the centre (Odsazení osy): the body winds round it like a spiral */
-  const off = f.mode === 'twist' ? Number(f.off) || 0 : 0, tb = cb + (f.dir === 'c' ? 0 : off), tc = cc + (f.dir === 'c' ? off : 0);
   const t0 = clamp(Number(f.from === undefined ? 0 : f.from) / 100, 0, 1), t1 = clamp(Number(f.to === undefined ? 100 : f.to) / 100, 0, 1);
   const tt = s => (t1 > t0 ? clamp((s - t0) / (t1 - t0), 0, 1) : 0);
   const amt = Number(f.amount) || 0;
   for (const p of M.V) {
     const s = (p[a] - bb.min[a]) / L, t = tt(s);
     if (f.mode === 'twist') {
-      const ang = amt * D2R * t, u = p[b] - tb, v = p[c] - tc, co = Math.cos(ang), si = Math.sin(ang);
-      p[b] = tb + u * co - v * si; p[c] = tc + u * si + v * co;
+      const ang = amt * D2R * t, u = p[b] - cb, v = p[c] - cc, co = Math.cos(ang), si = Math.sin(ang);
+      p[b] = cb + u * co - v * si; p[c] = cc + u * si + v * co;
     } else if (f.mode === 'taper') {
       const k = 1 + (amt / 100 - 1) * t; p[b] = cb + (p[b] - cb) * k; p[c] = cc + (p[c] - cc) * k;
     } else if (f.mode === 'bend') {

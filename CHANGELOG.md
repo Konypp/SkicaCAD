@@ -1,7 +1,7 @@
 # Changelog
 
-## Beta 2.06
-- **Deformace › Zkroutit – Odsazení osy:** osa zkroucení se dá posunout ze středu tělesa (o zadané mm, směrem k jedné z příčných os). Těleso se pak vine kolem ní do spirály jako vývrtka – viditelně se tak zkroutí i hladký válec, který je kolem vlastní osy souměrný. Při velkém úhlu se síť podél osy zjemní (každý úsek se otočí nejvýš o 6°), aby spirála zůstala hladká.
+## Beta 2.07
+- Odsazení osy u zkroucení (z Beta 2.06) odstraněno.
 ## Beta 2.05
 - **Skica – Zrcadlit (M, v Úpravách skici):** osa svislá nebo vodorovná se zadanou polohou (tlačítko Osa na střed skici ji posadí doprostřed nakreslených tvarů), nebo libovolná rovná čára skici (i pomocná). Klepnutím na prvek vznikne jeho zrcadlový obraz. Zapnete-li **Kreslit zrcadlově**, každý nově nakreslený tvar (i jinými nástroji) se hned zrcadlí podle osy; osa je ve skice vidět oranžově. Obdélník se podle šikmé osy změní na obrys, text se jen přemístí (zůstane čitelný).
 ## Beta 2.04
