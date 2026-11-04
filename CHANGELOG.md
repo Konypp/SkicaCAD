@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 2.08
+- **Rychlejší a lehčí Deformace (Zkroutit, Zúžit, Ohnout):** síť se dělí jen podél osy deformace (rovinami napříč), ne do všech směrů; u zkroucení navíc jen tak jemně, aby se tvar od přesné šroubovice lišil nejvýš o setiny mm, a napříč jen u širokých ploch. Zkroucených 50 žeber na válci má teď asi 27 tisíc plošek místo 560 tisíc, takže deformace, následné spojení s válcem i načtení modelu jsou mnohonásobně rychlejší (místo „příliš složité“ asi 6 s).
+- **Pole se spojením s originálem:** kopie, které se ničeho nedotýkají, se jen přidají bez booleovské operace; 50 žeber se spojí za zlomek sekundy (dřív asi 8 s).
+- **Booleovské operace:** dělení plochy mnoha řezy přeskočí kusy, kterých se řez netýká – odečtení válce od 50 žeber trvá místo 5 s necelou sekundu.
 ## Beta 2.07
 - Odsazení osy u zkroucení (z Beta 2.06) odstraněno.
 ## Beta 2.05

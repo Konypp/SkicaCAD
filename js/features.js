@@ -2392,7 +2392,17 @@ function step(state, f) {
         const copies = mats.map(m => (m ? KK.transform(b.polys, m) : KK.mirror(b.polys, f.plane || 'YZ')));
         const cseams = mats.map(m => seamXform(b.seams, m || MIR[f.plane || 'YZ']));
         if (f.join) {
-          let acc = b.polys; for (const c of copies) acc = KK.boolean(acc, c, 'union');
+          /* copies apart from everything joined so far are only added (no boolean); one that may touch is joined just
+             with the pieces whose boxes it meets – many small copies (ribs round a cylinder) join quickly */
+          const ov = (p, q) => [0, 1, 2].every(k => p.min[k] <= q.max[k] + 1e-6 && q.min[k] <= p.max[k] + 1e-6);
+          let pieces = [{ p: b.polys, bb: KK.bbox(b.polys) }];
+          for (const c of copies) {
+            const cb = KK.bbox(c), hit = pieces.filter(x => ov(x.bb, cb));
+            if (!hit.length) { pieces.push({ p: c, bb: cb }); continue; }
+            let m = c; for (const x of hit) m = KK.boolean(m, x.p, 'union');
+            pieces = pieces.filter(x => !hit.includes(x)); pieces.push({ p: m, bb: KK.bbox(m) });
+          }
+          const acc = pieces.length === 1 ? pieces[0].p : [].concat(...pieces.map(x => x.p));
           repl.set(b.id, acc); if (b.seams) repl.set(b.id + '\u0000s', [].concat(b.seams, ...cseams.filter(Boolean)));
         } else copies.forEach((c, j) => added.push({ id: f.id + '_' + (k++), name: 'Těleso ' + (++n), polys: c, from: f.id, ...(cseams[j] ? { seams: cseams[j] } : {}) }));
       }

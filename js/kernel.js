@@ -316,8 +316,15 @@ function crossSegment(q, p) { /* part of polygon q lying in p's plane */
 }
 function splitBy(pieces, plane, seg) {
   const out = [];
+  /* a piece whose box the segment misses is left at once (a face crossed by many cuts splits into many pieces) */
+  let sl = null, sh = null;
+  if (seg) { sl = [0, 1, 2].map(k => Math.min(seg[0][k], seg[1][k]) - EPS * 4); sh = [0, 1, 2].map(k => Math.max(seg[0][k], seg[1][k]) + EPS * 4); }
   for (const pc of pieces) {
-    if (seg && !segThrough(seg[0], seg[1], pc)) { out.push(pc); continue; }
+    if (seg) {
+      let bx = pc._bx; if (!bx) { const [mn, mx] = polyBox(pc); bx = [mn, mx]; Object.defineProperty(pc, '_bx', { value: bx, enumerable: false }); }
+      if (bx[1][0] < sl[0] || bx[0][0] > sh[0] || bx[1][1] < sl[1] || bx[0][1] > sh[1] || bx[1][2] < sl[2] || bx[0][2] > sh[2]) { out.push(pc); continue; }
+      if (!segThrough(seg[0], seg[1], pc)) { out.push(pc); continue; }
+    }
     const f = [], b = [];
     splitPolygon(plane, pc, f, b, f, b);
     for (const x of f) out.push(x); for (const x of b) out.push(x);

@@ -424,14 +424,17 @@ function toPolys(M) {
   return out;
 }
 /* split triangle edges longer than L (only where `want(midpoint)` says so) until none is left or the mesh is too big */
-function refine(polys, L, want, maxTris) {
+function refine(polys, L, want, maxTris, axis) {
   const M = fixTJunctions(indexed(polys)), V = M.V;
   let T = []; for (const f of M.F) for (let i = 1; i < f.length - 1; i++) T.push([f[0], f[i], f[i + 1]]);
   const lim = maxTris || 350000, L2 = L * L;
   for (let pass = 0; pass < 12 && T.length < lim; pass++) {
     const mid = new Map(), ek = (a, b) => (a < b ? a * 4194304 + b : b * 4194304 + a);
     const long = (a, b) => {
-      const A = V[a], B = V[b], x = A[0] - B[0], y = A[1] - B[1], z = A[2] - B[2]; if (x * x + y * y + z * z <= L2) return false;
+      const A = V[a], B = V[b];
+      if (typeof axis === 'function') { if (axis(A, B) <= L2) return false; } /* a length of one's own */
+      else if (axis !== undefined) { const d = A[axis] - B[axis]; if (d * d <= L2) return false; } /* only the length along the axis counts */
+      else { const x = A[0] - B[0], y = A[1] - B[1], z = A[2] - B[2]; if (x * x + y * y + z * z <= L2) return false; }
       return !want || want([(A[0] + B[0]) / 2, (A[1] + B[1]) / 2, (A[2] + B[2]) / 2]);
     };
     const m = (a, b) => { const k = ek(a, b); let i = mid.get(k); if (i === undefined) { if (!long(a, b)) { mid.set(k, -1); return -1; } i = V.length; V.push([0, 1, 2].map(c => (V[a][c] + V[b][c]) / 2)); mid.set(k, i); } return i; };
@@ -452,13 +455,54 @@ function refine(polys, L, want, maxTris) {
   }
   return { V, F: T };
 }
+/* faces cut into slabs across an axis (planes every `step` along it): the fewest pieces for a deformation that changes
+   only along that axis; neighbouring faces are cut at the same planes, so the mesh stays closed */
+function slabRefine(polys, a, step) {
+  const M = fixTJunctions(indexed(polys)), map = new Map(), V = [], F = [];
+  const id = q => { const k = KK.qk(q); let i = map.get(k); if (i === undefined) { i = V.length; map.set(k, i); V.push(q.slice()); } return i; };
+  let z0 = Infinity; for (const q of M.V) if (q[a] < z0) z0 = q[a];
+  const cut = (pts, val, above) => { /* keep the part with q[a] >= val (above) or <= val */
+    const out = [], n = pts.length, inn = q => (above ? q[a] >= val - 1e-9 : q[a] <= val + 1e-9);
+    for (let i = 0; i < n; i++) {
+      const A = pts[i], B = pts[(i + 1) % n], ia = inn(A), ib = inn(B);
+      if (ia) out.push(A);
+      if (ia !== ib && Math.abs(B[a] - A[a]) > 1e-12) { const t = (val - A[a]) / (B[a] - A[a]); if (t > 1e-9 && t < 1 - 1e-9) { const q = A.map((x, k) => x + (B[k] - x) * t); q[a] = val; out.push(q); } }
+    }
+    return out;
+  };
+  for (const f of M.F) {
+    const pts = f.map(i => M.V[i]); let lo = Infinity, hi = -Infinity; for (const q of pts) { lo = Math.min(lo, q[a]); hi = Math.max(hi, q[a]); }
+    const k0 = Math.floor((lo - z0) / step + 1e-9), k1 = Math.ceil((hi - z0) / step - 1e-9);
+    if (k1 - k0 <= 1) { F.push(pts.map(id)); continue; }
+    for (let k = k0; k < k1; k++) {
+      let piece = k > k0 ? cut(pts, z0 + k * step, true) : pts;
+      if (k < k1 - 1 && piece.length >= 3) piece = cut(piece, z0 + (k + 1) * step, false);
+      if (piece.length >= 3) { const g = piece.map(id).filter((x, i, arr) => x !== arr[(i + 1) % arr.length]); if (g.length >= 3) F.push(g); }
+    }
+  }
+  /* faces of more than 4 corners would bend out of plane: fan them into triangles */
+  const T = []; for (const g of F) { if (g.length <= 4) T.push(g); else for (let i = 1; i < g.length - 1; i++) T.push([g[0], g[i], g[i + 1]]); }
+  return { V, F: T };
+}
 /* ---------------- deformations ---------------- */
 const AX = { x: 0, y: 1, z: 2 };
 function deformSimple(polys, f) {
   const a = AX[f.axis] === undefined ? 2 : AX[f.axis], b = (a + 1) % 3, c = (a + 2) % 3, bb = KK.bbox(polys);
   const L = bb.max[a] - bb.min[a]; if (L < 1e-6) throw new Error('Těleso je v ose deformace ploché');
-  const diag = len3(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]);
-  const M = refine(polys, Math.max(diag / 45, 0.3));
+  /* twist, taper and bend all change only along the axis: edges are split by their length along it alone (a twist or
+     bend so that each piece turns at most 3°), not across – a model of many small parts (fine ribs) stays light */
+  const amt0 = Math.abs(Number(f.amount) || 0), rmax = Math.hypot(bb.max[b] - bb.min[b], bb.max[c] - bb.min[c]) / 2;
+  /* twist: each slab turns so little that a straight edge strays at most ~0.03 mm from its true helix */
+  const stepT = clamp(Math.sqrt(8 * 0.03 / Math.max(rmax, 0.1)) / D2R, 2, 10);
+  const seg = f.mode === 'taper' ? L / 24 : (f.mode === 'twist' ? stepT : 3) * L / Math.max(amt0, 3);
+  let M = slabRefine(polys, a, Math.max(seg, 0.3));
+  if (f.mode === 'twist' && amt0 > 0) {
+    /* a wide face twists into a saddle: across the axis it is split too, so that between two slabs it strays at most
+       ~0.05 mm (width × slab height × twist per mm / 4) */
+    const h = Math.max(seg, 0.3), rate = amt0 * D2R / L, wmax = Math.max(0.2 / (h * rate), 0.3);
+    const lat = (A, B) => { const x = A[b] - B[b], y = A[c] - B[c]; return x * x + y * y; };
+    M = refine(toPolys(M), wmax, null, 400000, lat);
+  }
   const cb = (bb.min[b] + bb.max[b]) / 2, cc = (bb.min[c] + bb.max[c]) / 2;
   const t0 = clamp(Number(f.from === undefined ? 0 : f.from) / 100, 0, 1), t1 = clamp(Number(f.to === undefined ? 100 : f.to) / 100, 0, 1);
   const tt = s => (t1 > t0 ? clamp((s - t0) / (t1 - t0), 0, 1) : 0);
