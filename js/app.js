@@ -60,6 +60,7 @@ const ICONS = {
   chamfer: '<path class="b" d="M4 20V9h6l5 5h5v6z"/><path d="M4 20V9h6l5 5h5v6z"/><path d="M10 9l5 5" style="stroke:var(--orange);stroke-width:2.4"/><path d="M10 9V4h10v10" stroke-dasharray="2 2" opacity=".6"/>',
   splitbody: '<path class="b" d="M4 8 12 4l8 4v8l-8 4-8-4z" opacity=".55"/><path d="M4 8 12 4l8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"/><path d="M2 13.5 12 9l10 4.5" stroke-dasharray="2.2 1.6"/>',
   curvecut: '<path class="b" d="M4 8 12 4l8 4v8l-8 4-8-4z" opacity=".55"/><path d="M4 8 12 4l8 4v8l-8 4-8-4z"/><path d="M2 14l3-3 3 3 4-5 3 3 3-3 4 2" stroke-dasharray="2.2 1.6"/><circle cx="5" cy="11" r="1.1"/><circle cx="12" cy="9" r="1.1"/><circle cx="18" cy="11" r="1.1"/>',
+  ribs: '<rect class="b" x="5" y="3" width="14" height="18" rx="2" opacity=".35"/><path d="M5 3h14v18H5z"/><path d="M8 3v18M12 3v18M16 3v18" style="stroke:var(--orange)"/>',
   bendface: '<path class="b" d="M3 5h9a8 8 0 0 1 8 8v8h-5v-8a3 3 0 0 0-3-3H3z" opacity=".55"/><path d="M3 5h9a8 8 0 0 1 8 8v8h-5v-8a3 3 0 0 0-3-3H3z"/>',
   combine: '<rect class="b" x="3" y="7" width="11" height="11" rx="1"/><circle class="b2" cx="15" cy="10" r="6" opacity=".85"/><rect x="3" y="7" width="11" height="11" rx="1"/><circle cx="15" cy="10" r="6"/>',
   move: '<path d="M12 3v18M3 12h18M12 3 9.5 5.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5"/><rect class="b" x="9" y="9" width="6" height="6" rx="1"/>',
@@ -1122,7 +1123,7 @@ function featureTitle(i) {
   let n = 0; for (let j = 0; j <= i; j++) if (doc.features[j].type === f.type) n++;
   return Engine.FEATURE_LABEL[f.type] + ' ' + n;
 }
-const TL_ICON = { buckle: 'buckle', libpart: 'articulate', jointpart: 'articulate', articulate: 'articulate', blob: 'blob', skin: 'skin', sweep: 'sweep', loft: 'loft', deform: 'deform', lattice: 'lattice', softmove: 'softmove', subdiv: 'subdiv', sculpt: 'sculpt', remesh: 'remesh', hollow: 'hollow', flatbase: 'flatbase', pegsplit: 'pegsplit', text3d: 'sktext', movefaces: 'pressface', shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', splitbody: 'splitbody', curvecut: 'curvecut', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
+const TL_ICON = { buckle: 'buckle', libpart: 'articulate', jointpart: 'articulate', articulate: 'articulate', blob: 'blob', skin: 'skin', sweep: 'sweep', loft: 'loft', deform: 'deform', lattice: 'lattice', softmove: 'softmove', subdiv: 'subdiv', sculpt: 'sculpt', remesh: 'remesh', hollow: 'hollow', flatbase: 'flatbase', pegsplit: 'pegsplit', text3d: 'sktext', movefaces: 'pressface', shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', ribs: 'ribs', splitbody: 'splitbody', curvecut: 'curvecut', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
 function renderTimeline() {
   const tr = $('#tltrack'); tr.innerHTML = '';
   const m = viewMarker === null ? doc.marker : viewMarker;
@@ -1526,6 +1527,7 @@ function editFeature(i) {
     case 'shell': startShell(i, ef); break;
     case 'splitface': startSplitFace(i, ef); break;
     case 'bendface': startBendFace(i, ef); break;
+    case 'ribs': startRibs(i, ef); break;
     case 'splitbody': startSplitBody(i, ef); break;
     case 'revolve': startRevolve(i, ef); break;
     case 'mirror': startMirror(i, ef); break;
@@ -3938,8 +3940,8 @@ function syncFaceBar() {
   if (key === faceBarKey) return;
   faceBarKey = key; bar.hidden = !show; document.body.classList.toggle('has-facebar', !!show); if (!show) { bar.innerHTML = ''; return; }
   const pl = selFace.kind === 'plane', acts = list.length > 1 ? multiFaceActs(list) : !pl && selFace.cyl.partial ? [['pressm', 'Posunout plochu', 'pressface']] : pl
-    ? [['ext', 'Vysunout', 'extrude'], ['press', 'Posunout plochu', 'pressface'], ['split', 'Rozdělit plochu', 'splitface'], ['bend', 'Ohnout', 'bendface'], ['al', 'Zarovnat k…', 'center'], ['sk', 'Skica z plochy', 'sketchi'], ['esk', 'Prázdná skica', 'sketch']]
-    : [['press', selFace.cyl.internal ? 'Průměr otvoru' : 'Změnit průměr', 'pressface'], ['al', 'Zarovnat k…', 'center'], ['thr', 'Závit', 'thread']];
+    ? [['ext', 'Vysunout', 'extrude'], ['press', 'Posunout plochu', 'pressface'], ['split', 'Rozdělit plochu', 'splitface'], ['bend', 'Ohnout', 'bendface'], ['ribs', 'Žebra', 'ribs'], ['al', 'Zarovnat k…', 'center'], ['sk', 'Skica z plochy', 'sketchi'], ['esk', 'Prázdná skica', 'sketch']]
+    : [['press', selFace.cyl.internal ? 'Průměr otvoru' : 'Změnit průměr', 'pressface'], ['ribs', 'Žebra', 'ribs'], ['al', 'Zarovnat k…', 'center'], ['thr', 'Závit', 'thread']];
   bar.innerHTML = `<span class="fb-t"></span><div class="fb-a">${acts.map(([k, l, ic]) => `<button class="fb-b" data-fb="${k}"><span class="ico">${svg(ic, 18)}</span>${l}</button>`).join('')}<button class="ibtn" data-fb="x" aria-label="Zrušit výběr plochy" title="Zrušit výběr plochy">${svg('close', 16)}</button></div>`;
   $('.fb-t', bar).textContent = list.length > 1 ? multiFaceText(list) : faceText(selFace);
 }
@@ -3969,6 +3971,7 @@ document.addEventListener('click', e => {
   else if (k === 'press') startPressFace();
   else if (k === 'split') startSplitFace(undefined, undefined, s);
   else if (k === 'bend') startBendFace(undefined, undefined, s);
+  else if (k === 'ribs') startRibs(undefined, undefined, s);
   else if (k === 'sk') faceToSketch();
   else if (k === 'esk') enterSketch({ id: newId(), type: 'sketch', name: 'Skica ' + (doc.features.filter(x => x.type === 'sketch').length + 1), plane: facePlane(s.n, s.w, facePolys(s)), ents: [] }, null);
   else if (k === 'thr') { startThread(); if (cmd && cmd.setFace) cmd.setFace(s.bodyId, s.cyl); }
@@ -4023,6 +4026,7 @@ function faceContext(e) {
     [selFace.kind === 'cyl' ? (selFace.cyl.internal ? 'Změnit průměr otvoru…' : 'Změnit průměr…') : 'Posunout plochu (vysunout / zapustit)…', () => startPressFace()],
     ['Rozdělit plochu čarou…', () => startSplitFace(undefined, undefined, selFace), selFace.kind !== 'plane'],
     ['Ohnout plochu kolem hrany…', () => startBendFace(undefined, undefined, selFace), selFace.kind !== 'plane'],
+    ['Žebra nebo drážky na ploše…', () => startRibs(undefined, undefined, selFace)],
     ['Skica z plochy (Ctrl+D)', () => faceToSketch(), selFace.kind !== 'plane'],
     ['Nová prázdná skica na ploše', () => { const s = selFace; enterSketch({ id: newId(), type: 'sketch', name: 'Skica ' + (doc.features.filter(x => x.type === 'sketch').length + 1), plane: facePlane(s.n, s.w, facePolys(s)), ents: [] }, null); }, selFace.kind !== 'plane'],
     ['Závit na této ploše…', () => { const s = selFace; startThread(); if (cmd && cmd.setFace) cmd.setFace(s.bodyId, s.cyl); }, selFace.kind !== 'cyl'],
@@ -4309,6 +4313,77 @@ function faceEdgesOf(regionPolys) {
     for (let k = 0; k < corner.length; k++) { const a = loop[corner[k]], b = loop[corner[(k + 1) % corner.length]]; if (K.vdot(K.vsub(b, a), K.vsub(b, a)) > 1e-6) out.push([a, b]); }
   }
   return out;
+}
+/* Žebra: ribs or grooves on a selected face (cylinder: along the axis, also twisted into a spiral, or rings; flat face:
+   parallel bars at an angle) */
+function startRibs(editIndex, f, face) {
+  const r6 = x => Math.round(x * 1e6) / 1e6, r4 = x => Math.round(x * 1e4) / 1e4;
+  const c = {
+    editIndex, body: f ? f.body : null, desc: null, timer: 0, tool: null,
+    v: f ? { op: f.op || 'join', dir: f.dir || 'axial', profile: f.profile || 'rect', count: f.count, width: f.width, height: f.height, twist: f.twist || 0, angle: f.angle || 0, from: f.from || 0, to: f.to === undefined ? 100 : f.to }
+      : { op: 'join', dir: 'axial', profile: 'rect', count: 12, width: 2, height: 1.5, twist: 0, angle: 0, from: 0, to: 100 },
+    init() {
+      if (f) this.desc = f.kind === 'cyl' ? { kind: 'cyl', c: f.c, ax: f.ax, r: f.r, len: f.len, ...(f.internal ? { internal: true } : {}) } : { kind: 'plane', n: f.n, w: f.w, p: f.p, ...(f.clip ? { clip: f.clip } : {}) };
+      openDialog({
+        title: 'Žebra', icon: 'ribs',
+        fields: [{ k: 'sel', id: 'face', label: 'Plocha' },
+          { k: 'seg', id: 'op', label: 'Vytvořit', options: [['join', 'Žebra'], ['cut', 'Drážky']], value: this.v.op },
+          { k: 'seg', id: 'dir', label: 'Směr', options: [['axial', 'Podél osy'], ['ring', 'Prstence']], value: this.v.dir },
+          { k: 'seg', id: 'profile', label: 'Průřez', options: [['rect', 'Hranatý'], ['round', 'Oblý'], ['tri', 'Klínový']], value: this.v.profile },
+          { k: 'num', id: 'count', label: 'Počet', unit: 'ks', value: this.v.count, range: [1, 120, 1] },
+          { k: 'num', id: 'width', label: 'Šířka', value: this.v.width }, { k: 'num', id: 'height', label: 'Výška', value: this.v.height },
+          { k: 'num', id: 'twist', label: 'Zkroucení (spirála)', unit: '°', value: this.v.twist, range: [-720, 720, 15] },
+          { k: 'num', id: 'angle', label: 'Natočení žeber', unit: '°', value: this.v.angle, range: [-90, 90, 5] },
+          { k: 'num', id: 'from', label: 'Od (% délky)', unit: '%', value: this.v.from, range: [0, 100, 1] }, { k: 'num', id: 'to', label: 'Do (% délky)', unit: '%', value: this.v.to, range: [0, 100, 1] },
+          { k: 'note', id: 'n' }],
+        onChange: id => {
+          if (id === 'op' || id === 'dir' || id === 'profile') this.v[id] = dlg.get(id);
+          else { const x = dlg.get(id); if (isFinite(x) && (id === 'twist' || id === 'angle' || id === 'from' || id === 'to' || x > 0)) this.v[id] = id === 'count' ? Math.max(1, Math.round(x)) : x; }
+          this.update();
+        }
+      });
+      if (!f && face) this.useFace(face);
+      this.update();
+    },
+    useFace(face) {
+      if (face.kind === 'cyl') { if (face.cyl.partial) { toast('Žebra jdou na celou válcovou plochu nebo na rovnou plochu.'); return; } const y = face.cyl; this.desc = { kind: 'cyl', c: y.c.map(r6), ax: y.ax.map(r6), r: r6(y.r), len: r6(y.len), ...(y.internal ? { internal: true } : {}) }; }
+      else this.desc = { kind: 'plane', n: face.n.map(r6), w: Math.round(face.w * 1e5) / 1e5, p: face.p.map(r4), ...(face.clip ? { clip: face.clip } : {}) };
+      this.body = face.bodyId;
+      if (!f && this.desc.kind === 'cyl') { const circ = 2 * Math.PI * this.desc.r; this.v.count = Math.max(3, Math.min(60, Math.round(circ / (this.v.width * 3)))); dlg.set('count', this.v.count); }
+    },
+    feature() { return { id: f ? f.id : 'tmp', type: 'ribs', body: this.body, ...this.desc, ...this.v }; },
+    update() {
+      const d = this.desc, cy = d && d.kind === 'cyl';
+      dlg.set('face', { text: !d ? 'Klepněte na válcovou nebo rovnou plochu' : cy ? (d.internal ? 'Otvor' : 'Válcová plocha') + ` Ø${fmtc(d.r * 2, 2)}` : 'Rovinná plocha', has: !!d, active: !d });
+      dlg.show('dir', !!cy); dlg.show('twist', !!cy && this.v.dir === 'axial'); dlg.show('angle', !!d && !cy);
+      for (const id of ['from', 'to', 'from-r', 'to-r']) dlg.show(id, !!cy);
+      dlg.label('height', this.v.op === 'cut' ? 'Hloubka' : 'Výška');
+      setPrompt(d ? 'Upravte žebra v okně; OK je přidá' : 'Klepněte na válcovou nebo rovnou plochu tělesa');
+      clearTimeout(this.timer); clearGroup(G.preview); this.tool = null; dlg.okEnabled(false);
+      if (!d) { dlg.set('n', 'Vyberte plochu: na válci vzniknou žebra podél osy nebo prstence, na rovné ploše rovnoběžná žebra.'); requestRender(); return; }
+      dlg.set('n', 'Počítám…');
+      this.timer = setTimeout(() => {
+        if (cmd !== this) return;
+        const b = cur.bodies.find(x => x.id === this.body); if (!b) return;
+        try {
+          this.tool = Engine.ribsTool(b.polys, this.feature());
+          G.preview.add(previewMesh(this.tool, this.v.op === 'cut' ? 'cut' : 'join'));
+          dlg.set('n', cy && this.v.dir === 'axial' && Math.abs(this.v.twist) > 0 ? 'Žebra se kolem osy stočí do spirály.' : ''); dlg.okEnabled(true);
+        } catch (e) { dlg.set('n', '!' + e.message); }
+        requestRender();
+      }, 150);
+    },
+    onMove(ev) { if (!this.desc) dom.style.cursor = hitBodies(ev) ? 'pointer' : ''; },
+    onClick(ev) {
+      if (this.desc && !f) return;
+      const h = hitBodies(ev), fc = h ? faceAtHit(h) : null;
+      if (!fc || (fc.kind !== 'plane' && fc.kind !== 'cyl')) { if (h) toast('Vyberte válcovou nebo rovnou plochu.'); return; }
+      this.useFace(fc); this.update();
+    },
+    ok() { if (!this.tool) return null; clearTimeout(this.timer); const o = this.feature(); o.id = f ? f.id : newId(); return o; },
+    after() { selFace = null; selFaces = []; hoverFace = null; }
+  };
+  beginCmd(c); c.init();
 }
 function startBendFace(editIndex, f, face) {
   const R = TOUCH ? 24 : 14, r6 = x => Math.round(x * 1e6) / 1e6, r4 = x => Math.round(x * 1e4) / 1e4;

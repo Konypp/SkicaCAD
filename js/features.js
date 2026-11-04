@@ -7,7 +7,7 @@ const PLANES = {
   XZ: { o: [0, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] },
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
-const FEATURE_LABEL = { buckle: 'Spona', articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Konektory', libpart: 'Vložený díl', jointpart: 'Kloubový spoj', curvecut: 'Rozříznout křivkou', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
+const FEATURE_LABEL = { buckle: 'Spona', articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Konektory', libpart: 'Vložený díl', ribs: 'Žebra', jointpart: 'Kloubový spoj', curvecut: 'Rozříznout křivkou', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
   fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
@@ -405,6 +405,68 @@ function bendFaceTool(polys, f) {
   const Rm = [t * x * x + c, t * x * y + s * z, t * x * z - s * y, t * x * y - s * z, t * y * y + c, t * y * z + s * x, t * x * z + s * y, t * y * z - s * x, t * z * z + c];
   const ro = [o3[0] - (Rm[0] * o3[0] + Rm[3] * o3[1] + Rm[6] * o3[2]), o3[1] - (Rm[1] * o3[0] + Rm[4] * o3[1] + Rm[7] * o3[2]), o3[2] - (Rm[2] * o3[0] + Rm[5] * o3[1] + Rm[8] * o3[2])];
   return KK.transform(tool, [Rm[0], Rm[1], Rm[2], 0, Rm[3], Rm[4], Rm[5], 0, Rm[6], Rm[7], Rm[8], 0, ro[0], ro[1], ro[2], 1]);
+}
+/* Žebra (Plochy › Žebra): ribs or grooves on a selected face. A rib is a loft of its cross-section (square, rounded or
+   wedge, width × height, sunk 0.4 mm into the body so it joins) along the face: on a cylinder along the axis (with an
+   optional twist into a spiral) or round it as rings; on a flat face as parallel bars at a chosen angle, cut to the
+   face's outline. Grooves are the same shapes going into the body. */
+function loftSolid(S, closed) {
+  const polys = [], m = S[0].length, ns = S.length, add = v => { const q = KK.mkPoly(v); if (q) polys.push(q); };
+  for (let k = 0; k < (closed ? ns : ns - 1); k++) { const A = S[k], B = S[(k + 1) % ns]; for (let j = 0; j < m; j++) { const j2 = (j + 1) % m; add([A[j], A[j2], B[j2]]); add([A[j], B[j2], B[j]]); } }
+  if (!closed) { add(S[0].slice().reverse()); add(S[ns - 1].slice()); }
+  return KK.fixOrientation(polys);
+}
+function ribProfile(kind, w, h, e) {
+  if (kind === 'tri') return [[-w / 2, -e], [w / 2, -e], [0, h]];
+  if (kind === 'round') { const P = [[-w / 2, -e], [w / 2, -e]]; for (let i = 0; i <= 12; i++) { const t = i / 12 * Math.PI; P.push([w / 2 * Math.cos(t), h * Math.sin(t)]); } return P.filter((q, i, a) => i === 0 || Math.hypot(q[0] - a[i - 1][0], q[1] - a[i - 1][1]) > 1e-6); }
+  return [[-w / 2, -e], [w / 2, -e], [w / 2, h], [-w / 2, h]];
+}
+function ribsTool(polys, f) {
+  const n = Math.max(1, Math.min(360, Math.round(Number(f.count) || 1))), w = Number(f.width), h = Number(f.height), e = 0.4;
+  if (!(w > 0.05) || !(h > 0.05)) throw new Error('Šířka i výška žeber musí být větší než 0');
+  const cut = f.op === 'cut', prof = ribProfile(f.profile, w, h, e), out = [];
+  if (f.kind === 'cyl') {
+    const ax = KK.vnorm(f.ax.map(Number)), c = f.c.map(Number), r = Number(f.r), len = Number(f.len);
+    const t0 = Math.max(0, Math.min(100, Number(f.from) || 0)) / 100, t1 = Math.max(0, Math.min(100, f.to === undefined ? 100 : Number(f.to))) / 100;
+    if (!(t1 > t0)) throw new Error('Rozsah Od–Do je prázdný');
+    const z0 = len * t0, z1 = len * t1, tt = Math.abs(ax[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0], e1 = KK.vnorm(KK.cross(ax, tt)), e2 = KK.cross(ax, e1);
+    const D = (f.internal ? -1 : 1) * (cut ? -1 : 1);
+    if (cut && h >= r * 0.95 && !f.internal) throw new Error('Drážky jsou hlubší než poloměr válce');
+    const P = (z, ph, t, d) => { const U = KK.vadd(KK.vmul(e1, Math.cos(ph)), KK.vmul(e2, Math.sin(ph))), V = KK.vadd(KK.vmul(e1, -Math.sin(ph)), KK.vmul(e2, Math.cos(ph))); return KK.vadd(KK.vadd(c, KK.vmul(ax, z)), KK.vadd(KK.vmul(U, r + D * d), KK.vmul(V, t))); };
+    if (f.dir === 'ring') {
+      const M = 96;
+      for (let i = 0; i < n; i++) {
+        const zi = z0 + (i + 0.5) * (z1 - z0) / n, S = [];
+        for (let k = 0; k < M; k++) { const ph = k / M * 2 * Math.PI; S.push(prof.map(([t, d]) => P(zi + t, ph, 0, d))); }
+        out.push(...loftSolid(S, true));
+      }
+      if (n > 1 && (z1 - z0) / n < w + 0.05) throw new Error('Prstence se do délky nevejdou, zmenšete počet nebo šířku');
+    } else {
+      const tw = (Number(f.twist) || 0) * Math.PI / 180, dph = Math.max(2 * Math.PI / 180, Math.min(8 * Math.PI / 180, Math.sqrt(8 * 0.03 / (r + h)))), ns = Math.abs(tw) > 1e-6 ? Math.max(2, Math.ceil(Math.abs(tw) / dph) + 1) : 2;
+      if (n > 1 && 2 * Math.PI * r / n < w + 0.05) throw new Error('Žebra se po obvodu nevejdou, zmenšete počet nebo šířku');
+      for (let i = 0; i < n; i++) {
+        const S = [];
+        for (let k = 0; k < ns; k++) { const q = k / (ns - 1), z = z0 + (z1 - z0) * q, ph = 2 * Math.PI * i / n + tw * q; S.push(prof.map(([t, d]) => P(z, ph, t, d))); }
+        out.push(...loftSolid(S, false));
+      }
+    }
+    return out;
+  }
+  /* a flat face: parallel bars across it at the angle, cut to its outline */
+  const B = basisFromPlane(f.n.map(Number), Number(f.w)), loops = faceLoops2D(polys, { n: f.n, w: f.w, p: f.p, clip: f.clip }, B);
+  if (!loops.length) throw new Error('Obrys plochy se nepodařilo určit');
+  const al = (Number(f.angle) || 0) * Math.PI / 180, dv = [Math.cos(al), Math.sin(al)], pv = [-dv[1], dv[0]], all = loops.flat();
+  const dd = all.map(q => q[0] * dv[0] + q[1] * dv[1]), pp = all.map(q => q[0] * pv[0] + q[1] * pv[1]);
+  const d0 = Math.min(...dd) - 1, d1 = Math.max(...dd) + 1, p0 = Math.min(...pp), p1 = Math.max(...pp);
+  if (n > 1 && (p1 - p0) / n < w + 0.05) throw new Error('Žebra se na plochu nevejdou, zmenšete počet nebo šířku');
+  const D = cut ? -1 : 1, P3 = (x, y, d) => KK.vadd(B.o, KK.vadd(KK.vadd(KK.vmul(B.u, x), KK.vmul(B.v, y)), KK.vmul(B.n, D * d)));
+  const bars = [];
+  for (let i = 0; i < n; i++) {
+    const o = p0 + (i + 0.5) * (p1 - p0) / n, S = [d0, d1].map(a => prof.map(([t, d]) => P3(dv[0] * a + pv[0] * (o + t), dv[1] * a + pv[1] * (o + t), d)));
+    bars.push(...loftSolid(S, false));
+  }
+  const lim = KK.fixOrientation(KK.extrudeProfiles(loops.map(l => ({ pts: l, closed: true })), B, -h - e - 1, h + e + 1));
+  return KK.boolean(bars, lim, 'intersect');
 }
 /* cutting tool of Rozříznout: the whole half-space, or (a smaller cutting face) a square prism standing on the face,
    which cuts out only the part of the body in front of that square */
@@ -2542,6 +2604,16 @@ function step(state, f) {
       else out = bodies.map(x => (sel.includes(x) ? xfBody(x, m) : x));
       break;
     }
+    case 'ribs': {
+      const b = bodies.find(x => x.id === f.body);
+      if (!b) throw new Error('Těleso neexistuje');
+      const tool = ribsTool(b.polys, f);
+      if (!tool.length) throw new Error('Žebra se nepodařilo vytvořit');
+      const res = KK.boolean(b.polys, tool, f.op === 'cut' ? 'subtract' : 'union');
+      if (!res.length) throw new Error('Žebra se nepodařilo vytvořit');
+      out = bodies.map(x => (x === b ? { ...x, polys: res } : x));
+      break;
+    }
     case 'bendface': {
       const b = bodies.find(x => x.id === f.body);
       if (!b) throw new Error('Těleso neexistuje');
@@ -2663,7 +2735,7 @@ function makeRebuilder() {
   };
 }
 
-return { curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { ribsTool, curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

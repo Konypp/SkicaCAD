@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.09
+- **Plochy › Žebra:** žebra nebo drážky rovnou na vybrané ploše. Na válci (i ve vnitřní stěně otvoru) podél osy – s volitelným **zkroucením do spirály** – nebo jako **prstence** kolem dokola, v rozsahu Od–Do délky; na rovné ploše rovnoběžná žebra pod zvoleným úhlem, oříznutá podle obrysu plochy. Průřez hranatý, oblý nebo klínový; počet, šířka a výška (u drážek hloubka). Žebra se se tělesem rovnou spojí (zapuštěná 0,4 mm), drážky se vyříznou. Válec se přitom nedeformuje, takže jeho stěna zůstane čistá. Nabídka je v liště vybrané plochy i v kontextové nabídce.
 ## Beta 2.08
 - **Rychlejší a lehčí Deformace (Zkroutit, Zúžit, Ohnout):** síť se dělí jen podél osy deformace (rovinami napříč), ne do všech směrů; u zkroucení navíc jen tak jemně, aby se tvar od přesné šroubovice lišil nejvýš o setiny mm, a napříč jen u širokých ploch. Zkroucených 50 žeber na válci má teď asi 27 tisíc plošek místo 560 tisíc, takže deformace, následné spojení s válcem i načtení modelu jsou mnohonásobně rychlejší (místo „příliš složité“ asi 6 s).
 - **Pole se spojením s originálem:** kopie, které se ničeho nedotýkají, se jen přidají bez booleovské operace; 50 žeber se spojí za zlomek sekundy (dřív asi 8 s).
