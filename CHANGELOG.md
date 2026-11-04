@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.10
+- **Plochy › Žebra – Vytvořit: Nové těleso.** Žebra vzniknou jako samostatné těleso (Žebra 1, …), stále zapuštěná 0,4 mm do plochy, takže je lze nejdřív deformovat (Zkroutit, Zúžit, Ohnout…) a potom spojit s tělesem přes Kombinovat › Sjednotit.
 ## Beta 2.09
 - **Plochy › Žebra:** žebra nebo drážky rovnou na vybrané ploše. Na válci (i ve vnitřní stěně otvoru) podél osy – s volitelným **zkroucením do spirály** – nebo jako **prstence** kolem dokola, v rozsahu Od–Do délky; na rovné ploše rovnoběžná žebra pod zvoleným úhlem, oříznutá podle obrysu plochy. Průřez hranatý, oblý nebo klínový; počet, šířka a výška (u drážek hloubka). Žebra se se tělesem rovnou spojí (zapuštěná 0,4 mm), drážky se vyříznou. Válec se přitom nedeformuje, takže jeho stěna zůstane čistá. Nabídka je v liště vybrané plochy i v kontextové nabídce.
 ## Beta 2.08

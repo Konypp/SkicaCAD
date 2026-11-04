@@ -4327,7 +4327,7 @@ function startRibs(editIndex, f, face) {
       openDialog({
         title: 'Žebra', icon: 'ribs',
         fields: [{ k: 'sel', id: 'face', label: 'Plocha' },
-          { k: 'seg', id: 'op', label: 'Vytvořit', options: [['join', 'Žebra'], ['cut', 'Drážky']], value: this.v.op },
+          { k: 'seg', id: 'op', label: 'Vytvořit', options: [['join', 'Žebra'], ['cut', 'Drážky'], ['new', 'Nové těleso']], value: this.v.op },
           { k: 'seg', id: 'dir', label: 'Směr', options: [['axial', 'Podél osy'], ['ring', 'Prstence']], value: this.v.dir },
           { k: 'seg', id: 'profile', label: 'Průřez', options: [['rect', 'Hranatý'], ['round', 'Oblý'], ['tri', 'Klínový']], value: this.v.profile },
           { k: 'num', id: 'count', label: 'Počet', unit: 'ks', value: this.v.count, range: [1, 120, 1] },
@@ -4367,8 +4367,8 @@ function startRibs(editIndex, f, face) {
         const b = cur.bodies.find(x => x.id === this.body); if (!b) return;
         try {
           this.tool = Engine.ribsTool(b.polys, this.feature());
-          G.preview.add(previewMesh(this.tool, this.v.op === 'cut' ? 'cut' : 'join'));
-          dlg.set('n', cy && this.v.dir === 'axial' && Math.abs(this.v.twist) > 0 ? 'Žebra se kolem osy stočí do spirály.' : ''); dlg.okEnabled(true);
+          G.preview.add(previewMesh(this.tool, this.v.op === 'cut' ? 'cut' : this.v.op === 'new' ? 'new' : 'join'));
+          dlg.set('n', this.v.op === 'new' ? 'Žebra vzniknou jako samostatné těleso: můžete je deformovat (např. zkroutit) a pak spojit s tělesem přes Kombinovat › Sjednotit.' : cy && this.v.dir === 'axial' && Math.abs(this.v.twist) > 0 ? 'Žebra se kolem osy stočí do spirály.' : ''); dlg.okEnabled(true);
         } catch (e) { dlg.set('n', '!' + e.message); }
         requestRender();
       }, 150);

@@ -2609,6 +2609,8 @@ function step(state, f) {
       if (!b) throw new Error('Těleso neexistuje');
       const tool = ribsTool(b.polys, f);
       if (!tool.length) throw new Error('Žebra se nepodařilo vytvořit');
+      /* Nové těleso: the ribs on their own (still sunk 0.4 mm into the face), to deform them before joining them on */
+      if (f.op === 'new') { out = bodies.concat([{ id: f.id, name: 'Žebra ' + (bodies.filter(x => /^Žebra \d+$/.test(x.name)).length + 1), polys: tool, from: f.id }]); break; }
       const res = KK.boolean(b.polys, tool, f.op === 'cut' ? 'subtract' : 'union');
       if (!res.length) throw new Error('Žebra se nepodařilo vytvořit');
       out = bodies.map(x => (x === b ? { ...x, polys: res } : x));
