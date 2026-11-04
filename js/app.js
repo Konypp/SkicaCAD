@@ -75,6 +75,7 @@ const ICONS = {
   text3d: '<path d="M5 6V4h14v2M12 4v16M9 20h6"/>',
   skoffset: '<rect x="7" y="7" width="10" height="10" rx="1"/><rect x="3" y="3" width="18" height="18" rx="3" style="stroke:var(--orange)" stroke-dasharray="3 2"/>',
   sksegtrim: '<circle cx="10" cy="13" r="6"/><path d="M12 4h9v9h-5"/><path class="o" d="M13.5 7.5 16 10" stroke-dasharray="2 2" style="stroke:var(--orange)"/><path d="M3 21 8 16M8 21 3 16" style="stroke:var(--orange)"/>',
+  skmirror: '<path d="M12 2v20" stroke-dasharray="2 2" style="stroke:var(--orange)"/><path d="M9 7 3 17h6z"/><path d="M15 7l6 10h-6z" stroke-dasharray="2 1.5"/>',
   skjoin: '<path d="M4 6c3-2 6 2 9 0"/><path d="M4 18c3 2 6-2 9 0"/><path d="M13 6 18 12 13 18M4 6v12" stroke-dasharray="2 2" style="stroke:var(--orange)"/>',
   skcons: '<path d="M3 20 21 4" stroke-dasharray="3 2.5"/><circle cx="3.5" cy="19.5" r="1.6"/><circle cx="20.5" cy="4.5" r="1.6"/>',
   skdup: '<rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M16 8V5.5A1.5 1.5 0 0 0 14.5 4h-9A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8"/>',
@@ -421,6 +422,7 @@ function toggleCons() {
 }
 function skCheckpoint() {
   if (!sk || !sk.hist) return;
+  symLive();
   const j = JSON.stringify(sk.f.ents);
   if (j !== sk.lastJSON) { sk.hist.push(sk.lastJSON); if (sk.hist.length > 200) sk.hist.shift(); sk.fut = []; sk.lastJSON = j; }
   updateUndo();
@@ -1213,7 +1215,7 @@ const RIBBON = {
     ['Vytvořit', [['line', 'Čára', 'L'], ['spline', 'Křivka', 'K'], ['rect', 'Obdélník', 'R'], ['circle', 'Kružnice', 'C'],
       { menu: 'skshape', label: 'Další tvary', items: [['ellipse', 'Elipsa', 'E'], ['ngon', 'Mnohoúhelník', 'P'], ['slot', 'Drážka', 'D']] }]],
     ['Upravit', [['sksegtrim', 'Oříznout', 'T'], ['skcons', 'Pomocná', 'Q'], ['skdel', 'Smazat', 'Del'],
-      { menu: 'skedit', label: 'Úpravy skici', items: [['skfillet', 'Zaoblit rohy'], ['skoffset', 'Odsadit', 'O'], ['sktrim', 'Kombinovat', 'X'], ['skjoin', 'Spojit', 'J']] }]],
+      { menu: 'skedit', label: 'Úpravy skici', items: [['skfillet', 'Zaoblit rohy'], ['skoffset', 'Odsadit', 'O'], ['sktrim', 'Kombinovat', 'X'], ['skjoin', 'Spojit', 'J'], ['skmirror', 'Zrcadlit', 'M']] }]],
     ['Dokončit', [['skimport', 'DXF / SVG'], ['finish', 'Dokončit skicu', 'Enter']]]
   ]
 };
@@ -1256,7 +1258,7 @@ document.addEventListener('pointerdown', e => { if (!e.target.closest || e.targe
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeRibMenu(); });
 $('#rbody').addEventListener('click', e => { const mb = e.target.closest('[data-menu]'); if (mb) { openRibMenu(mb); return; } });
 $('#rbody').addEventListener('click', e => { const b = e.target.closest('[data-cmd]'); if (b) runCommand(b.dataset.cmd); });
-const SK_TOOLS = ['line', 'spline', 'rect', 'circle', 'ellipse', 'ngon', 'slot', 'skfillet', 'skoffset', 'sktext', 'sktrim', 'sksegtrim', 'skjoin'];
+const SK_TOOLS = ['line', 'spline', 'rect', 'circle', 'ellipse', 'ngon', 'slot', 'skfillet', 'skoffset', 'sktext', 'sktrim', 'sksegtrim', 'skjoin', 'skmirror'];
 function runCommand(id) {
   $('#ctxmenu').hidden = true;
   if (sk) {
@@ -1442,6 +1444,8 @@ $('#dialog').addEventListener('change', e => {
   if (sk && e.target.dataset.ent) onPaletteChange(e.target);
   if (sk && e.target.id === 'pal-ngon') { const v = Math.round(parseNum(e.target.value)); if (v >= 3 && v <= 64) sk.ngonN = v; e.target.value = sk.ngonN; redrawSketch(); }
   if (sk && e.target.id === 'pal-dims') { settings.skDims = e.target.checked; saveSettings(); requestRender(); }
+  if (sk && e.target.id === 'pal-symc') { const v = parseNum(e.target.value); if (isFinite(v)) symState().c = v; e.target.value = fmtc(symState().c, 3); redrawSketch(); }
+  if (sk && e.target.id === 'pal-symlive') { symState().live = e.target.checked; sk.symN = sk.f.ents.length; redrawSketch(); }
   if (sk && e.target.id === 'pal-offd') { const v = parseNum(e.target.value); if (v > 0) sk.offD = v; e.target.value = fmtc(sk.offD, 3); }
   if (sk && e.target.id === 'pal-txt') { const t = e.target.value.trim(); if (t) sk.txt.s = t.slice(0, 200); e.target.value = sk.txt.s; redrawSketch(); }
   if (sk && e.target.id === 'pal-txth') { const v = parseNum(e.target.value); if (v > 0) sk.txt.h = Math.min(1000, v); e.target.value = fmtc(sk.txt.h, 3); redrawSketch(); }
@@ -1656,7 +1660,8 @@ function redrawSketch() {
   live.add(pointsObj(P, keyPoints(ents).slice(1), tok.sketch, 5));
   const d = draftEntity();
   if (d) { if (sk.consMode) d.cons = true; live.add(sketchLines(P, [d], tok.orange, 0.07)); }
-  if (sk.offHover && sk.tool === 'skoffset') live.add(sketchLines(P, [{ ...sk.offHover, cons: true }], tok.accent, 0.08));
+  if (sk.offHover && (sk.tool === 'skoffset' || sk.tool === 'skmirror')) live.add(sketchLines(P, [{ ...sk.offHover, cons: true }], tok.accent, 0.08));
+  { const ax = symAxis(); if (ax && (sk.tool === 'skmirror' || (sk.sym && sk.sym.live))) { const L = 2000; live.add(sketchLines(P, [{ t: 'poly', pts: [[ax.p[0] - ax.d[0] * L, ax.p[1] - ax.d[1] * L], [ax.p[0] + ax.d[0] * L, ax.p[1] + ax.d[1] * L]], closed: false, cons: true }], tok.orange, 0.06)); } }
   if (sk.segHover && sk.tool === 'sksegtrim') { const g = sketchLines(P, [{ t: 'poly', pts: sk.segHover, closed: false, cons: true }], tok.danger, 0.08); live.add(g); }
   if (sk.draft && isPolyTool(sk.tool)) live.add(pointsObj(P, sk.draft.pts, tok.orange, 6));
   const se = ents[sk.selEnt];
@@ -1740,12 +1745,13 @@ function setSketchTool(t) {
     skfillet: 'Zaoblení rohů: nastavte poloměr v paletě a klepněte na obdélník, mnohoúhelník nebo uzavřený obrys',
     sktrim: COMB_PROMPT1[combOp()],
     skjoin: JOIN_PROMPT1,
+    skmirror: 'Zrcadlit: zvolte osu v paletě a klepněte na prvek, vznikne jeho zrcadlový obraz; zapnete-li Kreslit zrcadlově, zrcadlí se i vše nově nakreslené',
     skoffset: 'Odsadit: nastavte vzdálenost a směr v paletě a klepněte na obrys, vedle vznikne odsazená kopie',
     sktext: 'Text: napište text a výšku písma v paletě, pak klepněte na místo, kde má text začínat (levý konec účaří)',
     sksegtrim: 'Oříznout: klepněte na úsek čáry mezi průsečíky, úsek se odstraní a navazující čáry se spojí do jednoho obrysu'
   };
   setPrompt(PROMPTS[t] || 'Klepnutím vyberte prvek skici, tažením ho přesunete. Nástroje kreslení jsou v pásu nahoře.');
-  dom.style.cursor = t && t !== 'skfillet' && t !== 'skoffset' && t !== 'sktrim' && t !== 'sksegtrim' && t !== 'skjoin' ? 'crosshair' : '';
+  dom.style.cursor = t && t !== 'skfillet' && t !== 'skoffset' && t !== 'sktrim' && t !== 'sksegtrim' && t !== 'skjoin' && t !== 'skmirror' ? 'crosshair' : '';
   renderRibbon(); redrawSketch(); renderPalette(); $('#dim').hidden = true;
 }
 /* freehand curve: the sampled stroke is thinned (Douglas–Peucker) to a few through-points of a smooth spline */
@@ -1953,6 +1959,7 @@ function sketchDrag(ev) {
 function sketchMove(ev) {
   if (!sk.tool) { dom.style.cursor = sketchHandleAt(ev) ? 'move' : ''; }
   if (sk.tool === 'sksegtrim') { const r = segTrimAt(ev); sk.segHover = r ? r.cut : null; sk.snapPt = null; sk.cursor = null; sk.gridHot = null; redrawSketch(); return; }
+  if (sk.tool === 'skmirror') { const ax = symAxis(), i = hitSketchEntity(ev), e = sk.f.ents[i]; sk.offHover = ax && e ? mirrorEnt(e, ax) : null; sk.snapPt = null; sk.cursor = null; sk.gridHot = null; redrawSketch(); return; }
   if (sk.tool === 'skoffset') { const i = hitSketchEntity(ev), e = sk.f.ents[i]; sk.segHover = null; let o = null; try { o = e ? offsetEnt(e, offsetDist()) : null; } catch (er) { o = null; } sk.offHover = o; sk.snapPt = null; sk.cursor = null; sk.gridHot = null; redrawSketch(); return; }
   if (!sk.tool || sk.tool === 'skfillet' || sk.tool === 'sktrim' || sk.tool === 'skjoin') { sk.snapPt = null; sk.cursor = null; sk.gridHot = null; sk.hoverMid = !sk.tool ? nearMidpoint(ev) : null; redrawSketch(); return; }
   sk.cursor = sketchPoint(ev);
@@ -1985,6 +1992,7 @@ function sketchClick0(ev) {
   if (sk.tool === 'skjoin') { joinClick(ev); return; }
   if (sk.tool === 'sksegtrim') { segTrimClick(ev); return; }
   if (sk.tool === 'skoffset') { offsetClick(ev); return; }
+  if (sk.tool === 'skmirror') { mirrorClick(ev); return; }
   if (sk.tool === 'sktext') { const p = sketchPoint(ev); if (!p) return; sk.f.ents.push({ t: 'text', s: sk.txt.s, x: p[0], y: p[1], h: sk.txt.h, bold: sk.txt.bold, a: 0 }); sk.selEnt = sk.f.ents.length - 1; renderPalette(); redrawSketch(); return; }
   if (sk.tool === 'skfillet') {
     pickSketchEntity(ev);
@@ -2330,6 +2338,59 @@ function offsetEnt(e, d) {
   if (Math.sign(a0) !== Math.sign(a1) || Math.abs(a1) < 1e-6) bad();
   return { t: 'poly', pts, closed: true, ...(curved ? { tr: true } : {}) };
 }
+/* mirroring in a sketch (Zrcadlit): the axis is upright or level through a given coordinate, or a straight line of the sketch */
+function symState() { if (!sk.sym) sk.sym = { mode: 'v', c: 0, line: null, live: false }; return sk.sym; }
+function symAxis() {
+  if (!sk) return null;
+  const y = symState();
+  if (y.mode === 'v') return { p: [y.c, 0], d: [0, 1] };
+  if (y.mode === 'h') return { p: [0, y.c], d: [1, 0] };
+  return y.line;
+}
+function mirrorEnt(e, ax) {
+  const r4 = v => Math.round(v * 1e4) / 1e4, M = q => { const vx = q[0] - ax.p[0], vy = q[1] - ax.p[1], t = vx * ax.d[0] + vy * ax.d[1]; return [r4(ax.p[0] + 2 * t * ax.d[0] - vx), r4(ax.p[1] + 2 * t * ax.d[1] - vy)]; };
+  const th = Math.atan2(ax.d[1], ax.d[0]) / D2R, ang = a => { let x = Math.round((2 * th - (a || 0)) * 100) / 100; x = ((x % 360) + 540) % 360 - 180; return Object.is(x, -0) ? 0 : x; };
+  const level = Math.abs(ax.d[0]) < 1e-9 || Math.abs(ax.d[1]) < 1e-9, o = { ...e };
+  if (e.t === 'rect') {
+    const C = [[e.x, e.y], [e.x + e.w, e.y], [e.x + e.w, e.y + e.h], [e.x, e.y + e.h]].map(M);
+    if (level) { const xs = C.map(q => q[0]), ys = C.map(q => q[1]); Object.assign(o, { x: Math.min(...xs), y: Math.min(...ys), w: r4(Math.abs(e.w)), h: r4(Math.abs(e.h)) }); return o; }
+    return { t: 'poly', pts: C, closed: true, ...(e.fr ? { fr: e.fr } : {}), ...(e.cons ? { cons: true } : {}) };
+  }
+  if (e.t === 'circle') { const c = M([e.x, e.y]); o.x = c[0]; o.y = c[1]; return o; }
+  if (e.t === 'ngon' || e.t === 'ellipse') { const c = M([e.x, e.y]); o.x = c[0]; o.y = c[1]; o.a = ang(e.a); return o; }
+  if (e.t === 'slot') { const a = M([e.x1, e.y1]), b = M([e.x2, e.y2]); Object.assign(o, { x1: a[0], y1: a[1], x2: b[0], y2: b[1] }); return o; }
+  if (e.t === 'poly' || e.t === 'spline') { o.pts = e.pts.map(M); return o; }
+  if (e.t === 'text') { const c = M([e.x, e.y]); o.x = c[0]; o.y = c[1]; return o; } /* text stays readable: only its place is mirrored */
+  return null;
+}
+const sameEnt = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+function mirrorClick(ev) {
+  const y = symState(), i = hitSketchEntity(ev), e = sk.f.ents[i];
+  if (y.mode === 'line' && !y.line) {
+    if (!e) { toast('Klepněte na rovnou čáru, která bude osou.'); return; }
+    const pl = entityPolylines([e])[0]; if (!pl || pl.pts.length < 2) { toast('Osou může být jen rovná čára.'); return; }
+    const P = sk.f.plane; ray.setFromCamera(evNdc(ev), cam());
+    const hit = ray.ray.intersectPlane(new THREE.Plane().setFromNormalAndCoplanarPoint(v3(P.n), v3(P.o)), new V3()); if (!hit) return;
+    const q = P2(P, hit), n = pl.pts.length; let best = null, bd = Infinity;
+    for (let k = 0; k < (pl.closed ? n : n - 1); k++) { const a = pl.pts[k], b = pl.pts[(k + 1) % n], dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy; if (L2 < 1e-12) continue; const t = Math.max(0, Math.min(1, ((q[0] - a[0]) * dx + (q[1] - a[1]) * dy) / L2)), d = Math.hypot(a[0] + dx * t - q[0], a[1] + dy * t - q[1]); if (d < bd) { bd = d; best = { p: a.slice(), d: [dx / Math.sqrt(L2), dy / Math.sqrt(L2)] }; } }
+    if (!best) return;
+    y.line = best; sk.offHover = null; renderPalette(); redrawSketch(); toast('Osa je vybraná. Klepněte na prvek, který chcete zrcadlit.'); return;
+  }
+  if (!e) { toast('Klepněte na prvek, který chcete zrcadlit.'); return; }
+  const m = mirrorEnt(e, symAxis()); if (!m) return;
+  if (sameEnt(m, e)) { toast('Prvek je podle osy souměrný, zrcadlový obraz splývá s ním.'); return; }
+  sk.f.ents.push(m); sk.symN = sk.f.ents.length; sk.selEnt = sk.f.ents.length - 1; sk.offHover = null; renderPalette(); redrawSketch();
+}
+/* Kreslit zrcadlově: each shape newly drawn gets its mirror image at once */
+const SYM_DRAW = new Set(['line', 'spline', 'rect', 'circle', 'ellipse', 'ngon', 'slot', 'sktext']);
+function symLive() {
+  const y = sk.sym, n = sk.f.ents.length;
+  if (y && y.live && symAxis() && sk.symN != null && n > sk.symN && SYM_DRAW.has(sk.tool)) {
+    const ax = symAxis();
+    for (let i = sk.symN; i < n; i++) { const m = mirrorEnt(sk.f.ents[i], ax); if (m && !sameEnt(m, sk.f.ents[i])) sk.f.ents.push(m); }
+  }
+  sk.symN = sk.f.ents.length;
+}
 function offsetClick(ev) {
   const i = hitSketchEntity(ev), e = sk.f.ents[i]; if (!e) { toast('Klepněte na obrys, který chcete odsadit.'); return; }
   let o; try { o = offsetEnt(e, offsetDist()); } catch (er) { toast(er.message); return; }
@@ -2357,7 +2418,7 @@ function renderPalette() {
   const nr = Engine.regions(sk.f).length;
   const tb = $('#pal-tool');
   if (tb) {
-    const hasMode = !!DRAW_DEFAULT[sk.tool], want = (hasMode ? 'm-' + sk.tool + '-' + drawMode(sk.tool) : '') + (sk.tool === 'ngon' ? '+ngon' : '') + (sk.tool === 'skfillet' ? 'fr' : '') + (sk.tool === 'sktrim' ? 'comb-' + combOp() : '') + (sk.tool === 'skoffset' ? 'off-' + sk.offIn : '') + (sk.tool === 'sktext' ? 'txt' : '');
+    const hasMode = !!DRAW_DEFAULT[sk.tool], want = (hasMode ? 'm-' + sk.tool + '-' + drawMode(sk.tool) : '') + (sk.tool === 'ngon' ? '+ngon' : '') + (sk.tool === 'skfillet' ? 'fr' : '') + (sk.tool === 'sktrim' ? 'comb-' + combOp() : '') + (sk.tool === 'skoffset' ? 'off-' + sk.offIn : '') + (sk.tool === 'sktext' ? 'txt' : '') + (sk.tool === 'skmirror' ? 'mir-' + symState().mode + (symState().live ? 'L' : '') + (symState().line ? 'l' : '') : '');
     if (tb.dataset.kind !== want) {
       tb.dataset.kind = want;
       const opts = sk.tool === 'spline' ? [['points', 'Bod po bodu'], ['free', 'Od ruky']] : [['corner', 'Z rohu'], ['center', sk.tool === 'slot' ? 'Od konce ke konci' : 'Ze středu']];
@@ -2366,7 +2427,10 @@ function renderPalette() {
       const offRow = sk.tool === 'skoffset' ? `<div class="frow"><label for="pal-offd">Vzdálenost</label><span class="fnum"><input id="pal-offd" value="${fmtc(sk.offD, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div><div class="frow wide"><div class="seg"><button data-offdir="out" aria-pressed="${!sk.offIn}">Ven</button><button data-offdir="in" aria-pressed="${sk.offIn}">Dovnitř</button></div></div>` : '';
       const esc = t => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
       const txtRow = sk.tool === 'sktext' ? `<div class="frow"><label for="pal-txt">Text</label><span class="fnum ftext"><input id="pal-txt" value="${esc(sk.txt.s)}" autocomplete="off"></span></div><div class="frow"><label for="pal-txth">Výška písmen</label><span class="fnum"><input id="pal-txth" value="${fmtc(sk.txt.h, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div><label class="chk"><input type="checkbox" id="pal-txtb"${sk.txt.bold ? ' checked' : ''}><span>Tučné písmo</span></label>` : '';
-      tb.innerHTML = modeRow + combRow + offRow + txtRow + (sk.tool === 'ngon' ? `<div class="frow"><label for="pal-ngon">Počet stran</label><span class="fnum"><input id="pal-ngon" value="${sk.ngonN}" inputmode="numeric" autocomplete="off"><span class="u">ks</span></span></div>`
+      const sy = symState(), mirRow = sk.tool === 'skmirror' ? `<div class="frow"><span class="fl">Osa</span><div class="seg"><button data-symmode="v" aria-pressed="${sy.mode === 'v'}">Svislá</button><button data-symmode="h" aria-pressed="${sy.mode === 'h'}">Vodorovná</button><button data-symmode="line" aria-pressed="${sy.mode === 'line'}">Čára ze skici</button></div></div>`
+        + (sy.mode === 'line' ? `<div class="note">${sy.line ? 'Osou je vybraná čára. Jinou zvolíte znovu tlačítkem Čára ze skici.' : 'Klepněte na rovnou čáru skici (i pomocnou), podle které se bude zrcadlit.'}</div>` : `<div class="frow"><label for="pal-symc">${sy.mode === 'v' ? 'Poloha osy X' : 'Poloha osy Y'}</label><span class="fnum"><input id="pal-symc" value="${fmtc(sy.c, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div><div class="frow wide"><button class="btn" data-symcenter="1">Osa na střed skici</button></div>`)
+        + `<label class="chk"><input type="checkbox" id="pal-symlive"${sy.live ? ' checked' : ''}><span>Kreslit zrcadlově (i dalšími nástroji)</span></label>` : '';
+      tb.innerHTML = mirRow + modeRow + combRow + offRow + txtRow + (sk.tool === 'ngon' ? `<div class="frow"><label for="pal-ngon">Počet stran</label><span class="fnum"><input id="pal-ngon" value="${sk.ngonN}" inputmode="numeric" autocomplete="off"><span class="u">ks</span></span></div>`
         : want === 'fr' ? `<div class="frow"><label for="pal-fr">Poloměr rohů</label><span class="fnum"><input id="pal-fr" value="${fmtc(sk.frR, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div>`
         : '');
       tb.hidden = !want; fitDialogRows($('#dialog'));
@@ -2420,6 +2484,13 @@ $('#dialog').addEventListener('click', e => {
   if (!sk) return;
   const ta = e.target.closest('[data-tal]'); if (ta) { const t = sk.f.ents[+ta.dataset.ent]; if (t && t.t === 'text') { if (ta.dataset.tal === 'l') delete t.al; else t.al = ta.dataset.tal; renderPalette(); redrawSketch(); } return; }
   const od = e.target.closest('[data-offdir]'); if (od && sk && sk.tool === 'skoffset') { sk.offIn = od.dataset.offdir === 'in'; renderPalette(); return; }
+  const sc = e.target.closest('[data-symcenter]'); if (sc && sk.tool === 'skmirror') {
+    const pts = []; for (const pl of entityPolylines(sk.f.ents)) pts.push(...pl.pts);
+    if (!pts.length) { toast('Skica je prázdná, osa zůstává v počátku.'); return; }
+    const y = symState(), k = y.mode === 'v' ? 0 : 1, lo = Math.min(...pts.map(q => q[k])), hi = Math.max(...pts.map(q => q[k]));
+    y.c = Math.round((lo + hi) / 2 * 1e4) / 1e4; renderPalette(); redrawSketch(); const inp = $('#pal-symc'); if (inp) inp.value = fmtc(y.c, 3); return;
+  }
+  const sm = e.target.closest('[data-symmode]'); if (sm && sk.tool === 'skmirror') { const y = symState(); y.mode = sm.dataset.symmode; if (y.mode === 'line') y.line = null; renderPalette(); redrawSketch(); return; }
   const cm = e.target.closest('[data-cmode]'); if (cm && sk.tool === 'sktrim') { sk.combOp = cm.dataset.cmode; sk.cut = null; setSketchTool('sktrim'); return; }
   const rm = e.target.closest('[data-rmode]'); if (rm && DRAW_DEFAULT[sk.tool]) { settings.drawModes = { ...(settings.drawModes || {}), [sk.tool]: rm.dataset.rmode }; saveSettings(); sk.draft = null; setSketchTool(sk.tool); return; }
   const du = e.target.closest('[data-entdup]'); if (du) { sk.selEnt = +du.dataset.entdup; duplicateSel(); return; }
@@ -6492,7 +6563,7 @@ document.addEventListener('keydown', e => {
   /* arrow keys (PageUp / PageDown = Z): move the selected sketch element, the bodies in Move (selected bodies open Move), or pan the view; one grid step, Shift ×10 */
   const AR = { ArrowLeft: [-1, 0, 0], ArrowRight: [1, 0, 0], ArrowUp: [0, 1, 0], ArrowDown: [0, -1, 0], PageUp: [0, 0, 1], PageDown: [0, 0, -1] }[k];
   if (AR) { if (nudgeKeys(AR, e.shiftKey)) e.preventDefault(); return; }
-  const map = sk ? { l: 'line', k: 'spline', r: 'rect', c: 'circle', e: 'ellipse', p: 'ngon', d: 'slot', x: 'sktrim', o: 'skoffset', t: 'sksegtrim', j: 'skjoin', q: 'skcons' } : cmd ? {} : { s: 'sketch', e: 'extrude', f: 'fillet', m: 'move', r: 'rotate', t: 'thread', i: 'measure', g: 'facemode', h: 'hole' };
+  const map = sk ? { l: 'line', k: 'spline', r: 'rect', c: 'circle', e: 'ellipse', p: 'ngon', d: 'slot', x: 'sktrim', o: 'skoffset', m: 'skmirror', t: 'sksegtrim', j: 'skjoin', q: 'skcons' } : cmd ? {} : { s: 'sketch', e: 'extrude', f: 'fillet', m: 'move', r: 'rotate', t: 'thread', i: 'measure', g: 'facemode', h: 'hole' };
   const id = map[k.toLowerCase()];
   if (id) { e.preventDefault(); runCommand(id); return; }
   if (k === 'F6') { e.preventDefault(); fitView(); }

@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.05
+- **Skica – Zrcadlit (M, v Úpravách skici):** osa svislá nebo vodorovná se zadanou polohou (tlačítko Osa na střed skici ji posadí doprostřed nakreslených tvarů), nebo libovolná rovná čára skici (i pomocná). Klepnutím na prvek vznikne jeho zrcadlový obraz. Zapnete-li **Kreslit zrcadlově**, každý nově nakreslený tvar (i jinými nástroji) se hned zrcadlí podle osy; osa je ve skice vidět oranžově. Obdélník se podle šikmé osy změní na obrys, text se jen přemístí (zůstane čitelný).
 ## Beta 2.04
 - **Přichytávání k hranám a rohům modelu:** nové tlačítko v liště pohledu (pod přichytáváním k mřížce). Ve skice se body přichytí k rohům, středům hran a středům kružnic modelu ležícím v rovině skici a pak k jeho hranám – i když model neleží na mřížce. Platí i pro Rozdělit plochu. Tlačítkem se dá vypnout.
 - **Přichytávání k mřížce** se dá jako dosud vypnout svým tlačítkem; nově to potvrdí krátké hlášení a vypnuté přichytávání k mřížce ve skice vypne i přitahování k průsečíkům mřížky. Vypnete-li obojí, body se umisťují zcela volně.
