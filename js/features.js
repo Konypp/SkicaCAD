@@ -675,10 +675,22 @@ function feXform(op) {
   if (op.ax) { const a = KK.vnorm(op.ax.map(Number)); return p => { const d = KK.vsub(p, c), k = KK.vdot(a, d); return KK.vadd(p, KK.vmul(a, k * (sc - 1))); }; }
   return p => KK.vadd(c, KK.vmul(KK.vsub(p, c), sc));
 }
+/* edges and corners (Hrany, Body): {kind: 'edge', pts} – a chain of points along sharp edges – or {kind: 'vert', p} */
+const feIsEl = d => d.kind === 'edge' || d.kind === 'vert';
+function feOnEl(v, d) {
+  if (d.kind === 'vert') return Math.hypot(v[0] - d.p[0], v[1] - d.p[1], v[2] - d.p[2]) < 1e-5;
+  for (let i = 0; i + 1 < d.pts.length; i++) {
+    const a = d.pts[i], b = d.pts[i + 1], ab = KK.vsub(b, a), L2 = KK.vdot(ab, ab); if (L2 < 1e-12) continue;
+    const t = Math.max(0, Math.min(1, KK.vdot(KK.vsub(v, a), ab) / L2)), q = KK.vadd(a, KK.vmul(ab, t));
+    if (Math.hypot(v[0] - q[0], v[1] - q[1], v[2] - q[2]) < 1e-5) return true;
+  }
+  return false;
+}
 /* split the faces' planes along the parts' outlines, so a part has its own polygons and corners to move */
 function feRealize(polys, faces) {
   let out = polys; const keys = new Set();
   for (const d of faces) {
+    if (feIsEl(d)) { for (const q of out) for (const v of q.v) if (feOnEl(v, d)) keys.add(KK.qk(v)); if (!keys.size) throw new Error(d.kind === 'vert' ? 'Bod nebyl nalezen' : 'Hrana nebyla nalezena'); continue; }
     const g = feGroup(out, d), gs = new Set(g);
     if (!d.clip || !d.clip.length) { for (const i of g) for (const v of out[i].v) keys.add(KK.qk(v)); continue; }
     const inner = clipRegion(out, g, d.clip); if (!inner.length) throw new Error('Část plochy nebyla nalezena');
@@ -707,6 +719,55 @@ function feTris(V, n) {
   }
   if (idx.length === 3) out.push(idx.slice());
   return out;
+}
+/* a duplicated face (Duplikovat / Vsadit o 0) moves on its own: it leaves its outline where it was and new walls join the
+   two, so the faces around it stay as they were (Blender: extrude by 0, then move / turn / scale) */
+function feNewDesc(polys, d, T) {
+  const ip = feRegionPoint(polys, d), p = T(ip), B = basisFromPlane(d.n, d.w);
+  let n = KK.vnorm(KK.cross(KK.vsub(T(KK.vadd(ip, B.u)), p), KK.vsub(T(KK.vadd(ip, B.v)), p)));
+  if (!(Math.hypot(n[0], n[1], n[2]) > 0.5)) n = d.n.slice();
+  return { n, w: KK.vdot(n, p), p };
+}
+function feDetach(polys, seams, faces, op) {
+  const T = feXform(op); let out = polys; const sel = [];
+  for (const d of faces) {
+    const nd = feNewDesc(out, d, T);
+    if (KK.vdot(nd.n, d.n) > 1 - 1e-9 && Math.abs(nd.w - d.w) < 1e-6) {
+      /* staying in its plane (smaller, turned, moved within the face): the moved outline becomes a dividing line, like Vsadit */
+      const reg = feRegion(out, d), B = basisFromPlane(d.n, d.w), to2 = x => { const q = KK.vsub(x, B.o); return [KK.vdot(q, B.u), KK.vdot(q, B.v)]; };
+      const loops = KK.faceLoops(reg, reg.map((_, i) => i)); if (!loops.length) throw new Error('Obrys plochy se nepodařilo určit');
+      const big = loops.reduce((x, l) => (Math.abs(KK.area2D(l.map(to2))) > Math.abs(KK.area2D(x.map(to2))) ? l : x)), sg = Math.sign(KK.area2D(big.map(to2)));
+      const inside = x => reg.some(q => feInFlat(x, q) || q.v.some(v => Math.hypot(...KK.vsub(v, x)) < 1e-6));
+      const made = [];
+      for (const l of loops) {
+        if (Math.sign(KK.area2D(l.map(to2))) !== sg) continue;
+        const pts = l.map(T);
+        if (!pts.every(inside)) throw new Error('Zduplikovaná plocha v rovině musí zůstat uvnitř původní plochy (zmenšit, otočit nebo posunout uvnitř)');
+        made.push({ n: d.n.slice(), w: d.w, a: pts[0], b: pts[1], pts, closed: true });
+      }
+      seams = (seams || []).concat(made);
+      const g = feGroup(out, d);
+      for (const m of made) { const part = clipRegion(out, g, [...(d.clip || []), { poly: curveRegion(m), n: m.n }]), ip = feInner(part); if (ip) sel.push({ n: d.n.slice(), w: d.w, p: ip, clip: faceClip(out, seams, d.n, d.w, g, ip) }); }
+      continue;
+    }
+    const g = feGroup(out, d), gs = new Set(g);
+    let inner = g.map(i => out[i]), rest = out.filter((_, i) => !gs.has(i));
+    if (d.clip && d.clip.length) {
+      inner = clipRegion(out, g, d.clip); if (!inner.length) throw new Error('Část plochy nebyla nalezena');
+      for (let k = 0; k < d.clip.length; k++) rest.push(...clipRegion(out, g, [...d.clip.slice(0, k), feNeg(d.clip[k])]));
+    }
+    inner = inner.map(q => KK.mkPoly(q.v)).filter(Boolean);
+    const add = [];
+    for (const loop of KK.faceLoops(inner, inner.map((_, i) => i))) for (let k = 0; k < loop.length; k++) {
+      const a = loop[k], b = loop[(k + 1) % loop.length], A = T(a), Bb = T(b);
+      for (const t of [[a, b, Bb], [a, Bb, A]]) { const q = KK.mkPoly(t); if (q && KK.surfaceArea([q]) > 1e-10) add.push(q); }
+    }
+    const moved = inner.map(q => KK.mkPoly(q.v.map(T))).filter(Boolean);
+    out = KK.weldT(rest.map(q => KK.mkPoly(q.v)).filter(Boolean).concat(moved, add));
+    sel.push(nd);
+  }
+  if (!(KK.signedVolume(out) > 0)) throw new Error('Úprava je pro tvar kolem ploch příliš velká');
+  return { polys: out, seams, sel };
 }
 function feTransform(polys, seams, faces, op) {
   const T = feXform(op), R = feRealize(polys, faces), mv = new Map();
@@ -740,6 +801,8 @@ function feTransform(polys, seams, faces, op) {
     return nn ? { ...q, n: nn.n, w: nn.w, a, b, pts } : q;
   });
   const sel = faces.map(d => {
+    if (d.kind === 'vert') return { kind: 'vert', p: T(d.p) };
+    if (d.kind === 'edge') return { kind: 'edge', pts: d.pts.map(T) };
     const ip = feRegionPoint(polys, d), p = T(ip), B = basisFromPlane(d.n, d.w);
     let n = KK.vnorm(KK.cross(KK.vsub(T(KK.vadd(ip, B.u)), p), KK.vsub(T(KK.vadd(ip, B.v)), p)));
     if (!(Math.hypot(n[0], n[1], n[2]) > 0.5)) n = d.n.slice();
@@ -752,6 +815,7 @@ function feRegionPoint(polys, d) { return d.ip || feInner(feRegion(polys, d)) ||
 function feStep(polys, seams, op) {
   const faces = op.faces || [];
   if (!faces.length && op.op !== 'loop') throw new Error('Vyberte plochu');
+  if ((op.op === 'ext' || op.op === 'inset' || op.op === 'dup') && faces.some(feIsEl)) throw new Error('Vytáhnout, Vsadit a Duplikovat pracují jen s plochami');
   if (op.op === 'ext') {
     const d = Number(op.d); if (!(Math.abs(d) > 1e-4)) throw new Error('Zadejte vzdálenost různou od nuly');
     let out = polys; const sel = [];
@@ -789,9 +853,15 @@ function feStep(polys, seams, op) {
     return { polys, seams: ns, sel };
   }
   if (op.op === 'loop') return feLoopCut(polys, seams, op);
+  if (op.op === 'dup') return { polys, seams, sel: faces.map(d => ({ ...d, dup: true })) };
   if (op.op === 'move' || op.op === 'rot' || op.op === 'scale') {
     if (op.op === 'scale' && !(Number(op.s) > 1e-3)) throw new Error('Měřítko musí být větší než 0');
-    return feTransform(polys, seams, faces, op);
+    /* duplicated faces first (they keep their surroundings), then the others */
+    const du = faces.filter(d => d.dup), pl = faces.filter(d => !d.dup);
+    let st = { polys, seams, sel: [] };
+    if (du.length) st = feDetach(st.polys, st.seams, du, op);
+    if (pl.length) { const r = feTransform(st.polys, st.seams, pl, op); st = { polys: r.polys, seams: r.seams, sel: st.sel.concat(r.sel) }; }
+    return st;
   }
   throw new Error('Neznámý krok úpravy');
 }

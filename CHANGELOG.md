@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 2.20
+- **Modelovat – hrany a vrcholy:** přepínač Vybírat: Plochy / Hrany / Vrcholy. Vybrané hrany a vrcholy (i více najednou) jde Posunout (G), Otočit (R) a změnit Velikost (S) po normále nebo osách – okolní stěny se natáhnou jako v Blenderu (např. posunutá horní hrana udělá zkosenou stěnu, posunutý vrchol špičku). Najetím se hrana / vrchol zvýrazní; skryté za tělesem se nevyberou.
+- **Duplikovat plochu (D, nebo Vsadit se šířkou 0 a Enter):** plocha dostane vlastní kopii; Posunout, Otočit a Velikost pak hýbou jen kopií a nové stěny ji spojí s původním obrysem – okolní stěny zůstanou beze změny. V rovině plochy (zmenšit, otočit) vznikne nový obrys jako u Vsadit.
+- **Modelovat v pásu Těleso › Upravit:** spustí se i bez vybrané plochy – klepnutím vyberete těleso.
+- Velikost (S) začíná vždy jako rovnoměrná (Vše).
 ## Beta 2.19
 - **Modelovat plochy – Řez smyčkou (L nebo Ctrl+R):** najeďte na plochu poblíž hrany, kterou má řez křížit – ukáže se oranžový řez dokola tělesem (u prostředku hrany skočí doprostřed, jinak po krocích mřížky); klepnutím se těleso rozřízne. Části pak jdou vybrat a vytáhnout, posunout nebo zmenšit (např. zkosit jen horní pás). Počet řezů rozdělí hranu rovnoměrně.
 - **Kruhové menu:** v režimu Plochy dlouhý stisk na ploše (telefon) nebo klávesa Q nabídne Vytáhnout, Vsadit, Posunout, Otočit, Velikost, Řez smyčkou, Rozdělit a Další…; uvnitř Modelovat plochy přepíná nástroje a nabízí Použít krok / Vrátit krok.

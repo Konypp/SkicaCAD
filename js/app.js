@@ -93,6 +93,7 @@ const ICONS = {
   tnext: '<path d="M8 5l9 7-9 7z"/>',
   tlast: '<path d="M18 5v14M6 5l9 7-9 7z"/>',
   facemode: '<path class="b" d="M4 9 12 5l8 4-8 4z"/><path d="M4 9 12 5l8 4-8 4zM4 9v7l8 4 8-4V9M12 13v7"/>',
+  faceedit: '<path class="b" d="M4 12 12 8l8 4-8 4z"/><path d="M4 12 12 8l8 4-8 4zM4 12v5l8 4 8-4v-5M12 8V2.5M9.8 4.7 12 2.5l2.2 2.2"/>',
   splitface: '<path class="b" d="M4 9 12 5l8 4-8 4z"/><path d="M4 9 12 5l8 4-8 4zM4 9v7l8 4 8-4V9"/><path d="M8 7l8 4" stroke-dasharray="2 1.6"/>',
   shell: '<path d="M4 8 12 4l8 4v9l-8 4-8-4z"/><path class="o" d="M7 9.5 12 7l5 2.5v6L12 18l-5-2.5z" style="stroke:var(--orange)"/>',
   hole: '<ellipse cx="12" cy="7" rx="7" ry="3"/><path d="M5 7v10c0 1.7 3.1 3 7 3s7-1.3 7-3V7"/><ellipse class="o" cx="12" cy="7" rx="3" ry="1.3" style="stroke:var(--orange)"/><path d="M9 7.5v8M15 7.5v8" stroke-dasharray="2 2" style="stroke:var(--orange)"/>',
@@ -1182,7 +1183,7 @@ function featureTitle(i) {
   let n = 0; for (let j = 0; j <= i; j++) if (doc.features[j].type === f.type) n++;
   return Engine.FEATURE_LABEL[f.type] + ' ' + n;
 }
-const TL_ICON = { buckle: 'buckle', libpart: 'articulate', jointpart: 'articulate', articulate: 'articulate', blob: 'blob', skin: 'skin', sweep: 'sweep', loft: 'loft', deform: 'deform', lattice: 'lattice', softmove: 'softmove', subdiv: 'subdiv', sculpt: 'sculpt', remesh: 'remesh', hollow: 'hollow', flatbase: 'flatbase', pegsplit: 'pegsplit', text3d: 'sktext', movefaces: 'pressface', shell: 'shell', hole: 'hole', offsetface: 'pressface', faceedit: 'pressface', splitface: 'splitface', bendface: 'bendface', ribs: 'ribs', splitbody: 'splitbody', curvecut: 'curvecut', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
+const TL_ICON = { buckle: 'buckle', libpart: 'articulate', jointpart: 'articulate', articulate: 'articulate', blob: 'blob', skin: 'skin', sweep: 'sweep', loft: 'loft', deform: 'deform', lattice: 'lattice', softmove: 'softmove', subdiv: 'subdiv', sculpt: 'sculpt', remesh: 'remesh', hollow: 'hollow', flatbase: 'flatbase', pegsplit: 'pegsplit', text3d: 'sktext', movefaces: 'pressface', shell: 'shell', hole: 'hole', offsetface: 'pressface', faceedit: 'faceedit', splitface: 'splitface', bendface: 'bendface', ribs: 'ribs', splitbody: 'splitbody', curvecut: 'curvecut', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
 function renderTimeline() {
   const tr = $('#tltrack'); tr.innerHTML = '';
   const m = viewMarker === null ? doc.marker : viewMarker;
@@ -1269,7 +1270,7 @@ function facePie(x, y) {
   const list = faceList(); if (!list.length || !list.every(f => f.kind === 'plane' && f.bodyId === list[0].bodyId)) return false;
   const go = t => () => { setFaceMode(false, true); startFaceEdit(undefined, undefined, list.slice(), t); };
   showPie(x, y, [['Vytáhnout', 'extrude', go('ext')], ['Vsadit', 'shell', go('inset')], ['Posunout', 'move', go('move')], ['Otočit', 'rotate', go('rot')],
-    ['Velikost', 'scale', go('scale')], ['Řez smyčkou', 'splitbody', go('loop')], ['Rozdělit', 'splitface', () => startSplitFace(undefined, undefined, list[0])], ['Další…', 'menu', () => faceContext({ clientX: x, clientY: y, button: 2 })]]);
+    ['Velikost', 'scale', go('scale')], ['Řez smyčkou', 'splitbody', go('loop')], ['Duplikovat', 'skdup', go('dup')], ['Rozdělit', 'splitface', () => startSplitFace(undefined, undefined, list[0])], ['Další…', 'menu', () => faceContext({ clientX: x, clientY: y, button: 2 })]]);
   return true;
 }
 
@@ -1281,7 +1282,7 @@ const RIBBON = {
     ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'],
       { menu: 'prim', label: 'Základní tělesa', items: [['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus'], ['text3d', 'Text']] },
       { menu: 'parts', label: 'Součásti', items: [['bolt', 'Šroub'], ['nut', 'Matice'], ['hinge', 'Pant'], ['latch', 'Západka'], ['buckle', 'Spona'], ['jointpart', 'Kloubové díly']] }]],
-    ['Upravit', [{ menu: 'edge', label: 'Hrany', items: [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení']] }, ['hole', 'Díra', 'H'], ['shell', 'Skořepina'], ['move', 'Přesunout', 'M'], ['scale', 'Měřítko'], ['rotate', 'Otočit', 'R'], ['facemode', 'Plochy', 'G'],
+    ['Upravit', [{ menu: 'edge', label: 'Hrany', items: [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení']] }, ['hole', 'Díra', 'H'], ['shell', 'Skořepina'], ['move', 'Přesunout', 'M'], ['scale', 'Měřítko'], ['rotate', 'Otočit', 'R'], ['facemode', 'Plochy', 'G'], ['faceedit', 'Modelovat'],
       { menu: 'shape', label: 'Tvar', items: [['combine', 'Kombinovat'], ['splitbody', 'Rozříznout'], ['curvecut', 'Rozříznout křivkou']] },
       { menu: 'xform', label: 'Uspořádat', items: [['center', 'Zarovnat'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole']] },
       ['del', 'Odstranit', 'Del']]],
@@ -1372,6 +1373,7 @@ function runCommand(id) {
     case 'center': startCenter(); break;
     case 'selall': if (faceMode) setFaceMode(false); selectAll(); break;
     case 'facemode': setFaceMode(!faceMode); break;
+    case 'faceedit': { const l = faceMode && selFace ? faceList().filter(x => x.kind === 'plane') : []; if (faceMode) setFaceMode(false, true); startFaceEdit(undefined, undefined, l.length ? l : null); break; }
     case 'pressface': startPressFace(); break;
     case 'buckle': startBuckle(); break;
     case 'libpart': startLibPart(); break;
@@ -4025,7 +4027,7 @@ function syncFaceBar() {
   if (key === faceBarKey) return;
   faceBarKey = key; bar.hidden = !show; document.body.classList.toggle('has-facebar', !!show); if (!show) { bar.innerHTML = ''; return; }
   const pl = selFace.kind === 'plane', acts = list.length > 1 ? multiFaceActs(list) : !pl && selFace.cyl.partial ? [['pressm', 'Posunout plochu', 'pressface']] : pl
-    ? [['model', 'Modelovat', 'pressface'], ['ext', 'Vysunout', 'extrude'], ['press', 'Posunout plochu', 'pressface'], ['split', 'Rozdělit plochu', 'splitface'], ['bend', 'Ohnout', 'bendface'], ['ribs', 'Žebra', 'ribs'], ['al', 'Zarovnat k…', 'center'], ['sk', 'Skica z plochy', 'sketchi'], ['esk', 'Prázdná skica', 'sketch']]
+    ? [['model', 'Modelovat', 'faceedit'], ['ext', 'Vysunout', 'extrude'], ['press', 'Posunout plochu', 'pressface'], ['split', 'Rozdělit plochu', 'splitface'], ['bend', 'Ohnout', 'bendface'], ['ribs', 'Žebra', 'ribs'], ['al', 'Zarovnat k…', 'center'], ['sk', 'Skica z plochy', 'sketchi'], ['esk', 'Prázdná skica', 'sketch']]
     : [['press', selFace.cyl.internal ? 'Průměr otvoru' : 'Změnit průměr', 'pressface'], ['ribs', 'Žebra', 'ribs'], ['al', 'Zarovnat k…', 'center'], ['thr', 'Závit', 'thread']];
   bar.innerHTML = `<span class="fb-t"></span><div class="fb-a">${acts.map(([k, l, ic]) => `<button class="fb-b" data-fb="${k}"><span class="ico">${svg(ic, 18)}</span>${l}</button>`).join('')}<button class="ibtn" data-fb="x" aria-label="Zrušit výběr plochy" title="Zrušit výběr plochy">${svg('close', 16)}</button></div>`;
   $('.fb-t', bar).textContent = list.length > 1 ? multiFaceText(list) : faceText(selFace);
@@ -4033,7 +4035,7 @@ function syncFaceBar() {
 /* actions for several selected faces: move them all by the same distance, or open them in a shell (one body, flat faces) */
 function multiFaceActs(list) {
   const flat = list.every(f => f.kind === 'plane' && !f.smooth), one = list.every(f => f.bodyId === list[0].bodyId);
-  return !one ? [] : flat ? [['model', 'Modelovat', 'pressface'], ['pressm', 'Posunout plochy', 'pressface'], ['shellm', 'Skořepina s otevřenými plochami', 'shell']] : [['pressm', 'Posunout plochy', 'pressface']];
+  return !one ? [] : flat ? [['model', 'Modelovat', 'faceedit'], ['pressm', 'Posunout plochy', 'pressface'], ['shellm', 'Skořepina s otevřenými plochami', 'shell']] : [['pressm', 'Posunout plochy', 'pressface']];
 }
 function multiFaceText(list) {
   const n = list.length, word = n < 5 ? 'plochy' : 'ploch', area = list.reduce((t, f) => t + (f.kind === 'plane' ? f.area : 0), 0);
@@ -4252,36 +4254,42 @@ function startFaceEdit(editIndex, f, faces, tool) {
   const neutral = t => (t === 'scale' || t === 'loop' ? 1 : 0);
   const c = {
     editIndex, body: f ? f.body : faces && faces.length ? faces[0].bodyId : null, ops: f ? clone(f.ops || []) : [], sel: [],
-    tool: tool || 'ext', ax: 'n', val: neutral(tool || 'ext'), add: false, err: null, drag: null, timer: null, hideBody: null,
+    mode: 'face', tool: tool || 'ext', ax: 'n',
+    pickBody(ev) { const h = hitBodies(ev); if (!h) return false; this.body = h.object.userData.bodyId; this.hideBody = this.body; this.rebuild(); this.update(); return true; }, val: neutral(tool === 'dup' ? 'move' : tool || 'ext'), add: false, err: null, drag: null, timer: null, hideBody: null,
     init() {
       if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
       openDialog({
-        title: 'Modelovat plochy', icon: 'pressface',
-        fields: [{ k: 'sel', id: 'face', label: 'Plochy' },
+        title: 'Modelovat', icon: 'faceedit',
+        fields: [{ k: 'seg', id: 'mode', label: 'Vybírat', options: [['face', 'Plochy'], ['edge', 'Hrany'], ['vert', 'Vrcholy']], value: 'face' },
+          { k: 'sel', id: 'face', label: 'Výběr' },
           { k: 'seg', id: 'tool', label: 'Nástroj', options: Object.entries(FE_TOOLS).map(([k, v]) => [k, v[0]]), value: this.tool },
           { k: 'seg', id: 'ax', label: 'Směr', options: [['all', 'Vše'], ['n', 'Normála'], ['x', 'X'], ['y', 'Y'], ['z', 'Z']], value: this.ax },
           { k: 'num', id: 'val', label: 'Vzdálenost', value: this.val },
-          { k: 'chk', id: 'add', label: 'Klepnutím přidávat plochy do výběru', value: false },
-          { k: 'btns', id: 'act', label: '', options: [['apply', 'Použít krok'], ['undo', 'Vrátit krok'], ['grow', 'Rozšířit výběr']] },
+          { k: 'chk', id: 'add', label: 'Klepnutím přidávat do výběru', value: false },
+          { k: 'btns', id: 'act', label: '', options: [['apply', 'Použít krok'], ['undo', 'Vrátit krok'], ['dup', 'Duplikovat plochu'], ['grow', 'Rozšířit výběr']] },
           { k: 'note', id: 'n' }],
         onChange: id => {
-          if (id === 'tool') this.setTool(dlg.get('tool'));
+          if (id === 'mode') this.setMode(dlg.get('mode'));
+          else if (id === 'tool') this.setTool(dlg.get('tool'));
           else if (id === 'ax') { this.ax = dlg.get('ax'); this.preview(); }
           else if (id === 'add') this.add = dlg.get('add');
           else if (id === 'val') { let v = dlg.get('val'); if (isFinite(v)) { if (this.tool === 'loop') { v = Math.max(1, Math.min(32, Math.round(v))); } this.val = v; this.preview(); } }
         },
         onBtn: (id, v) => {
-          if (v === 'apply') { if (!this.commit()) toast('Nejdřív nastavte hodnotu kroku (tažením za úchyt nebo číslem).'); }
+          if (v === 'apply') { if (this.tool === 'inset' && this.sel.length && !this.pending()) this.dupFaces(); else if (!this.commit()) toast('Nejdřív nastavte hodnotu kroku (tažením za úchyt nebo číslem).'); }
+          else if (v === 'dup') this.dupFaces();
           else if (v === 'undo') this.undoStep();
           else if (v === 'grow') this.grow();
           this.update();
         }
       });
       if (f) viewMarker = editIndex;
+      if (!this.body && sel.size === 1) this.body = [...sel][0];
       this.hideBody = this.body;
       this.rebuild();
       if (faces && faces.length) this.sel = faces.map(fc => this.descOf(fc));
-      this.setTool(this.tool, true);
+      if (this.tool === 'dup') { this.tool = 'move'; this.setTool('move', true); this.dupFaces(); }
+      else this.setTool(this.tool, true);
     },
     /* the body before this step, and after the kept steps */
     base() { const b = bodyById(this.body); return b ? { polys: b.polys, seams: b.seams || [] } : null; },
@@ -4302,11 +4310,22 @@ function startFaceEdit(editIndex, f, faces, tool) {
     /* centre and direction for the handle and for turning / scaling */
     frame(st) {
       st = st || this._st; if (!st || !this.sel.length) return null;
-      const pieces = []; let n = [0, 0, 0];
-      for (const d of this.sel) { try { const R = Engine.feRegion(st.polys, d); pieces.push(...R); let a = 0; for (const q of R) a += K.surfaceArea([q]); n = K.vadd(n, K.vmul(d.n, a)); } catch (e) { /* skip */ } }
-      if (!pieces.length) return null;
-      const L = Math.hypot(n[0], n[1], n[2]); n = L > 1e-9 ? K.vmul(n, 1 / L) : this.sel[0].n.slice();
-      return { c: Engine.feCentre(pieces), n, pieces };
+      const pieces = [], pts = []; let n = [0, 0, 0];
+      for (const d of this.sel) {
+        if (d.kind === 'edge' || d.kind === 'vert') {
+          /* edges and corners: their points; the normal is the mean of the faces meeting there */
+          const P = d.kind === 'vert' ? [d.p] : d.pts, near = v => P.some(x => Math.hypot(v[0] - x[0], v[1] - x[1], v[2] - x[2]) < 1e-5);
+          pts.push(...P); for (const q of st.polys) if (q.v.some(near)) n = K.vadd(n, K.vmul(q.n, K.surfaceArea([q]) > 0 ? 1 : 0));
+          continue;
+        }
+        try { const R = Engine.feRegion(st.polys, d); pieces.push(...R); let a = 0; for (const q of R) a += K.surfaceArea([q]); n = K.vadd(n, K.vmul(d.n, a)); } catch (e) { /* skip */ }
+      }
+      if (!pieces.length && !pts.length) return null;
+      const L = Math.hypot(n[0], n[1], n[2]); n = L > 1e-9 ? K.vmul(n, 1 / L) : [0, 0, 1];
+      let c;
+      if (pieces.length) c = Engine.feCentre(pieces);
+      else { c = [0, 0, 0]; for (const x of pts) for (let k = 0; k < 3; k++) c[k] += x[k] / pts.length; }
+      return { c, n, pieces, pts };
     },
     axisVec(fr) { return this.ax === 'x' ? [1, 0, 0] : this.ax === 'y' ? [0, 1, 0] : this.ax === 'z' ? [0, 0, 1] : fr.n; },
     op() {
@@ -4332,9 +4351,60 @@ function startFaceEdit(editIndex, f, faces, tool) {
       if (!this._pv) { this.preview(); if (!this._pv) { toast(this.err || 'Krok nelze použít'); return false; } }
       const op = this.op(); if (!op) return false;
       this.ops.push(op); this._st = this._pv; this._pv = null;
-      this.sel = (this._st.sel || []).map(d => ({ n: d.n.map(r6), w: r6(d.w), p: d.p.map(r4), ...(d.clip ? { clip: d.clip, ip: d.p.map(r4) } : {}) }));
+      this.sel = (this._st.sel || []).map(d => d.kind === 'vert' ? { kind: 'vert', p: d.p.map(r4) } : d.kind === 'edge' ? { kind: 'edge', pts: d.pts.map(p => p.map(r4)) } : ({ n: d.n.map(r6), w: r6(d.w), p: d.p.map(r4), ...(d.clip ? { clip: d.clip, ip: d.p.map(r4) } : {}), ...(d.dup ? { dup: true } : {}) }));
       this.val = neutral(this.tool); dlg.set('val', this.val);
       this.update(); return true;
+    },
+    /* what a tap picks: faces, edges or corners (like Blender's face / edge / vertex select) */
+    setMode(m) {
+      if (this.pending()) this.commit();
+      this.mode = m; this.sel = []; this._pv = null; dlg.set('mode', m);
+      if (m !== 'face' && ['ext', 'inset'].includes(this.tool)) this.setTool('move', true);
+      this.update();
+    },
+    /* the edge or corner nearest the pointer, not hidden behind the body */
+    pickEl(ev) {
+      if (!this._shown) return null;
+      const t = measureTargets(this._shown.polys), [mx, my] = evPx(ev), lim = TOUCH ? 26 : 14, cands = [];
+      if (this.mode === 'vert') for (const q of t.pts) { if (q.kind !== 'v') continue; const P = toPx(q.p); if (P[2] >= 1) continue; const d = Math.hypot(P[0] - mx, P[1] - my); if (d < lim) cands.push({ d, at: q.p, el: { kind: 'vert', p: q.p.toArray().map(r4) } }); }
+      else for (const ch of t.chains) {
+        let best = Infinity, at = null;
+        for (let i = 0; i + 1 < ch.pts.length; i++) { const A = toPx(v3(ch.pts[i])), B = toPx(v3(ch.pts[i + 1])), [d, tt] = segDist(mx, my, A, B); if (d < best) { best = d; at = v3(ch.pts[i]).lerp(v3(ch.pts[i + 1]), tt); } }
+        if (ch.kind === 'circle' && ch.pts.length > 2) { const A = toPx(v3(ch.pts[ch.pts.length - 1])), B = toPx(v3(ch.pts[0])), [d, tt] = segDist(mx, my, A, B); if (d < best) { best = d; at = v3(ch.pts[ch.pts.length - 1]).lerp(v3(ch.pts[0]), tt); } }
+        if (best < lim) cands.push({ d: best, at, el: { kind: 'edge', pts: (ch.kind === 'circle' && ch.pts.length > 2 ? [...ch.pts, ch.pts[0]] : ch.pts).map(p => p.map(r4)) } });
+      }
+      cands.sort((a, b) => a.d - b.d);
+      for (const c of cands) {
+        /* hidden: the body is hit before the point */
+        const camPos = cam().position, dir = c.at.clone().sub(camPos), L = dir.length(); ray.set(camPos, dir.normalize());
+        const h = this._mesh ? ray.intersectObject(this._mesh, false)[0] : null;
+        if (!h || h.distance > L - worldPerPx(c.at) * 4) return c.el;
+      }
+      return null;
+    },
+    drawHover(el) {
+      if (this._hg) { G.overlay.remove(this._hg); this._hg = null; }
+      if (el) { this._hg = this.elObj(el, tok['accent-hover'] || tok.accent); G.overlay.add(this._hg); }
+      requestRender();
+    },
+    elObj(el, color) {
+      if (el.kind === 'vert') return mpts([v3(el.p)], color, 12);
+      const g = new THREE.Group(), seg = []; for (let i = 0; i + 1 < el.pts.length; i++) seg.push(...el.pts[i], ...el.pts[i + 1]);
+      const l = noRay(new THREE.LineSegments(lineGeo(seg), new THREE.LineBasicMaterial({ color, depthTest: false, transparent: true }))); l.renderOrder = 13; g.add(l);
+      g.add(mpts([v3(el.pts[0]), v3(el.pts[el.pts.length - 1])], color, 8)); return g;
+    },
+    /* Duplikovat plochu (Vsadit o 0): the selected faces get their own copy; Posunout, Otočit and Velikost then move the copy
+       and new walls join it to where it was, the faces around stay as they are */
+    dupFaces() {
+      if (this.mode !== 'face') { toast('Duplikovat jde jen plochu.'); return; }
+      if (!this.sel.length) { toast('Vyberte plochu'); return; }
+      if (this.pending()) this.commit();
+      if (this.sel.every(d => d.dup)) { toast('Plocha už je zduplikovaná, teď ji posuňte, otočte nebo změňte velikost.'); return; }
+      const op = { op: 'dup', faces: clone(this.sel) };
+      try { this._st = Engine.feStep(this._st.polys, this._st.seams, op); } catch (e) { toast(e.message); return; }
+      this.ops.push(op); this.sel = this._st.sel.map(d => ({ ...d, dup: true })); this._pv = null;
+      if (this.tool === 'inset' || this.tool === 'loop' || this.tool === 'ext') this.setTool('move', true);
+      this.update();
     },
     undoStep() {
       if (this.pending()) { this.val = neutral(this.tool); dlg.set('val', this.val); this._pv = null; return; }
@@ -4344,7 +4414,8 @@ function startFaceEdit(editIndex, f, faces, tool) {
     setTool(t, quiet) {
       if (t !== this.tool && this.pending()) this.commit();
       this.tool = t; this.val = neutral(t); this._pv = null;
-      if (t === 'scale' && this.ax === 'n') this.ax = 'all';
+      if (this.mode !== 'face' && (t === 'ext' || t === 'inset')) { toast('Vytáhnout a Vsadit pracují jen s plochami.'); t = 'move'; }
+      if (t === 'scale' && t !== this.tool) this.ax = 'all';
       if (t !== 'scale' && this.ax === 'all') this.ax = 'n';
       dlg.set('tool', t); dlg.set('ax', this.ax); dlg.set('val', this.val);
       this._lk = ''; if (this._lg) { G.overlay.remove(this._lg); this._lg = null; }
@@ -4375,7 +4446,7 @@ function startFaceEdit(editIndex, f, faces, tool) {
       return fc && fc.kind === 'plane' ? fc : null;
     },
     update() {
-      clearGroup(G.preview); clearGroup(G.overlay); this._mesh = null; this._hd = null; this._lg = null; this._lk = '';
+      clearGroup(G.preview); clearGroup(G.overlay); this._mesh = null; this._hd = null; this._lg = null; this._lk = ''; this._hg = null; this._hk = '';
       const st = this._pv || this._st; this._shown = st;
       if (st) {
         const m = meshFromPolys(st.polys, bodyMaterial()); m.material.color.copy(tok.body).lerp(tok.accent, 0.12);
@@ -4385,16 +4456,18 @@ function startFaceEdit(editIndex, f, faces, tool) {
         if (st.seams && st.seams.length) { const sa = Engine.seamSegments(st.polys, st.seams); if (sa.length) m.add(noRay(new THREE.LineSegments(lineGeo(sa), new THREE.LineBasicMaterial({ color: tok.edge })))); }
         G.preview.add(m);
         const shownSel = this._pv ? this._pv.sel : this.sel;
-        for (const d of shownSel || []) { try { const R = Engine.feRegion(st.polys, d); G.overlay.add(faceMesh({ polys: R, group: R.map((_, i) => i), cpolys: R }, tok.accent, 0.45)); } catch (e) { /* skip */ } }
+        for (const d of shownSel || []) { if (d.kind === 'edge' || d.kind === 'vert') { G.overlay.add(this.elObj(d, tok.orange)); continue; } try { const R = Engine.feRegion(st.polys, d); G.overlay.add(faceMesh({ polys: R, group: R.map((_, i) => i), cpolys: R }, tok.accent, 0.45)); } catch (e) { /* skip */ } }
         this.makeHandle();
       }
       const n = this.sel.length;
-      dlg.set('face', { text: n ? `${n} ${n === 1 ? 'plocha' : n < 5 ? 'plochy' : 'ploch'}` : 'Klepněte na rovinnou plochu', has: n > 0, active: true });
+      const word = this.mode === 'edge' ? (n === 1 ? 'hrana' : n < 5 ? 'hrany' : 'hran') : this.mode === 'vert' ? (n === 1 ? 'vrchol' : n < 5 ? 'vrcholy' : 'vrcholů') : (n === 1 ? 'plocha' : n < 5 ? 'plochy' : 'ploch');
+      dlg.set('face', { text: !this.body ? 'Klepněte na těleso' : n ? `${n} ${word}` : this.mode === 'edge' ? 'Klepněte na hranu' : this.mode === 'vert' ? 'Klepněte na vrchol' : 'Klepněte na rovinnou plochu', has: n > 0, active: true });
+      for (const b of $$('#dlg-tool button')) b.disabled = this.mode !== 'face' && ['ext', 'inset'].includes(b.dataset.v);
       const axOn = ['move', 'rot', 'scale'].includes(this.tool); dlg.show('ax', axOn);
       const ab = $('#dlg-ax [data-v="all"]'); if (ab) ab.hidden = this.tool !== 'scale';
       const ns = this.ops.length + (this.pending() ? 1 : 0);
       if (this.tool === 'loop') dlg.set('n', this.err ? '!' + this.err : 'Najeďte na plochu poblíž hrany, kterou má řez křížit, a klepněte. Řez obejde těleso dokola; pak klepnutím vyberte jeho část a upravte ji.' + (this.ops.length ? ` Hotové kroky: ${this.ops.length}.` : ''));
-      else dlg.set('n', this.err ? '!' + this.err : !n ? 'Vyberte plochu klepnutím (víc ploch: Shift nebo volba níže).' : (this.pending() ? `Krok ${ns}: ${FE_TOOLS[this.tool][0].toLowerCase()} – další krok ho potvrdí (jiný nástroj, jiná plocha, Enter). ` : `Táhněte za úchyt nebo napište hodnotu (Enter). `) + (this.ops.length ? `Hotové kroky: ${this.ops.length}. OK je všechny použije.` : 'OK použije všechny kroky.'));
+      else dlg.set('n', this.err ? '!' + this.err : !this.body ? 'Klepněte na těleso, které chcete modelovat.' : !n ? (this.mode === 'edge' ? 'Vyberte hranu klepnutím (víc hran: Shift nebo volba níže). Hrany jde posunout, otočit nebo změnit jejich délku.' : this.mode === 'vert' ? 'Vyberte vrchol klepnutím (víc vrcholů: Shift nebo volba níže). Vrcholy jde posunout, otočit nebo přiblížit k sobě.' : 'Vyberte plochu klepnutím (víc ploch: Shift nebo volba níže).') : (this.pending() ? `Krok ${ns}: ${FE_TOOLS[this.tool][0].toLowerCase()} – další krok ho potvrdí (jiný nástroj, jiná plocha, Enter). ` : `Táhněte za úchyt nebo napište hodnotu (Enter). `) + (this.ops.length ? `Hotové kroky: ${this.ops.length}. OK je všechny použije.` : 'OK použije všechny kroky.') + (this.sel.some(d => d.dup) ? ' Zduplikovaná plocha: posunutí, otočení i velikost nechají okolní stěny beze změny.' : this.tool === 'inset' && !this.pending() && n ? ' Šířka 0 a Použít krok (Enter) plochu jen zduplikuje.' : ''));
       setPrompt(this.tool === 'loop' ? 'Klepněte na plochu poblíž hrany, kterou má řez křížit' : n ? 'Táhněte za úchyt; klávesy E, I, G, R, S, L mění nástroj, X, Y, Z směr' : 'Klepněte na plochu tělesa');
       dlg.okEnabled(this.ops.length > 0 || (this.pending() && !!this._pv));
       styleBodies(); requestRender();
@@ -4417,6 +4490,7 @@ function startFaceEdit(editIndex, f, faces, tool) {
       } else if (t === 'inset' || t === 'scale') {
         const u = v3(this.ax === 'all' || t === 'inset' || this.ax === 'n' ? B.u : this.axisVec(fr));
         let r0 = 0; for (const q of fr.pieces) for (const v of q.v) r0 = Math.max(r0, K.vdot(K.vsub(v, fr.c), u.toArray()));
+        for (const v of fr.pts) r0 = Math.max(r0, K.vdot(K.vsub(v, fr.c), u.toArray()));
         if (!(r0 > wp * 20)) r0 = L;
         const along = t === 'inset' ? r0 - this.val : r0 * this.val;
         tip = c.clone().addScaledVector(u, along); line([c, c.clone().addScaledVector(u, Math.max(r0, along) + wp * 20)]);
@@ -4509,15 +4583,25 @@ function startFaceEdit(editIndex, f, faces, tool) {
       if (this.tool === 'loop') { const lp = this.loopAt(ev), key = lp ? lp.n.map(x => x.toFixed(4)).join() + lp.ds.map(x => x.toFixed(4)).join() : ''; if (key !== this._lk) { this._lk = key; this.drawLoop(lp); } dom.style.cursor = lp ? 'crosshair' : ''; return; }
       const hd = this._hd; let over = false;
       if (hd) { const P = toPx(hd.tip), [mx, my] = evPx(ev); over = Math.hypot(P[0] - mx, P[1] - my) < 18; }
+      if (this.mode !== 'face' && !over) { const el = this.pickEl(ev), key = el ? JSON.stringify(el) : ''; if (key !== this._hk) { this._hk = key; this.drawHover(el); } dom.style.cursor = el ? 'pointer' : ''; return; }
+      if (hd) { const P = toPx(hd.tip), [mx, my] = evPx(ev); over = Math.hypot(P[0] - mx, P[1] - my) < 18; }
       dom.style.cursor = over ? 'grab' : this.pickFace(ev) ? 'pointer' : '';
     },
     onClick(ev) {
+      if (!this.body || !this._st) { this.pickBody(ev); return; }
       if (this.tool === 'loop') {
         const lp = this.loopAt(ev); if (!lp || !this._st) return;
         const op = { op: 'loop', n: lp.n.map(r6), p: lp.p.map(r4), ds: lp.ds.map(r4), f: { n: lp.f.n.map(r6), w: r6(lp.f.w), p: lp.f.p.map(r4) } };
         try { this._st = Engine.feStep(this._st.polys, this._st.seams, op); this.ops.push(op); this.sel = []; this.err = null; }
         catch (e) { toast(e.message); }
         this._lk = ''; this.update(); return;
+      }
+      if (this.mode !== 'face') {
+        if (this.pending()) this.commit();
+        const el = this.pickEl(ev); if (!el) return;
+        const addM = this.add || ev.shiftKey || ev.ctrlKey || ev.metaKey, key = JSON.stringify(el), i = this.sel.findIndex(x => JSON.stringify(x) === key);
+        if (addM) { if (i >= 0) this.sel.splice(i, 1); else this.sel.push(el); } else this.sel = [el];
+        this._pv = null; this._hk = ''; this.update(); return;
       }
       const fc = this.pickFace(ev); if (!fc) return;
       const addMode = this.add || ev.shiftKey || ev.ctrlKey || ev.metaKey;
@@ -4534,7 +4618,7 @@ function startFaceEdit(editIndex, f, faces, tool) {
       const T = t => [FE_TOOLS[t][0], { ext: 'extrude', inset: 'shell', move: 'move', rot: 'rotate', scale: 'scale', loop: 'splitbody' }[t], () => { this.setTool(t); }];
       showPie(ev.clientX, ev.clientY, [T('ext'), T('inset'), T('move'), T('rot'), T('scale'), T('loop'),
         ['Použít krok', 'finish', () => { if (!this.commit()) toast('Nejdřív nastavte hodnotu kroku (tažením za úchyt nebo číslem).'); this.update(); }],
-        ['Vrátit krok', 'undo', () => { this.undoStep(); this.update(); }]]);
+        ['Duplikovat', 'skdup', () => this.dupFaces()], ['Vrátit krok', 'undo', () => { this.undoStep(); this.update(); }]]);
     },
     /* Shift+R: the last step again on the faces selected now (same distance, angle or scale) */
     repeat() {
@@ -4550,13 +4634,14 @@ function startFaceEdit(editIndex, f, faces, tool) {
     onKey(e) {
       const k = (e.key || '').toLowerCase();
       if (k === 'r' && e.shiftKey) { this.repeat(); return true; }
+      if (k === 'd') { this.dupFaces(); return true; }
       if (k === 'q') { const lp = lastMoveEv || { clientX: innerWidth / 2, clientY: innerHeight / 2 }; this.onLongPress(lp); return true; }
       if (FE_KEYS[k]) { this.setTool(FE_KEYS[k]); return true; }
       if (['x', 'y', 'z', 'n'].includes(k) && ['move', 'rot', 'scale'].includes(this.tool)) { this.ax = this.ax === k && this.tool === 'scale' ? 'all' : k; dlg.set('ax', this.ax); this.preview(); return true; }
       if (/^[0-9.,-]$/.test(e.key) && (this.sel.length || this.tool === 'loop')) { const inp = $('#dlg-val'); if (inp) { inp.focus(); inp.value = e.key; inp.dispatchEvent(new Event('input', { bubbles: true })); } return true; }
       return false;
     },
-    onEnter() { if (this.pending()) { this.commit(); return true; } return this.tool === 'loop' && !this.ops.length; },
+    onEnter() { if (this.pending()) { this.commit(); return true; } if (this.tool === 'inset' && this.sel.length && Math.abs(this.val) < 1e-9 && !this.sel.every(d => d.dup)) { this.dupFaces(); return true; } return this.tool === 'loop' && !this.ops.length; },
     onEsc() { if (this.pending()) { this.val = neutral(this.tool); dlg.set('val', this.val); this._pv = null; this.update(); return true; } return false; },
     ok() {
       if (this.pending()) this.commit();
@@ -7074,6 +7159,7 @@ document.addEventListener('keydown', e => {
   if (cmd && !sk && cmd.onKey && cmd.onKey(e)) { e.preventDefault(); return; }
   if (faceMode && selFace && !cmd && !sk && k.toLowerCase() === 'q') { const ev = lastMoveEv || { clientX: innerWidth / 2, clientY: innerHeight / 2 }; if (facePie(ev.clientX, ev.clientY)) { e.preventDefault(); return; } }
   /* Plochy: a selected flat face and E, I, G, R, S start Modelovat plochy with that tool, like in Blender */
+  if (faceMode && selFace && !cmd && !sk && k === 'd' && faceList().every(x => x.kind === 'plane' && x.bodyId === selFace.bodyId)) { e.preventDefault(); const l = faceList(); setFaceMode(false, true); startFaceEdit(undefined, undefined, l, 'dup'); return; }
   if (faceMode && selFace && !cmd && !sk && FE_KEYS[k.toLowerCase()] && faceList().every(x => x.kind === 'plane' && x.bodyId === selFace.bodyId)) { e.preventDefault(); const l = faceList(); setFaceMode(false, true); startFaceEdit(undefined, undefined, l, FE_KEYS[k.toLowerCase()]); return; }
   if (k === 'Escape') {
     $('#ctxmenu').hidden = true;
