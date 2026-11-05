@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.16
+- **Skica – úhly v kótách:** se zapnutou volbou Zobrazit kóty se teď ukazují i úhly, a to trvale, ne jen při kreslení čáry: v každém rohu čáry nebo uzavřeného obrysu je oblouček s hodnotou úhlu (u uzavřeného obrysu vnitřní úhel, pravý úhel jako malý čtvereček). Hladké body křivek a oblouky po oříznutí se přeskakují, hodnota se nepřekrývá s délkovými kótami.
+- **Natočení tvarů:** mnohoúhelník, elipsa a drážka ukazují úhel natočení vůči ose X, když jsou natočené.
 ## Beta 2.15
 - **Skica:** u vybrané čáry se už nezobrazují rámečky s délkou a úhlem úseček ani úhly v rozích – délky a úhly ukazuje jen volba Zobrazit kóty (a pole v paletě).
 ## Beta 2.14

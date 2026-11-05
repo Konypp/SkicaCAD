@@ -803,6 +803,7 @@ function updateSketchDims() {
     const di = dimMeta.push({ ...ed, x: anchor === 'middle' ? x : anchor === 'start' ? x + w / 2 - 6 : x - w / 2 + 6, y }) - 1;
     return `<rect class="dhit" data-di="${di}" x="${x0}" y="${y - 12}" width="${w}" height="24" rx="4"${ang ? ` transform="rotate(${ang} ${x} ${y})"` : ''}/>`;
   };
+  const labBoxes = [];
   const ok = (...q) => q.every(v => v[2] < 1 && v[0] > -W && v[0] < 2 * W && v[1] > -H && v[1] < 2 * H);
   /* aligned linear dimension between plane points a and b, pushed away from plane point c */
   const lin = (a, b, c, label, ed) => {
@@ -817,6 +818,8 @@ function updateSketchDims() {
     let ang = Math.atan2(u[1], u[0]) / D2R; if (ang > 90) ang -= 180; if (ang <= -90) ang += 180;
     const lb = label || f1(Math.hypot(b[0] - a[0], b[1] - a[1])), tx = (a1[0] + b1[0]) / 2, ty = (a1[1] + b1[1]) / 2, ra = Math.round(ang * 10) / 10;
     out.push(hit(ed, tx, ty, lb, ra), text(tx, ty, lb, ra));
+    const lw = lb.length * 3.4 + 2, cr = Math.abs(Math.cos(ra * D2R)), sr = Math.abs(Math.sin(ra * D2R)), ex = lw * cr + 7 * sr, ey = lw * sr + 7 * cr;
+    labBoxes.push([tx - ex, ty - ey - 4, tx + ex, ty + ey - 4]);
   };
   /* line through or from a centre with arrows at the ends that touch the curve; the label sits past the end */
   const across = (p1, p2, label, both, ed) => {
@@ -827,6 +830,7 @@ function updateSketchDims() {
     if (both) out.push(arrow(A, [-u[0], -u[1]]));
     const tx = hz + (u[0] >= 0 ? 3 : -3), an = u[0] >= 0 ? 'start' : 'end';
     out.push(hit(ed, tx, E[1], label, 0, an), text(tx, E[1], label, 0, an));
+    const lw = label.length * 6.8 + 4; labBoxes.push(an === 'start' ? [tx, E[1] - 12, tx + lw, E[1] + 4] : [tx - lw, E[1] - 12, tx, E[1] + 4]);
   };
   const rot = (cx, cy, a, x, y) => [cx + x * Math.cos(a) - y * Math.sin(a), cy + x * Math.sin(a) + y * Math.cos(a)];
   /* angle of segment a→b against the sketch X axis: dashed reference line, arc and the value */
@@ -844,6 +848,51 @@ function updateSketchDims() {
     const deg = dirAngle(a, b), shown = deg > 180 ? deg - 360 : deg, tm = a0 + da / 2;
     out.push(text(A[0] + Math.cos(tm) * (R + 12), A[1] + Math.sin(tm) * (R + 12), fmtc(shown, 1) + '°'));
   };
+  /* angle between the two sides meeting at corner p (from a, to b): an arc on the inner side (a closed outline: inside
+     it) with the value, a right angle as a small square */
+  const cornerDim = (p, a, b, poly2) => {
+    const Pp = px(p[0], p[1]), Ax = px(a[0], a[1]), Bx = px(b[0], b[1]), U = px(p[0] + 1, p[1]); if (!ok(Pp, Ax, Bx, U)) return;
+    const la = Math.hypot(Ax[0] - Pp[0], Ax[1] - Pp[1]), lb = Math.hypot(Bx[0] - Pp[0], Bx[1] - Pp[1]); if (Math.min(la, lb) < 16) return;
+    const k = Math.hypot(U[0] - Pp[0], U[1] - Pp[1]); if (k < 1e-6) return; /* px per mm */
+    const v1 = [a[0] - p[0], a[1] - p[1]], v2 = [b[0] - p[0], b[1] - p[1]], t1 = Math.atan2(v1[1], v1[0]); let sw = Math.atan2(v2[1], v2[0]) - t1;
+    while (sw <= 0) sw += 2 * Math.PI; while (sw > 2 * Math.PI) sw -= 2 * Math.PI; /* ccw from side a to side b */
+    const R = Math.min(26, 0.45 * Math.min(la, lb)) / k;
+    const mid = sw2 => [p[0] + Math.cos(t1 + sw2 / 2) * R * 0.5, p[1] + Math.sin(t1 + sw2 / 2) * R * 0.5];
+    let use = sw;
+    if (poly2) { if (!inPoly2(mid(sw), poly2)) use = sw - 2 * Math.PI; } else if (sw > Math.PI) use = sw - 2 * Math.PI;
+    const deg = Math.abs(use) / D2R;
+    if (Math.abs(deg - 90) < 0.05) {
+      const s0 = R * 0.6, u1 = [Math.cos(t1), Math.sin(t1)], t2 = t1 + use, u2 = [Math.cos(t2), Math.sin(t2)];
+      const q1 = px(p[0] + u1[0] * s0, p[1] + u1[1] * s0), q2 = px(p[0] + (u1[0] + u2[0]) * s0, p[1] + (u1[1] + u2[1]) * s0), q3 = px(p[0] + u2[0] * s0, p[1] + u2[1] * s0);
+      out.push(`<path d="M${q1[0]},${q1[1]}L${q2[0]},${q2[1]}L${q3[0]},${q3[1]}"/>`); return;
+    }
+    const n = Math.max(3, Math.ceil(Math.abs(use) / 0.15)); let arc = '';
+    for (let j = 0; j <= n; j++) { const t = t1 + use * j / n, q = px(p[0] + Math.cos(t) * R, p[1] + Math.sin(t) * R); arc += (j ? 'L' : 'M') + q[0] + ',' + q[1]; }
+    out.push(`<path d="${arc}"/>`);
+    /* the value goes in the corner when there is room for it, otherwise just outside the corner; a value that would
+       cover another one is left out (the arc stays) */
+    const lab = fmtc(deg, 1) + '°', hw = lab.length * 3.3 + 2, tm = t1 + use / 2;
+    /* first on the middle of the arc (the text has a halo), else just outside the corner */
+    const place = (dir, d0, onArc) => {
+      const q = px(p[0] + Math.cos(dir), p[1] + Math.sin(dir)), u = [(q[0] - Pp[0]) / k, (q[1] - Pp[1]) / k], ext = onArc ? 0 : hw * Math.abs(u[0]) + 7 * Math.abs(u[1]);
+      const L = [Pp[0] + u[0] * (d0 + ext), Pp[1] + u[1] * (d0 + ext)], bx = [L[0] - hw, L[1] - 7, L[0] + hw, L[1] + 7];
+      if (segBox(Pp, Ax, bx) || segBox(Pp, Bx, bx) || labBoxes.some(o => bx[0] < o[2] && bx[2] > o[0] && bx[1] < o[3] && bx[3] > o[1])) return false;
+      labBoxes.push(bx); out.push(text(L[0], L[1] + 4, lab)); return true;
+    };
+    if (!place(tm, R * k, true)) { let done = false; for (let d = R * k + 4; !done && d < Math.min(R * k + 2 * hw, 0.9 * Math.min(la, lb)); d += 5) done = place(tm, d); if (!done) place(tm + Math.PI, 4); }
+  };
+  /* does segment a-b touch the box [x0, y0, x1, y1] */
+  const segBox = (a, b, bx) => {
+    let t0 = 0, t1 = 1; const dx = b[0] - a[0], dy = b[1] - a[1];
+    for (const [pp, qq] of [[-dx, a[0] - bx[0]], [dx, bx[2] - a[0]], [-dy, a[1] - bx[1]], [dy, bx[3] - a[1]]]) {
+      if (Math.abs(pp) < 1e-12) { if (qq < 0) return false; continue; }
+      const r = qq / pp; if (pp < 0) { if (r > t1) return false; if (r > t0) t0 = r; } else { if (r < t0) return false; if (r < t1) t1 = r; }
+    }
+    return true;
+  };
+  const inPoly2 = (q, P2) => { let c = false; for (let i = 0, j = P2.length - 1; i < P2.length; j = i++) { const a = P2[i], b = P2[j]; if ((a[1] > q[1]) !== (b[1] > q[1]) && q[0] < (b[0] - a[0]) * (q[1] - a[1]) / (b[1] - a[1]) + a[0]) c = !c; } return c; };
+  /* rotation of a shape: its axis against the sketch X axis, only when it is turned */
+  const turnDim = (cx, cy, deg, r) => { if (Math.abs(((deg % 360) + 360) % 360) < 0.05 || r <= 0) return; const a = deg * D2R; angleDim([cx, cy], [cx + Math.cos(a) * r, cy + Math.sin(a) * r]); };
   /* sketch made from a face: how far each outline has moved from where it was on the face */
   if (sk.f.orig) {
     const cen = e => { const pl = entityPolylines([e])[0]; if (!pl || !pl.pts.length) return null; let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const q of pl.pts) { x0 = Math.min(x0, q[0]); y0 = Math.min(y0, q[1]); x1 = Math.max(x1, q[0]); y1 = Math.max(y1, q[1]); } return [(x0 + x1) / 2, (y0 + y1) / 2]; };
@@ -870,21 +919,31 @@ function updateSketchDims() {
       const a = Math.PI / 4; across([e.x - e.r * Math.cos(a), e.y - e.r * Math.sin(a)], [e.x + e.r * Math.cos(a), e.y + e.r * Math.sin(a)], 'Ø ' + f1(e.r * 2), true, ed('d', e.r * 2));
     } else if (e.t === 'ngon') {
       const a = (e.a || 0) * D2R; across([e.x, e.y], [e.x + e.r * Math.cos(a), e.y + e.r * Math.sin(a)], 'R ' + f1(e.r), false, ed('r', e.r));
+      turnDim(e.x, e.y, e.a || 0, e.r);
       /* side length on the side opposite the radius line so the two labels don't collide */
       const s1 = a + Math.floor(e.n / 2) * 2 * Math.PI / e.n, s2 = s1 + 2 * Math.PI / e.n; lin([e.x + e.r * Math.cos(s1), e.y + e.r * Math.sin(s1)], [e.x + e.r * Math.cos(s2), e.y + e.r * Math.sin(s2)], [e.x, e.y], null, ed('r', 2 * e.r * Math.sin(Math.PI / e.n), v => v / (2 * Math.sin(Math.PI / e.n))));
     } else if (e.t === 'ellipse') {
       const a = (e.a || 0) * D2R, c = [e.x, e.y];
       lin(rot(e.x, e.y, a, -e.rx, -e.ry), rot(e.x, e.y, a, e.rx, -e.ry), c, f1(e.rx * 2), ed('rx', e.rx * 2, v => v / 2));
       lin(rot(e.x, e.y, a, e.rx, -e.ry), rot(e.x, e.y, a, e.rx, e.ry), c, f1(e.ry * 2), ed('ry', e.ry * 2, v => v / 2));
+      turnDim(e.x, e.y, e.a || 0, e.rx);
     } else if (e.t === 'slot') {
       const g = slotGeom(e), a = g.ang * D2R, h = e.w / 2, c = [g.cx, g.cy];
       lin(rot(g.cx, g.cy, a, -g.len / 2, -h), rot(g.cx, g.cy, a, g.len / 2, -h), c, f1(g.len), ed('slen', g.len));
       lin(rot(g.cx, g.cy, a, g.len / 2 - h, -h), rot(g.cx, g.cy, a, g.len / 2 - h, h), rot(g.cx, g.cy, a, 0, 0), f1(e.w), ed('w', e.w));
+      if (Math.abs(g.ang % 180) > 0.05) turnDim(g.cx, g.cy, g.ang, g.len / 2 + h);
     } else if (e.t === 'poly') {
       const n = e.pts.length, segs = e.closed ? n : n - 1; if ((segs > 40 && !e.tr) || n < 2) continue;
       const c = e.pts.reduce((s, q) => [s[0] + q[0] / n, s[1] + q[1] / n], [0, 0]);
       /* a trimmed outline keeps arcs as short chords: those get no length, only the straight sides do */
       for (let k = 0; k < segs; k++) { if (isChord(e, k)) continue; const a = e.pts[k], b = e.pts[(k + 1) % n]; lin(a, b, c, null, ed('L' + k, Math.hypot(b[0] - a[0], b[1] - a[1]))); }
+      /* the angle at every corner (a closed outline: the inner angle) */
+      if (segs <= 24) for (let j = 0; j < n; j++) {
+        if ((!e.closed && (j === 0 || j === n - 1)) || isSmoothPt(e, j) || isChord(e, (j - 1 + n) % n) || isChord(e, j)) continue;
+        const pa = e.pts[(j - 1 + n) % n], pb = e.pts[(j + 1) % n], pj = e.pts[j];
+        if (Math.hypot(pa[0] - pj[0], pa[1] - pj[1]) < 1e-9 || Math.hypot(pb[0] - pj[0], pb[1] - pj[1]) < 1e-9) continue;
+        cornerDim(pj, pa, pb, e.closed ? e.pts : null);
+      }
       if (i < 0 && n >= 2) angleDim(e.pts[n - 2], e.pts[n - 1]); /* the segment being drawn: its angle too */
       else if (i === sk.selEnt && !sk.tool && !e.closed && segs <= 6) for (let k = 0; k < segs; k++) if (!isChord(e, k)) angleDim(e.pts[k], e.pts[k + 1]); /* a selected open line: angles of its segments */
     } else if (e.t === 'spline' && i < 0 && e.pts.length >= 2) {
