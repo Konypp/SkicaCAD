@@ -2490,6 +2490,12 @@ function step(state, f) {
       if (!tools.length) throw new Error('Vyberte nástrojová tělesa');
       let acc = t.polys;
       for (const tl of tools) acc = KK.boolean(acc, tl.polys, f.op === 'cut' ? 'subtract' : f.op === 'intersect' ? 'intersect' : 'union');
+      /* Jako nové těleso: the result is added as a body of its own and the target and the tools all stay as they were */
+      if (f.asNew) {
+        if (!acc.length) throw new Error('Výsledek kombinace je prázdný (tělesa se nepřekrývají)');
+        out = bodies.concat([{ id: f.id, name: 'Těleso ' + (++n), polys: acc, from: f.id }]);
+        break;
+      }
       const drop = f.keep ? new Set() : new Set(tools.map(x => x.id));
       out = bodies.filter(x => !drop.has(x.id)).map(x => (x === t ? { ...x, polys: acc } : x)).filter(x => x.polys.length);
       break;

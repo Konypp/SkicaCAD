@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.11
+- **Kombinovat – Výsledek jako nové těleso:** výsledek spojení, vyříznutí nebo průniku vznikne jako nové těleso a cílové i nástrojová tělesa zůstanou beze změny (např. vyříznout tvar a mít pořád i původní kus). Volba Ponechat nástrojová tělesa se pak skryje.
+- Anglická verze: „1 těleso“ se ukazovalo jako „1 point“ – opraveno na „1 body“.
 ## Beta 2.10
 - **Plochy › Žebra – Vytvořit: Nové těleso.** Žebra vzniknou jako samostatné těleso (Žebra 1, …), stále zapuštěná 0,4 mm do plochy, takže je lze nejdřív deformovat (Zkroutit, Zúžit, Ohnout…) a potom spojit s tělesem přes Kombinovat › Sjednotit.
 ## Beta 2.09

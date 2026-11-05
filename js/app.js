@@ -3740,7 +3740,7 @@ function startEdgeMod(mode, editIndex, f) {
 /* ================= combine ================= */
 function startCombine(editIndex, f) {
   const c = {
-    editIndex, target: f ? f.target : null, tools: new Set(f ? f.tools : []), op: f ? f.op : 'join', keep: f ? !!f.keep : false, active: 'target',
+    editIndex, target: f ? f.target : null, tools: new Set(f ? f.tools : []), op: f ? f.op : 'join', keep: f ? !!f.keep : false, asNew: f ? !!f.asNew : false, active: 'target',
     init() {
       if (cur.bodies.length < 2) { endCmd(false); toast('Kombinace potřebuje alespoň dvě tělesa.'); return; }
       if (!f && sel.size) { const ids = [...sel]; this.target = ids[0]; ids.slice(1).forEach(i => this.tools.add(i)); }
@@ -3749,9 +3749,10 @@ function startCombine(editIndex, f) {
         title: 'Kombinovat', icon: 'combine',
         fields: [{ k: 'sel', id: 'target', label: 'Cílové těleso' }, { k: 'sel', id: 'tools', label: 'Nástroje' },
           { k: 'opt', id: 'op', label: 'Operace', options: [['join', 'Spojit'], ['cut', 'Vyříznout'], ['intersect', 'Průnik']], value: this.op },
+          { k: 'chk', id: 'asNew', label: 'Výsledek jako nové těleso (původní tělesa zůstanou)', value: this.asNew },
           { k: 'chk', id: 'keep', label: 'Ponechat nástrojová tělesa', value: this.keep }],
         onSel: id => { this.active = id; this.update(); },
-        onChange: id => { if (id === 'op') this.op = dlg.get('op'); if (id === 'keep') this.keep = dlg.get('keep'); }
+        onChange: id => { if (id === 'op') this.op = dlg.get('op'); if (id === 'keep') this.keep = dlg.get('keep'); if (id === 'asNew') { this.asNew = dlg.get('asNew'); this.update(); } }
       });
       this.update();
     },
@@ -3763,7 +3764,7 @@ function startCombine(editIndex, f) {
       dlg.set('target', { text: tb ? bodyName(tb) : 'Vyberte těleso', has: !!tb, active: this.active === 'target' });
       const n = this.tools.size;
       dlg.set('tools', { text: n ? `${n} ${n === 1 ? 'těleso' : n < 5 ? 'tělesa' : 'těles'}` : 'Vyberte tělesa', has: n > 0, active: this.active === 'tools' });
-      dlg.okEnabled(!!tb && n > 0);
+      dlg.okEnabled(!!tb && n > 0); dlg.show('keep', !this.asNew);
       setPrompt(this.active === 'target' ? 'Vyberte cílové těleso' : 'Vyberte nástrojová tělesa');
       styleBodies();
     },
@@ -3774,7 +3775,7 @@ function startCombine(editIndex, f) {
     },
     onMove(ev) { const h = hitBodies(ev); dom.style.cursor = h ? 'pointer' : ''; },
     onClick(ev) { const h = hitBodies(ev); if (h) this.onBody(h.object.userData.bodyId); },
-    ok() { if (!this.target || !this.tools.size) return null; return { id: f ? f.id : newId(), type: 'combine', target: this.target, tools: Array.from(this.tools), op: this.op, keep: this.keep }; }
+    ok() { if (!this.target || !this.tools.size) return null; return { id: f ? f.id : newId(), type: 'combine', target: this.target, tools: Array.from(this.tools), op: this.op, keep: this.keep, ...(this.asNew ? { asNew: true } : {}) }; }
   };
   beginCmd(c); c.init();
 }
