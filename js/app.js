@@ -1250,6 +1250,28 @@ function showCtx(x, y, items) {
   m.style.top = Math.max(8, Math.min(y - h, window.innerHeight - h - 8)) + 'px';
 }
 document.addEventListener('pointerdown', e => { const m = $('#ctxmenu'); if (!m.hidden && !m.contains(e.target)) m.hidden = true; });
+/* kruhové menu: items [label, icon, fn] round the point (a long press on a touch screen, Q on a keyboard) */
+function showPie(x, y, items) {
+  let m = $('#pie'); if (!m) { m = document.createElement('div'); m.id = 'pie'; m.className = 'pie'; document.body.appendChild(m); }
+  const R = items.length > 6 ? 92 : 80, cx = Math.max(R + 60, Math.min(x, window.innerWidth - R - 60)), cy = Math.max(R + 40, Math.min(y, window.innerHeight - R - 40));
+  m.innerHTML = `<button class="pie-x" aria-label="Zavřít" style="left:${cx}px;top:${cy}px">${svg('close', 16)}</button>` + items.map(([l, ic], i) => {
+    const a = -Math.PI / 2 + i / items.length * Math.PI * 2;
+    return `<button class="pie-b" data-i="${i}" style="left:${cx + Math.cos(a) * R}px;top:${cy + Math.sin(a) * R}px"><span class="ico">${svg(ic, 18)}</span><span>${l}</span></button>`;
+  }).join('');
+  m.hidden = false;
+  $$('.pie-b', m).forEach(b => b.addEventListener('click', ev => { ev.stopPropagation(); m.hidden = true; items[+b.dataset.i][2](); }));
+  $('.pie-x', m).addEventListener('click', () => { m.hidden = true; });
+}
+document.addEventListener('pointerdown', e => { const m = $('#pie'); if (m && !m.hidden && !e.target.closest('.pie-b, .pie-x')) m.hidden = true; }, true);
+document.addEventListener('keydown', e => { const m = $('#pie'); if (e.key === 'Escape' && m && !m.hidden) { m.hidden = true; e.stopPropagation(); } }, true);
+/* the pie for selected flat faces in Plochy */
+function facePie(x, y) {
+  const list = faceList(); if (!list.length || !list.every(f => f.kind === 'plane' && f.bodyId === list[0].bodyId)) return false;
+  const go = t => () => { setFaceMode(false, true); startFaceEdit(undefined, undefined, list.slice(), t); };
+  showPie(x, y, [['Vytáhnout', 'extrude', go('ext')], ['Vsadit', 'shell', go('inset')], ['Posunout', 'move', go('move')], ['Otočit', 'rotate', go('rot')],
+    ['Velikost', 'scale', go('scale')], ['Řez smyčkou', 'splitbody', go('loop')], ['Rozdělit', 'splitface', () => startSplitFace(undefined, undefined, list[0])], ['Další…', 'menu', () => faceContext({ clientX: x, clientY: y, button: 2 })]]);
+  return true;
+}
 
 /* ================= ribbon ================= */
 /* compact ribbon: a plain item is [id, label, key]; a menu is { menu, label, items } and opens a drop-down list of items
@@ -4086,6 +4108,8 @@ function faceContext(e) {
     return;
   }
   showCtx(e.clientX, e.clientY + 4, [
+    ['Modelovat plochy (E, I, G, R, S)…', () => { const l = faceList(); setFaceMode(false, true); startFaceEdit(undefined, undefined, l); }, selFace.kind !== 'plane'],
+    ['Kruhové menu (Q)…', () => facePie(e.clientX, e.clientY), selFace.kind !== 'plane'],
     ['Vysunout (nové těleso, přidat nebo vyříznout)…', () => extrudeFace(), selFace.kind !== 'plane'],
     [selFace.kind === 'cyl' ? (selFace.cyl.internal ? 'Změnit průměr otvoru…' : 'Změnit průměr…') : 'Posunout plochu (vysunout / zapustit)…', () => startPressFace()],
     ['Rozdělit plochu čarou…', () => startSplitFace(undefined, undefined, selFace), selFace.kind !== 'plane'],
@@ -4221,11 +4245,11 @@ function startPressFace(editIndex, f, faces) {
 /* Tools: Vytáhnout (E), Vsadit (I), Posunout (G), Otočit (R), Velikost (S). Faces are picked on the model; a handle drags
    the value (or type it). A finished step is kept as soon as the next one starts (another tool, another face, Enter); OK
    keeps them all as one step of the timeline ('faceedit' with its list of steps). */
-const FE_TOOLS = { ext: ['Vytáhnout', 'Vzdálenost', 'mm'], inset: ['Vsadit', 'Šířka okraje', 'mm'], move: ['Posunout', 'Posunutí', 'mm'], rot: ['Otočit', 'Úhel', '°'], scale: ['Velikost', 'Měřítko', '×'] };
-const FE_KEYS = { e: 'ext', i: 'inset', g: 'move', r: 'rot', s: 'scale' };
+const FE_TOOLS = { ext: ['Vytáhnout', 'Vzdálenost', 'mm'], inset: ['Vsadit', 'Šířka okraje', 'mm'], move: ['Posunout', 'Posunutí', 'mm'], rot: ['Otočit', 'Úhel', '°'], scale: ['Velikost', 'Měřítko', '×'], loop: ['Řez smyčkou', 'Počet řezů', '×'] };
+const FE_KEYS = { e: 'ext', i: 'inset', g: 'move', r: 'rot', s: 'scale', l: 'loop' };
 function startFaceEdit(editIndex, f, faces, tool) {
   const r6 = x => Math.round(x * 1e6) / 1e6, r4 = x => Math.round(x * 1e4) / 1e4;
-  const neutral = t => (t === 'scale' ? 1 : 0);
+  const neutral = t => (t === 'scale' || t === 'loop' ? 1 : 0);
   const c = {
     editIndex, body: f ? f.body : faces && faces.length ? faces[0].bodyId : null, ops: f ? clone(f.ops || []) : [], sel: [],
     tool: tool || 'ext', ax: 'n', val: neutral(tool || 'ext'), add: false, err: null, drag: null, timer: null, hideBody: null,
@@ -4244,7 +4268,7 @@ function startFaceEdit(editIndex, f, faces, tool) {
           if (id === 'tool') this.setTool(dlg.get('tool'));
           else if (id === 'ax') { this.ax = dlg.get('ax'); this.preview(); }
           else if (id === 'add') this.add = dlg.get('add');
-          else if (id === 'val') { const v = dlg.get('val'); if (isFinite(v)) { this.val = v; this.preview(); } }
+          else if (id === 'val') { let v = dlg.get('val'); if (isFinite(v)) { if (this.tool === 'loop') { v = Math.max(1, Math.min(32, Math.round(v))); } this.val = v; this.preview(); } }
         },
         onBtn: (id, v) => {
           if (v === 'apply') { if (!this.commit()) toast('Nejdřív nastavte hodnotu kroku (tažením za úchyt nebo číslem).'); }
@@ -4274,7 +4298,7 @@ function startFaceEdit(editIndex, f, faces, tool) {
       if (fc.clip) { d.clip = fc.clip; const ip = Engine.feInner(fc.cpolys || []); if (ip) d.ip = ip.map(r4); }
       return d;
     },
-    pending() { return this.sel.length && Math.abs(this.val - neutral(this.tool)) > 1e-6; },
+    pending() { return this.tool !== 'loop' && this.sel.length && Math.abs(this.val - neutral(this.tool)) > 1e-6; },
     /* centre and direction for the handle and for turning / scaling */
     frame(st) {
       st = st || this._st; if (!st || !this.sel.length) return null;
@@ -4323,6 +4347,7 @@ function startFaceEdit(editIndex, f, faces, tool) {
       if (t === 'scale' && this.ax === 'n') this.ax = 'all';
       if (t !== 'scale' && this.ax === 'all') this.ax = 'n';
       dlg.set('tool', t); dlg.set('ax', this.ax); dlg.set('val', this.val);
+      this._lk = ''; if (this._lg) { G.overlay.remove(this._lg); this._lg = null; }
       const [, lab, unit] = FE_TOOLS[t]; dlg.label('val', lab); const u = $('#dlg-val') && $('#dlg-val').parentElement.querySelector('.u'); if (u) u.textContent = unit;
       if (!quiet) this.update(); else this.update();
     },
@@ -4350,7 +4375,7 @@ function startFaceEdit(editIndex, f, faces, tool) {
       return fc && fc.kind === 'plane' ? fc : null;
     },
     update() {
-      clearGroup(G.preview); clearGroup(G.overlay); this._mesh = null; this._hd = null;
+      clearGroup(G.preview); clearGroup(G.overlay); this._mesh = null; this._hd = null; this._lg = null; this._lk = '';
       const st = this._pv || this._st; this._shown = st;
       if (st) {
         const m = meshFromPolys(st.polys, bodyMaterial()); m.material.color.copy(tok.body).lerp(tok.accent, 0.12);
@@ -4368,14 +4393,16 @@ function startFaceEdit(editIndex, f, faces, tool) {
       const axOn = ['move', 'rot', 'scale'].includes(this.tool); dlg.show('ax', axOn);
       const ab = $('#dlg-ax [data-v="all"]'); if (ab) ab.hidden = this.tool !== 'scale';
       const ns = this.ops.length + (this.pending() ? 1 : 0);
-      dlg.set('n', this.err ? '!' + this.err : !n ? 'Vyberte plochu klepnutím (víc ploch: Shift nebo volba níže).' : (this.pending() ? `Krok ${ns}: ${FE_TOOLS[this.tool][0].toLowerCase()} – další krok ho potvrdí (jiný nástroj, jiná plocha, Enter). ` : `Táhněte za úchyt nebo napište hodnotu (Enter). `) + (this.ops.length ? `Hotové kroky: ${this.ops.length}. OK je všechny použije.` : 'OK použije všechny kroky.'));
-      setPrompt(n ? 'Táhněte za úchyt; klávesy E, I, G, R, S mění nástroj, X, Y, Z směr' : 'Klepněte na plochu tělesa');
+      if (this.tool === 'loop') dlg.set('n', this.err ? '!' + this.err : 'Najeďte na plochu poblíž hrany, kterou má řez křížit, a klepněte. Řez obejde těleso dokola; pak klepnutím vyberte jeho část a upravte ji.' + (this.ops.length ? ` Hotové kroky: ${this.ops.length}.` : ''));
+      else dlg.set('n', this.err ? '!' + this.err : !n ? 'Vyberte plochu klepnutím (víc ploch: Shift nebo volba níže).' : (this.pending() ? `Krok ${ns}: ${FE_TOOLS[this.tool][0].toLowerCase()} – další krok ho potvrdí (jiný nástroj, jiná plocha, Enter). ` : `Táhněte za úchyt nebo napište hodnotu (Enter). `) + (this.ops.length ? `Hotové kroky: ${this.ops.length}. OK je všechny použije.` : 'OK použije všechny kroky.'));
+      setPrompt(this.tool === 'loop' ? 'Klepněte na plochu poblíž hrany, kterou má řez křížit' : n ? 'Táhněte za úchyt; klávesy E, I, G, R, S, L mění nástroj, X, Y, Z směr' : 'Klepněte na plochu tělesa');
       dlg.okEnabled(this.ops.length > 0 || (this.pending() && !!this._pv));
       styleBodies(); requestRender();
     },
     /* the handle: an arrow along the direction (Vytáhnout, Posunout), a ball moving inwards (Vsadit) or outwards (Velikost),
        a ball on a ring (Otočit) */
     makeHandle() {
+      if (this.tool === 'loop') return;
       const fr = this.frame(this._st); if (!fr) return;
       const c = v3(fr.c), wp = worldPerPx(c), L = wp * 70, t = this.tool, col = tok.orange;
       const mk = g => { const o = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: col, depthTest: false, transparent: true })); o.renderOrder = 14; return noRay(o); };
@@ -4433,15 +4460,65 @@ function startFaceEdit(editIndex, f, faces, tool) {
       }
       if (Math.abs(v - this.val) < 1e-9) return;
       this.val = v; dlg.set('val', v);
+      const u = FE_TOOLS[this.tool][2]; showDimAt(ev, (this.tool === 'scale' ? '× ' + fmtc(v, 2) : fmtc(v, this.tool === 'rot' ? 1 : 2) + (u === 'mm' ? ' mm' : '°')));
       clearTimeout(this.timer); this.timer = setTimeout(() => { if (cmd === this) this.preview(); }, 40);
     },
-    onUp() { this.drag = null; controls.enabled = true; clearTimeout(this.timer); this.preview(); },
+    onUp() { this.drag = null; controls.enabled = true; clearTimeout(this.timer); $('#dim').hidden = true; this.preview(); },
+    /* Řez smyčkou: the side of the face nearest the pointer gives the direction; the cut crosses it at the pointer
+       (near its middle: in the middle; otherwise in grid steps), several cuts share it evenly */
+    loopAt(ev) {
+      if (!this._mesh) return null;
+      ray.setFromCamera(evNdc(ev), cam());
+      const h = ray.intersectObject(this._mesh, false)[0]; if (!h) return null;
+      const P = this._shown.polys, { poly } = polyOfHit(h), at = h.point.toArray(), g = K.planarFace(P, poly.n, poly.w, at) || [P.indexOf(poly)];
+      const [mx, my] = evPx(ev); let best = null, bd = Infinity;
+      for (const loop of K.faceLoops(P, g)) for (let k = 0; k < loop.length; k++) {
+        const a = loop[k], b = loop[(k + 1) % loop.length], A = toPx(v3(a)), B = toPx(v3(b)), [d] = segDist(mx, my, A, B);
+        if (d < bd && Math.hypot(...K.vsub(b, a)) > 1e-4) { bd = d; best = [a, b]; }
+      }
+      if (!best) return null;
+      const [a, b] = best, L = Math.hypot(...K.vsub(b, a)), n = K.vmul(K.vsub(b, a), 1 / L);
+      const cnt = Math.max(1, Math.min(32, Math.round(this.val) || 1)); let ts;
+      if (cnt > 1) ts = [...Array(cnt)].map((_, k) => (k + 1) / (cnt + 1));
+      else {
+        let t = Math.max(0, Math.min(1, K.vdot(K.vsub(at, a), n) / L));
+        if (Math.abs(t - 0.5) * L < worldPerPx(h.point) * 12) t = 0.5;
+        else if (settings.gridSnap) { const st = settings.snap; t = Math.round(t * L / st) * st / L; }
+        if (t <= 1e-6 || t >= 1 - 1e-6) return null;
+        ts = [t];
+      }
+      const ds = ts.map(t => K.vdot(n, K.vadd(a, K.vmul(K.vsub(b, a), t))));
+      return { n, ds, p: at, f: { n: poly.n.slice(), w: poly.w, p: at } };
+    },
+    drawLoop(lp) {
+      if (this._lg) { G.overlay.remove(this._lg); this._lg = null; }
+      if (!lp) { requestRender(); return; }
+      const P = this._shown.polys, seg = [];
+      for (const d of lp.ds) {
+        const ring = Engine.feLoopRing(P, lp.n, d, K.vadd(lp.p, K.vmul(lp.n, d - K.vdot(lp.n, lp.p)))); if (!ring) continue;
+        for (const i of ring) {
+          const v = P[i].v, cr = [];
+          for (let k = 0; k < v.length; k++) { const a = v[k], b = v[(k + 1) % v.length], sa = K.vdot(lp.n, a) - d, sb = K.vdot(lp.n, b) - d; if (sa * sb < 0) { const t = sa / (sa - sb); cr.push(K.vadd(a, K.vmul(K.vsub(b, a), t))); } }
+          for (let k = 0; k + 1 < cr.length; k += 2) seg.push(...cr[k], ...cr[k + 1]);
+        }
+      }
+      const l = noRay(new THREE.LineSegments(lineGeo(seg), new THREE.LineBasicMaterial({ color: tok.orange, depthTest: false, transparent: true }))); l.renderOrder = 14;
+      this._lg = l; G.overlay.add(l); requestRender();
+    },
     onMove(ev) {
+      if (this.tool === 'loop') { const lp = this.loopAt(ev), key = lp ? lp.n.map(x => x.toFixed(4)).join() + lp.ds.map(x => x.toFixed(4)).join() : ''; if (key !== this._lk) { this._lk = key; this.drawLoop(lp); } dom.style.cursor = lp ? 'crosshair' : ''; return; }
       const hd = this._hd; let over = false;
       if (hd) { const P = toPx(hd.tip), [mx, my] = evPx(ev); over = Math.hypot(P[0] - mx, P[1] - my) < 18; }
       dom.style.cursor = over ? 'grab' : this.pickFace(ev) ? 'pointer' : '';
     },
     onClick(ev) {
+      if (this.tool === 'loop') {
+        const lp = this.loopAt(ev); if (!lp || !this._st) return;
+        const op = { op: 'loop', n: lp.n.map(r6), p: lp.p.map(r4), ds: lp.ds.map(r4), f: { n: lp.f.n.map(r6), w: r6(lp.f.w), p: lp.f.p.map(r4) } };
+        try { this._st = Engine.feStep(this._st.polys, this._st.seams, op); this.ops.push(op); this.sel = []; this.err = null; }
+        catch (e) { toast(e.message); }
+        this._lk = ''; this.update(); return;
+      }
       const fc = this.pickFace(ev); if (!fc) return;
       const addMode = this.add || ev.shiftKey || ev.ctrlKey || ev.metaKey;
       if (this.pending()) { this.commit(); }
@@ -4452,14 +4529,34 @@ function startFaceEdit(editIndex, f, faces, tool) {
       else this.sel = [d];
       this._pv = null; this.update();
     },
+    /* the round menu inside the command: tools, keep the step, undo a step */
+    onLongPress(ev) {
+      const T = t => [FE_TOOLS[t][0], { ext: 'extrude', inset: 'shell', move: 'move', rot: 'rotate', scale: 'scale', loop: 'splitbody' }[t], () => { this.setTool(t); }];
+      showPie(ev.clientX, ev.clientY, [T('ext'), T('inset'), T('move'), T('rot'), T('scale'), T('loop'),
+        ['Použít krok', 'finish', () => { if (!this.commit()) toast('Nejdřív nastavte hodnotu kroku (tažením za úchyt nebo číslem).'); this.update(); }],
+        ['Vrátit krok', 'undo', () => { this.undoStep(); this.update(); }]]);
+    },
+    /* Shift+R: the last step again on the faces selected now (same distance, angle or scale) */
+    repeat() {
+      const last = this.ops[this.ops.length - 1];
+      if (!last || last.op === 'loop' || !this.sel.length) { toast('Není co zopakovat: nejdřív udělejte krok a vyberte plochy.'); return; }
+      if (this.pending()) this.commit();
+      const t = last.op;
+      this.setTool(t, true);
+      if (t === 'move') { const L = Math.hypot(...last.v); this.val = L; const u = last.v.map(x => x / (L || 1)); this.ax = Math.abs(u[0]) > 0.9999 ? 'x' : Math.abs(u[1]) > 0.9999 ? 'y' : Math.abs(u[2]) > 0.9999 ? 'z' : 'n'; if (this.ax !== 'n' && u[{ x: 0, y: 1, z: 2 }[this.ax]] < 0) this.val = -L; }
+      else this.val = t === 'ext' ? last.d : t === 'inset' ? last.t : t === 'rot' ? last.ang : last.s;
+      dlg.set('ax', this.ax); dlg.set('val', this.val); this.preview();
+    },
     onKey(e) {
-      const k = e.key.toLowerCase();
+      const k = (e.key || '').toLowerCase();
+      if (k === 'r' && e.shiftKey) { this.repeat(); return true; }
+      if (k === 'q') { const lp = lastMoveEv || { clientX: innerWidth / 2, clientY: innerHeight / 2 }; this.onLongPress(lp); return true; }
       if (FE_KEYS[k]) { this.setTool(FE_KEYS[k]); return true; }
       if (['x', 'y', 'z', 'n'].includes(k) && ['move', 'rot', 'scale'].includes(this.tool)) { this.ax = this.ax === k && this.tool === 'scale' ? 'all' : k; dlg.set('ax', this.ax); this.preview(); return true; }
-      if (/^[0-9.,-]$/.test(e.key) && this.sel.length) { const inp = $('#dlg-val'); if (inp) { inp.focus(); inp.value = e.key; inp.dispatchEvent(new Event('input', { bubbles: true })); } return true; }
+      if (/^[0-9.,-]$/.test(e.key) && (this.sel.length || this.tool === 'loop')) { const inp = $('#dlg-val'); if (inp) { inp.focus(); inp.value = e.key; inp.dispatchEvent(new Event('input', { bubbles: true })); } return true; }
       return false;
     },
-    onEnter() { if (this.pending()) { this.commit(); return true; } return false; },
+    onEnter() { if (this.pending()) { this.commit(); return true; } return this.tool === 'loop' && !this.ops.length; },
     onEsc() { if (this.pending()) { this.val = neutral(this.tool); dlg.set('val', this.val); this._pv = null; this.update(); return true; } return false; },
     ok() {
       if (this.pending()) this.commit();
@@ -6813,12 +6910,19 @@ dom.addEventListener('pointerdown', e => {
   down = { x: e.clientX, y: e.clientY, btn: e.button, gizmo: !!(transform.object && transform.axis), special: false };
   /* touch: holding a finger still for a moment opens the same menu as a right click */
   clearTimeout(longPressT);
-  if (e.pointerType === 'touch' && e.button === 0 && !sk && !cmd) {
+  if (e.pointerType === 'touch' && e.button === 0 && !sk && (!cmd || cmd.onLongPress)) {
     const d0 = down, ev0 = { clientX: e.clientX, clientY: e.clientY, button: 2 };
     longPressT = setTimeout(() => {
-      if (down !== d0 || d0.moved) return;
+      if (down !== d0 || d0.moved || d0.special) return;
       d0.longpress = true;
-      if (faceMode) faceContext(ev0); else { const h = hitBodies(ev0); if (h) bodyContext(ev0, h.object.userData.bodyId); }
+      if (cmd) { cmd.onLongPress(ev0); return; }
+      if (faceMode) {
+        /* a long press on a flat face: the round menu of Modelovat plochy (Další… opens the full menu) */
+        const h = hitBodies(ev0), f = h ? faceAtHit(h) : null;
+        if (f && !faceList().some(q => faceKey(q) === faceKey(f))) { selFace = f; selFaces = [f]; drawFaces(); updateInfo(); }
+        if (f && f.kind === 'plane' && facePie(ev0.clientX, ev0.clientY)) return;
+        faceContext(ev0);
+      } else { const h = hitBodies(ev0); if (h) bodyContext(ev0, h.object.userData.bodyId); }
     }, 550);
   }
   if (e.button === 0 && cmd && cmd.onDown && cmd.onDown(e)) { down.special = true; try { dom.setPointerCapture(e.pointerId); } catch (er) {} }
@@ -6962,10 +7066,13 @@ document.addEventListener('keydown', e => {
   if (mod && k.toLowerCase() === 'c') { e.preventDefault(); copySel(); return; }
   if (mod && k.toLowerCase() === 'v') { e.preventDefault(); pasteClip(); return; }
   if (mod && k.toLowerCase() === 'd') { e.preventDefault(); if (faceMode && selFace && !sk && !cmd) faceToSketch(); else duplicateSel(); return; }
+  if (mod && k.toLowerCase() === 'r' && !e.shiftKey && cmd && !sk && cmd.onKey) { e.preventDefault(); cmd.onKey({ key: 'l' }); return; }
+  if (mod && k.toLowerCase() === 'r' && !e.shiftKey && faceMode && selFace && !cmd && !sk) { e.preventDefault(); const l = faceList().filter(x => x.kind === 'plane'); setFaceMode(false, true); startFaceEdit(undefined, undefined, l, 'loop'); return; }
   if (mod) return;
   if (cmd && !sk && k === 'Escape' && cmd.onEsc && cmd.onEsc()) { e.preventDefault(); return; }
   if (cmd && !sk && k === 'Enter' && cmd.onEnter && cmd.onEnter()) { e.preventDefault(); return; }
   if (cmd && !sk && cmd.onKey && cmd.onKey(e)) { e.preventDefault(); return; }
+  if (faceMode && selFace && !cmd && !sk && k.toLowerCase() === 'q') { const ev = lastMoveEv || { clientX: innerWidth / 2, clientY: innerHeight / 2 }; if (facePie(ev.clientX, ev.clientY)) { e.preventDefault(); return; } }
   /* Plochy: a selected flat face and E, I, G, R, S start Modelovat plochy with that tool, like in Blender */
   if (faceMode && selFace && !cmd && !sk && FE_KEYS[k.toLowerCase()] && faceList().every(x => x.kind === 'plane' && x.bodyId === selFace.bodyId)) { e.preventDefault(); const l = faceList(); setFaceMode(false, true); startFaceEdit(undefined, undefined, l, FE_KEYS[k.toLowerCase()]); return; }
   if (k === 'Escape') {

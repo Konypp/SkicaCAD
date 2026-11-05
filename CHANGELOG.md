@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 2.19
+- **Modelovat plochy – Řez smyčkou (L nebo Ctrl+R):** najeďte na plochu poblíž hrany, kterou má řez křížit – ukáže se oranžový řez dokola tělesem (u prostředku hrany skočí doprostřed, jinak po krocích mřížky); klepnutím se těleso rozřízne. Části pak jdou vybrat a vytáhnout, posunout nebo zmenšit (např. zkosit jen horní pás). Počet řezů rozdělí hranu rovnoměrně.
+- **Kruhové menu:** v režimu Plochy dlouhý stisk na ploše (telefon) nebo klávesa Q nabídne Vytáhnout, Vsadit, Posunout, Otočit, Velikost, Řez smyčkou, Rozdělit a Další…; uvnitř Modelovat plochy přepíná nástroje a nabízí Použít krok / Vrátit krok.
+- **Zkratky:** Shift+R zopakuje poslední krok na nově vybraných plochách; Esc zruší rozpracovaný krok; během tažení úchytu se u ukazatele ukazuje hodnota. Kontextové menu ploch má položky Modelovat plochy a Kruhové menu.
 ## Beta 2.18
 - **Nové: Modelovat plochy** (lišta Plochy › Modelovat, nebo v režimu Plochy klávesy E, I, G, R, S) – práce s plochami jako v Blenderu:
   - **Vytáhnout (E)** – plocha (i její část) se vytáhne ven nebo zatlačí dovnitř; vytažená plocha zůstane vybraná pro další krok.
