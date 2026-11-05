@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.12
+- **Kombinovat – Rozdělit výsledek na samostatné díly:** každá oddělená část výsledku se stane samostatným tělesem (např. po vyříznutí nástrojem ohebného spoje vzniknou dva články „– díl 1“ a „– díl 2“); dutiny zůstanou u dílu, ve kterém leží. Lze kombinovat s volbou Výsledek jako nové těleso (pak zůstane i původní těleso a nástroj).
 ## Beta 2.11
 - **Kombinovat – Výsledek jako nové těleso:** výsledek spojení, vyříznutí nebo průniku vznikne jako nové těleso a cílové i nástrojová tělesa zůstanou beze změny (např. vyříznout tvar a mít pořád i původní kus). Volba Ponechat nástrojová tělesa se pak skryje.
 - Anglická verze: „1 těleso“ se ukazovalo jako „1 point“ – opraveno na „1 body“.

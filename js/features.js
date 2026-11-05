@@ -1983,6 +1983,21 @@ function shellsOf(P) {
   const g = new Map(); P.forEach((p, i) => { const r = find(i); if (!g.has(r)) g.set(r, []); g.get(r).push(p); });
   return [...g.values()].filter(sh => KK.signedVolume(sh) > 1e-3);
 }
+/* the separate parts of a solid: its outer shells, each with the hollows (inner shells) that lie inside it; largest first */
+function partsOf(P) {
+  const par = P.map((_, i) => i), find = i => { while (par[i] !== i) i = par[i] = par[par[i]]; return i; }, seen = new Map();
+  P.forEach((p, i) => p.v.forEach(q => { const k = KK.qk(q); if (seen.has(k)) par[find(i)] = find(seen.get(k)); else seen.set(k, i); }));
+  const g = new Map(); P.forEach((p, i) => { const r = find(i); if (!g.has(r)) g.set(r, []); g.get(r).push(p); });
+  const all = [...g.values()].map(sh => ({ sh, v: KK.signedVolume(sh) })), outer = all.filter(x => x.v > 1e-3).sort((a, b) => b.v - a.v), inner = all.filter(x => x.v < -1e-3);
+  if (outer.length <= 1) return [P];
+  const parts = outer.map(x => ({ polys: x.sh.slice(), v: x.v, test: null }));
+  for (const h of inner) {
+    const q = h.sh[0].v[0];
+    let best = null; for (const pt of parts) { pt.test = pt.test || insideTest(pt.polys); if (pt.test(q) && (!best || pt.v < best.v)) best = pt; }
+    (best || parts[0]).polys.push(...h.sh);
+  }
+  return parts.map(x => x.polys);
+}
 /* a point-in-solid test by ray parity (one fixed skew direction) */
 function insideTest(polys) {
   const dir = KK.vnorm([0.5773, 0.6131, 0.5401]), list = polys.map(p => ({ p, dn: KK.vdot(p.n, dir) }));
@@ -2491,13 +2506,17 @@ function step(state, f) {
       let acc = t.polys;
       for (const tl of tools) acc = KK.boolean(acc, tl.polys, f.op === 'cut' ? 'subtract' : f.op === 'intersect' ? 'intersect' : 'union');
       /* Jako nové těleso: the result is added as a body of its own and the target and the tools all stay as they were */
+      /* Rozdělit na samostatné díly: each separate piece of the result (e.g. the two segments left by a joint cutter) becomes a
+         body of its own; the first (largest) keeps the target's place unless the result is a new body */
+      const pieces = f.separate && acc.length ? partsOf(acc) : [acc];
+      const extra = (k0) => pieces.slice(k0).map((polys, k) => ({ id: f.id + '_' + (k + k0), name: (t.name || 'Těleso') + ' – díl ' + (k + k0 + 1), polys, from: f.id }));
       if (f.asNew) {
         if (!acc.length) throw new Error('Výsledek kombinace je prázdný (tělesa se nepřekrývají)');
-        out = bodies.concat([{ id: f.id, name: 'Těleso ' + (++n), polys: acc, from: f.id }]);
+        out = bodies.concat(pieces.length > 1 ? extra(0) : [{ id: f.id, name: 'Těleso ' + (++n), polys: acc, from: f.id }]);
         break;
       }
       const drop = f.keep ? new Set() : new Set(tools.map(x => x.id));
-      out = bodies.filter(x => !drop.has(x.id)).map(x => (x === t ? { ...x, polys: acc } : x)).filter(x => x.polys.length);
+      out = bodies.filter(x => !drop.has(x.id)).map(x => (x === t ? { ...x, polys: pieces[0] } : x)).filter(x => x.polys.length).concat(pieces.length > 1 ? extra(1) : []);
       break;
     }
     case 'thread': {
