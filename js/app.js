@@ -6693,7 +6693,9 @@ $('#nav-step').addEventListener('change', e => { settings.snap = parseFloat(e.ta
 /* samostatná verze (PWA): soubory se stahují přes odkaz s atributem download */
 /* samostatná verze (PWA): soubory se stahují přes odkaz s atributem download */
 const dl = { async save({ filename, data }) {
-  const blob = data instanceof Blob ? data : new Blob([data], { type: typeof data === 'string' ? 'application/json' : 'application/octet-stream' });
+  /* a 3MF is a zip inside: with its own type, so a phone does not save it as .zip */
+  const type = /\.3mf$/i.test(filename) ? 'model/3mf' : typeof data === 'string' ? 'application/json' : 'application/octet-stream';
+  const blob = data instanceof Blob ? (/\.3mf$/i.test(filename) ? new Blob([data], { type }) : data) : new Blob([data], { type });
   const url = URL.createObjectURL(blob), el = document.createElement('a');
   el.href = url; el.download = filename; document.body.append(el); el.click();
   setTimeout(() => { URL.revokeObjectURL(url); el.remove(); }, 4000);
@@ -6706,7 +6708,9 @@ async function saveFile(filename, data, okMsg) {
     /* the Claude preview only lets pages save some file types (not .stl / .obj): hand the file over packed in a .zip */
     if (e && e.code === 'rejected_extension' && !/\.zip$/i.test(filename)) {
       try {
-        await dl.save({ filename: filename + '.zip', data: makeZip([{ name: filename, data: typeof data === 'string' ? new TextEncoder().encode(data) : data }]) });
+        /* the packed file must be bytes: a 3MF arrives as a Blob (it is a zip itself) and was packed empty before */
+        const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data instanceof Blob ? new Uint8Array(await data.arrayBuffer()) : data instanceof ArrayBuffer ? new Uint8Array(data) : data;
+        await dl.save({ filename: filename + '.zip', data: makeZip([{ name: filename, data: bytes }]) });
         toast('Tady nejde uložit soubor ' + filename.split('.').pop().toUpperCase() + ' přímo, je zabalený v ZIP. Ve verzi na GitHub Pages se uloží přímo.');
       } catch (e2) { if (!e2 || e2.code !== 'declined') toast('Soubor se nepodařilo uložit.'); }
       return;

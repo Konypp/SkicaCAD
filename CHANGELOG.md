@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.14
+- **Oprava exportu 3MF v náhledu v Claude:** tady se 3MF nedá uložit přímo, balí se do ZIP – jenže se do archivu vkládal chybně (prázdný, poškozený záznam), takže po rozbalení žádný soubor .3mf nebyl. Teď je v ZIPu platný soubor .3mf.
+- **Samostatná verze (GitHub Pages):** 3MF se ukládá s vlastním typem souboru (model/3mf), aby ho telefon nepřejmenoval na .zip.
 ## Beta 2.13
 - **Mobil: aplikace se už nepřibližuje ani neoddaluje** (sevření dvěma prsty, dvojité klepnutí, ani přiblížení při psaní do políčka na iPhonu). Pohled do 3D scény se dvěma prsty přibližuje dál jako dosud.
 ## Beta 2.12
