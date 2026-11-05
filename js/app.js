@@ -4928,6 +4928,11 @@ function startSplitFace(editIndex, f, face) {
     mode: f ? f.mode || (f.pts ? 'curve' : 'line') : 'line',
     pts: f && !f.pts ? [v3(f.a), v3(f.b)] : [], cpts: f && f.mode !== 'edge' && f.cpts ? f.cpts.map(v3) : [], edge: null, dist: f && f.dist ? f.dist : 5,
     fixed: f && f.mode === 'edge' ? f : null, hover: null, valid: false, q: null,
+    /* a new split keeps going: every finished dividing line is kept here and the next one can be drawn straight away;
+       OK applies them all (editing an existing split stays one line) */
+    done: [], multi: editIndex === undefined || editIndex === null,
+    /* keep the finished line and start the next one on the same face */
+    stash() { if (!this.multi || !this.valid) return false; this.done.push(this.build()); this.pts = []; this.cpts = []; this.edge = null; this.fixed = null; this.valid = false; return true; },
     polys() { const b = cur.bodies.find(x => x.id === this.body); return b ? b.polys : null; },
     init() {
       if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
@@ -4939,6 +4944,7 @@ function startSplitFace(editIndex, f, face) {
           { k: 'btns', id: 'dir', label: 'Čára z bodu 1', options: [['u', 'Vodorovně'], ['v', 'Svisle']] },
           { k: 'sel', id: 'cp', label: 'Křivka' }, { k: 'btns', id: 'cb', label: '', options: [['undo', 'Zpět'], ['clear', 'Smazat vše']] },
           { k: 'sel', id: 'ed', label: 'Hrana' }, { k: 'num', id: 'dist', label: 'Odsazení', value: this.dist },
+          { k: 'btns', id: 'more', label: '', options: [['next', 'Další dělení'], ['back', 'Vrátit poslední']] },
           { k: 'note', id: 'n' }],
         onChange: id => {
           if (id === 'mode') { this.mode = dlg.get('mode'); this.fixed = null; this.update(); }
@@ -4946,6 +4952,12 @@ function startSplitFace(editIndex, f, face) {
         },
         onBtn: (id, v) => {
           if (id === 'cb') { if (v === 'undo') this.cpts.pop(); else this.cpts = []; this.update(); return; }
+          if (id === 'more') {
+            if (v === 'next') { if (!this.stash()) toast('Nejdřív dokončete dělicí čáru, která plochu protne.'); }
+            else if (this.valid || this.pts.length || this.cpts.length || this.edge) { this.pts = []; this.cpts = []; this.edge = null; this.fixed = null; }
+            else if (this.done.length) { const d = this.done.pop(); this.body = d.body; this.n = d.n.slice(); this.w = d.w; this.seed = d.a.slice(); }
+            this.update(); return;
+          }
           if (id !== 'dir' || !this.n || !this.pts.length) return;
           const B = Engine.basisFromPlane(this.n, this.w), d = v3(v === 'u' ? B.u : B.v);
           this.pts = [this.pts[0], this.pts[0].clone().addScaledVector(d, 10)]; this.update();
@@ -5036,6 +5048,11 @@ function startSplitFace(editIndex, f, face) {
       if (has) {
         const g = this.group();
         if (g.length) G.overlay.add(faceOverlay(g.map(i => P[i]), planeKey(P[g[0]]), tok.accent, 0.18));
+        for (const d of this.done) {
+          const bp = (cur.bodies.find(x => x.id === d.body) || {}).polys; if (!bp) continue;
+          const seg = Engine.seamSegments(bp, [{ n: d.n, w: d.w, a: d.a, b: d.b, ...(d.pts ? { pts: d.pts, closed: !!d.closed } : {}) }]);
+          if (seg.length) { const l = noRay(new THREE.LineSegments(lineGeo(seg), new THREE.LineBasicMaterial({ color: tok.accent, depthTest: false, transparent: true }))); l.renderOrder = 12; G.overlay.add(l); }
+        }
         let q = this.seam();
         if (!q && m === 'line' && this.pts.length === 1 && this.hover && this.pts[0].distanceTo(this.hover.p) > 1e-3) q = { n: this.n, w: this.w, a: this.pts[0].toArray(), b: this.hover.p.toArray() };
         if (q) {
@@ -5048,7 +5065,7 @@ function startSplitFace(editIndex, f, face) {
               A = K.surfaceArea(Engine.clipRegion(P, g, [h])); Bb = K.surfaceArea(Engine.clipRegion(P, g, [hb]));
             } catch (e) { A = 0; }
             this.valid = A > 1e-4 && Bb > 1e-4;
-            dlg.set('n', this.valid ? `Plocha se rozdělí na části ${fmtc(A, 1)} mm² a ${fmtc(Bb, 1)} mm². Každou pak vyberete a upravíte samostatně.` : '!Čára plochu nerozdělí, musí plochou procházet.');
+            dlg.set('n', this.valid ? (this.multi ? `Plocha se rozdělí na části ${fmtc(A, 1)} mm² a ${fmtc(Bb, 1)} mm². Další dělení: ${m === 'line' ? 'klepněte na první bod další čáry' : m === 'edge' ? 'klepněte na další hranu' : 'tlačítko Další dělení'}; OK použije všechna.` : `Plocha se rozdělí na části ${fmtc(A, 1)} mm² a ${fmtc(Bb, 1)} mm². Každou pak vyberete a upravíte samostatně.`) : '!Čára plochu nerozdělí, musí plochou procházet.');
           }
         }
         if (!this.valid && !this.seam()) {
@@ -5062,7 +5079,9 @@ function startSplitFace(editIndex, f, face) {
         if (this.hover) G.overlay.add(mpts([this.hover.p], tok.accent, 12));
       } else dlg.set('n', 'Vyberte rovinnou stěnu tělesa, kterou chcete rozdělit.');
       setPrompt(!has ? 'Klepněte na rovinnou plochu, kterou chcete rozdělit' : m === 'curve' ? 'Klepejte body dělicí křivky' : m === 'edge' ? 'Klepněte na hranu, která se odsadí dovnitř plochy' : this.pts.length === 1 ? 'Klepněte na druhý bod dělicí čáry' : 'Klepněte na první bod dělicí čáry');
-      dlg.okEnabled(this.valid); requestRender();
+      dlg.show('more', this.multi && has);
+      if (this.multi && this.done.length && !this.valid && !(this.pts.length || this.cpts.length || this.edge)) dlg.set('n', `Hotová dělení: ${this.done.length}. Kreslete další, nebo potvrďte OK.`);
+      dlg.okEnabled(this.valid || this.done.length > 0); requestRender();
     },
     onMove(ev) {
       if (!this.n) { dom.style.cursor = hitBodies(ev) ? 'pointer' : ''; return; }
@@ -5076,14 +5095,26 @@ function startSplitFace(editIndex, f, face) {
         if (!fc || fc.kind !== 'plane') { if (h) toast('Rozdělit lze jen rovinnou plochu.'); return; }
         this.body = fc.bodyId; this.n = fc.n.slice(); this.w = fc.w; this.seed = fc.p.slice(); this.update(); return;
       }
-      if (this.mode === 'edge') { const e = this.pickEdge(ev, R); if (!e) return; this.edge = e.ch; this.fixed = null; this.update(); return; }
+      /* another flat face tapped while nothing is half-drawn: carry on there */
+      if (this.multi && (this.mode === 'edge' ? !this.edge || this.valid : this.mode === 'curve' ? !this.cpts.length : this.pts.length !== 1)) {
+        const h = hitBodies(ev), fc = h ? faceAtHit(h) : null;
+        if (fc && fc.kind === 'plane' && (fc.bodyId !== this.body || Math.abs(fc.w - this.w) > 1e-4 || K.vdot(fc.n, this.n) < 0.9999)
+          && !(this.mode === 'edge' ? this.pickEdge(ev, R) : (q0 => q0 && q0.kind !== 'g' && q0.kind !== 'f')(this.pick(ev)))) {
+          this.stash(); this.pts = []; this.cpts = []; this.edge = null; this.fixed = null;
+          this.body = fc.bodyId; this.n = fc.n.slice(); this.w = fc.w; this.seed = fc.p.slice(); this.hover = null; this.update(); return;
+        }
+      }
+      if (this.mode === 'edge') { const e = this.pickEdge(ev, R); if (!e) return; this.stash(); this.edge = e.ch; this.fixed = null; this.update(); return; }
       const q = this.pick(ev); if (!q) return;
       if (this.mode === 'curve') { this.cpts.push(q.p); this.hover = TOUCH ? null : q; this.update(); return; }
-      if (this.pts.length >= 2) this.pts = [];
+      if (this.pts.length >= 2) { this.stash(); this.pts = []; }
       this.pts.push(q.p); this.hover = TOUCH ? null : q; this.update();
     },
     ok() {
-      if (!this.valid) return null;
+      if (!this.valid) return this.done.length ? this.done.slice() : null;
+      return this.done.length ? [...this.done, this.build()] : this.build();
+    },
+    build() {
       const r4 = v => Math.round(v * 1e4) / 1e4, r6 = v => Math.round(v * 1e6) / 1e6, q = this.seam();
       const o = { id: f ? f.id : newId(), type: 'splitface', body: this.body, n: this.n.map(r6), w: r6(this.w), a: q.a.map(r4), b: q.b.map(r4) };
       if (this.mode !== 'line') o.mode = this.mode;
@@ -5092,7 +5123,7 @@ function startSplitFace(editIndex, f, face) {
       if (this.mode === 'edge') o.dist = this.dist;
       return o;
     },
-    after() { selFace = null; selFaces = []; hoverFace = null; setTimeout(() => toast('Plocha je rozdělená. V režimu Plochy klepněte na její část a upravte ji.'), 700); },
+    after(r) { selFace = null; selFaces = []; hoverFace = null; const k = Array.isArray(r) ? r.length : 1; setTimeout(() => toast(k > 1 ? `Hotovo, ${k} dělení. V režimu Plochy klepněte na část plochy a upravte ji.` : 'Plocha je rozdělená. V režimu Plochy klepněte na její část a upravte ji.'), 700); },
     cleanup() { this.hover = null; }
   };
   beginCmd(c); c.init();

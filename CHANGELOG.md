@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.17
+- **Rozdělit plochu – více dělení najednou:** po dokončení dělicí čáry se nemusí potvrzovat. Klepnutím na první bod další čáry (u odsazení na další hranu, u křivky tlačítkem Další dělení) se hotové dělení odloží a kreslí se další. Klepnutím na jinou rovinnou plochu se pokračuje tam. Hotová dělení zůstávají vidět, tlačítko Vrátit poslední vrací krok zpět a OK použije všechna dělení najednou (na časové ose vznikne položka pro každé).
 ## Beta 2.16
 - **Skica – úhly v kótách:** se zapnutou volbou Zobrazit kóty se teď ukazují i úhly, a to trvale, ne jen při kreslení čáry: v každém rohu čáry nebo uzavřeného obrysu je oblouček s hodnotou úhlu (u uzavřeného obrysu vnitřní úhel, pravý úhel jako malý čtvereček). Hladké body křivek a oblouky po oříznutí se přeskakují, hodnota se nepřekrývá s délkovými kótami.
 - **Natočení tvarů:** mnohoúhelník, elipsa a drážka ukazují úhel natočení vůči ose X, když jsou natočené.
