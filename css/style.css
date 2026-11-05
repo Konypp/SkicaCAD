@@ -64,6 +64,8 @@ html, body { margin: 0; padding: 0; }
 html, body { height: 100%; }
 body { background: var(--app); color: var(--ink); font: 13px/1.35 var(--font); overflow: hidden; }
 button, input, select { font: inherit; color: inherit; }
+/* the app itself never zooms on a phone (pinch or double tap); the 3D view keeps its own pinch (touch-action: none) */
+html, body { touch-action: pan-x pan-y; }
 button { cursor: pointer; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .ico { display: inline-flex; flex: none; }

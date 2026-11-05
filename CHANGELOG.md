@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.13
+- **Mobil: aplikace se už nepřibližuje ani neoddaluje** (sevření dvěma prsty, dvojité klepnutí, ani přiblížení při psaní do políčka na iPhonu). Pohled do 3D scény se dvěma prsty přibližuje dál jako dosud.
 ## Beta 2.12
 - **Kombinovat – Rozdělit výsledek na samostatné díly:** každá oddělená část výsledku se stane samostatným tělesem (např. po vyříznutí nástrojem ohebného spoje vzniknou dva články „– díl 1“ a „– díl 2“); dutiny zůstanou u dílu, ve kterém leží. Lze kombinovat s volbou Výsledek jako nové těleso (pak zůstane i původní těleso a nástroj).
 ## Beta 2.11

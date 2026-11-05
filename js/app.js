@@ -6683,6 +6683,8 @@ $('#nav-fit').addEventListener('click', () => fitView());
 $('#nav-proj').addEventListener('click', () => setProjection(!isOrtho));
 $('#nav-style').addEventListener('click', () => { settings.style = STYLES[(STYLES.indexOf(settings.style) + 1) % 3]; saveSettings(); applyNav(); toast(STYLE_LABEL[settings.style]); });
 $('#nav-grid').addEventListener('click', () => { settings.grid = !settings.grid; saveSettings(); applyNav(); });
+/* iOS Safari ignores user-scalable=no: its pinch gesture on the page is stopped here (the 3D view uses pointer events) */
+for (const t of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(t, e => e.preventDefault(), { passive: false });
 $('#nav-snap').addEventListener('click', () => { settings.gridSnap = !settings.gridSnap; saveSettings(); applyNav(); toast(settings.gridSnap ? 'Přichytávání k mřížce zapnuto' : 'Přichytávání k mřížce vypnuto'); });
 $('#nav-esnap').addEventListener('click', () => { settings.edgeSnap = settings.edgeSnap === false; saveSettings(); applyNav(); toast(settings.edgeSnap ? 'Přichytávání k hranám a rohům modelu zapnuto' : 'Přichytávání k hranám a rohům modelu vypnuto'); });
 $('#nav-step').addEventListener('change', e => { settings.snap = parseFloat(e.target.value) || 1; saveSettings(); applyNav(); });
