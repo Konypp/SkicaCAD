@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.15
+- **Skica:** u vybrané čáry se už nezobrazují rámečky s délkou a úhlem úseček ani úhly v rozích – délky a úhly ukazuje jen volba Zobrazit kóty (a pole v paletě).
 ## Beta 2.14
 - **Oprava exportu 3MF v náhledu v Claude:** tady se 3MF nedá uložit přímo, balí se do ZIP – jenže se do archivu vkládal chybně (prázdný, poškozený záznam), takže po rozbalení žádný soubor .3mf nebyl. Teď je v ZIPu platný soubor .3mf.
 - **Samostatná verze (GitHub Pages):** 3MF se ukládá s vlastním typem souboru (model/3mf), aby ho telefon nepřejmenoval na .zip.

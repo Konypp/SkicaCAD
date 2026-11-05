@@ -922,8 +922,8 @@ let segLabelsOn = false;
 function updateSegLabels() {
   const box = $('#seglabels');
   const e = sk && sk.f.ents[sk.selEnt];
-  /* with dimensions shown, lengths and angles are in the dimensions: no label boxes */
-  if (!e || e.t !== 'poly' || sk.tool || showSkDims()) { if (segLabelsOn) { box.innerHTML = ''; segLabelsOn = false; } return; }
+  /* lengths and angles are shown only as dimensions (Zobrazit kóty): the label boxes are kept off */
+  if (true || !e || e.t !== 'poly' || sk.tool || showSkDims()) { if (segLabelsOn) { box.innerHTML = ''; segLabelsOn = false; } return; }
   const P = sk.f.plane, n = e.pts.length, segs = e.closed ? n : n - 1, html = [];
   if (segs > 40 && !e.tr) { box.innerHTML = ''; return; }
   const scr = e.pts.map(q => toPx(P3(P, q[0], q[1])));
