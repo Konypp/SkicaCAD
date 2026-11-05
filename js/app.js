@@ -4415,7 +4415,7 @@ function startFaceEdit(editIndex, f, faces, tool) {
       if (t !== this.tool && this.pending()) this.commit();
       this.tool = t; this.val = neutral(t); this._pv = null;
       if (this.mode !== 'face' && (t === 'ext' || t === 'inset')) { toast('Vytáhnout a Vsadit pracují jen s plochami.'); t = 'move'; }
-      if (t === 'scale' && t !== this.tool) this.ax = 'all';
+      if (t === 'scale' && (t !== this.tool || this.ax === 'n' || quiet)) this.ax = 'all';
       if (t !== 'scale' && this.ax === 'all') this.ax = 'n';
       dlg.set('tool', t); dlg.set('ax', this.ax); dlg.set('val', this.val);
       this._lk = ''; if (this._lg) { G.overlay.remove(this._lg); this._lg = null; }

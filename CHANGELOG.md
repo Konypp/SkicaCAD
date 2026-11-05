@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.21
+- **Modelovat – Velikost (S):** směr je vždy předvybraný na Vše (rovnoměrně), i když se nástroj spustí rovnou klávesou S z režimu Plochy; dřív zůstávala Normála, se kterou se plocha nezměnila.
 ## Beta 2.20
 - **Modelovat – hrany a vrcholy:** přepínač Vybírat: Plochy / Hrany / Vrcholy. Vybrané hrany a vrcholy (i více najednou) jde Posunout (G), Otočit (R) a změnit Velikost (S) po normále nebo osách – okolní stěny se natáhnou jako v Blenderu (např. posunutá horní hrana udělá zkosenou stěnu, posunutý vrchol špičku). Najetím se hrana / vrchol zvýrazní; skryté za tělesem se nevyberou.
 - **Duplikovat plochu (D, nebo Vsadit se šířkou 0 a Enter):** plocha dostane vlastní kopii; Posunout, Otočit a Velikost pak hýbou jen kopií a nové stěny ji spojí s původním obrysem – okolní stěny zůstanou beze změny. V rovině plochy (zmenšit, otočit) vznikne nový obrys jako u Vsadit.
