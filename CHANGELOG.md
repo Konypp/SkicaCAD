@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta 2.18
+- **Nové: Modelovat plochy** (lišta Plochy › Modelovat, nebo v režimu Plochy klávesy E, I, G, R, S) – práce s plochami jako v Blenderu:
+  - **Vytáhnout (E)** – plocha (i její část) se vytáhne ven nebo zatlačí dovnitř; vytažená plocha zůstane vybraná pro další krok.
+  - **Vsadit (I)** – uvnitř plochy vznikne menší plocha s okrajem zadané šířky (vybere se rovnou, takže ji jde hned vytáhnout).
+  - **Posunout (G), Otočit (R), Velikost (S)** – po normále nebo po ose X, Y, Z; okolní stěny se natáhnou nebo zkosí (např. E a pak S udělá zkosený výstupek).
+  - Úchyt přímo na modelu (šipka, kulička, kroužek otočení) se táhne myší i prstem a skáče po krocích mřížky (Shift = jemně); hodnotu jde i napsat z klávesnice (např. E 5 Enter).
+  - Kroky jdou za sebou bez potvrzování – další krok ten předchozí potvrdí. Vrátit krok, Rozšířit výběr o sousední plochy, výběr více ploch (Shift nebo volba v dialogu). OK uloží všechny kroky jako jednu položku časové osy, kterou jde později otevřít a upravit.
 ## Beta 2.17
 - **Rozdělit plochu – více dělení najednou:** po dokončení dělicí čáry se nemusí potvrzovat. Klepnutím na první bod další čáry (u odsazení na další hranu, u křivky tlačítkem Další dělení) se hotové dělení odloží a kreslí se další. Klepnutím na jinou rovinnou plochu se pokračuje tam. Hotová dělení zůstávají vidět, tlačítko Vrátit poslední vrací krok zpět a OK použije všechna dělení najednou (na časové ose vznikne položka pro každé).
 ## Beta 2.16

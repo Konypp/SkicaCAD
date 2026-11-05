@@ -367,3 +367,9 @@ button { cursor: pointer; }
 .sd-acct-u b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sd-acct-st { font-size: 12px; color: var(--muted); }
 .sd-acct-st.err { color: var(--danger); }
+/* Modelovat plochy: five tools in two rows */
+#dlg-tool { display: grid; grid-template-columns: repeat(3, 1fr); height: auto; }
+#dlg-tool button { height: 28px; white-space: nowrap; overflow-wrap: normal; padding: 0 4px; border-left: 0; border-top: 1px solid var(--line); }
+#dlg-tool button:nth-child(-n+3) { border-top: 0; }
+#dlg-tool button:not(:nth-child(3n+1)) { border-left: 1px solid var(--line); }
+#dlg-ax button[data-v="n"] { flex: 1.6; }

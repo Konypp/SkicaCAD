@@ -8,7 +8,7 @@ const PLANES = {
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
 const FEATURE_LABEL = { buckle: 'Spona', articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Konektory', libpart: 'Vložený díl', ribs: 'Žebra', jointpart: 'Kloubový spoj', curvecut: 'Rozříznout křivkou', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
-  fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
+  fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', faceedit: 'Modelovat plochy', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
 /* ready-made parts (js/partslib.js): packed meshes, unpacked once */
@@ -612,6 +612,195 @@ function offsetFace(polys, f) {
   for (const s of offsetFaceTool(polys, f)) out = KK.boolean(out, s.tool, s.op);
   if (!out.length) throw new Error('Úprava plochy by odstranila celé těleso');
   return out;
+}
+/* ---------- Modelovat plochy: Blender-like steps on the faces of one body, applied in turn ----------
+   A face is {n, w, p, clip?} (plane, a point identifying the flat face, half-planes / outlines cutting out its part).
+   Steps: ext (vytáhnout: d), inset (vsadit: t – a closed dividing line t inside the outline), move (posunout: v),
+   rot (otočit: ax, ang in degrees about c), scale (velikost: s about c, optionally only along ax).
+   Each step returns the faces to work on next (the top of an extrusion, the inner part of an inset, the moved faces). */
+const feNeg = h => (h.poly ? { ...h, out: !h.out } : { m: KK.vmul(h.m, -1), d: -h.d });
+function feGroup(polys, d) { const g = KK.planarFace(polys, d.n, d.w, d.p); if (!g || !g.length) throw new Error('Plocha nebyla nalezena'); return g; }
+function feRegion(polys, d) { const g = feGroup(polys, d); return d.clip && d.clip.length ? clipRegion(polys, g, d.clip) : g.map(i => polys[i]); }
+/* a point well inside a set of convex pieces: the centre of the largest one */
+function feInner(pieces) {
+  let best = null, ba = -1;
+  for (const q of pieces) { const a = KK.surfaceArea([q]); if (a > ba) { ba = a; best = q; } }
+  if (!best) return null;
+  const c = [0, 0, 0]; for (const v of best.v) for (let k = 0; k < 3; k++) c[k] += v[k] / best.v.length;
+  return c;
+}
+/* the region's centre (area weighted) */
+function feCentre(pieces) {
+  let A = 0; const c = [0, 0, 0];
+  for (const q of pieces) for (let i = 1; i < q.v.length - 1; i++) {
+    const a = KK.surfaceArea([{ v: [q.v[0], q.v[i], q.v[i + 1]], n: q.n }]); A += a;
+    for (let k = 0; k < 3; k++) c[k] += a * (q.v[0][k] + q.v[i][k] + q.v[i + 1][k]) / 3;
+  }
+  return A > 0 ? c.map(x => x / A) : (pieces[0] ? pieces[0].v[0].slice() : [0, 0, 0]);
+}
+/* move a 2D outline (counter-clockwise) t to its left, i.e. inwards; null when it folds over */
+function feOffsetLoop(P, t) {
+  P = P.filter((p, i) => { const a = P[(i - 1 + P.length) % P.length], b = P[(i + 1) % P.length]; return Math.abs((p[0] - a[0]) * (b[1] - a[1]) - (p[1] - a[1]) * (b[0] - a[0])) > 1e-9; });
+  const n = P.length; if (n < 3) return null;
+  const nrm = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1; return [-dy / l, dx / l]; };
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const a = P[(i - 1 + n) % n], b = P[i], c = P[(i + 1) % n], n1 = nrm(a, b), n2 = nrm(b, c);
+    const m = [n1[0] + n2[0], n1[1] + n2[1]], dt = 1 + n1[0] * n2[0] + n1[1] * n2[1];
+    if (dt < 0.05) return null; /* a hairpin turn */
+    out.push([b[0] + m[0] * t / dt, b[1] + m[1] * t / dt]);
+  }
+  /* every side keeps its direction, and the outline stays simple */
+  for (let i = 0; i < n; i++) {
+    const a = P[i], b = P[(i + 1) % n], A = out[i], B = out[(i + 1) % n];
+    if ((b[0] - a[0]) * (B[0] - A[0]) + (b[1] - a[1]) * (B[1] - A[1]) <= 1e-9) return null;
+  }
+  const cr = (p, q, r) => (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0]);
+  for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) {
+    if (i === 0 && j === n - 1) continue;
+    const a = out[i], b = out[(i + 1) % n], c = out[j], d = out[(j + 1) % n];
+    if (cr(a, b, c) * cr(a, b, d) < 0 && cr(c, d, a) * cr(c, d, b) < 0) return null;
+  }
+  return KK.area2D(out) > 1e-8 ? out : null;
+}
+/* the point transform of a move / turn / scale step */
+function feXform(op) {
+  if (op.op === 'move') { const v = op.v.map(Number); return p => [p[0] + v[0], p[1] + v[1], p[2] + v[2]]; }
+  const c = op.c.map(Number);
+  if (op.op === 'rot') {
+    const a = KK.vnorm(op.ax.map(Number)), t = Number(op.ang) * Math.PI / 180, cs = Math.cos(t), sn = Math.sin(t);
+    return p => { const d = KK.vsub(p, c), k = KK.vdot(a, d), x = KK.cross(a, d); return [0, 1, 2].map(i => c[i] + d[i] * cs + x[i] * sn + a[i] * k * (1 - cs)); };
+  }
+  const sc = Number(op.s);
+  if (op.ax) { const a = KK.vnorm(op.ax.map(Number)); return p => { const d = KK.vsub(p, c), k = KK.vdot(a, d); return KK.vadd(p, KK.vmul(a, k * (sc - 1))); }; }
+  return p => KK.vadd(c, KK.vmul(KK.vsub(p, c), sc));
+}
+/* split the faces' planes along the parts' outlines, so a part has its own polygons and corners to move */
+function feRealize(polys, faces) {
+  let out = polys; const keys = new Set();
+  for (const d of faces) {
+    const g = feGroup(out, d), gs = new Set(g);
+    if (!d.clip || !d.clip.length) { for (const i of g) for (const v of out[i].v) keys.add(KK.qk(v)); continue; }
+    const inner = clipRegion(out, g, d.clip); if (!inner.length) throw new Error('Část plochy nebyla nalezena');
+    const outer = []; for (let k = 0; k < d.clip.length; k++) outer.push(...clipRegion(out, g, [...d.clip.slice(0, k), feNeg(d.clip[k])]));
+    for (const q of inner) for (const v of q.v) keys.add(KK.qk(v));
+    out = out.filter((_, i) => !gs.has(i)).concat(inner, outer).map(q => KK.mkPoly(q.v)).filter(Boolean);
+  }
+  return { polys: KK.weldT(out), keys };
+}
+/* triangles (corner indices) of a flat polygon; corners lying on a straight side stay corners of some triangle */
+function feTris(V, n) {
+  const B = basisFromPlane(n, KK.vdot(n, V[0])), P = V.map(x => { const d = KK.vsub(x, B.o); return [KK.vdot(d, B.u), KK.vdot(d, B.v)]; });
+  let idx = P.map((_, i) => i); if (KK.area2D(P) < 0) idx.reverse();
+  const cr = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]), out = [];
+  let guard = 0;
+  while (idx.length > 3 && guard++ < 10000) {
+    let k0 = -1;
+    for (let k = 0; k < idx.length; k++) {
+      const a = P[idx[(k + idx.length - 1) % idx.length]], b = P[idx[k]], c = P[idx[(k + 1) % idx.length]];
+      if (cr(a, b, c) <= 1e-10) continue;
+      if (idx.some((j, m) => m !== k && m !== (k + 1) % idx.length && m !== (k + idx.length - 1) % idx.length && cr(a, b, P[j]) >= -1e-10 && cr(b, c, P[j]) >= -1e-10 && cr(c, a, P[j]) >= -1e-10)) continue;
+      k0 = k; break;
+    }
+    if (k0 < 0) break;
+    out.push([idx[(k0 + idx.length - 1) % idx.length], idx[k0], idx[(k0 + 1) % idx.length]]); idx.splice(k0, 1);
+  }
+  if (idx.length === 3) out.push(idx.slice());
+  return out;
+}
+function feTransform(polys, seams, faces, op) {
+  const T = feXform(op), R = feRealize(polys, faces), mv = new Map();
+  for (const q of R.polys) for (const v of q.v) { const k = KK.qk(v); if (R.keys.has(k) && !mv.has(k)) mv.set(k, T(v)); }
+  const out = [], flat = (vv, p) => vv.every(x => Math.abs(KK.vdot(p.n, x) - p.w) < 1e-6);
+  /* a polygon in pieces: kept whole when it stays flat, else triangles */
+  const put = (V0, V1, n) => {
+    const p = KK.mkPoly(V1); if (p && flat(V1, p)) { out.push(p); return; }
+    for (const t of feTris(V0, n)) { const tp = KK.mkPoly(t.map(i => V1[i])); if (tp) out.push(tp); }
+  };
+  for (const q of R.polys) {
+    const m = q.v.map(x => mv.has(KK.qk(x))), v = q.v.map(x => mv.get(KK.qk(x)) || x), N = v.length;
+    if (!m.some(Boolean) || m.every(Boolean)) { const p = KK.mkPoly(v); if (p) out.push(p); continue; }
+    /* a side between moved and fixed corners: its fixed part stays as it was (one run of fixed corners cut off by a
+       straight line), only the strip towards the moved corners bends – like the side of an extrusion in Blender */
+    let runs = 0; for (let i = 0; i < N; i++) if (!m[i] && m[(i + N - 1) % N]) runs++;
+    const s0 = m.findIndex((x, i) => !x && m[(i + N - 1) % N]);
+    let cnt = 0; while (cnt < N && !m[(s0 + cnt) % N]) cnt++;
+    if (runs === 1 && cnt >= 3) {
+      const fi = [...Array(cnt)].map((_, k) => (s0 + k) % N), ri = [(s0 + cnt - 1) % N]; for (let k = cnt; k < N; k++) ri.push((s0 + k) % N); ri.push(s0);
+      const F = KK.mkPoly(fi.map(i => q.v[i]));
+      if (F && KK.vdot(F.n, q.n) > 0.999) { out.push(F); put(ri.map(i => q.v[i]), ri.map(i => v[i]), q.n); continue; }
+    }
+    put(q.v, v, q.n);
+  }
+  if (!(KK.signedVolume(out) > 0)) throw new Error('Úprava je pro tvar kolem ploch příliš velká');
+  /* outlines lying wholly on the moved parts go with them */
+  const P3 = x => T(x), ns = (seams || []).map(q => {
+    if (!q.pts || !q.closed || !q.pts.every(x => R.keys.has(KK.qk(x)))) return q;
+    const pts = q.pts.map(P3), a = P3(q.a), b = P3(q.b), nn = KK.mkPoly(pts);
+    return nn ? { ...q, n: nn.n, w: nn.w, a, b, pts } : q;
+  });
+  const sel = faces.map(d => {
+    const ip = feRegionPoint(polys, d), p = T(ip), B = basisFromPlane(d.n, d.w);
+    let n = KK.vnorm(KK.cross(KK.vsub(T(KK.vadd(ip, B.u)), p), KK.vsub(T(KK.vadd(ip, B.v)), p)));
+    if (!(Math.hypot(n[0], n[1], n[2]) > 0.5)) n = d.n.slice();
+    const w = KK.vdot(n, p), same = KK.vdot(n, d.n) > 1 - 1e-9 && Math.abs(w - d.w) < 1e-6;
+    return { n, w, p, ...(same && d.clip ? { clip: faceClip(out, ns, n, w, feGroup(out, { n, w, p }), p) } : {}) };
+  });
+  return { polys: out, seams: ns, sel };
+}
+function feRegionPoint(polys, d) { return d.ip || feInner(feRegion(polys, d)) || d.p; }
+function feStep(polys, seams, op) {
+  const faces = op.faces || [];
+  if (!faces.length) throw new Error('Vyberte plochu');
+  if (op.op === 'ext') {
+    const d = Number(op.d); if (!(Math.abs(d) > 1e-4)) throw new Error('Zadejte vzdálenost různou od nuly');
+    let out = polys; const sel = [];
+    for (const f of faces) {
+      const ip = feRegionPoint(out, f);
+      out = offsetFace(out, { n: f.n, w: f.w, p: f.p, ...(f.clip ? { clip: f.clip } : {}), d });
+      sel.push({ n: f.n.slice(), w: f.w + d, p: KK.vadd(ip, KK.vmul(f.n, d)) });
+    }
+    return { polys: out, seams, sel };
+  }
+  if (op.op === 'inset') {
+    const t = Number(op.t); if (!(t > 1e-4)) throw new Error('Zadejte šířku okraje');
+    const ns = (seams || []).slice(), sel = [];
+    for (const f of faces) {
+      const reg = feRegion(polys, f), B = basisFromPlane(f.n, f.w), to2 = x => { const q = KK.vsub(x, B.o); return [KK.vdot(q, B.u), KK.vdot(q, B.v)]; };
+      const to3 = q => KK.vadd(B.o, KK.vadd(KK.vmul(B.u, q[0]), KK.vmul(B.v, q[1])));
+      const loops = KK.faceLoops(reg, reg.map((_, i) => i)).map(l => l.map(to2));
+      if (!loops.length) throw new Error('Obrys plochy se nepodařilo určit');
+      const big = loops.reduce((a, l) => (Math.abs(KK.area2D(l)) > Math.abs(KK.area2D(a)) ? l : a));
+      const sg = Math.sign(KK.area2D(big)), made = [];
+      for (const l of loops) {
+        if (Math.sign(KK.area2D(l)) !== sg) continue; /* holes stay as they are */
+        const ccw = sg > 0 ? l : l.slice().reverse(), O = feOffsetLoop(ccw, t);
+        if (!O) throw new Error('Okraj je pro tuto plochu příliš široký');
+        const pts = O.map(to3);
+        made.push({ n: f.n.slice(), w: f.w, a: pts[0], b: pts[1], pts, closed: true });
+      }
+      ns.push(...made);
+      for (const m of made) {
+        const g = feGroup(polys, f), part = clipRegion(polys, g, [...(f.clip || []), { poly: curveRegion(m), n: m.n }]), ip = feInner(part);
+        if (!ip) continue;
+        sel.push({ n: f.n.slice(), w: f.w, p: ip, clip: faceClip(polys, ns, f.n, f.w, g, ip) });
+      }
+    }
+    return { polys, seams: ns, sel };
+  }
+  if (op.op === 'move' || op.op === 'rot' || op.op === 'scale') {
+    if (op.op === 'scale' && !(Number(op.s) > 1e-3)) throw new Error('Měřítko musí být větší než 0');
+    return feTransform(polys, seams, faces, op);
+  }
+  throw new Error('Neznámý krok úpravy');
+}
+function faceEditRun(polys, seams, ops) {
+  let st = { polys, seams: seams || [], sel: [] };
+  ops.forEach((op, i) => {
+    try { st = feStep(st.polys, st.seams, op); }
+    catch (e) { throw new Error(`Krok ${i + 1}: ${e.message}`); }
+  });
+  return st;
 }
 /* ---------- ISO metric bolts and nuts ----------
    size: [pitch, hex across flats (ISO 4017 / 4032), hex head height, nut height, socket head diameter (ISO 4762), hex key, socket depth] */
@@ -2557,6 +2746,13 @@ function step(state, f) {
       out = bodies.map(x => (x === b ? { ...x, polys: moveFaces(b.polys, f) } : x));
       break;
     }
+    case 'faceedit': {
+      const b = bodies.find(x => x.id === f.body);
+      if (!b) throw new Error('Těleso neexistuje');
+      const r = faceEditRun(b.polys, b.seams, f.ops || []);
+      out = bodies.map(x => (x === b ? { ...x, polys: r.polys, seams: r.seams.length ? r.seams : undefined } : x));
+      break;
+    }
     case 'offsetface': {
       const b = bodies.find(x => x.id === f.body);
       if (!b) throw new Error('Těleso neexistuje');
@@ -2762,7 +2958,7 @@ function makeRebuilder() {
   };
 }
 
-return { ribsTool, curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { faceEditRun, feStep, feRegion, feCentre, feInner, ribsTool, curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

@@ -1182,7 +1182,7 @@ function featureTitle(i) {
   let n = 0; for (let j = 0; j <= i; j++) if (doc.features[j].type === f.type) n++;
   return Engine.FEATURE_LABEL[f.type] + ' ' + n;
 }
-const TL_ICON = { buckle: 'buckle', libpart: 'articulate', jointpart: 'articulate', articulate: 'articulate', blob: 'blob', skin: 'skin', sweep: 'sweep', loft: 'loft', deform: 'deform', lattice: 'lattice', softmove: 'softmove', subdiv: 'subdiv', sculpt: 'sculpt', remesh: 'remesh', hollow: 'hollow', flatbase: 'flatbase', pegsplit: 'pegsplit', text3d: 'sktext', movefaces: 'pressface', shell: 'shell', hole: 'hole', offsetface: 'pressface', splitface: 'splitface', bendface: 'bendface', ribs: 'ribs', splitbody: 'splitbody', curvecut: 'curvecut', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
+const TL_ICON = { buckle: 'buckle', libpart: 'articulate', jointpart: 'articulate', articulate: 'articulate', blob: 'blob', skin: 'skin', sweep: 'sweep', loft: 'loft', deform: 'deform', lattice: 'lattice', softmove: 'softmove', subdiv: 'subdiv', sculpt: 'sculpt', remesh: 'remesh', hollow: 'hollow', flatbase: 'flatbase', pegsplit: 'pegsplit', text3d: 'sktext', movefaces: 'pressface', shell: 'shell', hole: 'hole', offsetface: 'pressface', faceedit: 'pressface', splitface: 'splitface', bendface: 'bendface', ribs: 'ribs', splitbody: 'splitbody', curvecut: 'curvecut', center: 'center', scale: 'scale', thread: 'thread', rotate: 'rotate', revolve: 'revolve', mirror: 'mirror', pattern: 'pattern', import: 'import', sketch: 'sketchi', extrude: 'extrude', box: 'box', cylinder: 'cylinder', sphere: 'sphere', cone: 'cone', torus: 'torus', bolt: 'bolt', nut: 'nut', hinge: 'hinge', latch: 'latch', boxpose: 'simulate', fillet: 'fillet', chamfer: 'chamfer', combine: 'combine', move: 'move', del: 'del' };
 function renderTimeline() {
   const tr = $('#tltrack'); tr.innerHTML = '';
   const m = viewMarker === null ? doc.marker : viewMarker;
@@ -1513,8 +1513,8 @@ $('#dialog').addEventListener('change', e => {
   if (sk && e.target.id === 'pal-fr') { const v = parseNum(e.target.value); if (v > 0) sk.frR = v; e.target.value = fmtc(sk.frR, 3); }
 });
 $('#dialog').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); e.target.blur(); if (sk) return; setTimeout(okCmd, 0); }
-  else if (e.key === 'Escape') { e.preventDefault(); e.target.blur(); }
+  if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); e.target.blur(); if (sk) return; setTimeout(() => { if (cmd && cmd.onEnter && cmd.onEnter()) return; okCmd(); }, 0); }
+  else if (e.key === 'Escape') { e.preventDefault(); e.target.blur(); if (cmd && !sk && cmd.onEsc) cmd.onEsc(); }
 });
 
 /* ================= command lifecycle ================= */
@@ -1585,6 +1585,7 @@ function editFeature(i) {
     case 'hole': startHole(i, ef); break;
     case 'shell': startShell(i, ef); break;
     case 'splitface': startSplitFace(i, ef); break;
+    case 'faceedit': startFaceEdit(i, ef); break;
     case 'bendface': startBendFace(i, ef); break;
     case 'ribs': startRibs(i, ef); break;
     case 'splitbody': startSplitBody(i, ef); break;
@@ -3956,7 +3957,7 @@ let faceMode = false, selFace = null, hoverFace = null, selFaces = [];
 /* the selected faces: several with Ctrl (Cmd) + click, selFace is the last one picked */
 const faceList = () => (selFaces.length ? selFaces : selFace ? [selFace] : []);
 /* describe the face under a hit: whole cylinder (hole or boss) or a connected planar patch */
-function faceAtHit(h) {
+function faceAtHit(h, seamsOv) {
   const { pi, poly } = polyOfHit(h), polys = h.object.userData.polys, bodyId = h.object.userData.bodyId;
   const smooth = !!smoothFor(polys)[pi];
   if (smooth) {
@@ -3969,7 +3970,8 @@ function faceAtHit(h) {
   if (!group) return null;
   /* a face split by dividing lines (Rozdělit plochu): only the part under the pointer */
   const body = cur.bodies.find(b => b.id === bodyId), at = h.point.toArray();
-  const clip = body && body.seams ? Engine.faceClip(polys, body.seams, poly.n, poly.w, group, at) : [];
+  const seams = seamsOv !== undefined ? seamsOv : body && body.seams;
+  const clip = seams && seams.length ? Engine.faceClip(polys, seams, poly.n, poly.w, group, at) : [];
   const cpolys = clip.length ? Engine.clipRegion(polys, group, clip) : null;
   const area = cpolys ? K.surfaceArea(cpolys) : group.reduce((s, i) => s + K.surfaceArea([polys[i]]), 0);
   const r6 = x => Math.round(x * 1e6) / 1e6;
@@ -4001,7 +4003,7 @@ function syncFaceBar() {
   if (key === faceBarKey) return;
   faceBarKey = key; bar.hidden = !show; document.body.classList.toggle('has-facebar', !!show); if (!show) { bar.innerHTML = ''; return; }
   const pl = selFace.kind === 'plane', acts = list.length > 1 ? multiFaceActs(list) : !pl && selFace.cyl.partial ? [['pressm', 'Posunout plochu', 'pressface']] : pl
-    ? [['ext', 'Vysunout', 'extrude'], ['press', 'Posunout plochu', 'pressface'], ['split', 'Rozdělit plochu', 'splitface'], ['bend', 'Ohnout', 'bendface'], ['ribs', 'Žebra', 'ribs'], ['al', 'Zarovnat k…', 'center'], ['sk', 'Skica z plochy', 'sketchi'], ['esk', 'Prázdná skica', 'sketch']]
+    ? [['model', 'Modelovat', 'pressface'], ['ext', 'Vysunout', 'extrude'], ['press', 'Posunout plochu', 'pressface'], ['split', 'Rozdělit plochu', 'splitface'], ['bend', 'Ohnout', 'bendface'], ['ribs', 'Žebra', 'ribs'], ['al', 'Zarovnat k…', 'center'], ['sk', 'Skica z plochy', 'sketchi'], ['esk', 'Prázdná skica', 'sketch']]
     : [['press', selFace.cyl.internal ? 'Průměr otvoru' : 'Změnit průměr', 'pressface'], ['ribs', 'Žebra', 'ribs'], ['al', 'Zarovnat k…', 'center'], ['thr', 'Závit', 'thread']];
   bar.innerHTML = `<span class="fb-t"></span><div class="fb-a">${acts.map(([k, l, ic]) => `<button class="fb-b" data-fb="${k}"><span class="ico">${svg(ic, 18)}</span>${l}</button>`).join('')}<button class="ibtn" data-fb="x" aria-label="Zrušit výběr plochy" title="Zrušit výběr plochy">${svg('close', 16)}</button></div>`;
   $('.fb-t', bar).textContent = list.length > 1 ? multiFaceText(list) : faceText(selFace);
@@ -4009,7 +4011,7 @@ function syncFaceBar() {
 /* actions for several selected faces: move them all by the same distance, or open them in a shell (one body, flat faces) */
 function multiFaceActs(list) {
   const flat = list.every(f => f.kind === 'plane' && !f.smooth), one = list.every(f => f.bodyId === list[0].bodyId);
-  return !one ? [] : flat ? [['pressm', 'Posunout plochy', 'pressface'], ['shellm', 'Skořepina s otevřenými plochami', 'shell']] : [['pressm', 'Posunout plochy', 'pressface']];
+  return !one ? [] : flat ? [['model', 'Modelovat', 'pressface'], ['pressm', 'Posunout plochy', 'pressface'], ['shellm', 'Skořepina s otevřenými plochami', 'shell']] : [['pressm', 'Posunout plochy', 'pressface']];
 }
 function multiFaceText(list) {
   const n = list.length, word = n < 5 ? 'plochy' : 'ploch', area = list.reduce((t, f) => t + (f.kind === 'plane' ? f.area : 0), 0);
@@ -4026,6 +4028,7 @@ function startShellWith(list) {
 document.addEventListener('click', e => {
   const b = e.target.closest && e.target.closest('[data-fb]'); if (!b || !selFace) return;
   const k = b.dataset.fb, s = selFace, list = faceList();
+  if (k === 'model') { setFaceMode(false, true); startFaceEdit(undefined, undefined, list.slice()); return; }
   if (k === 'pressm') startPressFace(undefined, undefined, list.slice());
   else if (k === 'shellm') startShellWith(list.slice());
   else if (k === 'ext') extrudeFace();
@@ -4213,6 +4216,261 @@ function startPressFace(editIndex, f, faces) {
   beginCmd(c); c.init();
 }
 
+
+/* ================= Modelovat plochy: Blender-like editing of the faces of one body ================= */
+/* Tools: Vytáhnout (E), Vsadit (I), Posunout (G), Otočit (R), Velikost (S). Faces are picked on the model; a handle drags
+   the value (or type it). A finished step is kept as soon as the next one starts (another tool, another face, Enter); OK
+   keeps them all as one step of the timeline ('faceedit' with its list of steps). */
+const FE_TOOLS = { ext: ['Vytáhnout', 'Vzdálenost', 'mm'], inset: ['Vsadit', 'Šířka okraje', 'mm'], move: ['Posunout', 'Posunutí', 'mm'], rot: ['Otočit', 'Úhel', '°'], scale: ['Velikost', 'Měřítko', '×'] };
+const FE_KEYS = { e: 'ext', i: 'inset', g: 'move', r: 'rot', s: 'scale' };
+function startFaceEdit(editIndex, f, faces, tool) {
+  const r6 = x => Math.round(x * 1e6) / 1e6, r4 = x => Math.round(x * 1e4) / 1e4;
+  const neutral = t => (t === 'scale' ? 1 : 0);
+  const c = {
+    editIndex, body: f ? f.body : faces && faces.length ? faces[0].bodyId : null, ops: f ? clone(f.ops || []) : [], sel: [],
+    tool: tool || 'ext', ax: 'n', val: neutral(tool || 'ext'), add: false, err: null, drag: null, timer: null, hideBody: null,
+    init() {
+      if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
+      openDialog({
+        title: 'Modelovat plochy', icon: 'pressface',
+        fields: [{ k: 'sel', id: 'face', label: 'Plochy' },
+          { k: 'seg', id: 'tool', label: 'Nástroj', options: Object.entries(FE_TOOLS).map(([k, v]) => [k, v[0]]), value: this.tool },
+          { k: 'seg', id: 'ax', label: 'Směr', options: [['all', 'Vše'], ['n', 'Normála'], ['x', 'X'], ['y', 'Y'], ['z', 'Z']], value: this.ax },
+          { k: 'num', id: 'val', label: 'Vzdálenost', value: this.val },
+          { k: 'chk', id: 'add', label: 'Klepnutím přidávat plochy do výběru', value: false },
+          { k: 'btns', id: 'act', label: '', options: [['apply', 'Použít krok'], ['undo', 'Vrátit krok'], ['grow', 'Rozšířit výběr']] },
+          { k: 'note', id: 'n' }],
+        onChange: id => {
+          if (id === 'tool') this.setTool(dlg.get('tool'));
+          else if (id === 'ax') { this.ax = dlg.get('ax'); this.preview(); }
+          else if (id === 'add') this.add = dlg.get('add');
+          else if (id === 'val') { const v = dlg.get('val'); if (isFinite(v)) { this.val = v; this.preview(); } }
+        },
+        onBtn: (id, v) => {
+          if (v === 'apply') { if (!this.commit()) toast('Nejdřív nastavte hodnotu kroku (tažením za úchyt nebo číslem).'); }
+          else if (v === 'undo') this.undoStep();
+          else if (v === 'grow') this.grow();
+          this.update();
+        }
+      });
+      if (f) viewMarker = editIndex;
+      this.hideBody = this.body;
+      this.rebuild();
+      if (faces && faces.length) this.sel = faces.map(fc => this.descOf(fc));
+      this.setTool(this.tool, true);
+    },
+    /* the body before this step, and after the kept steps */
+    base() { const b = bodyById(this.body); return b ? { polys: b.polys, seams: b.seams || [] } : null; },
+    rebuild() {
+      const b = this.base(); this._st = null; this.err = null;
+      if (!b) return;
+      try { this._st = Engine.faceEditRun(b.polys, b.seams, this.ops); }
+      catch (e) { this.err = e.message; this._st = { polys: b.polys, seams: b.seams, sel: [] }; }
+      this._pv = null;
+    },
+    restored() { this.rebuild(); },
+    descOf(fc) {
+      const d = { n: fc.n.map(r6), w: r6(fc.w), p: fc.p.map(r4) };
+      if (fc.clip) { d.clip = fc.clip; const ip = Engine.feInner(fc.cpolys || []); if (ip) d.ip = ip.map(r4); }
+      return d;
+    },
+    pending() { return this.sel.length && Math.abs(this.val - neutral(this.tool)) > 1e-6; },
+    /* centre and direction for the handle and for turning / scaling */
+    frame(st) {
+      st = st || this._st; if (!st || !this.sel.length) return null;
+      const pieces = []; let n = [0, 0, 0];
+      for (const d of this.sel) { try { const R = Engine.feRegion(st.polys, d); pieces.push(...R); let a = 0; for (const q of R) a += K.surfaceArea([q]); n = K.vadd(n, K.vmul(d.n, a)); } catch (e) { /* skip */ } }
+      if (!pieces.length) return null;
+      const L = Math.hypot(n[0], n[1], n[2]); n = L > 1e-9 ? K.vmul(n, 1 / L) : this.sel[0].n.slice();
+      return { c: Engine.feCentre(pieces), n, pieces };
+    },
+    axisVec(fr) { return this.ax === 'x' ? [1, 0, 0] : this.ax === 'y' ? [0, 1, 0] : this.ax === 'z' ? [0, 0, 1] : fr.n; },
+    op() {
+      if (!this.pending()) return null;
+      const faces = clone(this.sel), t = this.tool, v = this.val, fr = this.frame();
+      if (t === 'ext') return { op: 'ext', faces, d: r4(v) };
+      if (t === 'inset') return { op: 'inset', faces, t: r4(v) };
+      if (!fr) return null;
+      const a = this.axisVec(fr).map(r6);
+      if (t === 'move') return { op: 'move', faces, v: a.map(x => r4(x * v)) };
+      if (t === 'rot') return { op: 'rot', faces, ax: a, ang: r4(v), c: fr.c.map(r4) };
+      return { op: 'scale', faces, s: r4(v), c: fr.c.map(r4), ...(this.ax === 'all' ? {} : { ax: a }) };
+    },
+    preview() {
+      this._pv = null; this.err = null;
+      const op = this.op();
+      if (op && this._st) { try { this._pv = Engine.feStep(this._st.polys, this._st.seams, op); } catch (e) { this.err = e.message; } }
+      this.update();
+    },
+    /* keep the step being set up; the faces it made are selected next */
+    commit() {
+      if (!this.pending()) return false;
+      if (!this._pv) { this.preview(); if (!this._pv) { toast(this.err || 'Krok nelze použít'); return false; } }
+      const op = this.op(); if (!op) return false;
+      this.ops.push(op); this._st = this._pv; this._pv = null;
+      this.sel = (this._st.sel || []).map(d => ({ n: d.n.map(r6), w: r6(d.w), p: d.p.map(r4), ...(d.clip ? { clip: d.clip, ip: d.p.map(r4) } : {}) }));
+      this.val = neutral(this.tool); dlg.set('val', this.val);
+      this.update(); return true;
+    },
+    undoStep() {
+      if (this.pending()) { this.val = neutral(this.tool); dlg.set('val', this.val); this._pv = null; return; }
+      if (!this.ops.length) return;
+      const op = this.ops.pop(); this.rebuild(); this.sel = clone(op.faces);
+    },
+    setTool(t, quiet) {
+      if (t !== this.tool && this.pending()) this.commit();
+      this.tool = t; this.val = neutral(t); this._pv = null;
+      if (t === 'scale' && this.ax === 'n') this.ax = 'all';
+      if (t !== 'scale' && this.ax === 'all') this.ax = 'n';
+      dlg.set('tool', t); dlg.set('ax', this.ax); dlg.set('val', this.val);
+      const [, lab, unit] = FE_TOOLS[t]; dlg.label('val', lab); const u = $('#dlg-val') && $('#dlg-val').parentElement.querySelector('.u'); if (u) u.textContent = unit;
+      if (!quiet) this.update(); else this.update();
+    },
+    /* the flat faces next to the selected ones (sharing a side) join the selection */
+    grow() {
+      const st = this._st; if (!st || !this.sel.length) return;
+      if (this.pending()) this.commit();
+      const P = this._st.polys, keys = new Set(), have = new Set();
+      for (const d of this.sel) { try { const g = K.planarFace(P, d.n, d.w, d.p) || []; g.forEach(i => have.add(i)); for (const q of Engine.feRegion(P, d)) for (const v of q.v) keys.add(K.qk(v)); } catch (e) { /* skip */ } }
+      const add = [];
+      P.forEach((q, i) => {
+        if (have.has(i) || add.some(a => a.g.has(i))) return;
+        if (q.v.filter(v => keys.has(K.qk(v))).length < 2) return;
+        const cen = q.v.reduce((s, v) => K.vadd(s, K.vmul(v, 1 / q.v.length)), [0, 0, 0]), g = K.planarFace(P, q.n, q.w, cen);
+        if (!g) return; add.push({ g: new Set(g), d: { n: q.n.map(r6), w: r6(q.w), p: cen.map(r4) } });
+      });
+      this.sel.push(...add.map(a => a.d));
+    },
+    /* the shown model is a mesh of its own: faces are picked on it */
+    pickFace(ev) {
+      if (!this._mesh) return null;
+      ray.setFromCamera(evNdc(ev), cam());
+      const h = ray.intersectObject(this._mesh, false)[0]; if (!h) return null;
+      const fc = faceAtHit(h, this._shown.seams || []);
+      return fc && fc.kind === 'plane' ? fc : null;
+    },
+    update() {
+      clearGroup(G.preview); clearGroup(G.overlay); this._mesh = null; this._hd = null;
+      const st = this._pv || this._st; this._shown = st;
+      if (st) {
+        const m = meshFromPolys(st.polys, bodyMaterial()); m.material.color.copy(tok.body).lerp(tok.accent, 0.12);
+        m.userData.bodyId = this.body; m.userData.polys = st.polys; this._mesh = m;
+        const eg = new THREE.BufferGeometry(); eg.setAttribute('position', new THREE.BufferAttribute(K.edgeSegments(st.polys), 3));
+        m.add(noRay(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: tok.edge }))));
+        if (st.seams && st.seams.length) { const sa = Engine.seamSegments(st.polys, st.seams); if (sa.length) m.add(noRay(new THREE.LineSegments(lineGeo(sa), new THREE.LineBasicMaterial({ color: tok.edge })))); }
+        G.preview.add(m);
+        const shownSel = this._pv ? this._pv.sel : this.sel;
+        for (const d of shownSel || []) { try { const R = Engine.feRegion(st.polys, d); G.overlay.add(faceMesh({ polys: R, group: R.map((_, i) => i), cpolys: R }, tok.accent, 0.45)); } catch (e) { /* skip */ } }
+        this.makeHandle();
+      }
+      const n = this.sel.length;
+      dlg.set('face', { text: n ? `${n} ${n === 1 ? 'plocha' : n < 5 ? 'plochy' : 'ploch'}` : 'Klepněte na rovinnou plochu', has: n > 0, active: true });
+      const axOn = ['move', 'rot', 'scale'].includes(this.tool); dlg.show('ax', axOn);
+      const ab = $('#dlg-ax [data-v="all"]'); if (ab) ab.hidden = this.tool !== 'scale';
+      const ns = this.ops.length + (this.pending() ? 1 : 0);
+      dlg.set('n', this.err ? '!' + this.err : !n ? 'Vyberte plochu klepnutím (víc ploch: Shift nebo volba níže).' : (this.pending() ? `Krok ${ns}: ${FE_TOOLS[this.tool][0].toLowerCase()} – další krok ho potvrdí (jiný nástroj, jiná plocha, Enter). ` : `Táhněte za úchyt nebo napište hodnotu (Enter). `) + (this.ops.length ? `Hotové kroky: ${this.ops.length}. OK je všechny použije.` : 'OK použije všechny kroky.'));
+      setPrompt(n ? 'Táhněte za úchyt; klávesy E, I, G, R, S mění nástroj, X, Y, Z směr' : 'Klepněte na plochu tělesa');
+      dlg.okEnabled(this.ops.length > 0 || (this.pending() && !!this._pv));
+      styleBodies(); requestRender();
+    },
+    /* the handle: an arrow along the direction (Vytáhnout, Posunout), a ball moving inwards (Vsadit) or outwards (Velikost),
+       a ball on a ring (Otočit) */
+    makeHandle() {
+      const fr = this.frame(this._st); if (!fr) return;
+      const c = v3(fr.c), wp = worldPerPx(c), L = wp * 70, t = this.tool, col = tok.orange;
+      const mk = g => { const o = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: col, depthTest: false, transparent: true })); o.renderOrder = 14; return noRay(o); };
+      const line = pts => { const l = noRay(new THREE.Line(lineGeo(pts.flatMap(p => [p.x, p.y, p.z])), new THREE.LineBasicMaterial({ color: col, depthTest: false, transparent: true }))); l.renderOrder = 13; G.overlay.add(l); };
+      const s = arrowSize(c), B = Engine.basisFromPlane(fr.n, K.vdot(fr.n, fr.c));
+      let tip, dir = null, kind = 'ball';
+      if (t === 'ext' || t === 'move') {
+        const a = v3(t === 'ext' ? fr.n : this.axisVec(fr)); dir = a; kind = 'arrow';
+        tip = c.clone().addScaledVector(a, L + this.val); line([c, tip]);
+        const cone = mk(new THREE.ConeGeometry(1, 2.6, 18)); cone.scale.setScalar(s); cone.quaternion.setFromUnitVectors(new V3(0, 1, 0), a); cone.position.copy(tip).addScaledVector(a, s * 1.3); G.overlay.add(cone);
+        this._hd = { kind, o: c, a, base: L };
+      } else if (t === 'inset' || t === 'scale') {
+        const u = v3(this.ax === 'all' || t === 'inset' || this.ax === 'n' ? B.u : this.axisVec(fr));
+        let r0 = 0; for (const q of fr.pieces) for (const v of q.v) r0 = Math.max(r0, K.vdot(K.vsub(v, fr.c), u.toArray()));
+        if (!(r0 > wp * 20)) r0 = L;
+        const along = t === 'inset' ? r0 - this.val : r0 * this.val;
+        tip = c.clone().addScaledVector(u, along); line([c, c.clone().addScaledVector(u, Math.max(r0, along) + wp * 20)]);
+        const b = mk(new THREE.SphereGeometry(1, 16, 10)); b.scale.setScalar(s * 0.9); b.position.copy(tip); G.overlay.add(b);
+        this._hd = { kind: t, o: c, a: u, r0 };
+      } else {
+        const a = v3(this.axisVec(fr)), tt = Math.abs(a.x) < 0.9 ? new V3(1, 0, 0) : new V3(0, 1, 0), u = new V3().crossVectors(a, tt).normalize(), w = new V3().crossVectors(a, u);
+        const R = L * 1.1, ring = []; for (let k = 0; k <= 64; k++) { const q = k / 64 * Math.PI * 2; ring.push(c.clone().addScaledVector(u, Math.cos(q) * R).addScaledVector(w, Math.sin(q) * R)); }
+        line(ring);
+        const q = this.val * D2R; tip = c.clone().addScaledVector(u, Math.cos(q) * R).addScaledVector(w, Math.sin(q) * R);
+        const b = mk(new THREE.SphereGeometry(1, 16, 10)); b.scale.setScalar(s * 0.9); b.position.copy(tip); G.overlay.add(b);
+        this._hd = { kind: 'rot', o: c, a, u, w };
+      }
+      this._hd.tip = tip;
+    },
+    onDown(ev) {
+      const hd = this._hd; if (!hd) return false;
+      const P = toPx(hd.tip), [mx, my] = evPx(ev);
+      if (Math.hypot(P[0] - mx, P[1] - my) > (TOUCH ? 30 : 18)) return false;
+      controls.enabled = false;
+      this.drag = { v0: this.val, t0: this.param(ev), ang0: this.angle(ev) };
+      return true;
+    },
+    param(ev) { const hd = this._hd; return hd ? lineParam(ev, hd.o, hd.a) : null; },
+    angle(ev) {
+      const hd = this._hd; if (!hd || hd.kind !== 'rot') return null;
+      ray.setFromCamera(evNdc(ev), cam()); const pl = new THREE.Plane().setFromNormalAndCoplanarPoint(hd.a, hd.o), x = new V3();
+      if (!ray.ray.intersectPlane(pl, x)) return null; const d = x.sub(hd.o);
+      return Math.atan2(d.dot(hd.w), d.dot(hd.u)) / D2R;
+    },
+    onDrag(ev) {
+      const dr = this.drag, hd = this._hd; if (!dr || !hd) return;
+      const fine = ev.shiftKey; let v = dr.v0;
+      if (hd.kind === 'rot') { const a = this.angle(ev); if (a === null || dr.ang0 === null) return; let da = a - dr.ang0; while (da > 180) da -= 360; while (da < -180) da += 360; v = dr.v0 + da; if (!fine) v = Math.round(v / 5) * 5; }
+      else {
+        const t = this.param(ev); if (t === null || dr.t0 === null) return;
+        const st = settings.gridSnap && !fine ? settings.snap : 0.01;
+        if (hd.kind === 'arrow') v = Math.round((dr.v0 + t - dr.t0) / st) * st;
+        else if (hd.kind === 'inset') v = Math.max(0, Math.round((dr.v0 - (t - dr.t0)) / st) * st);
+        else { v = Math.max(0.05, dr.v0 + (t - dr.t0) / hd.r0); if (!fine) v = Math.round(v * 20) / 20; }
+      }
+      if (Math.abs(v - this.val) < 1e-9) return;
+      this.val = v; dlg.set('val', v);
+      clearTimeout(this.timer); this.timer = setTimeout(() => { if (cmd === this) this.preview(); }, 40);
+    },
+    onUp() { this.drag = null; controls.enabled = true; clearTimeout(this.timer); this.preview(); },
+    onMove(ev) {
+      const hd = this._hd; let over = false;
+      if (hd) { const P = toPx(hd.tip), [mx, my] = evPx(ev); over = Math.hypot(P[0] - mx, P[1] - my) < 18; }
+      dom.style.cursor = over ? 'grab' : this.pickFace(ev) ? 'pointer' : '';
+    },
+    onClick(ev) {
+      const fc = this.pickFace(ev); if (!fc) return;
+      const addMode = this.add || ev.shiftKey || ev.ctrlKey || ev.metaKey;
+      if (this.pending()) { this.commit(); }
+      const fc2 = this.pickFace(ev); if (!fc2) { this.update(); return; }
+      const d = this.descOf(fc2), gk = x => (K.planarFace(this._st.polys, x.n, x.w, x.p) || [-1])[0] + '|' + (x.clip ? JSON.stringify(x.clip) : '');
+      const same = this.sel.findIndex(x => gk(x) === gk(d));
+      if (addMode) { if (same >= 0) this.sel.splice(same, 1); else this.sel.push(d); }
+      else this.sel = [d];
+      this._pv = null; this.update();
+    },
+    onKey(e) {
+      const k = e.key.toLowerCase();
+      if (FE_KEYS[k]) { this.setTool(FE_KEYS[k]); return true; }
+      if (['x', 'y', 'z', 'n'].includes(k) && ['move', 'rot', 'scale'].includes(this.tool)) { this.ax = this.ax === k && this.tool === 'scale' ? 'all' : k; dlg.set('ax', this.ax); this.preview(); return true; }
+      if (/^[0-9.,-]$/.test(e.key) && this.sel.length) { const inp = $('#dlg-val'); if (inp) { inp.focus(); inp.value = e.key; inp.dispatchEvent(new Event('input', { bubbles: true })); } return true; }
+      return false;
+    },
+    onEnter() { if (this.pending()) { this.commit(); return true; } return false; },
+    onEsc() { if (this.pending()) { this.val = neutral(this.tool); dlg.set('val', this.val); this._pv = null; this.update(); return true; } return false; },
+    ok() {
+      if (this.pending()) this.commit();
+      if (!this.ops.length) return null;
+      return { id: f ? f.id : newId(), type: 'faceedit', body: this.body, ops: this.ops };
+    },
+    after() { selFace = null; selFaces = []; drawFaces(); },
+    cleanup() { clearTimeout(this.timer); this.hideBody = null; controls.enabled = true; }
+  };
+  beginCmd(c); c.init();
+}
 
 /* ================= shell (skořepina) ================= */
 function startShell(editIndex, f) {
@@ -6705,6 +6963,11 @@ document.addEventListener('keydown', e => {
   if (mod && k.toLowerCase() === 'v') { e.preventDefault(); pasteClip(); return; }
   if (mod && k.toLowerCase() === 'd') { e.preventDefault(); if (faceMode && selFace && !sk && !cmd) faceToSketch(); else duplicateSel(); return; }
   if (mod) return;
+  if (cmd && !sk && k === 'Escape' && cmd.onEsc && cmd.onEsc()) { e.preventDefault(); return; }
+  if (cmd && !sk && k === 'Enter' && cmd.onEnter && cmd.onEnter()) { e.preventDefault(); return; }
+  if (cmd && !sk && cmd.onKey && cmd.onKey(e)) { e.preventDefault(); return; }
+  /* Plochy: a selected flat face and E, I, G, R, S start Modelovat plochy with that tool, like in Blender */
+  if (faceMode && selFace && !cmd && !sk && FE_KEYS[k.toLowerCase()] && faceList().every(x => x.kind === 'plane' && x.bodyId === selFace.bodyId)) { e.preventDefault(); const l = faceList(); setFaceMode(false, true); startFaceEdit(undefined, undefined, l, FE_KEYS[k.toLowerCase()]); return; }
   if (k === 'Escape') {
     $('#ctxmenu').hidden = true;
     if (sk) { if (sk.cut && (sk.cut.parts || sk.cut.target !== undefined)) { sk.cut = null; setSketchTool('sktrim'); return; } if (sk.draft) { sk.draft = null; redrawSketch(); $('#dim').hidden = true; } else if (sk.tool) setSketchTool(null); return; }
@@ -8332,7 +8595,7 @@ $('#m-login').addEventListener('click', () => { closeMenu(); if (syncFns) syncFn
 $('#m-logout').addEventListener('click', () => { closeMenu(); if (syncFns) syncFns.logout(); });
 if (window.I18N) I18N.onChange(() => syncMenu());
 
-if (window.__KOTA_TEST__) window.__kota = { get cmd() { return cmd; }, viewTo, startSplitFace, threeMfBytes, transform, get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart, makeThumb, libThumb, transform, persp, toPx, startMove, alignDesc,
+if (window.__KOTA_TEST__) window.__kota = { get cmd() { return cmd; }, viewTo, startSplitFace, startFaceEdit, threeMfBytes, transform, get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart, makeThumb, libThumb, transform, persp, toPx, startMove, alignDesc,
   cmdSnap, get doc() { return doc; }, get cur() { return cur; }, get cmd() { return cmd; }, get sk() { return sk; }, get dlg() { return dlg; }, get sel() { return sel; }, meshes, chainsFor };
 })();
 
