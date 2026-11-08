@@ -1,7 +1,7 @@
 # Changelog
 
-## Beta 2.23
-- **Řezný nástroj pro klouby** (Součásti › Kloubové díly › Vytvořit: Řezný nástroj): místo dvou dílů vznikne jedno těleso – to, co kloub z hranolu nebo válce odebere (mezera, prostor jamky, odlehčení pro natočení). Nastavte Šířku a Výšku (Průměr) podle průřezu svého modelu, položte nástroj přes model a dejte Kombinovat › Vyříznout s Rozdělit výsledek na samostatné díly – vzniknou dva díly spojené kloubem, tištěné vcelku. Funguje pro všechny typy kloubů, včetně kulového bez podpěr. Přesah řezu prodlouží řez kolem nástroje pro model o něco větší, než je nástroj.
+## Beta 2.24
+- Odebrán řezný nástroj pro klouby z Beta 2.23 (Kloubové díly mají opět jen Díly).
 ## Beta 2.22
 - **Kulový kloub (ohebné modely i součásti Kloubů) – tisk bez podpěr:** spodek kuličky má tvar kapky – pod 45° je kužel, zakončený kulovou ploškou jednu až dvě vrstvy (asi 0,24 mm) nad dnem jamky. Žádná vrstva kuličky už nezačíná ve vzduchu ani nepřevisá víc než 45°, slicer nehlásí plovoucí oblast a mezera pod kuličkou zůstává stejná v každé poloze kloubu.
 ## Beta 2.21
