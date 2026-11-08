@@ -2408,7 +2408,7 @@ function articulateCore(polys, f) {
     } else if (style === 'ball') {
       /* Kulový: a ball on a neck of the left segment sits in a round socket of the right one, printed in place with a
          clearance all round, so the right segment turns about every axis (sideways, up and down, and twists). The
-         socket's roof is a 45° tent, the ball has a small flat underside just above the socket's floor, the neck is a
+         socket's roof is a 45° tent, the ball's underside is a 45° drop ending a layer or two above the socket's floor, the neck is a
          diamond (45° faces) and the mouth a cone, so it prints without supports; the mouth is narrower than the ball.
          The neck widens away from the ball (a diamond pyramid of half-angle nA about the ball's centre, its bottom ridge
          level), so it is thickest where it bends most; the mouth is the cone it sweeps (half-angle nA + swing), and nA
@@ -2461,7 +2461,12 @@ function articulateCore(polys, f) {
       const mouth = coneX(C.map((v, k) => v + ea[k] * del), dirA, 0.01, mouthLen * Math.tan(be), mouthLen);
       sock = U(sock, mouth);
       /* ball (flat underside near the floor) and the diamond neck back into the left segment */
-      const ball = I(KK.translate(KK.primitive('sphere', { r: rb }), C), boxAS([C[a] - rb - 1, C[a] + rb + 1], [sc - rb - 1, sc + rb + 1], [C[2] - 0.92 * rb, C[2] + rb + 1]));
+      /* the ball's underside is a drop: below its 45° line a cone, cut by a sphere about C a layer or two inside the
+         socket's floor – so no layer of it starts in the air or hangs out more than 45°, the lowest layers print just above
+         the floor (a gap of one or two layers), and the gap stays the same however the joint turns */
+      const gz = Math.min(g, Math.max(0.2, 0.6 * g)), hc = rb * Math.SQRT1_2;
+      const drop = KK.translate(KK.primitive('cone', { r: 0.01, rt: hc + 0.02, h: hc }), [C[0], C[1], C[2] - rb * Math.SQRT2 + hc / 2]);
+      const ball = I(U(KK.translate(KK.primitive('sphere', { r: rb }), C), drop), KK.translate(KK.primitive('sphere', { r: R - gz }), C));
       const nLen = C[a] - (xp - g - Math.max(3, rb));
       /* cross-sections at distance t back from C: a diamond of half-diagonal w(t) = (0.95 t tan nA + rn) / 2 standing on
          the level ridge rn below C, so it keeps inside the cone of half-angle nA (and its faces at 45°) */

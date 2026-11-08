@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.22
+- **Kulový kloub (ohebné modely i součásti Kloubů) – tisk bez podpěr:** spodek kuličky má tvar kapky – pod 45° je kužel, zakončený kulovou ploškou jednu až dvě vrstvy (asi 0,24 mm) nad dnem jamky. Žádná vrstva kuličky už nezačíná ve vzduchu ani nepřevisá víc než 45°, slicer nehlásí plovoucí oblast a mezera pod kuličkou zůstává stejná v každé poloze kloubu.
 ## Beta 2.21
 - **Modelovat – Velikost (S):** směr je vždy předvybraný na Vše (rovnoměrně), i když se nástroj spustí rovnou klávesou S z režimu Plochy; dřív zůstávala Normála, se kterou se plocha nezměnila.
 ## Beta 2.20
