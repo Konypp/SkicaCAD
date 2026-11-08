@@ -8655,22 +8655,26 @@ const JOINT_TIP = {
 const PART_FAMS = [['joint', 'Kloubový spoj'], ['lib', 'Hotové díly']];
 function startJointPart(editIndex, f, pre) {
   const c = {
-    editIndex, v: f ? { style: f.style || 'disc', shape: f.shape || 'box', w: f.w || 20, h: f.h || 14, len: f.len || 60, gap: f.gap || 0.4, angle: f.angle || 30, snap: !!f.snap, rot: f.rot || 0 }
-      : { style: 'disc', shape: 'box', w: 20, h: 14, len: 60, gap: 0.4, angle: 30, snap: false, rot: 0 }, pos: f ? f.pos.slice() : pre ? pre.pos.slice() : [0, 0, 0], tool: null, timer: 0,
+    editIndex, v: f ? { style: f.style || 'disc', shape: f.shape || 'box', w: f.w || 20, h: f.h || 14, len: f.len || 60, gap: f.gap || 0.4, angle: f.angle || 30, snap: !!f.snap, rot: f.rot || 0, cutter: !!f.cutter, ext: f.ext ?? 10 }
+      : { style: 'disc', shape: 'box', w: 20, h: 14, len: 60, gap: 0.4, angle: 30, snap: false, rot: 0, cutter: false, ext: 10 }, pos: f ? f.pos.slice() : pre ? pre.pos.slice() : [0, 0, 0], tool: null, timer: 0,
     init() {
       openDialog({ title: f ? 'Kloubový spoj' : 'Kloubové díly', icon: 'articulate',
         fields: [...(f ? [] : [{ k: 'seg', id: 'fam', label: 'Druh', options: PART_FAMS, value: 'joint' }]), { k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů'], ['ball', 'Kulový'], ['flexi', 'Flexi']], value: this.v.style },
+          { k: 'seg', id: 'make', label: 'Vytvořit', options: [['parts', 'Díly'], ['cutter', 'Řezný nástroj']], value: this.v.cutter ? 'cutter' : 'parts' },
           { k: 'chk', id: 'snap', label: 'Tisknout po dílech a zacvaknout', value: this.v.snap },
           { k: 'seg', id: 'shape', label: 'Tvar', options: [['box', 'Hranol'], ['round', 'Válec']], value: this.v.shape },
           { k: 'num', id: 'len', label: 'Délka', value: this.v.len, range: [10, 400, 1] }, { k: 'num', id: 'w', label: 'Šířka', value: this.v.w, range: [3, 200, 1] },
           { k: 'num', id: 'h', label: 'Výška', value: this.v.h, range: [3, 200, 1] },
           { k: 'num', id: 'gap', label: 'Vůle v kloubu', value: this.v.gap }, { k: 'num', id: 'angle', label: 'Natočení kloubu', unit: '°', value: this.v.angle, range: [10, 60, 1] },
+          { k: 'num', id: 'ext', label: 'Přesah řezu', value: this.v.ext, range: [0, 100, 1] },
           { k: 'num', id: 'rot', label: 'Otočení', unit: '°', value: this.v.rot, range: [-180, 180, 15] },
           { k: 'xyz', id: 'pos', label: 'Poloha', value: this.pos }, { k: 'note', id: 'tip' }, { k: 'note', id: 'n' }],
         onChange: id => {
           if (id === 'fam') { if (dlg.get('fam') === 'lib') { const pos = this.pos; clearTimeout(this.timer); endCmd(false); startLibPart(undefined, null, { pos }); } return; }
           if (id === 'style' || id === 'shape') this.v[id] = dlg.get(id);
+          else if (id === 'make') this.v.cutter = dlg.get('make') === 'cutter';
           else if (id === 'snap') this.v.snap = !!dlg.get('snap');
+          else if (id === 'ext') { const x = dlg.get('ext'); if (isFinite(x) && x >= 0) this.v.ext = x; }
           else if (id === 'pos') this.pos = dlg.get('pos');
           else { const x = dlg.get(id); if (isFinite(x) && (id === 'rot' || x > 0)) this.v[id] = x; }
           this.update();
@@ -8678,18 +8682,18 @@ function startJointPart(editIndex, f, pre) {
       setPrompt('Klepnutím do pohledu nebo na těleso spoj umístíte');
       this.update();
     },
-    feature() { return { id: f ? f.id : 'tmp', type: 'jointpart', ...this.v, snap: this.v.style === 'flex' && this.v.snap, pos: this.pos.slice() }; },
+    feature() { const o = { id: f ? f.id : 'tmp', type: 'jointpart', ...this.v, snap: this.v.style === 'flex' && this.v.snap && !this.v.cutter, pos: this.pos.slice() }; if (!o.cutter) { delete o.cutter; delete o.ext; } return o; },
     update() {
       const round = this.v.shape === 'round';
-      dlg.show('w', !round); dlg.label('h', round ? 'Průměr' : 'Výška'); dlg.show('snap', this.v.style === 'flex');
-      dlg.set('tip', JOINT_TIP[this.v.style] || ''); dlg.set('n', 'Počítám…'); dlg.okEnabled(false);
+      dlg.show('w', !round); dlg.label('h', round ? 'Průměr' : 'Výška'); dlg.show('snap', this.v.style === 'flex' && !this.v.cutter); dlg.show('ext', this.v.cutter);
+      dlg.set('tip', this.v.cutter ? 'Řezný nástroj: nastavte Šířku a Výšku (Průměr) podle průřezu svého modelu, položte ho přes model v místě kloubu a pak Kombinovat › Vyříznout (Cílové těleso: model, Nástroje: řezný nástroj) se zaškrtnutým Rozdělit výsledek na samostatné díly – vzniknou dva díly spojené kloubem, tisknou se vcelku. Přesah řezu prodlouží řez kolem nástroje pro model o něco větší, než je nástroj.' : JOINT_TIP[this.v.style] || ''); dlg.set('n', 'Počítám…'); dlg.okEnabled(false);
       clearTimeout(this.timer);
       this.timer = setTimeout(() => {
         if (cmd !== this) return;
         clearGroup(G.preview); this.tool = null;
         try {
           this.tool = Engine.jointParts(this.feature());
-          for (const t of this.tool) G.preview.add(previewMesh(t, 'new'));
+          for (const t of this.tool) G.preview.add(previewMesh(t, this.v.cutter ? 'cut' : 'new'));
           dlg.set('n', ''); dlg.okEnabled(true);
         } catch (e) { dlg.set('n', '!' + e.message); dlg.okEnabled(false); }
         requestRender();

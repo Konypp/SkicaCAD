@@ -29,12 +29,29 @@ function jointParts(f) {
   const style = f.style in JOINT_PARTS ? f.style : 'disc', round = f.shape === 'round';
   const L = Math.max(10, Math.min(400, Number(f.len) || 60)), H = Math.max(3, Math.min(200, Number(f.h) || 14)), W = round ? H : Math.max(3, Math.min(200, Number(f.w) || 20));
   const opt = { style, axis: 'x', n: 1, at: [0], gap: Number(f.gap) || 0.4, angle: Number(f.angle) || 30, ...(f.snap && style === 'flex' ? { snap: true } : {}) };
-  const key = JSON.stringify([round, L, W, H, opt]);
+  const cutter = !!f.cutter, ext = Math.max(0, Math.min(200, Number(f.ext) >= 0 ? Number(f.ext) : 10));
+  const key = JSON.stringify([round, L, W, H, opt, cutter, cutter ? ext : 0]);
   let segs = jointCache.get(key);
   if (!segs) {
     const bar = round ? KK.transform(KK.primitive('cylinder', { r: H / 2, h: L }), [0, 0, -1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, H / 2, 1])
       : KK.translate(KK.primitive('box', { w: L, d: W, h: H }), [0, 0, H / 2]);
     segs = articulate(bar, opt);
+    if (cutter) {
+      /* Řezný nástroj: what the joint takes away from the bar (the gap, the socket's room, the swing reliefs) as one
+         body. Taken away from a model of the same section (Kombinovat › Odebrat, as new bodies, in parts) it leaves two
+         parts joined by the joint, printed in place. Round the bar the cut goes on as a flat slit of the joint's gap,
+         so a model a little larger than the bar is still cut through */
+      const S = (p, q) => KK.boolean(p, q, 'subtract');
+      let N = S(S(bar, segs[0]), segs[1]);
+      if (ext > 0) {
+        let xr = Infinity; for (const q of segs[1]) for (const v of q.v) xr = Math.min(xr, v[0]);
+        let xl = -Infinity; for (const q of segs[0]) for (const v of q.v) if (v[0] < xr + 1e-6) xl = Math.max(xl, v[0]);
+        if (!(xr - xl > 1e-3)) { xl = xr - opt.gap; }
+        const E = (round ? H / 2 : Math.max(W, H) / 2) + ext, slit = KK.translate(KK.primitive('box', { w: xr - xl, d: 2 * E, h: 2 * E }), [(xl + xr) / 2, 0, H / 2]);
+        N = KK.boolean(N, S(slit, bar), 'union');
+      }
+      segs = [N];
+    }
     if (jointCache.size > 24) jointCache.clear();
     jointCache.set(key, segs);
   }
@@ -2770,7 +2787,7 @@ function step(state, f) {
     }
     case 'jointpart': {
       const name = JOINT_PARTS[f.style] || JOINT_PARTS.disc;
-      out = bodies.concat(jointParts(f).map((polys, i) => ({ id: f.id + (i ? '_' + i : ''), name: name + ' – díl ' + (i + 1), polys, from: f.id })));
+      out = bodies.concat(jointParts(f).map((polys, i) => ({ id: f.id + (i ? '_' + i : ''), name: f.cutter ? name + ' – řezný nástroj' : name + ' – díl ' + (i + 1), polys, from: f.id })));
       break;
     }
     case 'import':
@@ -3096,7 +3113,7 @@ function makeRebuilder() {
   };
 }
 
-return { faceEditRun, feStep, feLoopRing, feRegion, feCentre, feInner, ribsTool, curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { shellsOf, partsOf, faceEditRun, feStep, feLoopRing, feRegion, feCentre, feInner, ribsTool, curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 
