@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.25
+- **Název návrhu na telefonu:** po klepnutí na název se pole roztáhne přes celou horní lištu (větší písmo, nic ho nepřekrývá a je vidět celý název); Enter nebo klepnutí jinam zadávání ukončí.
 ## Beta 2.24
 - Odebrán řezný nástroj pro klouby z Beta 2.23 (Kloubové díly mají opět jen Díly).
 ## Beta 2.22

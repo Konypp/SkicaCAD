@@ -7534,6 +7534,10 @@ $('#fileinput').addEventListener('change', e => {
   })();
 });
 $('#docname').addEventListener('input', e => { doc.name = e.target.value; saveDoc(); renderBrowser(); });
+/* on a phone the name field spreads over the whole top bar while it is typed in; Enter finishes */
+$('#docname').addEventListener('focus', e => { if (matchMedia('(max-width: 760px)').matches) { $('.appbar').classList.add('naming'); setTimeout(() => { try { e.target.setSelectionRange(e.target.value.length, e.target.value.length); e.target.scrollIntoView({ block: 'nearest' }); } catch (er) { /* ignore */ } }, 50); } });
+$('#docname').addEventListener('blur', () => $('.appbar').classList.remove('naming'));
+$('#docname').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.target.blur(); } });
 $('#docname').addEventListener('change', () => { if (ensureUniqueName(true)) { saveDoc(); renderBrowser(); } pushHist(); });
 $('#undo').addEventListener('click', undo);
 $('#redo').addEventListener('click', redo);
