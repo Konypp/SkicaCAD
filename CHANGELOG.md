@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 2.39
+- Spona: samice je bez dna, takže jazýčky samce (tištěné na podložce) jsou v ní ve stejné výšce – spojená spona je zarovnaná nahoře i dole, bez skoku. Háčky začínají nad lištou pod okénky (spodek pod 45°, tisk bez podpěr) a drží samce i svisle.
+- Spona: zachycovací plocha háčků je podříznutá o 15°, tah za řemínek háčky zatlačí hlouběji do okének – spona se rozepne jen stisknutím háčků.
+- Spona: jazýčky jsou vyšší (pevnější), u kořene mají zaoblení; úzká spona je kratší (samec 12 mm místo 14 mm u 10mm řemínku).
+
 ## Beta 2.38
 - **Délka spony:** nové pole Délka jazýčků spony (Kloubový model › Zapínání: Spona) a Délka jazýčků (Součásti › Spona). Kratší jazýčky zkrátí samce i samici stejně – např. na 10mm řemínku ze 14 / 13,3 mm (automaticky) až na 11 / 10,3 mm. Nejkratší jazýček je zobáček + 4 mm pružné části (u úzké spony 7 mm); 0 = automaticky jako dřív.
 ## Beta 2.37
