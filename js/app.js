@@ -1449,7 +1449,7 @@ function openDialog(spec) {
       case 'sel': return `<div class="frow" data-row="${f.id}"><span class="fl">${f.label}</span><button class="selbtn" id="${id}" data-sel="${f.id}"><span class="dot"></span><span class="tx"></span></button></div>`;
       case 'num': return `<div class="frow" data-row="${f.id}"><label for="${id}">${f.label}</label><span class="fnum"><input id="${id}" data-f="${f.id}" inputmode="decimal" autocomplete="off"><span class="u">${f.unit || 'mm'}</span></span></div>`
         + (f.range ? `<div class="frow frange-row" data-row="${f.id}-r"><input type="range" class="frange" id="${id}-r" data-f="${f.id}" data-range="1" min="${f.range[0]}" max="${f.range[1]}" step="${f.range[2] || 1}" aria-label="${f.label}"></div>` : '');
-      case 'xyz': return `<div class="frow" data-row="${f.id}"><span class="fl">${f.label}</span><div class="xyz">${['x', 'y', 'z'].map((a, j) => `<span class="fnum"><span class="ax ax-${a}">${a.toUpperCase()}</span><input id="${id}-${j}" data-f="${f.id}" data-j="${j}" inputmode="decimal" autocomplete="off" aria-label="${f.label} ${a.toUpperCase()}"></span>`).join('')}</div></div>`;
+      case 'xyz': return `<div class="frow wide" data-row="${f.id}"><span class="fl">${f.label}</span><div class="xyz">${['x', 'y', 'z'].map((a, j) => `<span class="fnum"><span class="ax ax-${a}">${a.toUpperCase()}</span><input id="${id}-${j}" data-f="${f.id}" data-j="${j}" inputmode="decimal" autocomplete="off" aria-label="${f.label} ${a.toUpperCase()}"></span>`).join('')}</div></div>`;
       case 'opt': return `<div class="frow" data-row="${f.id}"><label for="${id}">${f.label}</label><select class="fsel" id="${id}" data-f="${f.id}">${f.options.map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select></div>`;
       case 'seg': return `<div class="frow" data-row="${f.id}"><span class="fl">${f.label}</span><div class="seg" id="${id}" data-seg="${f.id}">${f.options.map(([v, l]) => `<button data-v="${v}" aria-pressed="false">${l}</button>`).join('')}</div></div>`;
       case 'btns': return `<div class="frow" data-row="${f.id}"><span class="fl">${f.label}</span><div class="btnrow${f.options.length === 1 ? ' one' : ''}">${f.options.map(([v, l]) => `<button class="btn sm" data-btn="${f.id}" data-v="${v}" aria-pressed="false">${l}</button>`).join('')}</div></div>`;
@@ -4638,7 +4638,7 @@ function startFaceEdit(editIndex, f, faces, tool) {
       if (k === 'q') { const lp = lastMoveEv || { clientX: innerWidth / 2, clientY: innerHeight / 2 }; this.onLongPress(lp); return true; }
       if (FE_KEYS[k]) { this.setTool(FE_KEYS[k]); return true; }
       if (['x', 'y', 'z', 'n'].includes(k) && ['move', 'rot', 'scale'].includes(this.tool)) { this.ax = this.ax === k && this.tool === 'scale' ? 'all' : k; dlg.set('ax', this.ax); this.preview(); return true; }
-      if (/^[0-9.,-]$/.test(e.key) && (this.sel.length || this.tool === 'loop')) { const inp = $('#dlg-val'); if (inp) { inp.focus(); inp.value = e.key; inp.dispatchEvent(new Event('input', { bubbles: true })); } return true; }
+      if (/^[0-9.,-]$/.test(e.key) && (this.sel.length || this.tool === 'loop')) { const inp = $('#dlg-val'); if (inp) { inp.dataset.nosel = '1'; inp.focus(); inp.value = e.key; setTimeout(() => { delete inp.dataset.nosel; }, 300); inp.dispatchEvent(new Event('input', { bubbles: true })); } return true; }
       return false;
     },
     onEnter() { if (this.pending()) { this.commit(); return true; } if (this.tool === 'inset' && this.sel.length && Math.abs(this.val) < 1e-9 && !this.sel.every(d => d.dup)) { this.dupFaces(); return true; } return this.tool === 'loop' && !this.ops.length; },
@@ -7534,6 +7534,22 @@ $('#fileinput').addEventListener('change', e => {
   })();
 });
 $('#docname').addEventListener('input', e => { doc.name = e.target.value; saveDoc(); renderBrowser(); });
+/* a tap or click into a number field selects its value, so typing replaces it at once (dialogs, sketch palette, dimension
+   edits); a second tap places the caret as usual */
+const isNumField = t => t instanceof HTMLInputElement && t.id !== 'docname' && (t.inputMode === 'decimal' || t.type === 'number' || t.classList.contains('dimedit'));
+document.addEventListener('focusin', e => {
+  const t = e.target; if (!isNumField(t) || t.dataset.nosel) return;
+  t._selAll = true;
+  const sel = () => { if (document.activeElement === t && !t.dataset.nosel) { try { t.select(); } catch (er) { /* ignore */ } } };
+  requestAnimationFrame(sel); setTimeout(sel, 60);
+});
+/* the release of the click / tap that focused the field would put the caret back: keep the value selected */
+for (const ev of ['mouseup', 'touchend', 'pointerup']) document.addEventListener(ev, e => {
+  const t = e.target; if (!isNumField(t) || !t._selAll) return;
+  if (ev === 'mouseup' && t.selectionStart === t.selectionEnd) e.preventDefault();
+  setTimeout(() => { if (document.activeElement === t && t._selAll && !t.dataset.nosel) { try { t.select(); } catch (er) { /* ignore */ } } t._selAll = false; }, 0);
+}, true);
+document.addEventListener('focusout', e => { if (e.target) e.target._selAll = false; });
 /* on a phone the name field spreads over the whole top bar while it is typed in; Enter finishes */
 $('#docname').addEventListener('focus', e => { if (matchMedia('(max-width: 760px)').matches) { $('.appbar').classList.add('naming'); setTimeout(() => { try { e.target.setSelectionRange(e.target.value.length, e.target.value.length); e.target.scrollIntoView({ block: 'nearest' }); } catch (er) { /* ignore */ } }, 50); } });
 $('#docname').addEventListener('blur', () => $('.appbar').classList.remove('naming'));

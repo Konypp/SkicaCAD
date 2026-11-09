@@ -382,3 +382,7 @@ button { cursor: pointer; }
 .pie-b { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 64px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font-size: 12px; box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
 .pie-b:hover, .pie-b:focus-visible { background: var(--accent-soft); }
 .pie-x { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); display: grid; place-items: center; box-shadow: 0 2px 8px rgba(0, 0, 0, .15); }
+/* three values in a row (X Y Z): the row spans the dialog under its label and the fields keep their padding small, so
+   longer values (e.g. 101,125 or -12,5) stay readable */
+.xyz .fnum .ax { min-width: 14px; padding: 0 2px 0 4px; }
+.xyz .fnum input { padding: 0 5px 0 2px; font-size: 12px; }
