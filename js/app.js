@@ -1279,10 +1279,10 @@ function facePie(x, y) {
    (rarely used or related tools); its button shows the tool used last */
 const RIBBON = {
   solid: [
-    ['Vytvořit', [['sketch', 'Vytvořit skicu', 'S'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'],
+    ['Vytvořit', [['sketch', 'Vytvořit skicu', 'D'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'],
       { menu: 'prim', label: 'Základní tělesa', items: [['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus'], ['text3d', 'Text']] },
       { menu: 'parts', label: 'Součásti', items: [['bolt', 'Šroub'], ['nut', 'Matice'], ['hinge', 'Pant'], ['latch', 'Západka'], ['buckle', 'Spona'], ['jointpart', 'Kloubové díly']] }]],
-    ['Upravit', [{ menu: 'edge', label: 'Hrany', items: [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení']] }, ['hole', 'Díra', 'H'], ['shell', 'Skořepina'], ['move', 'Přesunout', 'M'], ['scale', 'Měřítko'], ['rotate', 'Otočit', 'R'], ['facemode', 'Plochy', 'G'], ['faceedit', 'Modelovat'],
+    ['Upravit', [{ menu: 'edge', label: 'Hrany', items: [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení']] }, ['hole', 'Díra', 'H'], ['shell', 'Skořepina'], ['move', 'Přesunout', 'M'], ['scale', 'Měřítko', 'S'], ['rotate', 'Otočit', 'R'], ['facemode', 'Plochy', 'G'], ['faceedit', 'Modelovat'],
       { menu: 'shape', label: 'Tvar', items: [['combine', 'Kombinovat'], ['splitbody', 'Rozříznout'], ['curvecut', 'Rozříznout křivkou']] },
       { menu: 'xform', label: 'Uspořádat', items: [['center', 'Zarovnat'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole']] },
       ['del', 'Odstranit', 'Del']]],
@@ -2701,7 +2701,7 @@ function startExtrude(editIndex, f, opts) {
       }
       if (!sketches.length) {
         endCmd(false);
-        toast(cur.sketches.size ? 'Všechny skici už jsou vysunuté. Nakreslete novou skicu (S), nebo v režimu Plochy (G) vyberte stěnu a zvolte Vysunout.' : 'Nejprve vytvořte skicu s uzavřeným profilem (S), nebo v režimu Plochy (G) vyberte stěnu a zvolte Vysunout.');
+        toast(cur.sketches.size ? 'Všechny skici už jsou vysunuté. Nakreslete novou skicu (D), nebo v režimu Plochy (G) vyberte stěnu a zvolte Vysunout.' : 'Nejprve vytvořte skicu s uzavřeným profilem (D), nebo v režimu Plochy (G) vyberte stěnu a zvolte Vysunout.');
         return;
       }
       if (!this.sketch) {
@@ -6381,7 +6381,7 @@ function startRevolve(editIndex, f) {
     op: f ? f.op : 'new', autoOp: !f, regionMeshes: [], tool: null,
     init() {
       const sketches = Array.from(cur.sketches.values());
-      if (!sketches.length) { endCmd(false); toast('Nejprve vytvořte skicu s profilem a osou rotace (S).'); return; }
+      if (!sketches.length) { endCmd(false); toast('Nejprve vytvořte skicu s profilem a osou rotace (D).'); return; }
       if (!this.sketch) {
         const last = sketches[sketches.length - 1], regs = Engine.regions(last);
         if (regs.length === 1) { this.sketch = last.id; this.regions = new Set([regs[0].ei]); }
@@ -7186,7 +7186,7 @@ document.addEventListener('keydown', e => {
   /* arrow keys (PageUp / PageDown = Z): move the selected sketch element, the bodies in Move (selected bodies open Move), or pan the view; one grid step, Shift ×10 */
   const AR = { ArrowLeft: [-1, 0, 0], ArrowRight: [1, 0, 0], ArrowUp: [0, 1, 0], ArrowDown: [0, -1, 0], PageUp: [0, 0, 1], PageDown: [0, 0, -1] }[k];
   if (AR) { if (nudgeKeys(AR, e.shiftKey)) e.preventDefault(); return; }
-  const map = sk ? { l: 'line', k: 'spline', r: 'rect', c: 'circle', e: 'ellipse', p: 'ngon', d: 'slot', x: 'sktrim', o: 'skoffset', m: 'skmirror', t: 'sksegtrim', j: 'skjoin', q: 'skcons' } : cmd ? {} : { s: 'sketch', e: 'extrude', f: 'fillet', m: 'move', r: 'rotate', t: 'thread', i: 'measure', g: 'facemode', h: 'hole' };
+  const map = sk ? { l: 'line', k: 'spline', r: 'rect', c: 'circle', e: 'ellipse', p: 'ngon', d: 'slot', x: 'sktrim', o: 'skoffset', m: 'skmirror', t: 'sksegtrim', j: 'skjoin', q: 'skcons' } : cmd ? {} : { d: 'sketch', s: 'scale', e: 'extrude', f: 'fillet', m: 'move', r: 'rotate', t: 'thread', i: 'measure', g: 'facemode', h: 'hole' };
   const id = map[k.toLowerCase()];
   if (id) { e.preventDefault(); runCommand(id); return; }
   if (k === 'F6') { e.preventDefault(); fitView(); }

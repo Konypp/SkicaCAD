@@ -75,9 +75,9 @@
     // extrude / revolve
     'Táhněte šipkou nebo zadejte vzdálenost. Klepnutím na profil výběr změníte.': 'Drag the arrow or enter a distance. Tap a profile to change the selection.',
     'Vyberte uzavřený profil skici': 'Select a closed sketch profile', 'Tato skica už je vysunutá.': 'This sketch has already been extruded.', '– vyberte –': '– select –',
-    'Nejprve vytvořte skicu s uzavřeným profilem (S), nebo v režimu Plochy (G) vyberte stěnu a zvolte Vysunout.': 'Create a sketch with a closed profile first (S), or select a face in Faces mode (G) and choose Extrude.',
-    'Všechny skici už jsou vysunuté. Zbylý profil dřív vysunuté skici vysunete, když skicu nejdřív vyberete na časové ose.': 'All sketches have been extruded. To extrude the leftover profile of an extruded sketch, first select the sketch in the timeline.', 'Všechny skici už jsou vysunuté. Nakreslete novou skicu (S), nebo v režimu Plochy (G) vyberte stěnu a zvolte Vysunout.': 'All sketches have been extruded. Draw a new sketch (S), or select a face in Faces mode (G) and choose Extrude.',
-    'Nejprve vytvořte skicu s profilem a osou rotace (S).': 'Create a sketch with a profile and a revolve axis first (S).',
+    'Nejprve vytvořte skicu s uzavřeným profilem (D), nebo v režimu Plochy (G) vyberte stěnu a zvolte Vysunout.': 'Create a sketch with a closed profile first (D), or select a face in Faces mode (G) and choose Extrude.',
+    'Všechny skici už jsou vysunuté. Zbylý profil dřív vysunuté skici vysunete, když skicu nejdřív vyberete na časové ose.': 'All sketches have been extruded. To extrude the leftover profile of an extruded sketch, first select the sketch in the timeline.', 'Všechny skici už jsou vysunuté. Nakreslete novou skicu (D), nebo v režimu Plochy (G) vyberte stěnu a zvolte Vysunout.': 'All sketches have been extruded. Draw a new sketch (D), or select a face in Faces mode (G) and choose Extrude.',
+    'Nejprve vytvořte skicu s profilem a osou rotace (D).': 'Create a sketch with a profile and a revolve axis first (D).',
     'Zvolte osu a úhel rotace. Klepnutím na profil výběr změníte.': 'Choose the axis and angle. Tap a profile to change the selection.',
     'Osa X skici': 'Sketch X axis', 'Osa Y skici': 'Sketch Y axis', 'Osa X': 'X axis', 'Osa Y': 'Y axis', 'Osa Z': 'Z axis',
     'Profil protíná osu rotace.': 'The profile crosses the revolve axis.', 'Osa rotace má nulovou délku': 'The revolve axis has zero length', 'Osa rotace neexistuje': 'The revolve axis does not exist',

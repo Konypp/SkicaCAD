@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.27
+- **Klávesové zkratky:** Vytvořit skicu je nově **D** (Draw), Měřítko **S** (Scale). Uvnitř skici zůstává D pro Drážku; v režimu Plochy s vybranou plochou D duplikuje a S mění velikost (Modelovat).
 ## Beta 2.26
 - **Zobrazení hodnot X / Y / Z:** trojice polí (Poloha, Měřítko, Rozměry, Střed, Posun…) byla na počítači v dialogu jen asi 24 px široká a hodnoty se ořezávaly (např. „9(“ místo 90). Teď je řádek pod svým popiskem přes celou šířku dialogu a vejdou se i hodnoty jako -123,456. Prošlo se všech 45 dialogů a paleta skici – žádné pole už hodnotu neořezává.
 - **Klepnutí do číselného pole označí celou hodnotu**, takže ji stačí rovnou přepsat (dialogy, paleta skici, úprava kót); druhé klepnutí umístí kurzor jako obvykle.
