@@ -7155,9 +7155,13 @@ document.addEventListener('keydown', e => {
   if (mod && k.toLowerCase() === 'd') { e.preventDefault(); if (faceMode && selFace && !sk && !cmd) faceToSketch(); else duplicateSel(); return; }
   if (mod && k.toLowerCase() === 'r' && !e.shiftKey && cmd && !sk && cmd.onKey) { e.preventDefault(); cmd.onKey({ key: 'l' }); return; }
   if (mod && k.toLowerCase() === 'r' && !e.shiftKey && faceMode && selFace && !cmd && !sk) { e.preventDefault(); const l = faceList().filter(x => x.kind === 'plane'); setFaceMode(false, true); startFaceEdit(undefined, undefined, l, 'loop'); return; }
-  /* Ctrl / Cmd (or Alt) + arrows: a fine step of 0.1 mm (Shift: 1 mm) */
+  /* Ctrl / Cmd (or Alt) + arrows: a fine step of 0.1 mm (Shift: 1 mm; Ctrl+Shift+up / down: Z) */
   const ARF = { ArrowLeft: [-1, 0, 0], ArrowRight: [1, 0, 0], ArrowUp: [0, 1, 0], ArrowDown: [0, -1, 0], PageUp: [0, 0, 1], PageDown: [0, 0, -1] }[k];
-  if (ARF && (mod || e.altKey)) { if (nudgeKeys(ARF, e.shiftKey, true)) e.preventDefault(); return; }
+  if (ARF && (mod || e.altKey)) {
+    /* Ctrl+Shift + up / down: along Z by 0.1 mm (Alt+Shift keeps 1 mm in the plane) */
+    if (mod && e.shiftKey && ARF[1]) { if (nudgeKeys([0, 0, ARF[1]], false, true)) e.preventDefault(); return; }
+    if (nudgeKeys(ARF, e.shiftKey, true)) e.preventDefault(); return;
+  }
   if (mod) return;
   if (cmd && !sk && k === 'Escape' && cmd.onEsc && cmd.onEsc()) { e.preventDefault(); return; }
   if (cmd && !sk && k === 'Enter' && cmd.onEnter && cmd.onEnter()) { e.preventDefault(); return; }

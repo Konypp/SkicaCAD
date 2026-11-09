@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.44
+- Jemný posun v ose Z: Ctrl+Shift+šipka nahoru / dolů posune vybraná tělesa o 0,1 mm nahoru / dolů (posun o 1 mm v rovině je teď Alt+Shift+šipka).
+
 ## Beta 2.43
 - Kloubový model – Zapínání na koncích: nová volba Kloub. Na začátek řemínku přijdou dvě ramena s kuželovými důlky (samice), na konec jazýček s kuželovými čepy (samec), jako u kloubu Nahoru/dolů tištěného po dílech; po zacvaknutí se řemínek spojí do kruhu a jde zase rozepnout.
 
