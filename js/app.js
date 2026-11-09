@@ -5864,6 +5864,8 @@ function cylinderAt(polys, pi) {
 }
 /* default 3D-print clearances on the diameter, from print tests: bolt / pin 0.15 mm, nut / hole 0.35 mm */
 const TOL_HINGE = 0.35, TOL_LATCH = 0.3; /* from the user's test prints: hinges 0.35 (0.3 held the lid ajar at the hinge), latches 0.3 */
+/* default clearance of a print-in-place joint: the pin hinge (Pant) 0.5 mm, the others 0.4 mm */
+const jointGap = style => (style === 'hinge' ? 0.5 : 0.4);
 const TOL_BOLT = 0.15, TOL_NUT = 0.35;
 const threadLabel = (d, p) => `M${fmtc(d, 1)} × ${fmtc(p, 2)}`;
 function startThread(editIndex, f) {
@@ -8105,6 +8107,8 @@ const ORG_MODS = {
   },
   articulate: {
     defaults: () => ({ style: 'disc', axis: 'x', place: 'even', lines: [], curve: [], snap: false, cnt: 4, gap: 0.4, angle: 30, ends: 'none', bw: 0, bh: 0 }),
+    /* the pin hinge prints best with a little more clearance: switching the type moves an untouched clearance along */
+    change: (c, id) => { if (id !== 'style') return; const ns = dlg.get('style'); if (Math.abs(c.v.gap - jointGap(c.v.style)) < 1e-9) { c.v.gap = jointGap(ns); dlg.set('gap', c.v.gap); } },
     load: f => ({ style: !f.style || f.style === 'ball' ? 'disc' : f.style, snap: !!f.snap, axis: f.axis || 'x', place: f.curve && f.curve.length ? 'curve' : f.lines && f.lines.length ? 'lines' : 'even', lines: (f.lines || []).slice(), curve: (f.curve || []).map(p => p.slice()), cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30, ends: f.ends || 'none', bw: f.bw || 0, bh: f.bh || 0 }),
     fields: v => [{ k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů'], ['flexi', 'Flexi']].concat(v.style === 'ring' ? [['ring', 'Očka']] : v.style === 'chain' ? [['chain', 'Očka (starší)']] : []), value: v.style }, /* the eyes only for older models that use them */
       { k: 'chk', id: 'snap', label: 'Tisknout po dílech a zacvaknout', value: v.snap },
@@ -8673,7 +8677,7 @@ const JOINT_TIP = {
 const PART_FAMS = [['joint', 'Kloubový spoj'], ['lib', 'Hotové díly']];
 function startJointPart(editIndex, f, pre) {
   const c = {
-    editIndex, v: f ? { style: !f.style || f.style === 'ball' ? 'disc' : f.style, shape: f.shape || 'box', w: f.w || 20, h: f.h || 14, len: f.len || 60, gap: f.gap || 0.4, angle: f.angle || 30, snap: !!f.snap, rot: f.rot || 0 }
+    editIndex, v: f ? { style: !f.style || f.style === 'ball' ? 'disc' : f.style, shape: f.shape || 'box', w: f.w || 20, h: f.h || 14, len: f.len || 60, gap: f.gap || jointGap(f.style), angle: f.angle || 30, snap: !!f.snap, rot: f.rot || 0 }
       : { style: 'disc', shape: 'box', w: 20, h: 14, len: 60, gap: 0.4, angle: 30, snap: false, rot: 0 }, pos: f ? f.pos.slice() : pre ? pre.pos.slice() : [0, 0, 0], tool: null, timer: 0,
     init() {
       openDialog({ title: f ? 'Kloubový spoj' : 'Kloubové díly', icon: 'articulate',
@@ -8687,7 +8691,8 @@ function startJointPart(editIndex, f, pre) {
           { k: 'xyz', id: 'pos', label: 'Poloha', value: this.pos }, { k: 'note', id: 'tip' }, { k: 'note', id: 'n' }],
         onChange: id => {
           if (id === 'fam') { if (dlg.get('fam') === 'lib') { const pos = this.pos; clearTimeout(this.timer); endCmd(false); startLibPart(undefined, null, { pos }); } return; }
-          if (id === 'style' || id === 'shape') this.v[id] = dlg.get(id);
+          if (id === 'style') { const ns = dlg.get('style'); if (Math.abs(this.v.gap - jointGap(this.v.style)) < 1e-9) { this.v.gap = jointGap(ns); dlg.set('gap', this.v.gap); } this.v.style = ns; }
+          else if (id === 'shape') this.v[id] = dlg.get(id);
           else if (id === 'snap') this.v.snap = !!dlg.get('snap');
           else if (id === 'pos') this.pos = dlg.get('pos');
           else { const x = dlg.get(id); if (isFinite(x) && (id === 'rot' || x > 0)) this.v[id] = x; }

@@ -28,7 +28,7 @@ const jointCache = new Map();
 function jointParts(f) {
   const style = f.style in JOINT_PARTS ? f.style : 'disc', round = f.shape === 'round';
   const L = Math.max(10, Math.min(400, Number(f.len) || 60)), H = Math.max(3, Math.min(200, Number(f.h) || 14)), W = round ? H : Math.max(3, Math.min(200, Number(f.w) || 20));
-  const opt = { style, axis: 'x', n: 1, at: [0], gap: Number(f.gap) || 0.4, angle: Number(f.angle) || 30, ...(f.snap && style === 'flex' ? { snap: true } : {}) };
+  const opt = { style, axis: 'x', n: 1, at: [0], gap: Number(f.gap) || (style === 'hinge' ? 0.5 : 0.4), angle: Number(f.angle) || 30, ...(f.snap && style === 'flex' ? { snap: true } : {}) };
   const key = JSON.stringify([round, L, W, H, opt]);
   let segs = jointCache.get(key);
   if (!segs) {
@@ -2219,7 +2219,7 @@ function articulateParts(polys, f) {
    an up/down joint of the first link: after printing, fold it 90° outwards into the strap's line, mouth outwards. The
    foot carries diamond lugs that turn in round bores of the link's arms. */
 function articulateFold(polys, f) {
-  const a = f.axis === 'y' ? 1 : 0, sAx = 1 - a, bb = KK.bbox(polys), g = Math.max(0.15, Number(f.gap) || 0.4);
+  const a = f.axis === 'y' ? 1 : 0, sAx = 1 - a, bb = KK.bbox(polys), g = Math.max(0.15, Number(f.gap) || (f.style === 'hinge' ? 0.5 : 0.4));
   const ea = [0, 0, 0], es = [0, 0, 0], ez = [0, 0, 1]; ea[a] = 1; es[sAx] = 1;
   const BIG = 4 * Math.max(...[0, 1, 2].map(k => bb.max[k] - bb.min[k])) + 100;
   const P3 = (av, sv, zv) => { const p = [0, 0, zv]; p[a] = av; p[sAx] = sv; return p; };
@@ -2333,7 +2333,7 @@ function insideTest(polys) {
 }
 function articulateCore(polys, f) {
   if (Array.isArray(f.at) && (Array.isArray(f.atS) || (Array.isArray(f.tilt) && f.tilt.some(t => Math.abs(Number(t) || 0) > 0.5)))) return articulateOblique(polys, f);
-  const a = f.axis === 'y' ? 1 : 0, sAx = 1 - a, bb = KK.bbox(polys), g = Math.max(0.15, Number(f.gap) || 0.4);
+  const a = f.axis === 'y' ? 1 : 0, sAx = 1 - a, bb = KK.bbox(polys), g = Math.max(0.15, Number(f.gap) || (f.style === 'hinge' ? 0.5 : 0.4));
   const L = bb.max[a] - bb.min[a], n = Math.max(1, Math.min(40, Math.round(Number(f.n) || 4))), th = Math.max(5, Math.min(60, Number(f.angle) || 30)) * Math.PI / 180;
   const BIG = 4 * Math.max(bb.max[0] - bb.min[0], bb.max[1] - bb.min[1], bb.max[2] - bb.min[2]) + 100;
   const box = (lo, hi) => KK.translate(KK.primitive('box', { w: hi[0] - lo[0], d: hi[1] - lo[1], h: hi[2] - lo[2] }), [0, 1, 2].map(k => (lo[k] + hi[k]) / 2));
