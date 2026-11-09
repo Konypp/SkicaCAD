@@ -2100,15 +2100,19 @@ function sectionNear(polys, a, x, Q) {
    tongue and two springy prongs whose hooks snap into the windows (press them to release). The prongs bend in the
    bed's plane, which is how printed layers flex best; the sleeve's roof is one bridge. */
 function buckleParts(f) {
-  const Wf = Math.max(12, Number(f.w) || 25), H = Math.max(4.6, Number(f.h) || 8), g = Math.max(0.15, Number(f.gap) || 0.3);
-  const ws = Math.max(1.6, Math.min(3, Wf * 0.08)), tw = Math.max(1.2, Math.min(2, H * 0.16));
+  /* below 14 mm the buckle is the narrow kind: no centre tongue, 1.2 mm walls and prongs, smaller hooks and longer
+     prongs (thin prongs bend more gently over a longer length) – it holds less, enough for a watch strap or a bracelet.
+     9 mm is the least that still leaves the hooks room to spring in. */
+  const Wf = Math.max(9, Number(f.w) || 25), H = Math.max(4.6, Number(f.h) || 8), g = Math.max(0.15, Number(f.gap) || 0.3), narrow = Wf < 14;
+  const ws = narrow ? 1.2 : Math.max(1.6, Math.min(3, Wf * 0.08)), tw = Math.max(1.2, Math.min(2, H * 0.16));
   /* the male's tongue and prongs lie on the bed (z = 0) so they print without supports; in use they slide into the
      female's cavity, which is tw + g above her bottom */
   const Wc = Wf - 2 * ws, Hc = H - 2 * tw, hm = Hc - 2 * g, zoff = 0, zcav = tw + g;
   if (hm < 1.6 - 1e-6) throw new Error('Spona je příliš nízká; zvyšte výšku spony');
-  const Li = Wf * 0.75, Lc = Li + g, lh = Math.max(3, Wf * 0.22), pw = Math.max(1.6, Math.min(3, Wf * 0.1)), hk = Math.min(ws * 0.85, 2);
-  const tc = Wc - 2 * (g + pw + hk + 0.8);
-  if (tc < 2) throw new Error('Spona je příliš úzká; zvětšete šířku spony');
+  const Li = narrow ? Math.max(10, Wf * 0.9) : Wf * 0.75, Lc = Li + g, lh = Math.max(3, Wf * 0.22);
+  const pw = narrow ? 1.2 : Math.max(1.6, Math.min(3, Wf * 0.1)), hk = narrow ? 1 : Math.min(ws * 0.85, 2);
+  const tc = narrow ? 0 : Wc - 2 * (g + pw + hk + 0.8);
+  if (narrow ? Wc / 2 - g - pw - hk < 0.4 - 1e-6 : tc < 2) throw new Error('Spona je příliš úzká; zvětšete šířku spony');
   const slot = !!f.slot, sl = 3.5, sz = slot ? sl + 2 * 2.2 : 0; /* webbing slot zone at the back */
   const bw = Math.max(2.5, Wf * 0.3), Lf = sz + bw + Lc, Lb = sz + 4; /* a solid back long enough for a broad waist */
   const box = (x0, x1, y0, y1, z0, z1) => KK.translate(KK.primitive('box', { w: x1 - x0, d: y1 - y0, h: z1 - z0 }), [(x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2]);
@@ -2131,7 +2135,7 @@ function buckleParts(f) {
   }
   /* male: base, tongue, two prongs with hooks */
   let mal = sq(rounded(0, Lb, -Wf / 2, Wf / 2, 0, H, rc));
-  mal = KK.boolean(mal, box(Lb - 0.5, Lb + Li - 1, -tc / 2, tc / 2, zoff, zoff + hm), 'union');
+  if (!narrow) mal = KK.boolean(mal, box(Lb - 0.5, Lb + Li - 1, -tc / 2, tc / 2, zoff, zoff + hm), 'union');
   const xt = Lb + Li, xc = xt - lh;
   for (const sg of [-1, 1]) {
     const yo = Wc / 2 - g, yi = yo - pw;
@@ -2144,7 +2148,7 @@ function buckleParts(f) {
     const hole = box(2.2, 2.2 + sl, -(Wc / 2 - 0.5), Wc / 2 - 0.5, -1, H + 1);
     if (part === 'f') fem = KK.boolean(fem, hole, 'subtract'); else mal = KK.boolean(mal, hole, 'subtract');
   }
-  return { female: fem, male: mal, Lf, Lb, H, Wf, zcav };
+  return { female: fem, male: mal, Lf, Lb, H, Wf, zcav, narrow };
 }
 /* ---------- Jazyk a poutko: the clasp of a thin strap (like a printed watch strap) ----------
    Local frame as for the buckle. The female is a narrow upright U at the strap's end, open at the top; the male is a
@@ -2191,7 +2195,7 @@ function articulateParts(polys, f) {
     const sec = sectionAt(polys, a, xe - sg * 0.6) || { min: bb.min, max: bb.max };
     const wEnd = sec.max[sAx] - sec.min[sAx], hEnd = sec.max[2] - sec.min[2];
     const B = f.ends === 'tongue' ? tongueParts({ w: Number(f.bw) || wEnd, h: hEnd })
-      : buckleParts({ w: Number(f.bw) || Math.max(14, wEnd), h: Number(f.bh) || Math.max(4.6, hEnd), gap: f.bgap || 0.3, squareBack: true });
+      : buckleParts({ w: Number(f.bw) || Math.max(9, wEnd), h: Number(f.bh) || Math.max(4.6, hEnd), gap: f.bgap || 0.3, squareBack: true });
     const body = sg < 0 ? B.female : B.male, len = KK.bbox(body).max[0];
     return { xe, sg, body, len, sec };
   });

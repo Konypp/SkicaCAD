@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.33
+- **Úzká spona (9–14 mm):** spona na řemínku je teď stejně široká i u užších řemínků. Pod 14 mm se udělá úzká varianta – bez prostředního vodicího jazyka, se stěnami a pružnými jazýčky 1,2 mm, menšími zobáčky a delšími jazýčky (ohýbají se šetrněji). Drží slaběji než široká, na řemínek hodinek nebo náramek stačí. Nejužší spona je 9 mm (u užšího řemínku do stran přesahuje). Totéž platí pro samostatnou Sponu v Součástech.
 ## Beta 2.32
 - **Kulový kloub v Konektorech vrácen** (Konektory › Kulový kloub funguje jako dřív). Z Kloubového modelu a Kloubových dílů zůstává odebraný.
 ## Beta 2.31
