@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.36
+- **Pole pro název:** klepnutí do názvu návrhu (i do přejmenování tělesa) označí celý název, takže ho stačí rovnou přepsat – na počítači i na telefonu.
 ## Beta 2.35
 - **Spona / Jazyk a poutko na řemínku se zaoblenými konci:** velikost spony se brala z průřezu těsně u konce řemínku – u řemínku se zakulacenými nebo zúženými konci tak vyšla úzká (např. 9 mm na 20mm řemínku). Teď se řídí průřezem řemínku v místě, kde se spona napojuje, takže má plnou šířku řemínku. Ověřeno na rovném i zaobleném řemínku, podél os X i Y, mimo střed a s kotoučovými i ohybovými klouby.
 ## Beta 2.34

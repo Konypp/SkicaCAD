@@ -7536,9 +7536,9 @@ $('#fileinput').addEventListener('change', e => {
   })();
 });
 $('#docname').addEventListener('input', e => { doc.name = e.target.value; saveDoc(); renderBrowser(); });
-/* a tap or click into a number field selects its value, so typing replaces it at once (dialogs, sketch palette, dimension
+/* a tap or click into a number field or a name field (design, body) selects its value, so typing replaces it at once (dialogs, sketch palette, dimension
    edits); a second tap places the caret as usual */
-const isNumField = t => t instanceof HTMLInputElement && t.id !== 'docname' && (t.inputMode === 'decimal' || t.type === 'number' || t.classList.contains('dimedit'));
+const isNumField = t => t instanceof HTMLInputElement && (t.id === 'docname' || t.classList.contains('ren') || t.inputMode === 'decimal' || t.type === 'number' || t.classList.contains('dimedit'));
 document.addEventListener('focusin', e => {
   const t = e.target; if (!isNumField(t) || t.dataset.nosel) return;
   t._selAll = true;
@@ -7553,7 +7553,7 @@ for (const ev of ['mouseup', 'touchend', 'pointerup']) document.addEventListener
 }, true);
 document.addEventListener('focusout', e => { if (e.target) e.target._selAll = false; });
 /* on a phone the name field spreads over the whole top bar while it is typed in; Enter finishes */
-$('#docname').addEventListener('focus', e => { if (matchMedia('(max-width: 760px)').matches) { $('.appbar').classList.add('naming'); setTimeout(() => { try { e.target.setSelectionRange(e.target.value.length, e.target.value.length); e.target.scrollIntoView({ block: 'nearest' }); } catch (er) { /* ignore */ } }, 50); } });
+$('#docname').addEventListener('focus', e => { if (matchMedia('(max-width: 760px)').matches) { $('.appbar').classList.add('naming'); setTimeout(() => { try { e.target.select(); } catch (er) { /* ignore */ } }, 50); } });
 $('#docname').addEventListener('blur', () => $('.appbar').classList.remove('naming'));
 $('#docname').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.target.blur(); } });
 $('#docname').addEventListener('change', () => { if (ensureUniqueName(true)) { saveDoc(); renderBrowser(); } pushHist(); });
