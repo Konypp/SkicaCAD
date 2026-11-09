@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.31
+- **Odebrán kulový kloub** ze všech funkcí: Kloubový model (Typ kloubu), Součásti › Kloubové díly a Konektory. Starší návrhy, které ho používají, se otevřou dál – Kloubový model a Kloubové díly dostanou místo něj Kotouč, Konektory Kolík.
 ## Beta 2.30
 - **Spona na řemínku (Kloubový model › Zapínání: Spona):** samec i samice mají automaticky stejnou šířku i výšku jako konec řemínku a na straně u řemínku hranaté rohy, takže na řemínek navazují v rovině a nepřesahují. Dřív měla spona vždy aspoň 14 × 7 mm a zaoblené rohy i u řemínku. Nejmenší možná spona je 14 mm široká a 4,6 mm vysoká (pro užší nebo tenčí řemínek zůstane přesah jen o tolik).
 ## Beta 2.29

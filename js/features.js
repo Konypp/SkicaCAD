@@ -23,7 +23,7 @@ function libPolys(f) {
 }
 /* ready-made joints: a short bar (a block or a lying cylinder) cut in the middle by the chosen joint of the jointed
    model, printed in place; the user joins each half to a model of their own */
-const JOINT_PARTS = { disc: 'Kotoučový kloub', hinge: 'Pantový kloub', flex: 'Kloub nahoru/dolů', ball: 'Kulový kloub', flexi: 'Kloub Flexi' };
+const JOINT_PARTS = { disc: 'Kotoučový kloub', hinge: 'Pantový kloub', flex: 'Kloub nahoru/dolů', flexi: 'Kloub Flexi' };
 const jointCache = new Map();
 function jointParts(f) {
   const style = f.style in JOINT_PARTS ? f.style : 'disc', round = f.shape === 'round';
@@ -1809,7 +1809,7 @@ function orgModify(polys, f) {
 }
 /* Konektory: the body is cut by a plane (across one axis, or along a line drawn over the model) and the two parts are
    joined by a printed connector: kolík (pegs, on the lower part or loose), snap-fit (slit pins with a barb that clicks
-   into an undercut), rybina (dovetail tongue that slides into a groove), kulový kloub (ball on a neck in a socket) or
+   into an undercut), rybina (dovetail tongue that slides into a groove) or
    čepový kloub (knuckles round a pin, the parts swing about an axis lying in the cut). Local frame at the centroid c of
    the cut: u = the long direction across the cut, v = across it, n = the plane's normal (towards the upper part). */
 function connectorPlane(polys, f) {
@@ -1832,8 +1832,8 @@ function connectorPlane(polys, f) {
 /* a cut along a curve drawn on the view (f.curve: {pts, d}): the parts split by the curve, and the plane of the curve's
    longest straight stretch, where the connector goes */
 function connectorCurve(polys, f) {
-  const kind = f.kind || 'peg';
-  if (kind !== 'peg' && kind !== 'snap') throw new Error('Rybina, kulový a čepový kloub potřebují rovný řez; s křivkou jde kolík nebo snap-fit');
+  const kind = !f.kind || f.kind === 'ball' ? 'peg' : f.kind; /* the ball joint was taken out: older designs get pegs */
+  if (kind !== 'peg' && kind !== 'snap') throw new Error('Rybina a čepový kloub potřebují rovný řez; s křivkou jde kolík nebo snap-fit');
   const pts = (f.curve.pts || []).map(p => p.map(Number)), d = KK.vnorm(f.curve.d.map(Number)), B0 = basisFromPlane(d, 0);
   const r = curveCut(polys, { mode: 'view', pts, d, gap: 0 });
   const Q = pts.map(p => [KK.vdot(p, B0.u), KK.vdot(p, B0.v)]);
@@ -1844,7 +1844,7 @@ function connectorCurve(polys, f) {
   return { n, w, bb: KK.bbox(polys), top: r.a, bot: r.b };
 }
 function pegSplit(polys, f) {
-  const kind = f.kind || 'peg';
+  const kind = !f.kind || f.kind === 'ball' ? 'peg' : f.kind; /* the ball joint was taken out: older designs get pegs */
   let n, w, bb, top, bot;
   if (f.curve) ({ n, w, bb, top, bot } = connectorCurve(polys, f));
   else {
@@ -1926,25 +1926,6 @@ function pegSplit(polys, f) {
     const tongue = KK.boolean(sprism([[-wb / 2, -0.5], [wb / 2, -0.5], [wb / 2, 0], [wt / 2, hgt], [-wt / 2, hgt], [-wb / 2, 0]], -E, E), top, 'intersect');
     lower = KK.boolean(lower, tongue, 'union');
     upper = KK.boolean(upper, sprism([[-wb / 2 - tol, -0.01], [wb / 2 + tol, -0.01], [wt / 2 + tol, hgt + tol], [-wt / 2 - tol, hgt + tol]], -E - 1, E + 1), 'subtract');
-  } else if (kind === 'ball') {
-    /* kulový kloub: ball on a neck on the lower part; the upper part has a spherical socket whose mouth is a little
-       narrower than the ball (it snaps in), flared below so the neck can tilt; a gap between the parts lets them turn */
-    const rb = d / 2, R = rb + tol, ro = rb - 0.25, z0 = 0.8, gp = Math.max(0.8, d * 0.12), rn = Math.max(1, rb * 0.55);
-    const zb = z0 + Math.sqrt(R * R - ro * ro);
-    if (Math.min(reach(1, 0), reach(-1, 0), reach(0, 1), reach(0, -1)) < z0 + ro + 1) throw new Error('Kulový kloub se do řezu nevejde, zmenšete průměr');
-    need(zb + R + 0.8, 'Kulový kloub');
-    if (hDn < gp + 1) throw new Error('Spodní díl je na kloub příliš tenký');
-    lower = KK.boolean(bot, cutTool({}, n, w - gp, bb), 'subtract');
-    /* both faces at the joint slope away from the ball a little (a shallow cone), so the parts can tilt */
-    const beta = Math.max(0, Math.min(25, (Number(f.angle) || 30) / 2 - 2)) * Math.PI / 180;
-    if (beta > 0.01) {
-      const Rb = Math.max(reach(1, 0), reach(-1, 0), reach(0, 1), reach(0, -1)) + 5, H = Rb * Math.tan(beta);
-      lower = KK.boolean(lower, KK.boolean(lbox(-Rb, Rb, -Rb, Rb, -gp - H, -gp + 0.01), coneX(P(0, 0, -gp - H), n, Rb, 0.01, H), 'subtract'), 'subtract');
-      upper = KK.boolean(upper, KK.boolean(lbox(-Rb, Rb, -Rb, Rb, -0.01, H), coneX(P(0, 0, 0), n, 0.01, Rb, H), 'subtract'), 'subtract');
-    }
-    lower = KK.boolean(lower, KK.boolean(cylN(c, rn, -gp - 0.5, zb), KK.translate(KK.primitive('sphere', { r: rb }), P(0, 0, zb)), 'union'), 'union');
-    upper = KK.boolean(upper, coneX(P(0, 0, -0.01), n, ro + z0 + 0.01, ro - 0.4, z0 + 0.41), 'subtract');
-    upper = KK.boolean(upper, KK.translate(KK.primitive('sphere', { r: R }), P(0, 0, zb)), 'subtract');
   } else if (kind === 'pin') {
     /* čepový kloub: knuckles round an axis along u lying in the cut (like a knee): the outer ones belong to the upper
        part, the middle one to the lower; a pin goes through all of them; V-shaped relief on both sides of the cut lets
@@ -2349,7 +2330,8 @@ function articulateCore(polys, f) {
   const I = (p, q) => KK.boolean(p, q, 'intersect'), U = (p, q) => KK.boolean(p, q, 'union'), S = (p, q) => KK.boolean(p, q, 'subtract');
   /* a box given per axis: [chain axis range], [side axis range], [z range] */
   const boxAS = (ar, sr, zr) => { const lo = [0, 0, 0], hi = [0, 0, 0]; lo[a] = ar[0]; hi[a] = ar[1]; lo[sAx] = sr[0]; hi[sAx] = sr[1]; lo[2] = zr[0]; hi[2] = zr[1]; return box(lo, hi); };
-  const style = f.style || 'disc';
+  /* the ball joint was taken out of the app: an older design that has one gets the disc joint */
+  const style = !f.style || f.style === 'ball' ? 'disc' : f.style;
   /* room to swing: each segment keeps only a wedge of half-angle 90° − θ/2 around the chain axis at the joint (outside
      the knuckle), so the two can turn ±θ without touching */
   const ea = [0, 0, 0], es = [0, 0, 0]; ea[a] = 1; es[sAx] = 1;
@@ -2407,86 +2389,6 @@ function articulateCore(polys, f) {
       for (const sh of parts) { const b = KK.bbox(sh), m = (b.min[a] + b.max[a]) / 2; (m < xp ? L : Rp).push(...sh); }
       if (!L.length || !Rp.length) throw new Error('Kloub Flexi se nepodařilo vytvořit (díly se neoddělily)');
       A = KK.rebuildFaces(L); B = KK.rebuildFaces(Rp);
-    } else if (style === 'ball') {
-      /* Kulový: a ball on a neck of the left segment sits in a round socket of the right one, printed in place with a
-         clearance all round, so the right segment turns about every axis (sideways, up and down, and twists). The
-         socket's roof is a 45° tent, the ball's underside is a 45° drop ending a layer or two above the socket's floor, the neck is a
-         diamond (45° faces) and the mouth a cone, so it prints without supports; the mouth is narrower than the ball.
-         The neck widens away from the ball (a diamond pyramid of half-angle nA about the ball's centre, its bottom ridge
-         level), so it is thickest where it bends most; the mouth is the cone it sweeps (half-angle nA + swing), and nA
-         is as large as keeps the mouth's rim on the socket narrower than the ball. Less swing → thicker neck. */
-      /* the swing of a ball joint is held to 20°: the mouth must stay narrower than the ball while the neck sweeps it */
-      const thB = Math.min(th, 20 * Math.PI / 180), dirA = ea.map(v => -v), sw = thB + Math.PI / 180;
-      /* the socket (with a wall round it) must lie wholly inside the body: on a round body (cylinder, sphere) the section
-         narrows away from its middle, so sizes and heights are tried, largest first, until the socket, its roof and the
-         mouth on the face all keep inside */
-      const inside = insideTest(rest), wall = 0.9;
-      /* the neck's half-angle for a ball of radius rb: the largest (up to 40°) whose mouth rim on the socket stays within
-         0.86 rb, so the ball cannot slip out */
-      const neckAngle = rb => {
-        const R = rb + g;
-        for (let nA = 40; nA > 16; nA -= 0.5) {
-          const be = nA * Math.PI / 180 + sw, del = g / Math.sin(be), rim = (R * Math.cos(be) + del) * Math.tan(be);
-          if (rim <= 0.86 * rb) return nA * Math.PI / 180;
-        }
-        return 16 * Math.PI / 180;
-      };
-      const fits = (C, R, nA) => {
-        const be = nA + sw, del = g / Math.sin(be), D = [];
-        for (let i = 0; i < 16; i++) for (let j = 1; j < 8; j++) { const t = i / 16 * 2 * Math.PI, f2 = j / 8 * Math.PI, r = R + wall; D.push([r * Math.sin(f2) * Math.cos(t), r * Math.sin(f2) * Math.sin(t), r * Math.cos(f2)]); }
-        D.push([0, 0, R * Math.SQRT2 + wall], [0, 0, -R - wall]);
-        for (const d of D) { const q = [C[0] + d[0], C[1] + d[1], C[2] + d[2]]; if (!inside(q)) return false; }
-        /* the mouth where it meets the face, and half-way to the socket */
-        for (const xf of [xp + 0.05, (xp + C[a] - R) / 2]) {
-          const rf = (del + C[a] - xf) * Math.tan(be) + wall;
-          for (let i = 0; i < 16; i++) { const t = i / 16 * 2 * Math.PI, q = [0, 0, C[2] + rf * Math.sin(t)]; q[a] = xf; q[sAx] = sc + rf * Math.cos(t); if (!inside(q)) return false; }
-        }
-        return true;
-      };
-      let rb = Math.min(hw - g - 1.6, (zs - 2.4) / (1 + Math.SQRT2) - g, 12), R = 0, C = null;
-      for (; rb >= 2 && !C; rb *= 0.93) {
-        R = rb + g;
-        for (const cz of [zc - (Math.SQRT2 - 1) * R / 2, sec.min[2] + 1.2 + R]) {
-          const T = [0, 0, cz]; T[a] = xp + R + 1.2; T[sAx] = sc;
-          if (fits(T, R, neckAngle(rb))) { C = T; break; }
-        }
-        if (C) break;
-      }
-      if (!C) throw new Error('Těleso je v místě kloubu na kulový kloub příliš malé; použijte méně kloubů nebo jiný typ');
-      const nA = neckAngle(rb), be = nA + sw, rn = rb * Math.sin(nA);
-      /* socket: sphere, 45° tent above it, a cone mouth towards the left segment */
-      const tentH = R * Math.SQRT1_2;
-      let sock = KK.translate(KK.primitive('sphere', { r: R }), C);
-      sock = U(sock, KK.translate(KK.primitive('cone', { r: R * Math.SQRT1_2 + 0.01, rt: 0.01, h: tentH + 0.01 }), [C[0], C[1], C[2] + tentH + (tentH + 0.01) / 2]));
-      /* the mouth: the cone the neck sweeps, i.e. of half-angle = swing, its apex moved back so the neck's thickness fits */
-      const del = g / Math.sin(be), mouthLen = del + (C[a] - xp) + 2;
-      const mouth = coneX(C.map((v, k) => v + ea[k] * del), dirA, 0.01, mouthLen * Math.tan(be), mouthLen);
-      sock = U(sock, mouth);
-      /* ball (flat underside near the floor) and the diamond neck back into the left segment */
-      /* the ball's underside is a drop: below its 45° line a cone, cut by a sphere about C a layer or two inside the
-         socket's floor – so no layer of it starts in the air or hangs out more than 45°, the lowest layers print just above
-         the floor (a gap of one or two layers), and the gap stays the same however the joint turns */
-      const gz = Math.min(g, Math.max(0.2, 0.6 * g)), hc = rb * Math.SQRT1_2;
-      const drop = KK.translate(KK.primitive('cone', { r: 0.01, rt: hc + 0.02, h: hc }), [C[0], C[1], C[2] - rb * Math.SQRT2 + hc / 2]);
-      const ball = I(U(KK.translate(KK.primitive('sphere', { r: rb }), C), drop), KK.translate(KK.primitive('sphere', { r: R - gz }), C));
-      const nLen = C[a] - (xp - g - Math.max(3, rb));
-      /* cross-sections at distance t back from C: a diamond of half-diagonal w(t) = (0.95 t tan nA + rn) / 2 standing on
-         the level ridge rn below C, so it keeps inside the cone of half-angle nA (and its faces at 45°) */
-      const ez = [0, 0, 1], sec2 = t => { const w = (0.95 * t * Math.tan(nA) + rn) / 2, o = C.map((v, k) => v - ea[k] * t - ez[k] * rn);
-        const at = (x, z) => o.map((v, k) => v + es[k] * x + ez[k] * z); return [at(0, 0), at(w, w), at(0, 2 * w), at(-w, w)]; };
-      const n0 = sec2(rb * Math.cos(nA) * 0.85), n1 = sec2(nLen), fcs = [n0, n1.slice().reverse()];
-      for (let i = 0; i < 4; i++) fcs.push([n0[i], n1[i], n1[(i + 1) % 4], n0[(i + 1) % 4]]);
-      const neck = KK.fixOrientation(fcs.map(v => KK.mkPoly(v)).filter(Boolean));
-      /* the left segment: everything up to the gap, opened in a V both ways about the ball's centre for the swing */
-      /* the right segment's face turns about C (inside it): the left one keeps clear of every turned position of that face,
-         i.e. behind the two planes tangent to the circle of radius (C − face) at ±(swing) – a V whose apex lies behind C */
-      const th2 = thB + 2 * Math.PI / 180, al = Math.PI / 2 - th2, d = C[a] - xp + g, Q = C.slice(); Q[a] = C[a] - d / Math.cos(th2);
-      const XZ = { o: [0, 0, 0], u: ea, v: [0, 0, 1], n: KK.cross(ea, [0, 0, 1]) };
-      const wedgeV = () => { const pts = [[Q[a], Q[2]]], M = 24; for (let i = 0; i <= M; i++) { const t = -al + 2 * al * i / M; pts.push([Q[a] - Math.cos(t) * BIG, Q[2] + Math.sin(t) * BIG]); } if (KK.area2D(pts) < 0) pts.reverse(); const nv = KK.vdot(XZ.n, Q); return KK.extrudeProfiles([{ pts, closed: true }], XZ, nv - BIG, nv + BIG); };
-      A = I(I(I(rest, boxAS([xp - far * 2, xp - g], [sc - far, sc + far], [z0, z1])), wedge(Q, -1, al)), KK.fixOrientation(wedgeV()));
-      if (Array.isArray(f._dbg)) f._dbg.push({ body: A, neck: I(neck, rest), ball, C, rb, nA, rn, sock, be, del });
-      A = U(U(A, I(neck, rest)), ball);
-      B = S(I(rest, boxAS([xp, xp + far * 2], [sc - far, sc + far], [z0, z1])), sock);
     } else if (style === 'ring') {
       /* Očka (after the printed chain toys): two round rings interlocked like chain links at right angles; each passes
          through the other's centre. The left segment's ring A leans back 40° (its plane holds the axis across), the
@@ -2678,7 +2580,7 @@ function articulateCore(polys, f) {
          across the body's surface, which showed as dark streaks on round bodies */
       const keep = vcyl(P, hw * 0.92 + g, z0, z1), cutV = (sg, al) => S(wedge(P, sg, Math.PI - al), keep);
       A = S(A, cutV(1, Math.PI / 2 - th - 2 * Math.PI / 180));
-    } else if (style !== 'chain' && style !== 'flex' && style !== 'ball' && style !== 'flexi') {
+    } else if (style !== 'chain' && style !== 'flex' && style !== 'flexi') {
       const keep = vcyl(P, hw * 0.92 + g, z0, z1), cutV = (sg, al) => S(wedge(P, sg, Math.PI - al), keep);
       A = S(A, cutV(1, alpha));
       B = S(B, cutV(-1, alpha));

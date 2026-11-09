@@ -8105,8 +8105,8 @@ const ORG_MODS = {
   },
   articulate: {
     defaults: () => ({ style: 'disc', axis: 'x', place: 'even', lines: [], curve: [], snap: false, cnt: 4, gap: 0.4, angle: 30, ends: 'none', bw: 0, bh: 0 }),
-    load: f => ({ style: f.style || 'disc', snap: !!f.snap, axis: f.axis || 'x', place: f.curve && f.curve.length ? 'curve' : f.lines && f.lines.length ? 'lines' : 'even', lines: (f.lines || []).slice(), curve: (f.curve || []).map(p => p.slice()), cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30, ends: f.ends || 'none', bw: f.bw || 0, bh: f.bh || 0 }),
-    fields: v => [{ k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů'], ['ball', 'Kulový'], ['flexi', 'Flexi']].concat(v.style === 'ring' ? [['ring', 'Očka']] : v.style === 'chain' ? [['chain', 'Očka (starší)']] : []), value: v.style }, /* the eyes only for older models that use them */
+    load: f => ({ style: !f.style || f.style === 'ball' ? 'disc' : f.style, snap: !!f.snap, axis: f.axis || 'x', place: f.curve && f.curve.length ? 'curve' : f.lines && f.lines.length ? 'lines' : 'even', lines: (f.lines || []).slice(), curve: (f.curve || []).map(p => p.slice()), cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30, ends: f.ends || 'none', bw: f.bw || 0, bh: f.bh || 0 }),
+    fields: v => [{ k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů'], ['flexi', 'Flexi']].concat(v.style === 'ring' ? [['ring', 'Očka']] : v.style === 'chain' ? [['chain', 'Očka (starší)']] : []), value: v.style }, /* the eyes only for older models that use them */
       { k: 'chk', id: 'snap', label: 'Tisknout po dílech a zacvaknout', value: v.snap },
       { k: 'seg', id: 'axis', label: 'Řetěz podél osy', options: [['x', 'X'], ['y', 'Y']], value: v.axis },
       { k: 'seg', id: 'place', label: 'Rozmístění kloubů', options: [['even', 'Rovnoměrně'], ['lines', 'Řezy'], ['curve', 'Podél křivky']], value: v.place },
@@ -8167,7 +8167,6 @@ const ORG_MODS = {
       const endsTip = c.v.ends === 'fold' ? ' Spona sklápěcí: samice se tiskne nastojato na začátku řemínku (tenká dutina tak nepotřebuje most) a po tisku se v kloubu sklopí o 90° ven, ústím od řemínku; samec leží naplocho na konci. Spona je jen o málo silnější než řemínek.' : '';
       dlg.set('tip', {
         disc: 'Kotouč: jeden článek končí kulatým kloubem, druhý do něj zasahuje jazýčkem s kotoučem. Klouby se otáčejí kolem svislé osy, články se ohýbají do stran (had, drak, ještěrka).',
-        ball: 'Kulový: koule na krčku jednoho článku sedí v kulové jamce sousedního, kolem dokola je vůle. Článek se otáčí ve všech osách – do stran, nahoru a dolů i kolem své osy (natočení nejvýš 20°, aby koule nevyklouzla ústím). Krček se od koule kuželovitě rozšiřuje – čím menší Natočení kloubu, tím je silnější. Jamka má střechu pod 45°, krček je kosočtverečný, takže se tiskne vcelku bez podpěr; jen malá plôška pod koulí se tiskne přes mezeru.',
         flexi: 'Flexi: z tělesa se v místě kloubu vyřízne nástroj FlexiJoint Maker – tenký kotouč (mezera mezi články) s miskou kolem koule uprostřed. Zbudou dva články spojené koulí v misce; kloub se natáčí do všech stran. Kloub stojí na podložce – svislé očko vychází ze spodní stěny (na kulatém tělese se zvedne výš, aby miska zůstala uvnitř). Velikost nástroje se řídí průřezem tělesa – na tenkém se zmenší, na velkém zvětší (nejvýš 4×) i s mezerami.',
         hinge: 'Pant: tři klouby nad sebou jako u dveřního pantu, krajní drží svislý čep procházející prostředním. Otáčí se kolem svislé osy, články se ohýbají do stran.',
         flex: 'Nahoru/dolů: jako tištěný řemínek hodinek – jazýček článku mezi dvěma rameny sousedního, na bocích kuželové čepy v kuželových důlcích (vše pod 45°), takže se otáčí hladce. Články se ohýbají nahoru a dolů, třeba kolem zápěstí; konce jsou z boku kulaté.',
@@ -8224,7 +8223,7 @@ const ORG_MODS = {
   },
   pegsplit: {
     defaults: () => ({ kind: 'peg', mode: 'axis', axis: 'z', at: null, cut: null, cpts: [], cd: null, n: 1, d: 5, len: 10, tol: 0.2, style: 'attached', angle: 30, dir: 'long' }),
-    load: f => ({ ...ORG_MODS.pegsplit.defaults(), ...Object.fromEntries(Object.entries(f).filter(([k]) => !['id', 'type', 'body'].includes(k))), kind: f.kind || 'peg', mode: f.curve ? 'curve' : f.cut ? 'line' : 'axis', cpts: f.curve ? f.curve.pts.map(p => p.slice()) : [], cd: f.curve ? f.curve.d : null }),
+    load: f => ({ ...ORG_MODS.pegsplit.defaults(), ...Object.fromEntries(Object.entries(f).filter(([k]) => !['id', 'type', 'body'].includes(k))), kind: !f.kind || f.kind === 'ball' ? 'peg' : f.kind, mode: f.curve ? 'curve' : f.cut ? 'line' : 'axis', cpts: f.curve ? f.curve.pts.map(p => p.slice()) : [], cd: f.curve ? f.curve.d : null }),
     fields: v => [{ k: 'opt', id: 'kind', label: 'Typ spoje', options: CONN_KINDS, value: v.kind },
       { k: 'seg', id: 'mode', label: 'Způsob řezu', options: [['axis', 'Kolmo na osu'], ['line', 'Řez'], ['curve', 'Křivkou']], value: v.mode },
       { k: 'seg', id: 'axis', label: 'Řez kolmo na osu', options: AXSEG, value: v.axis }, { k: 'num', id: 'at', label: 'Poloha řezu', value: v.at || 0, range: [0, 100, 0.1] },
@@ -8241,7 +8240,7 @@ const ORG_MODS = {
       if (v.kind === 'peg' || v.kind === 'snap') { o.n = Number(v.n); o.len = v.len; }
       if (v.kind === 'peg') o.style = v.style;
       if (v.kind === 'dovetail') { o.len = v.len; o.dir = v.dir; }
-      if (v.kind === 'ball' || v.kind === 'pin') o.angle = v.angle;
+      if (v.kind === 'pin') o.angle = v.angle;
       if (v.kind === 'pin') o.dir = v.dir;
       return o;
     },
@@ -8261,8 +8260,8 @@ const ORG_MODS = {
       dlg.show('axis', !line && !cv); dlg.show('at', !line && !cv); dlg.show('cl', line); dlg.show('kp', cv); dlg.show('kb', cv && nk > 0);
       dlg.set('kp', { text: nk ? `${nk} ${nk === 1 ? 'bod' : nk < 5 ? 'body' : 'bodů'} – klepnutím přidáte další` : 'Klepejte do pohledu přes těleso', has: nk > 0, active: cv && !!c.body });
       dlg.show('pn', k === 'peg' || k === 'snap'); dlg.show('len', k === 'peg' || k === 'snap' || k === 'dovetail'); dlg.show('style', k === 'peg');
-      dlg.show('angle', k === 'ball' || k === 'pin'); dlg.show('dir', k === 'pin' || k === 'dovetail');
-      dlg.label('d', { peg: 'Průměr kolíku', snap: 'Průměr západky', dovetail: 'Šířka rybiny', ball: 'Průměr koule', pin: 'Průměr čepu' }[k]);
+      dlg.show('angle', k === 'pin'); dlg.show('dir', k === 'pin' || k === 'dovetail');
+      dlg.label('d', { peg: 'Průměr kolíku', snap: 'Průměr západky', dovetail: 'Šířka rybiny', pin: 'Průměr čepu' }[k]);
       dlg.label('len', k === 'dovetail' ? 'Výška rybiny × 2' : 'Délka spoje');
       dlg.set('cl', { text: c.v.cut ? 'Řez nakreslen – tažením nakreslíte nový' : 'Táhněte myší přes model', has: !!c.v.cut, active: line && !!c.body });
       dlg.set('tip', CONN_TIP[k] + (line ? ' Rovina řezu prochází nakreslenou čarou ve směru pohledu, může být i šikmá; pohled otočíte pravým tlačítkem.' : '') + (cv ? ' Křivkou: body klepejte do pohledu přes celé těleso, řez vede křivkou ve směru pohledu; spoj se postaví na nejdelší rovný úsek. Jen kolík a snap-fit.' : ''));
@@ -8278,12 +8277,11 @@ const ORG_MODS = {
     prompt: 'Těleso se rozřízne a díly spojí zvolený spoj (díly se tisknou zvlášť)'
   }
 };
-const CONN_KINDS = [['peg', 'Kolík'], ['snap', 'Snap-fit (západka)'], ['dovetail', 'Rybina (dovetail)'], ['ball', 'Kulový kloub'], ['pin', 'Čepový kloub']];
+const CONN_KINDS = [['peg', 'Kolík'], ['snap', 'Snap-fit (západka)'], ['dovetail', 'Rybina (dovetail)'], ['pin', 'Čepový kloub']];
 const CONN_TIP = {
   peg: 'Kolík: válcové kolíky na spodním dílu zapadnou do otvorů v horním dílu (nebo samostatné kolíky do otvorů v obou dílech).',
   snap: 'Snap-fit: rozříznutý kolík se zobáčkem projde zúženým otvorem a zacvakne za osazení; díly drží bez lepidla.',
   dovetail: 'Rybina: lichoběžníkový výstupek na spodním dílu, horní díl se na něj nasune z boku a tahem nejde oddělit.',
-  ball: 'Kulový kloub: koule na krčku zacvakne do jamky s užším ústím; díl se otáčí dokola a naklání (hlava, ramena, kyčle postaviček).',
   pin: 'Čepový kloub: očka obou dílů se střídají kolem osy ležící v řezu a drží je čep (vytiskne se zvlášť, nebo použijte kus filamentu); díly se ohýbají jako koleno.'
 };
 /* a point for a cut line: where the view ray meets the plane through the body's centre facing the camera */
@@ -8670,16 +8668,15 @@ const JOINT_TIP = {
   hinge: 'Pantový kloub: svislý čep ve třech kloubech, ohýbá se do stran. Oba díly jsou už spojené a tisknou se vcelku bez podpěr; každý připojte k vlastnímu modelu (Kombinovat › Sjednotit).',
   flex: 'Kloub nahoru/dolů: jazyk mezi dvěma rameny s kuželovými čepy, ohýbá se nahoru a dolů. Oba díly jsou už spojené a tisknou se vcelku bez podpěr; každý připojte k vlastnímu modelu (Kombinovat › Sjednotit).',
   flexi: 'Kloub Flexi: vyříznutý nástrojem FlexiJoint Maker – koule v misce za tenkou mezerou, natáčí se do všech stran. Oba díly jsou už spojené a tisknou se vcelku bez podpěr; každý připojte k vlastnímu modelu (Kombinovat › Sjednotit).',
-  ball: 'Kulový kloub: koule v jamce, natáčí se do všech stran i kolem osy. Oba díly jsou už spojené a tisknou se vcelku bez podpěr; každý připojte k vlastnímu modelu (Kombinovat › Sjednotit).'
 };
 const PART_FAMS = [['joint', 'Kloubový spoj'], ['lib', 'Hotové díly']];
 function startJointPart(editIndex, f, pre) {
   const c = {
-    editIndex, v: f ? { style: f.style || 'disc', shape: f.shape || 'box', w: f.w || 20, h: f.h || 14, len: f.len || 60, gap: f.gap || 0.4, angle: f.angle || 30, snap: !!f.snap, rot: f.rot || 0 }
+    editIndex, v: f ? { style: !f.style || f.style === 'ball' ? 'disc' : f.style, shape: f.shape || 'box', w: f.w || 20, h: f.h || 14, len: f.len || 60, gap: f.gap || 0.4, angle: f.angle || 30, snap: !!f.snap, rot: f.rot || 0 }
       : { style: 'disc', shape: 'box', w: 20, h: 14, len: 60, gap: 0.4, angle: 30, snap: false, rot: 0 }, pos: f ? f.pos.slice() : pre ? pre.pos.slice() : [0, 0, 0], tool: null, timer: 0,
     init() {
       openDialog({ title: f ? 'Kloubový spoj' : 'Kloubové díly', icon: 'articulate',
-        fields: [...(f ? [] : [{ k: 'seg', id: 'fam', label: 'Druh', options: PART_FAMS, value: 'joint' }]), { k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů'], ['ball', 'Kulový'], ['flexi', 'Flexi']], value: this.v.style },
+        fields: [...(f ? [] : [{ k: 'seg', id: 'fam', label: 'Druh', options: PART_FAMS, value: 'joint' }]), { k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů'], ['flexi', 'Flexi']], value: this.v.style },
           { k: 'chk', id: 'snap', label: 'Tisknout po dílech a zacvaknout', value: this.v.snap },
           { k: 'seg', id: 'shape', label: 'Tvar', options: [['box', 'Hranol'], ['round', 'Válec']], value: this.v.shape },
           { k: 'num', id: 'len', label: 'Délka', value: this.v.len, range: [10, 400, 1] }, { k: 'num', id: 'w', label: 'Šířka', value: this.v.w, range: [3, 200, 1] },
