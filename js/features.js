@@ -2110,7 +2110,7 @@ function buckleParts(f) {
      same height as in use and both halves are flush top and bottom when buckled. The hooks then hold the male up and
      down too: they start above a lip left under each window (with a 45° underside, printable) and the roof covers the
      prongs. The old kind (a floored sleeve, the male a step lower) stays for the folding buckle. */
-  const flush = f.flush !== false;
+  const flush = f.flush === true; /* off: the open floor let the male break out downwards */
   const ws = narrow ? 1.2 : Math.max(1.6, Math.min(3, Wf * 0.08));
   const pw = narrow ? 1.2 : Math.max(1.6, Math.min(3, Wf * 0.1)), hk = narrow ? 1 : Math.min(ws * 0.85, 2);
   const lp = flush ? Math.max(0.6, Math.min(1.2, H * 0.15)) : 0; /* lip under the windows */

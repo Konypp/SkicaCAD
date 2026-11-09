@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.42
+- Spona: samice má zase uzavřené dno (otevřené dno z 2.39 dovolilo samce vylomit dolů). Zůstávají podříznuté háčky (tah sponu nerozepne), zaoblení u kořene jazýčků, kratší úzká spona a klouby hned za díly spony.
+
 ## Beta 2.41
 - Jemný posun šipkami: s Ctrl (Cmd) nebo Alt posunou šipky (a PageUp / PageDown) vybraný prvek skici nebo tělesa o 0,1 mm, se Shift navíc o 1 mm; bez výběru jemně posunou pohled.
 
