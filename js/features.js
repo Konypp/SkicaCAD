@@ -1809,7 +1809,7 @@ function orgModify(polys, f) {
 }
 /* Konektory: the body is cut by a plane (across one axis, or along a line drawn over the model) and the two parts are
    joined by a printed connector: kolík (pegs, on the lower part or loose), snap-fit (slit pins with a barb that clicks
-   into an undercut), rybina (dovetail tongue that slides into a groove) or
+   into an undercut), rybina (dovetail tongue that slides into a groove), kulový kloub (ball on a neck in a socket) or
    čepový kloub (knuckles round a pin, the parts swing about an axis lying in the cut). Local frame at the centroid c of
    the cut: u = the long direction across the cut, v = across it, n = the plane's normal (towards the upper part). */
 function connectorPlane(polys, f) {
@@ -1832,8 +1832,8 @@ function connectorPlane(polys, f) {
 /* a cut along a curve drawn on the view (f.curve: {pts, d}): the parts split by the curve, and the plane of the curve's
    longest straight stretch, where the connector goes */
 function connectorCurve(polys, f) {
-  const kind = !f.kind || f.kind === 'ball' ? 'peg' : f.kind; /* the ball joint was taken out: older designs get pegs */
-  if (kind !== 'peg' && kind !== 'snap') throw new Error('Rybina a čepový kloub potřebují rovný řez; s křivkou jde kolík nebo snap-fit');
+  const kind = f.kind || 'peg';
+  if (kind !== 'peg' && kind !== 'snap') throw new Error('Rybina, kulový a čepový kloub potřebují rovný řez; s křivkou jde kolík nebo snap-fit');
   const pts = (f.curve.pts || []).map(p => p.map(Number)), d = KK.vnorm(f.curve.d.map(Number)), B0 = basisFromPlane(d, 0);
   const r = curveCut(polys, { mode: 'view', pts, d, gap: 0 });
   const Q = pts.map(p => [KK.vdot(p, B0.u), KK.vdot(p, B0.v)]);
@@ -1844,7 +1844,7 @@ function connectorCurve(polys, f) {
   return { n, w, bb: KK.bbox(polys), top: r.a, bot: r.b };
 }
 function pegSplit(polys, f) {
-  const kind = !f.kind || f.kind === 'ball' ? 'peg' : f.kind; /* the ball joint was taken out: older designs get pegs */
+  const kind = f.kind || 'peg';
   let n, w, bb, top, bot;
   if (f.curve) ({ n, w, bb, top, bot } = connectorCurve(polys, f));
   else {
@@ -1926,6 +1926,25 @@ function pegSplit(polys, f) {
     const tongue = KK.boolean(sprism([[-wb / 2, -0.5], [wb / 2, -0.5], [wb / 2, 0], [wt / 2, hgt], [-wt / 2, hgt], [-wb / 2, 0]], -E, E), top, 'intersect');
     lower = KK.boolean(lower, tongue, 'union');
     upper = KK.boolean(upper, sprism([[-wb / 2 - tol, -0.01], [wb / 2 + tol, -0.01], [wt / 2 + tol, hgt + tol], [-wt / 2 - tol, hgt + tol]], -E - 1, E + 1), 'subtract');
+  } else if (kind === 'ball') {
+    /* kulový kloub: ball on a neck on the lower part; the upper part has a spherical socket whose mouth is a little
+       narrower than the ball (it snaps in), flared below so the neck can tilt; a gap between the parts lets them turn */
+    const rb = d / 2, R = rb + tol, ro = rb - 0.25, z0 = 0.8, gp = Math.max(0.8, d * 0.12), rn = Math.max(1, rb * 0.55);
+    const zb = z0 + Math.sqrt(R * R - ro * ro);
+    if (Math.min(reach(1, 0), reach(-1, 0), reach(0, 1), reach(0, -1)) < z0 + ro + 1) throw new Error('Kulový kloub se do řezu nevejde, zmenšete průměr');
+    need(zb + R + 0.8, 'Kulový kloub');
+    if (hDn < gp + 1) throw new Error('Spodní díl je na kloub příliš tenký');
+    lower = KK.boolean(bot, cutTool({}, n, w - gp, bb), 'subtract');
+    /* both faces at the joint slope away from the ball a little (a shallow cone), so the parts can tilt */
+    const beta = Math.max(0, Math.min(25, (Number(f.angle) || 30) / 2 - 2)) * Math.PI / 180;
+    if (beta > 0.01) {
+      const Rb = Math.max(reach(1, 0), reach(-1, 0), reach(0, 1), reach(0, -1)) + 5, H = Rb * Math.tan(beta);
+      lower = KK.boolean(lower, KK.boolean(lbox(-Rb, Rb, -Rb, Rb, -gp - H, -gp + 0.01), coneX(P(0, 0, -gp - H), n, Rb, 0.01, H), 'subtract'), 'subtract');
+      upper = KK.boolean(upper, KK.boolean(lbox(-Rb, Rb, -Rb, Rb, -0.01, H), coneX(P(0, 0, 0), n, 0.01, Rb, H), 'subtract'), 'subtract');
+    }
+    lower = KK.boolean(lower, KK.boolean(cylN(c, rn, -gp - 0.5, zb), KK.translate(KK.primitive('sphere', { r: rb }), P(0, 0, zb)), 'union'), 'union');
+    upper = KK.boolean(upper, coneX(P(0, 0, -0.01), n, ro + z0 + 0.01, ro - 0.4, z0 + 0.41), 'subtract');
+    upper = KK.boolean(upper, KK.translate(KK.primitive('sphere', { r: R }), P(0, 0, zb)), 'subtract');
   } else if (kind === 'pin') {
     /* čepový kloub: knuckles round an axis along u lying in the cut (like a knee): the outer ones belong to the upper
        part, the middle one to the lower; a pin goes through all of them; V-shaped relief on both sides of the cut lets

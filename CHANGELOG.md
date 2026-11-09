@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.32
+- **Kulový kloub v Konektorech vrácen** (Konektory › Kulový kloub funguje jako dřív). Z Kloubového modelu a Kloubových dílů zůstává odebraný.
 ## Beta 2.31
 - **Odebrán kulový kloub** ze všech funkcí: Kloubový model (Typ kloubu), Součásti › Kloubové díly a Konektory. Starší návrhy, které ho používají, se otevřou dál – Kloubový model a Kloubové díly dostanou místo něj Kotouč, Konektory Kolík.
 ## Beta 2.30

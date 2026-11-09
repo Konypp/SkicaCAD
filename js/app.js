@@ -8223,7 +8223,7 @@ const ORG_MODS = {
   },
   pegsplit: {
     defaults: () => ({ kind: 'peg', mode: 'axis', axis: 'z', at: null, cut: null, cpts: [], cd: null, n: 1, d: 5, len: 10, tol: 0.2, style: 'attached', angle: 30, dir: 'long' }),
-    load: f => ({ ...ORG_MODS.pegsplit.defaults(), ...Object.fromEntries(Object.entries(f).filter(([k]) => !['id', 'type', 'body'].includes(k))), kind: !f.kind || f.kind === 'ball' ? 'peg' : f.kind, mode: f.curve ? 'curve' : f.cut ? 'line' : 'axis', cpts: f.curve ? f.curve.pts.map(p => p.slice()) : [], cd: f.curve ? f.curve.d : null }),
+    load: f => ({ ...ORG_MODS.pegsplit.defaults(), ...Object.fromEntries(Object.entries(f).filter(([k]) => !['id', 'type', 'body'].includes(k))), kind: f.kind || 'peg', mode: f.curve ? 'curve' : f.cut ? 'line' : 'axis', cpts: f.curve ? f.curve.pts.map(p => p.slice()) : [], cd: f.curve ? f.curve.d : null }),
     fields: v => [{ k: 'opt', id: 'kind', label: 'Typ spoje', options: CONN_KINDS, value: v.kind },
       { k: 'seg', id: 'mode', label: 'Způsob řezu', options: [['axis', 'Kolmo na osu'], ['line', 'Řez'], ['curve', 'Křivkou']], value: v.mode },
       { k: 'seg', id: 'axis', label: 'Řez kolmo na osu', options: AXSEG, value: v.axis }, { k: 'num', id: 'at', label: 'Poloha řezu', value: v.at || 0, range: [0, 100, 0.1] },
@@ -8240,7 +8240,7 @@ const ORG_MODS = {
       if (v.kind === 'peg' || v.kind === 'snap') { o.n = Number(v.n); o.len = v.len; }
       if (v.kind === 'peg') o.style = v.style;
       if (v.kind === 'dovetail') { o.len = v.len; o.dir = v.dir; }
-      if (v.kind === 'pin') o.angle = v.angle;
+      if (v.kind === 'ball' || v.kind === 'pin') o.angle = v.angle;
       if (v.kind === 'pin') o.dir = v.dir;
       return o;
     },
@@ -8260,8 +8260,8 @@ const ORG_MODS = {
       dlg.show('axis', !line && !cv); dlg.show('at', !line && !cv); dlg.show('cl', line); dlg.show('kp', cv); dlg.show('kb', cv && nk > 0);
       dlg.set('kp', { text: nk ? `${nk} ${nk === 1 ? 'bod' : nk < 5 ? 'body' : 'bodů'} – klepnutím přidáte další` : 'Klepejte do pohledu přes těleso', has: nk > 0, active: cv && !!c.body });
       dlg.show('pn', k === 'peg' || k === 'snap'); dlg.show('len', k === 'peg' || k === 'snap' || k === 'dovetail'); dlg.show('style', k === 'peg');
-      dlg.show('angle', k === 'pin'); dlg.show('dir', k === 'pin' || k === 'dovetail');
-      dlg.label('d', { peg: 'Průměr kolíku', snap: 'Průměr západky', dovetail: 'Šířka rybiny', pin: 'Průměr čepu' }[k]);
+      dlg.show('angle', k === 'ball' || k === 'pin'); dlg.show('dir', k === 'pin' || k === 'dovetail');
+      dlg.label('d', { peg: 'Průměr kolíku', snap: 'Průměr západky', dovetail: 'Šířka rybiny', ball: 'Průměr koule', pin: 'Průměr čepu' }[k]);
       dlg.label('len', k === 'dovetail' ? 'Výška rybiny × 2' : 'Délka spoje');
       dlg.set('cl', { text: c.v.cut ? 'Řez nakreslen – tažením nakreslíte nový' : 'Táhněte myší přes model', has: !!c.v.cut, active: line && !!c.body });
       dlg.set('tip', CONN_TIP[k] + (line ? ' Rovina řezu prochází nakreslenou čarou ve směru pohledu, může být i šikmá; pohled otočíte pravým tlačítkem.' : '') + (cv ? ' Křivkou: body klepejte do pohledu přes celé těleso, řez vede křivkou ve směru pohledu; spoj se postaví na nejdelší rovný úsek. Jen kolík a snap-fit.' : ''));
@@ -8277,11 +8277,12 @@ const ORG_MODS = {
     prompt: 'Těleso se rozřízne a díly spojí zvolený spoj (díly se tisknou zvlášť)'
   }
 };
-const CONN_KINDS = [['peg', 'Kolík'], ['snap', 'Snap-fit (západka)'], ['dovetail', 'Rybina (dovetail)'], ['pin', 'Čepový kloub']];
+const CONN_KINDS = [['peg', 'Kolík'], ['snap', 'Snap-fit (západka)'], ['dovetail', 'Rybina (dovetail)'], ['ball', 'Kulový kloub'], ['pin', 'Čepový kloub']];
 const CONN_TIP = {
   peg: 'Kolík: válcové kolíky na spodním dílu zapadnou do otvorů v horním dílu (nebo samostatné kolíky do otvorů v obou dílech).',
   snap: 'Snap-fit: rozříznutý kolík se zobáčkem projde zúženým otvorem a zacvakne za osazení; díly drží bez lepidla.',
   dovetail: 'Rybina: lichoběžníkový výstupek na spodním dílu, horní díl se na něj nasune z boku a tahem nejde oddělit.',
+  ball: 'Kulový kloub: koule na krčku zacvakne do jamky s užším ústím; díl se otáčí dokola a naklání (hlava, ramena, kyčle postaviček).',
   pin: 'Čepový kloub: očka obou dílů se střídají kolem osy ležící v řezu a drží je čep (vytiskne se zvlášť, nebo použijte kus filamentu); díly se ohýbají jako koleno.'
 };
 /* a point for a cut line: where the view ray meets the plane through the body's centre facing the camera */
