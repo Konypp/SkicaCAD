@@ -116,7 +116,7 @@ button { cursor: pointer; }
 .rgroup:last-child { border-right: 0; }
 .rtools { display: flex; gap: 1px; }
 .rlabel { text-align: center; font-size: 10px; font-weight: 600; letter-spacing: .08em; color: var(--muted); padding: 2px 0 4px; text-transform: uppercase; }
-.tool { width: 57px; height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 1px solid transparent; border-radius: 4px; background: transparent; font-size: 11px; line-height: 1.1; text-align: center; padding: 2px; }
+.tool { width: 57px; height: auto; min-height: 48px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: 1px solid transparent; border-radius: 4px; background: transparent; font-size: 11px; line-height: 1.1; text-align: center; padding: 2px; }
 .tool:hover:not(:disabled) { background: var(--panel-2); border-color: var(--line); }
 .tool[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
 .tool:disabled { opacity: .35; cursor: default; }

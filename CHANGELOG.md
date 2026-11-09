@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.28
+- **Pás nástrojů:** tlačítka s dvouřádkovým názvem (Vytvořit skicu, Základní tělesa, Vybrat vše…) jsou vyšší, takže rámeček zvýraznění už nezasahuje do textu.
 ## Beta 2.27
 - **Klávesové zkratky:** Vytvořit skicu je nově **D** (Draw), Měřítko **S** (Scale). Uvnitř skici zůstává D pro Drážku; v režimu Plochy s vybranou plochou D duplikuje a S mění velikost (Modelovat).
 ## Beta 2.26
