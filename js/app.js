@@ -7155,6 +7155,9 @@ document.addEventListener('keydown', e => {
   if (mod && k.toLowerCase() === 'd') { e.preventDefault(); if (faceMode && selFace && !sk && !cmd) faceToSketch(); else duplicateSel(); return; }
   if (mod && k.toLowerCase() === 'r' && !e.shiftKey && cmd && !sk && cmd.onKey) { e.preventDefault(); cmd.onKey({ key: 'l' }); return; }
   if (mod && k.toLowerCase() === 'r' && !e.shiftKey && faceMode && selFace && !cmd && !sk) { e.preventDefault(); const l = faceList().filter(x => x.kind === 'plane'); setFaceMode(false, true); startFaceEdit(undefined, undefined, l, 'loop'); return; }
+  /* Ctrl / Cmd (or Alt) + arrows: a fine step of 0.1 mm (Shift: 1 mm) */
+  const ARF = { ArrowLeft: [-1, 0, 0], ArrowRight: [1, 0, 0], ArrowUp: [0, 1, 0], ArrowDown: [0, -1, 0], PageUp: [0, 0, 1], PageDown: [0, 0, -1] }[k];
+  if (ARF && (mod || e.altKey)) { if (nudgeKeys(ARF, e.shiftKey, true)) e.preventDefault(); return; }
   if (mod) return;
   if (cmd && !sk && k === 'Escape' && cmd.onEsc && cmd.onEsc()) { e.preventDefault(); return; }
   if (cmd && !sk && k === 'Enter' && cmd.onEnter && cmd.onEnter()) { e.preventDefault(); return; }
@@ -7185,7 +7188,7 @@ document.addEventListener('keydown', e => {
     else if (tlSel !== null) deleteFeature(tlSel);
     return;
   }
-  /* arrow keys (PageUp / PageDown = Z): move the selected sketch element, the bodies in Move (selected bodies open Move), or pan the view; one grid step, Shift ×10 */
+  /* arrow keys (PageUp / PageDown = Z): move the selected sketch element, the bodies in Move (selected bodies open Move), or pan the view; one grid step, Shift ×10; with Ctrl / Alt 0.1 mm */
   const AR = { ArrowLeft: [-1, 0, 0], ArrowRight: [1, 0, 0], ArrowUp: [0, 1, 0], ArrowDown: [0, -1, 0], PageUp: [0, 0, 1], PageDown: [0, 0, -1] }[k];
   if (AR) { if (nudgeKeys(AR, e.shiftKey)) e.preventDefault(); return; }
   const map = sk ? { l: 'line', k: 'spline', r: 'rect', c: 'circle', e: 'ellipse', p: 'ngon', d: 'slot', x: 'sktrim', o: 'skoffset', m: 'skmirror', t: 'sksegtrim', j: 'skjoin', q: 'skcons' } : cmd ? {} : { d: 'sketch', s: 'scale', e: 'extrude', f: 'fillet', m: 'move', r: 'rotate', t: 'thread', i: 'measure', g: 'facemode', h: 'hole' };
@@ -7194,12 +7197,12 @@ document.addEventListener('keydown', e => {
   if (k === 'F6') { e.preventDefault(); fitView(); }
 });
 
-function nudgeKeys(v, big) {
-  const st = (settings.snap || 1) * (big ? 10 : 1);
+function nudgeKeys(v, big, fine) {
+  const st = fine ? (big ? 1 : 0.1) : (settings.snap || 1) * (big ? 10 : 1);
   if (sk) {
     if (sk.tool || v[2]) return false;
     const e = sk.f.ents[sk.selEnt];
-    if (!e) { panView(v, big); return true; }
+    if (!e) { panView(v, big, fine); return true; }
     sk.f.ents[sk.selEnt] = translateEnt(e, v[0] * st, v[1] * st);
     const n = sk.f.ents[sk.selEnt], r4 = x => Math.round(x * 1e4) / 1e4; if (n.pts) n.pts = n.pts.map(q => [r4(q[0]), r4(q[1])]); for (const kk of ['x', 'y', 'x1', 'y1', 'x2', 'y2']) if (typeof n[kk] === 'number') n[kk] = r4(n[kk]);
     renderPalette(); redrawSketch(); return true;
@@ -7207,11 +7210,11 @@ function nudgeKeys(v, big) {
   if (cmd) { if (!cmd.nudge) return false; cmd.nudge(v.map(x => x * st)); return true; }
   if (sel.size) { startMove(); if (cmd && cmd.nudge) cmd.nudge(v.map(x => x * st)); return true; }
   if (v[2]) return false;
-  panView(v, big); return true;
+  panView(v, big, fine); return true;
 }
 /* pan the view by a tenth of its height (Shift: half) along the screen axes */
-function panView(v, big) {
-  const c = cam(), H = dom.clientHeight || 600, d = worldPerPx(controls.target) * H * (big ? 0.5 : 0.1);
+function panView(v, big, fine) {
+  const c = cam(), H = dom.clientHeight || 600, d = worldPerPx(controls.target) * H * (big ? 0.5 : 0.1) * (fine ? 0.2 : 1);
   const right = new V3().setFromMatrixColumn(c.matrixWorld, 0), up = new V3().setFromMatrixColumn(c.matrixWorld, 1);
   const off = right.multiplyScalar(v[0] * d).add(up.multiplyScalar(v[1] * d));
   c.position.add(off); controls.target.add(off); controls.update(); requestRender();

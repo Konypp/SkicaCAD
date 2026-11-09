@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.41
+- Jemný posun šipkami: s Ctrl (Cmd) nebo Alt posunou šipky (a PageUp / PageDown) vybraný prvek skici nebo tělesa o 0,1 mm, se Shift navíc o 1 mm; bez výběru jemně posunou pohled.
+
 ## Beta 2.40
 - Kloubový model se sponou / jazykem: krajní klouby jsou hned za samcem a samicí (ne až o celý článek dál), takže se díly spony ohýbají s řemínkem; ostatní klouby jsou rovnoměrně mezi nimi.
 
