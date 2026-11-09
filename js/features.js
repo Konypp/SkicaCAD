@@ -2246,7 +2246,17 @@ function articulateParts(polys, f) {
   const blo = bb.min.map(v => v - BIG), bhi = bb.max.map(v => v + BIG); blo[a] = lo; bhi[a] = hi;
   const keep = KK.translate(KK.primitive('box', { w: bhi[0] - blo[0], d: bhi[1] - blo[1], h: bhi[2] - blo[2] }), [0, 1, 2].map(k => (blo[k] + bhi[k]) / 2));
   const trimmed = KK.boolean(polys, keep, 'intersect');
-  const out = articulateCore(trimmed, { ...f, ends: undefined });
+  /* the end joints sit right behind the clasp parts (not a whole link's length away), so the parts swing with the
+     strap; the other joints are spread evenly between them */
+  let at = f.at;
+  if (!(Array.isArray(f.at) && f.at.length)) {
+    const n = Math.max(1, Math.min(40, Math.round(Number(f.n) || 4))), hz = Math.max(...parts.map(p => p.sec.max[2] - p.sec.min[2]));
+    const hw = Math.max(...parts.map(p => p.sec.max[sAx] - p.sec.min[sAx])) / 2, st = f.style || 'disc';
+    /* how far a joint reaches back from its plane: the up/down joint by its height, the others by half the width */
+    const dj = Math.min((hi - lo) / (n + 1) - 1, st === 'flex' ? Math.max(3, hz * 0.75 + 1.5) : hw + 1.5), j0 = lo + 1 + dj, j1 = hi - 1 - dj;
+    if (n >= 2 && j1 - j0 > (n - 1) * 4) at = Array.from({ length: n }, (_, i) => j0 + (j1 - j0) * i / (n - 1));
+  }
+  const out = articulateCore(trimmed, { ...f, ends: undefined, ...(at ? { at } : {}) });
   for (const [k, p] of [[0, parts[0]], [out.length - 1, parts[1]]]) {
     const o = [0, 0, p.sec.min[2]]; o[a] = p.xe - p.sg * p.len; o[sAx] = (p.sec.min[sAx] + p.sec.max[sAx]) / 2;
     const dir = [0, 0]; dir[a] = p.sg;

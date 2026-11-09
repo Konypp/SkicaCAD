@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.40
+- Kloubový model se sponou / jazykem: krajní klouby jsou hned za samcem a samicí (ne až o celý článek dál), takže se díly spony ohýbají s řemínkem; ostatní klouby jsou rovnoměrně mezi nimi.
+
 ## Beta 2.39
 - Spona: samice je bez dna, takže jazýčky samce (tištěné na podložce) jsou v ní ve stejné výšce – spojená spona je zarovnaná nahoře i dole, bez skoku. Háčky začínají nad lištou pod okénky (spodek pod 45°, tisk bez podpěr) a drží samce i svisle.
 - Spona: zachycovací plocha háčků je podříznutá o 15°, tah za řemínek háčky zatlačí hlouběji do okének – spona se rozepne jen stisknutím háčků.
