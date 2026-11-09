@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.30
+- **Spona na řemínku (Kloubový model › Zapínání: Spona):** samec i samice mají automaticky stejnou šířku i výšku jako konec řemínku a na straně u řemínku hranaté rohy, takže na řemínek navazují v rovině a nepřesahují. Dřív měla spona vždy aspoň 14 × 7 mm a zaoblené rohy i u řemínku. Nejmenší možná spona je 14 mm široká a 4,6 mm vysoká (pro užší nebo tenčí řemínek zůstane přesah jen o tolik).
 ## Beta 2.29
 - **Uříznuté popisky tlačítek:** tlačítka v řádcích dialogů (např. Duplikovat plochu v Modelovat) dlouhý název zalomí na dva řádky místo uříznutí; tlačítka v pásu s dlouhým jedním slovem (v angličtině Connectors, Construction) se rozšíří. Prošly se všechny dialogy (i všechny nástroje Modelovat), lišta ploch, kruhové menu, pás a jeho nabídky – česky i anglicky, na počítači i telefonu – a nic dalšího uříznuté není.
 ## Beta 2.28

@@ -2100,12 +2100,12 @@ function sectionNear(polys, a, x, Q) {
    tongue and two springy prongs whose hooks snap into the windows (press them to release). The prongs bend in the
    bed's plane, which is how printed layers flex best; the sleeve's roof is one bridge. */
 function buckleParts(f) {
-  const Wf = Math.max(12, Number(f.w) || 25), H = Math.max(6, Number(f.h) || 8), g = Math.max(0.15, Number(f.gap) || 0.3);
+  const Wf = Math.max(12, Number(f.w) || 25), H = Math.max(4.6, Number(f.h) || 8), g = Math.max(0.15, Number(f.gap) || 0.3);
   const ws = Math.max(1.6, Math.min(3, Wf * 0.08)), tw = Math.max(1.2, Math.min(2, H * 0.16));
   /* the male's tongue and prongs lie on the bed (z = 0) so they print without supports; in use they slide into the
      female's cavity, which is tw + g above her bottom */
   const Wc = Wf - 2 * ws, Hc = H - 2 * tw, hm = Hc - 2 * g, zoff = 0, zcav = tw + g;
-  if (hm < 1.6) throw new Error('Spona je příliš nízká; zvyšte výšku spony');
+  if (hm < 1.6 - 1e-6) throw new Error('Spona je příliš nízká; zvyšte výšku spony');
   const Li = Wf * 0.75, Lc = Li + g, lh = Math.max(3, Wf * 0.22), pw = Math.max(1.6, Math.min(3, Wf * 0.1)), hk = Math.min(ws * 0.85, 2);
   const tc = Wc - 2 * (g + pw + hk + 0.8);
   if (tc < 2) throw new Error('Spona je příliš úzká; zvětšete šířku spony');
@@ -2115,7 +2115,9 @@ function buckleParts(f) {
   const prism = (pts, z0, z1) => KK.extrudeProfiles([{ pts: KK.area2D(pts) < 0 ? pts.slice().reverse() : pts, closed: true }], { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] }, z0, z1);
   const rounded = (x0, x1, y0, y1, z0, z1, r) => prism(KK.profilePoints({ t: 'rect', x: x0, y: y0, w: x1 - x0, h: y1 - y0, fr: r }), z0, z1);
   /* female */
-  let fem = rounded(0, Lf, -Wf / 2, Wf / 2, 0, H, Math.min(3, Wf * 0.12));
+  /* on a strap the back (x = 0) is square, so the half meets the strap flush */
+  const rc = Math.min(3, Wf * 0.12), sq = p => (f.squareBack ? KK.boolean(p, box(0, rc + 0.01, -Wf / 2, Wf / 2, 0, H), 'union') : p);
+  let fem = sq(rounded(0, Lf, -Wf / 2, Wf / 2, 0, H, rc));
   fem = KK.boolean(fem, box(Lf - Lc, Lf + 1, -Wc / 2, Wc / 2, tw, H - tw), 'subtract');
   const wx0 = Lf - Lc, wx1 = Lf - Li + lh + g;
   for (const sg of [-1, 1]) fem = KK.boolean(fem, box(wx0, wx1, sg < 0 ? -Wf / 2 - 1 : Wc / 2 - 0.1, sg < 0 ? -Wc / 2 + 0.1 : Wf / 2 + 1, tw, H - tw), 'subtract');
@@ -2128,7 +2130,7 @@ function buckleParts(f) {
     for (const sg of [-1, 1]) fem = KK.boolean(fem, KK.translate(KK.primitive('cylinder', { r: Rs, h: H + 2 }), [xs, sg * (Wf / 2 + Rs - dm), H / 2]), 'subtract');
   }
   /* male: base, tongue, two prongs with hooks */
-  let mal = rounded(0, Lb, -Wf / 2, Wf / 2, 0, H, Math.min(3, Wf * 0.12));
+  let mal = sq(rounded(0, Lb, -Wf / 2, Wf / 2, 0, H, rc));
   mal = KK.boolean(mal, box(Lb - 0.5, Lb + Li - 1, -tc / 2, tc / 2, zoff, zoff + hm), 'union');
   const xt = Lb + Li, xc = xt - lh;
   for (const sg of [-1, 1]) {
@@ -2189,7 +2191,7 @@ function articulateParts(polys, f) {
     const sec = sectionAt(polys, a, xe - sg * 0.6) || { min: bb.min, max: bb.max };
     const wEnd = sec.max[sAx] - sec.min[sAx], hEnd = sec.max[2] - sec.min[2];
     const B = f.ends === 'tongue' ? tongueParts({ w: Number(f.bw) || wEnd, h: hEnd })
-      : buckleParts({ w: Number(f.bw) || Math.max(14, wEnd), h: Number(f.bh) || Math.max(7, hEnd), gap: f.bgap || 0.3 });
+      : buckleParts({ w: Number(f.bw) || Math.max(14, wEnd), h: Number(f.bh) || Math.max(4.6, hEnd), gap: f.bgap || 0.3, squareBack: true });
     const body = sg < 0 ? B.female : B.male, len = KK.bbox(body).max[0];
     return { xe, sg, body, len, sec };
   });
