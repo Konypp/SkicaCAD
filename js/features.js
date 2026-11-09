@@ -2103,12 +2103,15 @@ function buckleParts(f) {
   /* below 14 mm the buckle is the narrow kind: no centre tongue, 1.2 mm walls and prongs, smaller hooks and longer
      prongs (thin prongs bend more gently over a longer length) – it holds less, enough for a watch strap or a bracelet.
      9 mm is the least that still leaves the hooks room to spring in. */
-  const Wf = Math.max(9, Number(f.w) || 25), H = Math.max(4.6, Number(f.h) || 8), g = Math.max(0.15, Number(f.gap) || 0.3), narrow = Wf < 14;
-  const ws = narrow ? 1.2 : Math.max(1.6, Math.min(3, Wf * 0.08)), tw = Math.max(1.2, Math.min(2, H * 0.16));
+  /* a low buckle (under 4.6 mm, e.g. on a 4 mm strap) gets a thinner floor and roof (down to 0.9 mm) and lower prongs
+     (down to 1.2 mm), so it stays as high as the strap; 3.6 mm is the least */
+  const Wf = Math.max(9, Number(f.w) || 25), H = Math.max(3.6, Number(f.h) || 8), g = Math.max(0.15, Number(f.gap) || 0.3), narrow = Wf < 14;
+  const tw0 = Math.max(1.2, Math.min(2, H * 0.16)), tw = H - 2 * tw0 - 2 * g >= 1.6 ? tw0 : Math.max(0.9, Math.min(tw0, (H - 2 * g - 1.4) / 2));
+  const ws = narrow ? 1.2 : Math.max(1.6, Math.min(3, Wf * 0.08));
   /* the male's tongue and prongs lie on the bed (z = 0) so they print without supports; in use they slide into the
      female's cavity, which is tw + g above her bottom */
   const Wc = Wf - 2 * ws, Hc = H - 2 * tw, hm = Hc - 2 * g, zoff = 0, zcav = tw + g;
-  if (hm < 1.6 - 1e-6) throw new Error('Spona je příliš nízká; zvyšte výšku spony');
+  if (hm < 1.2 - 1e-6) throw new Error('Spona je příliš nízká; zvyšte výšku spony');
   const Li = narrow ? Math.max(10, Wf * 0.9) : Wf * 0.75, Lc = Li + g, lh = Math.max(3, Wf * 0.22);
   const pw = narrow ? 1.2 : Math.max(1.6, Math.min(3, Wf * 0.1)), hk = narrow ? 1 : Math.min(ws * 0.85, 2);
   const tc = narrow ? 0 : Wc - 2 * (g + pw + hk + 0.8);
@@ -2199,7 +2202,7 @@ function articulateParts(polys, f) {
     const make = sec => {
       const wEnd = sec.max[sAx] - sec.min[sAx], hEnd = sec.max[2] - sec.min[2];
       const B = f.ends === 'tongue' ? tongueParts({ w: Number(f.bw) || wEnd, h: hEnd })
-        : buckleParts({ w: Number(f.bw) || Math.max(9, wEnd), h: Number(f.bh) || Math.max(4.6, hEnd), gap: f.bgap || 0.3, squareBack: true });
+        : buckleParts({ w: Number(f.bw) || Math.max(9, wEnd), h: Number(f.bh) || Math.max(3.6, hEnd), gap: f.bgap || 0.3, squareBack: true });
       const body = sg < 0 ? B.female : B.male;
       return { xe, sg, body, len: KK.bbox(body).max[0], sec };
     };

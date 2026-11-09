@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.37
+- **Nízká spona (3,6–4,6 mm):** spona na tenkém řemínku (např. 4 mm) je teď stejně vysoká jako řemínek a nepřečnívá. U nízké spony se ztenčí dno a strop samice (až na 0,9 mm) a pružné jazýčky samce jsou nižší (až 1,2 mm). Nejnižší spona je 3,6 mm.
 ## Beta 2.36
 - **Pole pro název:** klepnutí do názvu návrhu (i do přejmenování tělesa) označí celý název, takže ho stačí rovnou přepsat – na počítači i na telefonu.
 ## Beta 2.35
