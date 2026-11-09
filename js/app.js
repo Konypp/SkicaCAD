@@ -8595,15 +8595,16 @@ function startPrintCheck() {
 /* ---------- Spona (side release buckle), two halves printed flat ---------- */
 function startBuckle(editIndex, f) {
   const c = {
-    editIndex, v: f ? { w: f.w, h: f.h, gap: f.gap, slot: f.slot !== false, len: f.len || 0 } : { w: 25, h: 8, gap: 0.3, slot: true, len: 0 }, pos: f ? f.pos.slice() : [0, 0, 0], tool: null,
+    editIndex, v: f ? { w: f.w, h: f.h, gap: f.gap, slot: f.slot !== false, len: f.len || 0, center: !!f.center } : { w: 25, h: 8, gap: 0.3, slot: true, len: 0, center: true }, pos: f ? f.pos.slice() : [0, 0, 0], tool: null,
     init() {
       openDialog({ title: 'Spona', icon: 'buckle',
         fields: [{ k: 'num', id: 'w', label: 'Šířka spony', value: this.v.w }, { k: 'num', id: 'h', label: 'Výška spony', value: this.v.h },
           { k: 'num', id: 'len', label: 'Délka jazýčků (0 = automaticky)', value: this.v.len },
           { k: 'num', id: 'gap', label: 'Vůle', value: this.v.gap }, { k: 'chk', id: 'slot', label: 'Průvlek pro popruh', value: this.v.slot },
+          { k: 'chk', id: 'center', label: 'Vycentrovaná (jazýčky po celé výšce)', value: this.v.center },
           { k: 'xyz', id: 'pos', label: 'Poloha', value: this.pos }, { k: 'note', id: 'tip' }, { k: 'note', id: 'n' }],
         onChange: id => {
-          if (id === 'slot') this.v.slot = dlg.get('slot');
+          if (id === 'slot' || id === 'center') this.v[id] = dlg.get(id);
           else if (id === 'pos') this.pos = dlg.get('pos');
           else { const x = dlg.get(id); if (x > 0 || (id === 'len' && x === 0)) this.v[id] = x; }
           this.update();
@@ -8619,7 +8620,7 @@ function startBuckle(editIndex, f) {
         this.tool = [K.translate(B.female, [p[0], p[1] - B.Wf / 2 - 3, p[2]]), K.translate(B.male, [p[0], p[1] + B.Wf / 2 + 3, p[2]])];
         for (const t of this.tool) G.preview.add(previewMesh(t, 'new'));
         const ws = Math.max(1.6, Math.min(3, this.v.w * 0.08));
-        dlg.set('tip', 'Samice (vlevo) a samec (vpravo). Háčky samce zapadnou do bočních okének samice; spona se rozepne stisknutím háčků v okénkách.' + (this.v.slot ? ` Popruh do šířky ${fmtc(this.v.w - 2 * ws - 1, 1)} mm a tloušťky 3,5 mm.` : ''));
+        dlg.set('tip', 'Samice (vlevo) a samec (vpravo). Háčky samce zapadnou do bočních okének samice; spona se rozepne stisknutím háčků v okénkách.' + (this.v.center ? ` Vycentrovaná: jazýčky samce jsou vysoké jako celý samec (${fmtc(B.H, 1)} mm) a samice je vyšší (${fmtc(B.Hf, 1)} mm), takže po zapnutí z ní samec vychází přesně uprostřed.` : ' Jazýčky samce jsou nižší než samice, po zapnutí je samec o kousek níž.') + (this.v.slot ? ` Popruh do šířky ${fmtc(this.v.w - 2 * ws - 1, 1)} mm a tloušťky 3,5 mm.` : ''));
         dlg.set('n', ''); dlg.okEnabled(true);
       } catch (e) { dlg.set('n', '!' + e.message); dlg.okEnabled(false); }
       requestRender();

@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.45
+- Součásti › Spona: nová volba Vycentrovaná (zapnutá pro novou sponu). Jazýčky samce jsou vysoké jako celý samec a samice je o dno, strop a vůli vyšší, takže po zapnutí z ní samec vychází přesně uprostřed; tiskne se dál naplocho bez podpěr. Kód zarovnané spony bez dna (2.39) odstraněn.
+
 ## Beta 2.44
 - Jemný posun v ose Z: Ctrl+Shift+šipka nahoru / dolů posune vybraná tělesa o 0,1 mm nahoru / dolů (posun o 1 mm v rovině je teď Alt+Shift+šipka).
 

@@ -2106,19 +2106,18 @@ function buckleParts(f) {
   /* a low buckle (under 4.6 mm, e.g. on a 4 mm strap) gets a thinner floor and roof (down to 0.9 mm) and lower prongs
      (down to 1.2 mm), so it stays as high as the strap; 3.6 mm is the least */
   const Wf = Math.max(9, Number(f.w) || 25), H = Math.max(3.6, Number(f.h) || 8), g = Math.max(0.15, Number(f.gap) || 0.3), narrow = Wf < 14;
-  /* flush (default): the female has no floor, so the male's tongue and prongs, lying on the bed for printing, sit at the
-     same height as in use and both halves are flush top and bottom when buckled. The hooks then hold the male up and
-     down too: they start above a lip left under each window (with a 45° underside, printable) and the roof covers the
-     prongs. The old kind (a floored sleeve, the male a step lower) stays for the folding buckle. */
-  const flush = f.flush === true; /* off: the open floor let the male break out downwards */
+  /* centred (Součásti › Spona, f.center): the male's tongue and prongs are as high as its base (the whole height H)
+     and the female is made taller to hold them, by its floor and roof and the clearance, so buckled the two are
+     centred on each other (the female stands out evenly above and below). Otherwise the female is as high as the male
+     (on a strap) and the prongs are lower, lying on the bed: buckled the male sits a step lower. */
+  const center = !!f.center;
   const ws = narrow ? 1.2 : Math.max(1.6, Math.min(3, Wf * 0.08));
   const pw = narrow ? 1.2 : Math.max(1.6, Math.min(3, Wf * 0.1)), hk = narrow ? 1 : Math.min(ws * 0.85, 2);
-  const lp = flush ? Math.max(0.6, Math.min(1.2, H * 0.15)) : 0; /* lip under the windows */
   const tw0 = Math.max(1.2, Math.min(2, H * 0.16));
-  const tw = flush ? Math.max(0.9, Math.min(tw0, H - g - lp - hk - 0.5))
-    : (H - 2 * tw0 - 2 * g >= 1.6 ? tw0 : Math.max(0.9, Math.min(tw0, (H - 2 * g - 1.4) / 2)));
-  const Wc = Wf - 2 * ws, Hc = H - 2 * tw, hm = flush ? H - tw - g : Hc - 2 * g, zoff = 0, zcav = flush ? 0 : tw + g;
-  if (hm < (flush ? lp + hk + 0.5 : 1.2) - 1e-6) throw new Error('Spona je příliš nízká; zvyšte výšku spony');
+  const tw = center ? tw0 : (H - 2 * tw0 - 2 * g >= 1.6 ? tw0 : Math.max(0.9, Math.min(tw0, (H - 2 * g - 1.4) / 2)));
+  const Hf = center ? H + 2 * (tw + g) : H; /* the female's height */
+  const Wc = Wf - 2 * ws, hm = center ? H : H - 2 * tw - 2 * g, zoff = 0, zcav = tw + g;
+  if (hm < 1.2 - 1e-6) throw new Error('Spona je příliš nízká; zvyšte výšku spony');
   /* the prongs' length (and so how far the male reaches into the female) can be set: f.len, at least the hook plus
      4 mm of springy prong */
   const lh = narrow ? Math.max(2.6, Wf * 0.22) : Math.max(3, Wf * 0.22);
@@ -2135,15 +2134,15 @@ function buckleParts(f) {
   const rounded = (x0, x1, y0, y1, z0, z1, r) => prism(KK.profilePoints({ t: 'rect', x: x0, y: y0, w: x1 - x0, h: y1 - y0, fr: r }), z0, z1);
   /* female */
   /* on a strap the back (x = 0) is square, so the half meets the strap flush */
-  const rc = Math.min(3, Wf * 0.12), sq = p => (f.squareBack ? KK.boolean(p, box(0, rc + 0.01, -Wf / 2, Wf / 2, 0, H), 'union') : p);
-  let fem = sq(rounded(0, Lf, -Wf / 2, Wf / 2, 0, H, rc));
-  fem = KK.boolean(fem, box(Lf - Lc, Lf + 1, -Wc / 2, Wc / 2, flush ? -1 : tw, H - tw), 'subtract');
+  const rc = Math.min(3, Wf * 0.12), sq = (p, h) => (f.squareBack ? KK.boolean(p, box(0, rc + 0.01, -Wf / 2, Wf / 2, 0, h), 'union') : p);
+  let fem = sq(rounded(0, Lf, -Wf / 2, Wf / 2, 0, Hf, rc), Hf);
+  fem = KK.boolean(fem, box(Lf - Lc, Lf + 1, -Wc / 2, Wc / 2, tw, Hf - tw), 'subtract');
   const wx0 = Lf - Lc, wx1 = Lf - Li + lh + g, yo0 = Wc / 2 - g;
   for (const sg of [-1, 1]) {
     /* the window's front edge leans like the hook's catch (wider outside) */
     const y0 = Wc / 2 - 0.1, y1 = Wf / 2 + 1, ex = y => wx1 + ut * (y - yo0);
     const wp = [[wx0, y0], [ex(y0), y0], [ex(y1), y1], [wx0, y1]].map(([x, y]) => [x, sg * y]);
-    fem = KK.boolean(fem, prism(wp, flush ? lp : tw, H - tw), 'subtract');
+    fem = KK.boolean(fem, prism(wp, tw, Hf - tw), 'subtract');
   }
   /* a broad scallop in each side over the window (the "waist" of a backpack buckle), so the hooks are easy to reach and
      press with finger and thumb. It ends exactly at the window's front edge, where the full side wall catches the hooks,
@@ -2151,10 +2150,10 @@ function buckleParts(f) {
   if (f.scallop !== false) {
     const hs = Math.max(3, Math.min((wx1 - wx0) * 1.1, (wx1 - sz - 1.5) / 2)), dm = ws + Math.min(1.2, hk), xs = wx1 - hs;
     const Rs = (hs * hs + dm * dm) / (2 * dm);
-    for (const sg of [-1, 1]) fem = KK.boolean(fem, KK.translate(KK.primitive('cylinder', { r: Rs, h: H + 2 }), [xs, sg * (Wf / 2 + Rs - dm), H / 2]), 'subtract');
+    for (const sg of [-1, 1]) fem = KK.boolean(fem, KK.translate(KK.primitive('cylinder', { r: Rs, h: Hf + 2 }), [xs, sg * (Wf / 2 + Rs - dm), Hf / 2]), 'subtract');
   }
   /* male: base, tongue, two prongs with hooks */
-  let mal = sq(rounded(0, Lb, -Wf / 2, Wf / 2, 0, H, rc));
+  let mal = sq(rounded(0, Lb, -Wf / 2, Wf / 2, 0, H, rc), H);
   if (!narrow) mal = KK.boolean(mal, box(Lb - 0.5, Lb + Li - 1, -tc / 2, tc / 2, zoff, zoff + hm), 'union');
   const xt = Lb + Li, xc = xt - lh;
   for (const sg of [-1, 1]) {
@@ -2165,19 +2164,14 @@ function buckleParts(f) {
     mal = KK.boolean(mal, prism([[Lb - 0.5, yi + 0.1], [Lb + fr, yi + 0.1], [Lb - 0.5, yi - fr - 0.5]].map(([x, y]) => [x, sg * y]), zoff, zoff + hm), 'union');
     /* hook: catch facing the base (undercut), a ramp towards the tip */
     const hp = [[xc + ut * 0.3, yo - 0.3], [xc - ut * hk, yo + hk], [xc + lh * 0.4, yo + hk], [xt, yo - 0.3]].map(([x, y]) => [x, sg * y]);
-    let hook = prism(hp, flush ? lp : zoff, zoff + hm);
-    if (flush) {
-      /* 45° underside from the prong's face, so the hook prints without support */
-      const cut = KK.extrudeProfiles([{ pts: [[yo, lp - 1], [yo, lp], [yo + hk + 1, lp + hk + 1], [yo + hk + 1, lp - 1]].map(([y, z]) => [y * sg, z]), closed: true }].map(q => ({ ...q, pts: KK.area2D(q.pts) < 0 ? q.pts.slice().reverse() : q.pts })), { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }, xc - lh, xt + 1);
-      hook = KK.boolean(hook, KK.fixOrientation(cut), 'subtract');
-    }
+    const hook = prism(hp, zoff, zoff + hm);
     mal = KK.boolean(mal, hook, 'union');
   }
   if (slot) for (const part of ['f', 'm']) {
-    const hole = box(2.2, 2.2 + sl, -(Wc / 2 - 0.5), Wc / 2 - 0.5, -1, H + 1);
+    const hole = box(2.2, 2.2 + sl, -(Wc / 2 - 0.5), Wc / 2 - 0.5, -1, Hf + 1);
     if (part === 'f') fem = KK.boolean(fem, hole, 'subtract'); else mal = KK.boolean(mal, hole, 'subtract');
   }
-  return { female: fem, male: mal, Lf, Lb, H, Wf, zcav, narrow };
+  return { female: fem, male: mal, Lf, Lb, H, Hf, Wf, zcav, narrow };
 }
 /* ---------- Jazyk a poutko: the clasp of a thin strap (like a printed watch strap) ----------
    Local frame as for the buckle. The female is a narrow upright U at the strap's end, open at the top; the male is a
@@ -2290,7 +2284,7 @@ function articulateFold(polys, f) {
   const secS = sectionAt(polys, a, bb.min[a] + 0.6) || { min: bb.min, max: bb.max }, secE = sectionAt(polys, a, bb.max[a] - 0.6) || { min: bb.min, max: bb.max };
   const W = Number(f.bw) || (secS.max[sAx] - secS.min[sAx]), sc = (secS.min[sAx] + secS.max[sAx]) / 2, z0 = secS.min[2], zs = secS.max[2] - secS.min[2], zc = z0 + zs / 2, hz = zs / 2;
   /* thin buckle: cavity just thick enough for a male of ~1.6 mm */
-  const T = Math.max(4.6, zs + 0.6), B = buckleParts({ w: Math.max(12, W), h: T, gap: f.bgap || 0.3, flush: false });
+  const T = Math.max(4.6, zs + 0.6), B = buckleParts({ w: Math.max(12, W), h: T, gap: f.bgap || 0.3 });
   const hw = W / 2, wa = Math.max(1.6, Math.min(3, hw * 0.22)), st = hw - wa - g;
   const dp = Math.max(0.8, Math.min(hz * 0.6, 2)), Rr = Math.max(hz, dp + g * 1.42 + 1.2), pd = Math.min(wa * 0.55, 1.4);
   if (st < 2 || zs < 2.4) throw new Error('Řemínek je na sklápěcí sponu příliš malý');
