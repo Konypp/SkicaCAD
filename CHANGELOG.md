@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.38
+- **Délka spony:** nové pole Délka jazýčků spony (Kloubový model › Zapínání: Spona) a Délka jazýčků (Součásti › Spona). Kratší jazýčky zkrátí samce i samici stejně – např. na 10mm řemínku ze 14 / 13,3 mm (automaticky) až na 11 / 10,3 mm. Nejkratší jazýček je zobáček + 4 mm pružné části (u úzké spony 7 mm); 0 = automaticky jako dřív.
 ## Beta 2.37
 - **Nízká spona (3,6–4,6 mm):** spona na tenkém řemínku (např. 4 mm) je teď stejně vysoká jako řemínek a nepřečnívá. U nízké spony se ztenčí dno a strop samice (až na 0,9 mm) a pružné jazýčky samce jsou nižší (až 1,2 mm). Nejnižší spona je 3,6 mm.
 ## Beta 2.36

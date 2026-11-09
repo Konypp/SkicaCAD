@@ -2112,7 +2112,9 @@ function buckleParts(f) {
      female's cavity, which is tw + g above her bottom */
   const Wc = Wf - 2 * ws, Hc = H - 2 * tw, hm = Hc - 2 * g, zoff = 0, zcav = tw + g;
   if (hm < 1.2 - 1e-6) throw new Error('Spona je příliš nízká; zvyšte výšku spony');
-  const Li = narrow ? Math.max(10, Wf * 0.9) : Wf * 0.75, Lc = Li + g, lh = Math.max(3, Wf * 0.22);
+  /* the prongs' length (and so how far the male reaches into the female) can be set: f.len, at least the hook plus
+     4 mm of springy prong */
+  const lh = Math.max(3, Wf * 0.22), Li = Number(f.len) > 0 ? Math.max(lh + 4, Math.min(80, Number(f.len))) : narrow ? Math.max(10, Wf * 0.9) : Wf * 0.75, Lc = Li + g;
   const pw = narrow ? 1.2 : Math.max(1.6, Math.min(3, Wf * 0.1)), hk = narrow ? 1 : Math.min(ws * 0.85, 2);
   const tc = narrow ? 0 : Wc - 2 * (g + pw + hk + 0.8);
   if (narrow ? Wc / 2 - g - pw - hk < 0.4 - 1e-6 : tc < 2) throw new Error('Spona je příliš úzká; zvětšete šířku spony');
@@ -2202,7 +2204,7 @@ function articulateParts(polys, f) {
     const make = sec => {
       const wEnd = sec.max[sAx] - sec.min[sAx], hEnd = sec.max[2] - sec.min[2];
       const B = f.ends === 'tongue' ? tongueParts({ w: Number(f.bw) || wEnd, h: hEnd })
-        : buckleParts({ w: Number(f.bw) || Math.max(9, wEnd), h: Number(f.bh) || Math.max(3.6, hEnd), gap: f.bgap || 0.3, squareBack: true });
+        : buckleParts({ w: Number(f.bw) || Math.max(9, wEnd), h: Number(f.bh) || Math.max(3.6, hEnd), gap: f.bgap || 0.3, len: Number(f.bl) || 0, squareBack: true });
       const body = sg < 0 ? B.female : B.male;
       return { xe, sg, body, len: KK.bbox(body).max[0], sec };
     };

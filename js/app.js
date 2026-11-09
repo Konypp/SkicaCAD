@@ -8106,10 +8106,10 @@ const ORG_MODS = {
     prompt: 'Spodek tělesa se zarovná do roviny, aby postavička stála a dobře se tiskla'
   },
   articulate: {
-    defaults: () => ({ style: 'disc', axis: 'x', place: 'even', lines: [], curve: [], snap: false, cnt: 4, gap: 0.4, angle: 30, ends: 'none', bw: 0, bh: 0 }),
+    defaults: () => ({ style: 'disc', axis: 'x', place: 'even', lines: [], curve: [], snap: false, cnt: 4, gap: 0.4, angle: 30, ends: 'none', bw: 0, bh: 0, bl: 0 }),
     /* the pin hinge prints best with a little more clearance: switching the type moves an untouched clearance along */
     change: (c, id) => { if (id !== 'style') return; const ns = dlg.get('style'); if (Math.abs(c.v.gap - jointGap(c.v.style)) < 1e-9) { c.v.gap = jointGap(ns); dlg.set('gap', c.v.gap); } },
-    load: f => ({ style: !f.style || f.style === 'ball' ? 'disc' : f.style, snap: !!f.snap, axis: f.axis || 'x', place: f.curve && f.curve.length ? 'curve' : f.lines && f.lines.length ? 'lines' : 'even', lines: (f.lines || []).slice(), curve: (f.curve || []).map(p => p.slice()), cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30, ends: f.ends || 'none', bw: f.bw || 0, bh: f.bh || 0 }),
+    load: f => ({ style: !f.style || f.style === 'ball' ? 'disc' : f.style, snap: !!f.snap, axis: f.axis || 'x', place: f.curve && f.curve.length ? 'curve' : f.lines && f.lines.length ? 'lines' : 'even', lines: (f.lines || []).slice(), curve: (f.curve || []).map(p => p.slice()), cnt: f.n || 4, gap: f.gap || 0.4, angle: f.angle || 30, ends: f.ends || 'none', bw: f.bw || 0, bh: f.bh || 0, bl: f.bl || 0 }),
     fields: v => [{ k: 'seg', id: 'style', label: 'Typ kloubu', options: [['disc', 'Kotouč'], ['hinge', 'Pant'], ['flex', 'Nahoru/dolů'], ['flexi', 'Flexi']].concat(v.style === 'ring' ? [['ring', 'Očka']] : v.style === 'chain' ? [['chain', 'Očka (starší)']] : []), value: v.style }, /* the eyes only for older models that use them */
       { k: 'chk', id: 'snap', label: 'Tisknout po dílech a zacvaknout', value: v.snap },
       { k: 'seg', id: 'axis', label: 'Řetěz podél osy', options: [['x', 'X'], ['y', 'Y']], value: v.axis },
@@ -8119,6 +8119,7 @@ const ORG_MODS = {
       { k: 'num', id: 'gap', label: 'Vůle v kloubu', value: v.gap }, { k: 'num', id: 'angle', label: 'Natočení kloubu', unit: '°', value: v.angle, range: [10, 60, 1] },
       { k: 'seg', id: 'ends', label: 'Zapínání na koncích (řemínek)', options: [['none', 'Žádné'], ['buckle', 'Spona'], ['fold', 'Spona sklápěcí']].concat(v.ends === 'tongue' ? [['tongue', 'Jazyk a poutko']] : []), value: v.ends },
       { k: 'num', id: 'bw', label: 'Šířka spony (0 = jako řemínek)', value: v.bw }, { k: 'num', id: 'bh', label: 'Výška spony (0 = automaticky)', value: v.bh },
+      { k: 'num', id: 'bl', label: 'Délka jazýčků spony (0 = automaticky)', value: v.bl },
       { k: 'note', id: 'tip' }],
     feature: v => {
       if (v.place === 'curve' && v.curve.length >= 2) {
@@ -8126,7 +8127,7 @@ const ORG_MODS = {
         return { style: v.style, ...(v.snap && v.style === 'flex' ? { snap: true } : {}), axis: J.axis, n: J.at.length, at: J.at, atS: J.atS, tilt: J.tilt, curve: v.curve, gap: v.gap, angle: v.angle };
       }
       const L = v.place === 'lines' ? v.lines : [], a = v.axis === 'y' ? 1 : 0;
-      return { style: v.style, ...(v.snap && v.style === 'flex' && v.ends !== 'fold' ? { snap: true } : {}), axis: v.axis, n: L.length || Math.max(1, Math.round(v.cnt)), ...(L.length ? { at: L.map(l => l.at !== undefined ? l.at : r3((l.a[a] + l.b[a]) / 2)), ...(L.some(l => l.tilt) ? { tilt: L.map(l => l.tilt || 0) } : {}), lines: L } : {}), gap: v.gap, angle: v.angle, ...(v.ends && v.ends !== 'none' ? { ends: v.ends, bw: v.bw || 0, bh: v.bh || 0 } : {}) };
+      return { style: v.style, ...(v.snap && v.style === 'flex' && v.ends !== 'fold' ? { snap: true } : {}), axis: v.axis, n: L.length || Math.max(1, Math.round(v.cnt)), ...(L.length ? { at: L.map(l => l.at !== undefined ? l.at : r3((l.a[a] + l.b[a]) / 2)), ...(L.some(l => l.tilt) ? { tilt: L.map(l => l.tilt || 0) } : {}), lines: L } : {}), gap: v.gap, angle: v.angle, ...(v.ends && v.ends !== 'none' ? { ends: v.ends, bw: v.bw || 0, bh: v.bh || 0, ...(v.bl > 0 ? { bl: v.bl } : {}) } : {}) };
     },
     ready: v => (v.place !== 'lines' || v.lines.length > 0) && (v.place !== 'curve' || v.curve.length >= 2),
     drawing: c => c.v.place === 'lines',
@@ -8167,7 +8168,7 @@ const ORG_MODS = {
           J.pts.forEach(p => c.dots.add(orgDot([p[0], p[1], z], true)));
         }
       }
-      dlg.show('bw', c.v.ends !== 'none'); dlg.show('bh', c.v.ends === 'buckle');
+      dlg.show('bw', c.v.ends !== 'none'); dlg.show('bh', c.v.ends === 'buckle'); dlg.show('bl', c.v.ends === 'buckle');
       const endsTip = c.v.ends === 'fold' ? ' Spona sklápěcí: samice se tiskne nastojato na začátku řemínku (tenká dutina tak nepotřebuje most) a po tisku se v kloubu sklopí o 90° ven, ústím od řemínku; samec leží naplocho na konci. Spona je jen o málo silnější než řemínek.' : '';
       dlg.set('tip', {
         disc: 'Kotouč: jeden článek končí kulatým kloubem, druhý do něj zasahuje jazýčkem s kotoučem. Klouby se otáčejí kolem svislé osy, články se ohýbají do stran (had, drak, ještěrka).',
@@ -8587,16 +8588,17 @@ function startPrintCheck() {
 /* ---------- Spona (side release buckle), two halves printed flat ---------- */
 function startBuckle(editIndex, f) {
   const c = {
-    editIndex, v: f ? { w: f.w, h: f.h, gap: f.gap, slot: f.slot !== false } : { w: 25, h: 8, gap: 0.3, slot: true }, pos: f ? f.pos.slice() : [0, 0, 0], tool: null,
+    editIndex, v: f ? { w: f.w, h: f.h, gap: f.gap, slot: f.slot !== false, len: f.len || 0 } : { w: 25, h: 8, gap: 0.3, slot: true, len: 0 }, pos: f ? f.pos.slice() : [0, 0, 0], tool: null,
     init() {
       openDialog({ title: 'Spona', icon: 'buckle',
         fields: [{ k: 'num', id: 'w', label: 'Šířka spony', value: this.v.w }, { k: 'num', id: 'h', label: 'Výška spony', value: this.v.h },
+          { k: 'num', id: 'len', label: 'Délka jazýčků (0 = automaticky)', value: this.v.len },
           { k: 'num', id: 'gap', label: 'Vůle', value: this.v.gap }, { k: 'chk', id: 'slot', label: 'Průvlek pro popruh', value: this.v.slot },
           { k: 'xyz', id: 'pos', label: 'Poloha', value: this.pos }, { k: 'note', id: 'tip' }, { k: 'note', id: 'n' }],
         onChange: id => {
           if (id === 'slot') this.v.slot = dlg.get('slot');
           else if (id === 'pos') this.pos = dlg.get('pos');
-          else { const x = dlg.get(id); if (x > 0) this.v[id] = x; }
+          else { const x = dlg.get(id); if (x > 0 || (id === 'len' && x === 0)) this.v[id] = x; }
           this.update();
         } });
       setPrompt('Klepnutím do pohledu sponu umístíte; obě poloviny se tisknou naplocho');
