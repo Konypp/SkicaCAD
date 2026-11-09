@@ -2191,13 +2191,24 @@ function articulateParts(polys, f) {
   if (f.ends === 'fold') return articulateFold(polys, f);
   if (f.ends !== 'buckle' && f.ends !== 'tongue') return articulateCore(polys, f);
   const a = f.axis === 'y' ? 1 : 0, sAx = 1 - a, bb = KK.bbox(polys);
+  /* the strap's section where the part joins it: a strap with rounded (or tapered) ends is narrower right at the tip,
+     so the part is sized by the section at its back edge, found in two passes (the length depends on the width) */
+  const Ls = bb.max[a] - bb.min[a];
   const parts = [[bb.min[a], -1], [bb.max[a], 1]].map(([xe, sg]) => {
-    const sec = sectionAt(polys, a, xe - sg * 0.6) || { min: bb.min, max: bb.max };
-    const wEnd = sec.max[sAx] - sec.min[sAx], hEnd = sec.max[2] - sec.min[2];
-    const B = f.ends === 'tongue' ? tongueParts({ w: Number(f.bw) || wEnd, h: hEnd })
-      : buckleParts({ w: Number(f.bw) || Math.max(9, wEnd), h: Number(f.bh) || Math.max(4.6, hEnd), gap: f.bgap || 0.3, squareBack: true });
-    const body = sg < 0 ? B.female : B.male, len = KK.bbox(body).max[0];
-    return { xe, sg, body, len, sec };
+    const secAt = d => sectionAt(polys, a, xe - sg * Math.min(d, Ls / 3));
+    const make = sec => {
+      const wEnd = sec.max[sAx] - sec.min[sAx], hEnd = sec.max[2] - sec.min[2];
+      const B = f.ends === 'tongue' ? tongueParts({ w: Number(f.bw) || wEnd, h: hEnd })
+        : buckleParts({ w: Number(f.bw) || Math.max(9, wEnd), h: Number(f.bh) || Math.max(4.6, hEnd), gap: f.bgap || 0.3, squareBack: true });
+      const body = sg < 0 ? B.female : B.male;
+      return { xe, sg, body, len: KK.bbox(body).max[0], sec };
+    };
+    let sec = null;
+    for (const d of [0.6, 2, 4, 7, 10, 14, 18, 24, 30]) { const c = secAt(d); if (c && (!sec || c.max[sAx] - c.min[sAx] > sec.max[sAx] - sec.min[sAx] + 1e-6)) sec = c; }
+    let P = make(sec || { min: bb.min, max: bb.max });
+    const back = secAt(Math.max(0.6, P.len - 0.5));
+    if (back && Math.abs((back.max[sAx] - back.min[sAx]) - (P.sec.max[sAx] - P.sec.min[sAx])) > 0.3) P = make(back);
+    return P;
   });
   const L = bb.max[a] - bb.min[a], inner = L - parts[0].len - parts[1].len;
   if (inner < 6) throw new Error('Řemínek je na zapínání příliš krátký');
@@ -3023,7 +3034,7 @@ function makeRebuilder() {
   };
 }
 
-return { faceEditRun, feStep, feLoopRing, feRegion, feCentre, feInner, ribsTool, curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { sectionAt, faceEditRun, feStep, feLoopRing, feRegion, feCentre, feInner, ribsTool, curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 
