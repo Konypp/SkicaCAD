@@ -1,5 +1,7 @@
 # Changelog
 
+## Beta 2.29
+- **Uříznuté popisky tlačítek:** tlačítka v řádcích dialogů (např. Duplikovat plochu v Modelovat) dlouhý název zalomí na dva řádky místo uříznutí; tlačítka v pásu s dlouhým jedním slovem (v angličtině Connectors, Construction) se rozšíří. Prošly se všechny dialogy (i všechny nástroje Modelovat), lišta ploch, kruhové menu, pás a jeho nabídky – česky i anglicky, na počítači i telefonu – a nic dalšího uříznuté není.
 ## Beta 2.28
 - **Pás nástrojů:** tlačítka s dvouřádkovým názvem (Vytvořit skicu, Základní tělesa, Vybrat vše…) jsou vyšší, takže rámeček zvýraznění už nezasahuje do textu.
 ## Beta 2.27
