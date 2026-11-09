@@ -2202,6 +2202,17 @@ function tongueParts(f) {
   }
   return { female, male, W, Lu, Lt };
 }
+/* Spojka kloubem: the two ends of a strap get the halves of an up/down joint, made to be snapped together (like the
+   joints printed in parts), so the strap closes into a ring that opens again: the female (two arms with conical seats)
+   at the start, the male (a tongue with cone lugs) at the end. Local frame like the buckle: back at x = 0, +x outwards. */
+function jointEndParts(f) {
+  const W = Math.max(5, Number(f.w) || 20), H = Math.max(2.4, Number(f.h) || 4), g = Math.max(0.15, Number(f.gap) || 0.4);
+  const hz = H / 2, dp0 = Math.max(0.8, Math.min(hz * 0.6, 2)), Rr = Math.max(hz, dp0 + g * 1.42 + 1.2), Lp = Rr + g + 2.5;
+  const blk = KK.translate(KK.primitive('box', { w: 2 * Lp, d: W, h: H }), [Lp, 0, H / 2]);
+  const [A, B] = articulateCore(blk, { style: 'flex', axis: 'x', n: 1, at: [Lp], gap: g, angle: 30, snap: true });
+  /* the male turned end for end, so its back is at x = 0 too */
+  return { female: A, male: KK.transform(B, [-1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 2 * Lp, 0, 0, 1]) };
+}
 /* place a buckle half: local +x along dir (unit vector in the bed's plane), back at point o (z of the bed at o[2]) */
 function placeLocal(polys, o, dir) {
   const c = dir[0], s2 = dir[1];
@@ -2218,7 +2229,7 @@ function articulate(polys, f) {
 }
 function articulateParts(polys, f) {
   if (f.ends === 'fold') return articulateFold(polys, f);
-  if (f.ends !== 'buckle' && f.ends !== 'tongue') return articulateCore(polys, f);
+  if (f.ends !== 'buckle' && f.ends !== 'tongue' && f.ends !== 'joint') return articulateCore(polys, f);
   const a = f.axis === 'y' ? 1 : 0, sAx = 1 - a, bb = KK.bbox(polys);
   /* the strap's section where the part joins it: a strap with rounded (or tapered) ends is narrower right at the tip,
      so the part is sized by the section at its back edge, found in two passes (the length depends on the width) */
@@ -2227,7 +2238,8 @@ function articulateParts(polys, f) {
     const secAt = d => sectionAt(polys, a, xe - sg * Math.min(d, Ls / 3));
     const make = sec => {
       const wEnd = sec.max[sAx] - sec.min[sAx], hEnd = sec.max[2] - sec.min[2];
-      const B = f.ends === 'tongue' ? tongueParts({ w: Number(f.bw) || wEnd, h: hEnd })
+      const B = f.ends === 'joint' ? jointEndParts({ w: Number(f.bw) || wEnd, h: hEnd, gap: f.gap })
+        : f.ends === 'tongue' ? tongueParts({ w: Number(f.bw) || wEnd, h: hEnd })
         : buckleParts({ w: Number(f.bw) || Math.max(9, wEnd), h: Number(f.bh) || Math.max(3.6, hEnd), gap: f.bgap || 0.3, len: Number(f.bl) || 0, squareBack: true });
       const body = sg < 0 ? B.female : B.male;
       return { xe, sg, body, len: KK.bbox(body).max[0], sec };

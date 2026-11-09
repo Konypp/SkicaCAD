@@ -8120,7 +8120,7 @@ const ORG_MODS = {
       { k: 'sel', id: 'jl', label: 'Řezy' }, { k: 'btns', id: 'jb', label: '', options: [['undo', 'Zpět'], ['clear', 'Smazat vše']] },
       { k: 'num', id: 'cnt', label: 'Počet kloubů', unit: 'ks', value: v.cnt, range: [1, 20, 1] },
       { k: 'num', id: 'gap', label: 'Vůle v kloubu', value: v.gap }, { k: 'num', id: 'angle', label: 'Natočení kloubu', unit: '°', value: v.angle, range: [10, 60, 1] },
-      { k: 'seg', id: 'ends', label: 'Zapínání na koncích (řemínek)', options: [['none', 'Žádné'], ['buckle', 'Spona'], ['fold', 'Spona sklápěcí']].concat(v.ends === 'tongue' ? [['tongue', 'Jazyk a poutko']] : []), value: v.ends },
+      { k: 'seg', id: 'ends', label: 'Zapínání na koncích (řemínek)', options: [['none', 'Žádné'], ['buckle', 'Spona'], ['fold', 'Spona sklápěcí'], ['joint', 'Kloub']].concat(v.ends === 'tongue' ? [['tongue', 'Jazyk a poutko']] : []), value: v.ends },
       { k: 'num', id: 'bw', label: 'Šířka spony (0 = jako řemínek)', value: v.bw }, { k: 'num', id: 'bh', label: 'Výška spony (0 = automaticky)', value: v.bh },
       { k: 'num', id: 'bl', label: 'Délka jazýčků spony (0 = automaticky)', value: v.bl },
       { k: 'note', id: 'tip' }],
@@ -8171,8 +8171,8 @@ const ORG_MODS = {
           J.pts.forEach(p => c.dots.add(orgDot([p[0], p[1], z], true)));
         }
       }
-      dlg.show('bw', c.v.ends !== 'none'); dlg.show('bh', c.v.ends === 'buckle'); dlg.show('bl', c.v.ends === 'buckle');
-      const endsTip = c.v.ends === 'fold' ? ' Spona sklápěcí: samice se tiskne nastojato na začátku řemínku (tenká dutina tak nepotřebuje most) a po tisku se v kloubu sklopí o 90° ven, ústím od řemínku; samec leží naplocho na konci. Spona je jen o málo silnější než řemínek.' : '';
+      dlg.show('bw', c.v.ends !== 'none' && c.v.ends !== 'joint'); dlg.show('bh', c.v.ends === 'buckle'); dlg.show('bl', c.v.ends === 'buckle');
+      const endsTip = c.v.ends === 'joint' ? ' Kloub: na začátek řemínku přijdou dvě ramena s kuželovými důlky (samice), na konec jazýček s kuželovými čepy (samec), jako u kloubu Nahoru/dolů tištěného po dílech. Jazýček zasuňte mezi ramena, až čepy zacvaknou; řemínek se tak spojí do kruhu a jde zase rozepnout.' : c.v.ends === 'fold' ? ' Spona sklápěcí: samice se tiskne nastojato na začátku řemínku (tenká dutina tak nepotřebuje most) a po tisku se v kloubu sklopí o 90° ven, ústím od řemínku; samec leží naplocho na konci. Spona je jen o málo silnější než řemínek.' : '';
       dlg.set('tip', {
         disc: 'Kotouč: jeden článek končí kulatým kloubem, druhý do něj zasahuje jazýčkem s kotoučem. Klouby se otáčejí kolem svislé osy, články se ohýbají do stran (had, drak, ještěrka).',
         flexi: 'Flexi: z tělesa se v místě kloubu vyřízne nástroj FlexiJoint Maker – tenký kotouč (mezera mezi články) s miskou kolem koule uprostřed. Zbudou dva články spojené koulí v misce; kloub se natáčí do všech stran. Kloub stojí na podložce – svislé očko vychází ze spodní stěny (na kulatém tělese se zvedne výš, aby miska zůstala uvnitř). Velikost nástroje se řídí průřezem tělesa – na tenkém se zmenší, na velkém zvětší (nejvýš 4×) i s mezerami.',

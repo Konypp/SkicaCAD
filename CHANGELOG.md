@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.43
+- Kloubový model – Zapínání na koncích: nová volba Kloub. Na začátek řemínku přijdou dvě ramena s kuželovými důlky (samice), na konec jazýček s kuželovými čepy (samec), jako u kloubu Nahoru/dolů tištěného po dílech; po zacvaknutí se řemínek spojí do kruhu a jde zase rozepnout.
+
 ## Beta 2.42
 - Spona: samice má zase uzavřené dno (otevřené dno z 2.39 dovolilo samce vylomit dolů). Zůstávají podříznuté háčky (tah sponu nerozepne), zaoblení u kořene jazýčků, kratší úzká spona a klouby hned za díly spony.
 
