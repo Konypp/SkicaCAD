@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.47
+- Import DXF / SVG do otevřené skici: v paletě skici se po vložení objeví Šířka, Výška, Měřítko a Vycentrovat na počátek, takže i velký soubor hned zmenšíte na potřebný rozměr; Hotovo panel zavře (zavře se i po jiné úpravě vložených prvků).
+
 ## Beta 2.46
 - Vysunutí: tlačítka Vybrat vše a Zrušit výběr pro profily skici (i Ctrl+A), a výběr profilů rámečkem tažením se Shift (doprava celé uvnitř, doleva všechny dotčené) – např. všechny buňky importovaného Voronoi SVG najednou.
 

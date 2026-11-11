@@ -1534,6 +1534,12 @@ $('#dialog').addEventListener('change', e => {
   if (sk && e.target.id === 'pal-txt') { const t = e.target.value.trim(); if (t) sk.txt.s = t.slice(0, 200); e.target.value = sk.txt.s; redrawSketch(); }
   if (sk && e.target.id === 'pal-txth') { const v = parseNum(e.target.value); if (v > 0) sk.txt.h = Math.min(1000, v); e.target.value = fmtc(sk.txt.h, 3); redrawSketch(); }
   if (sk && e.target.id === 'pal-txtb') { sk.txt.bold = e.target.checked; redrawSketch(); }
+  if (sk && sk.imp && /^pal-imp[whs]$/.test(e.target.id)) {
+    const m = sk.imp, v = parseNum(e.target.value), k = e.target.id.slice(-1), bw = m.r.bbox[2] - m.r.bbox[0], bh = m.r.bbox[3] - m.r.bbox[1];
+    const sc = !(v > 0) ? m.scale : k === 's' ? v : k === 'w' ? (bw > 0 ? v / bw : m.scale) : (bh > 0 ? v / bh : m.scale);
+    skImpApply(Math.min(1e5, Math.max(1e-6, sc)), m.center);
+  }
+  if (sk && sk.imp && e.target.id === 'pal-impc') skImpApply(sk.imp.scale, e.target.checked);
   if (sk && e.target.id === 'pal-fr') { const v = parseNum(e.target.value); if (v > 0) sk.frR = v; e.target.value = fmtc(sk.frR, 3); }
 });
 $('#dialog').addEventListener('keydown', e => {
@@ -2492,7 +2498,7 @@ const ENT_LABEL = { text: 'Text', spline: 'Křivka', rect: 'Obdélník', circle:
 function openPalette() {
   const el = $('#dialog'); el.hidden = false; dlg = null;
   el.innerHTML = `<div class="phead"><span class="ico">${svg('sketch', 18)}</span><span class="t">PALETA SKICI</span><button class="ibtn" data-act="cancel" aria-label="Zrušit skicu" title="Zrušit změny">${svg('close', 14)}</button></div>
-    <div class="dbody palette"><div id="pal-tool" hidden></div><div class="note" id="pal-note"></div><label class="chk"><input type="checkbox" id="pal-dims"${showSkDims() ? ' checked' : ''}><span>Zobrazit kóty</span></label><div class="ents" id="pal-ents"></div></div>
+    <div class="dbody palette"><div id="pal-imp" class="palimp" hidden></div><div id="pal-tool" hidden></div><div class="note" id="pal-note"></div><label class="chk"><input type="checkbox" id="pal-dims"${showSkDims() ? ' checked' : ''}><span>Zobrazit kóty</span></label><div class="ents" id="pal-ents"></div></div>
     <div class="dfoot"><button class="btn" data-act="cancel">Zrušit</button><button class="btn primary" data-act="ok">Dokončit skicu</button></div>`;
   renderPalette();
 }
@@ -2523,6 +2529,8 @@ function renderPalette() {
     }
     tb.hidden = !want;
   }
+  const ib = $('#pal-imp');
+  if (ib) { const html = skImpHTML(), key = html ? sk.imp.scale + '|' + sk.imp.center + '|' + sk.imp.i0 : ''; if (ib.dataset.key !== key) { ib.dataset.key = key; ib.innerHTML = html; ib.hidden = !html; fitDialogRows($('#dialog')); } }
   $('#pal-note').textContent = ents.length ? `${sk.f.name} · ${nr} ${nr === 1 ? 'uzavřený profil' : nr >= 2 && nr <= 4 ? 'uzavřené profily' : 'uzavřených profilů'}` : 'Skica je prázdná. Nakreslete obdélník, kružnici nebo čáru.';
   const num = (i, k, label, val) => `<label class="fnum" title="${label}"><span class="ax">${label}</span><input id="ent-${i}-${k}" data-ent="${i}" data-k="${k}" value="${fmtc(val, 3)}" inputmode="decimal" autocomplete="off" aria-label="${label}"></label>`;
   const uniChk = i => `<label class="chk"><input type="checkbox" id="ent-${i}-uni" data-ent="${i}" data-k="uni"${sk.uniform ? ' checked' : ''}><span>Zachovat poměr stran</span></label>`;
@@ -2569,6 +2577,7 @@ function renderPalette() {
 $('#dialog').addEventListener('click', e => {
   if (!sk) return;
   const ta = e.target.closest('[data-tal]'); if (ta) { const t = sk.f.ents[+ta.dataset.ent]; if (t && t.t === 'text') { if (ta.dataset.tal === 'l') delete t.al; else t.al = ta.dataset.tal; renderPalette(); redrawSketch(); } return; }
+  if (e.target.closest('[data-impdone]')) { sk.imp = null; renderPalette(); return; }
   const od = e.target.closest('[data-offdir]'); if (od && sk && sk.tool === 'skoffset') { sk.offIn = od.dataset.offdir === 'in'; renderPalette(); return; }
   const sc = e.target.closest('[data-symcenter]'); if (sc && sk.tool === 'skmirror') {
     const pts = []; for (const pl of entityPolylines(sk.f.ents)) pts.push(...pl.pts);
@@ -6900,8 +6909,35 @@ function importIntoSketch(r, ext, name) {
   const center = ext === 'svg';
   const cx = center ? (r.bbox[0] + r.bbox[2]) / 2 : 0, cy = center ? (r.bbox[1] + r.bbox[3]) / 2 : 0;
   const ents = transformEnts(r.ents, r.scale, cx, cy);
+  /* the inserted entities stay adjustable (scale, size, centring) in the palette until Hotovo or another edit */
+  sk.imp = { r, name, ext, scale: r.scale, center, i0: sk.f.ents.length, ents };
   sk.f.ents.push(...ents); sk.selEnt = -1; renderPalette(); redrawSketch();
   toast(`Vloženo ${plural(ents.length, 'prvek', 'prvky', 'prvků')} ze souboru ${name}. Měřítko ${fmtc(r.scale, 4)} mm na jednotku${r.unitsKnown ? '' : ', jednotky nebyly v souboru uvedené'}.`);
+}
+/* the last import into the open sketch, still adjustable: false when its entities were changed since */
+function skImpLive() {
+  const m = sk && sk.imp; if (!m) return false;
+  const cur = sk.f.ents.slice(m.i0, m.i0 + m.ents.length);
+  if (cur.length !== m.ents.length || cur.some((e, i) => e !== m.ents[i])) { sk.imp = null; return false; }
+  return true;
+}
+function skImpApply(scale, center) {
+  if (!skImpLive()) { renderPalette(); return; }
+  const m = sk.imp, r = m.r;
+  m.scale = scale; m.center = center;
+  const cx = center ? (r.bbox[0] + r.bbox[2]) / 2 : 0, cy = center ? (r.bbox[1] + r.bbox[3]) / 2 : 0;
+  m.ents = transformEnts(r.ents, scale, cx, cy);
+  sk.f.ents.splice(m.i0, m.ents.length, ...m.ents); sk.selEnt = -1; renderPalette(); redrawSketch();
+}
+function skImpHTML() {
+  if (!skImpLive()) return '';
+  const m = sk.imp, w = (m.r.bbox[2] - m.r.bbox[0]) * m.scale, h = (m.r.bbox[3] - m.r.bbox[1]) * m.scale;
+  return `<div class="frow wide"><span class="fl">Import ${m.name}.${m.ext} · ${fmtc(w, 2)} × ${fmtc(h, 2)} mm</span></div>`
+    + `<div class="frow"><label for="pal-impw">Šířka</label><span class="fnum"><input id="pal-impw" value="${fmtc(w, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div>`
+    + `<div class="frow"><label for="pal-imph">Výška</label><span class="fnum"><input id="pal-imph" value="${fmtc(h, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div>`
+    + `<div class="frow"><label for="pal-imps">Měřítko</label><span class="fnum"><input id="pal-imps" value="${fmtc(m.scale, 4)}" inputmode="decimal" autocomplete="off"><span class="u">mm/j.</span></span></div>`
+    + `<label class="chk"><input type="checkbox" id="pal-impc"${m.center ? ' checked' : ''}><span>Vycentrovat na počátek</span></label>`
+    + `<div class="frow wide"><button class="btn" data-impdone="1">Hotovo</button></div>`;
 }
 function startImport2D(info) {
   const c = {
