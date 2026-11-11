@@ -544,6 +544,7 @@ function styleBodies() {
        faces show their shape), no triangle diagonals inside flat faces; sharp edges are drawn stronger over them */
     const wire = settings.style === 'w';
     m.wireframe = false; m.transparent = false; m.opacity = 1; m.depthWrite = true;
+    if (sk && sk.ghost) { m.transparent = true; m.opacity = 0.3; m.depthWrite = false; }
     m.visible = !wire;
     if (wire && !e.facets) {
       const arr = [];
@@ -1527,6 +1528,7 @@ $('#dialog').addEventListener('change', e => {
   const f = e.target.dataset && e.target.dataset.f; if (f && dlg && dlg.spec.onChange) dlg.spec.onChange(f);
   if (sk && e.target.dataset.ent) onPaletteChange(e.target);
   if (sk && e.target.id === 'pal-ngon') { const v = Math.round(parseNum(e.target.value)); if (v >= 3 && v <= 64) sk.ngonN = v; e.target.value = sk.ngonN; redrawSketch(); }
+  if (sk && e.target.id === 'pal-ghost') { sk.ghost = e.target.checked; styleBodies(); redrawSketch(); }
   if (sk && e.target.id === 'pal-dims') { settings.skDims = e.target.checked; saveSettings(); requestRender(); }
   if (sk && e.target.id === 'pal-symc') { const v = parseNum(e.target.value); if (isFinite(v)) symState().c = v; e.target.value = fmtc(symState().c, 3); redrawSketch(); }
   if (sk && e.target.id === 'pal-symlive') { symState().live = e.target.checked; sk.symN = sk.f.ents.length; redrawSketch(); }
@@ -1695,12 +1697,24 @@ function startSketchCmd() {
 /* ================= sketch mode ================= */
 let sk = null; /* {f, editIndex, tool, draft, selEnt, hoverPt} */
 const skGridMat = { minor: null, major: null };
+function cutsBody(P) {
+  for (const b of cur.bodies) {
+    if (!(bodiesVisible() && isVis(b.id))) continue;
+    const bb = K.bbox(b.polys); let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < 8; i++) { const p = [i & 1 ? bb.max[0] : bb.min[0], i & 2 ? bb.max[1] : bb.min[1], i & 4 ? bb.max[2] : bb.min[2]]; const d = (p[0] - P.o[0]) * P.n[0] + (p[1] - P.o[1]) * P.n[1] + (p[2] - P.o[2]) * P.n[2]; lo = Math.min(lo, d); hi = Math.max(hi, d); }
+    if (lo < -0.05 && hi > 0.05) return true;
+  }
+  return false;
+}
 function enterSketch(f, editIndex) {
   sk = { f, editIndex, tool: null, draft: null, selEnt: -1, cursor: null, snapPt: null, ngonN: 6, frR: 2, offD: 2, offIn: false, txt: { s: 'Text', h: 10, bold: true } };
   if (!f.ents) f.ents = [];
   sk.hist = []; sk.fut = []; sk.lastJSON = JSON.stringify(f.ents);
   /* a sketch taken from a face is resized uniformly by default (its outline keeps its shape) */
   if (f.orig) sk.uniform = true;
+  /* a sketch plane that runs through a body (e.g. the XZ plane through a centred cylinder): the bodies are shown see-through,
+     or the body would hide the sketch; the palette can switch it */
+  sk.ghost = cutsBody(f.plane);
   sel = new Set(); styleBodies();
   G.grid.visible = false;
   buildSketchGrid();
@@ -1767,7 +1781,7 @@ function redrawSketch() {
   if (sk.gridHot && !sk.snapPt) live.add(crossMarker(P, sk.gridHot));
   /* the sketch grid is drawn without depth test in the transparent pass (so a body face cannot hide it);
      sketch lines and points must therefore come after it in that pass, or the grid would paint over them */
-  live.traverse(o => { if (o.isLine || o.isPoints) { o.material.transparent = true; o.renderOrder = Math.max(o.renderOrder, 6); } });
+  live.traverse(o => { if (o.isLine || o.isPoints) { o.material.transparent = true; o.material.depthTest = !sk.ghost; o.renderOrder = Math.max(o.renderOrder, 6); } });
   requestRender();
 }
 function regionMesh(P, r, color, opacity, lift) {
@@ -2499,7 +2513,7 @@ const ENT_LABEL = { text: 'Text', spline: 'Křivka', rect: 'Obdélník', circle:
 function openPalette() {
   const el = $('#dialog'); el.hidden = false; dlg = null;
   el.innerHTML = `<div class="phead"><span class="ico">${svg('sketch', 18)}</span><span class="t">PALETA SKICI</span><button class="ibtn" data-act="cancel" aria-label="Zrušit skicu" title="Zrušit změny">${svg('close', 14)}</button></div>
-    <div class="dbody palette"><div id="pal-imp" class="palimp" hidden></div><div id="pal-tool" hidden></div><div class="note" id="pal-note"></div><label class="chk"><input type="checkbox" id="pal-dims"${showSkDims() ? ' checked' : ''}><span>Zobrazit kóty</span></label><div class="ents" id="pal-ents"></div></div>
+    <div class="dbody palette"><div id="pal-imp" class="palimp" hidden></div><div id="pal-tool" hidden></div><div class="note" id="pal-note"></div><label class="chk"><input type="checkbox" id="pal-dims"${showSkDims() ? ' checked' : ''}><span>Zobrazit kóty</span></label><label class="chk"><input type="checkbox" id="pal-ghost"${sk.ghost ? ' checked' : ''}><span>Průhledná tělesa</span></label><div class="ents" id="pal-ents"></div></div>
     <div class="dfoot"><button class="btn" data-act="cancel">Zrušit</button><button class="btn primary" data-act="ok">Dokončit skicu</button></div>`;
   renderPalette();
 }
@@ -2668,7 +2682,7 @@ function finishSketch(apply) {
   if (!sk) return;
   if (isPolyTool(sk.tool) && sk.draft) finishPolyline(false);
   const s = sk;
-  sk = null;
+  sk = null; styleBodies();
   clearGroup(G.skwork); closeDialog(); setPrompt(''); $('#dim').hidden = true; dom.style.cursor = '';
   G.grid.visible = settings.grid;
   renderRibbon();

@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.49
+- Skica na rovině, která prochází tělesem (např. XZ přes vycentrovaný válec): tělesa se ve skice zobrazí průhledně a čáry skici jsou vidět i uvnitř tělesa. V paletě skici to přepíná Průhledná tělesa.
+
 ## Beta 2.48
 - Import DXF / SVG do skici: v panelu importu přibyl Posun X a Posun Y, vložený obrys tak posunete kamkoli ve skice (posun zůstane i při změně velikosti).
 
