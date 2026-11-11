@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.50
+- Skica s průhlednými tělesy: mřížka skici se kreslí přes tělesa a výrazněji (tmavší čáry), takže je dobře vidět i přes válec.
+
 ## Beta 2.49
 - Skica na rovině, která prochází tělesem (např. XZ přes vycentrovaný válec): tělesa se ve skice zobrazí průhledně a čáry skici jsou vidět i uvnitř tělesa. V paletě skici to přepíná Průhledná tělesa.
 

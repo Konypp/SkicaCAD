@@ -1528,7 +1528,7 @@ $('#dialog').addEventListener('change', e => {
   const f = e.target.dataset && e.target.dataset.f; if (f && dlg && dlg.spec.onChange) dlg.spec.onChange(f);
   if (sk && e.target.dataset.ent) onPaletteChange(e.target);
   if (sk && e.target.id === 'pal-ngon') { const v = Math.round(parseNum(e.target.value)); if (v >= 3 && v <= 64) sk.ngonN = v; e.target.value = sk.ngonN; redrawSketch(); }
-  if (sk && e.target.id === 'pal-ghost') { sk.ghost = e.target.checked; styleBodies(); redrawSketch(); }
+  if (sk && e.target.id === 'pal-ghost') { sk.ghost = e.target.checked; styleBodies(); skGridGhost(); redrawSketch(); }
   if (sk && e.target.id === 'pal-dims') { settings.skDims = e.target.checked; saveSettings(); requestRender(); }
   if (sk && e.target.id === 'pal-symc') { const v = parseNum(e.target.value); if (isFinite(v)) symState().c = v; e.target.value = fmtc(symState().c, 3); redrawSketch(); }
   if (sk && e.target.id === 'pal-symlive') { symState().live = e.target.checked; sk.symN = sk.f.ents.length; redrawSketch(); }
@@ -1752,8 +1752,22 @@ function buildSketchGrid() {
   const axU = noRay(new THREE.Line(lineGeo([ax1.x, ax1.y, ax1.z, ax2.x, ax2.y, ax2.z]), new THREE.LineBasicMaterial({ color: 0xe5484d, transparent: true, opacity: 0.6, depthTest: false })));
   const axV = noRay(new THREE.Line(lineGeo([ay1.x, ay1.y, ay1.z, ay2.x, ay2.y, ay2.z]), new THREE.LineBasicMaterial({ color: 0x2f9e6a, transparent: true, opacity: 0.6, depthTest: false })));
   const work = new THREE.Group(); work.name = 'grid'; work.add(gf, g1, g2, axU, axV);
-  G.skwork.add(work);
+  for (const o of work.children) o.userData.ro = o.renderOrder;
+  G.skwork.add(work); skGridGhost();
   const live = new THREE.Group(); live.name = 'live'; G.skwork.add(live);
+}
+/* with see-through bodies the grid is drawn after them (over them) and a little stronger, so it reads across a body */
+function skGridGhost() {
+  const w = sk && G.skwork.getObjectByName('grid'); if (!w) return;
+  for (const o of w.children) {
+    o.renderOrder = sk.ghost ? o.userData.ro + 5 : o.userData.ro;
+    if (o.userData.op === undefined) { o.userData.op = o.material.opacity; o.userData.col = o.material.color.clone(); }
+    /* the grid's own light colour vanishes on a pale body: across bodies it takes the ink colour, faint */
+    const ax = o.isLine && !o.isLineSegments, maj = o.material === w.children[2].material;
+    if (sk.ghost && !ax) { o.material.color.copy(tok.ink); o.material.opacity = o.name === 'fine' ? 0.15 : maj ? 0.5 : 0.3; }
+    else { o.material.color.copy(o.userData.col); o.material.opacity = sk.ghost ? Math.min(1, o.userData.op + 0.3) : o.userData.op; }
+  }
+  requestRender();
 }
 function redrawSketch() {
   if (!sk) return;
