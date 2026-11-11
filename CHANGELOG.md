@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.51
+- Skica: výběr více prvků – Ctrl (Cmd) + klepnutí přidá nebo odebere prvek, Shift + tažení vybere rámečkem (doprava celé uvnitř, doleva dotčené), Ctrl+A vybere všechny, Esc výběr zruší. Vybrané prvky se společně přesouvají tažením i šipkami, mažou, kopírují (Ctrl+C / Ctrl+V), duplikují (Ctrl+D) a přepínají na pomocné.
+
 ## Beta 2.50
 - Skica s průhlednými tělesy: mřížka skici se kreslí přes tělesa a výrazněji (tmavší čáry), takže je dobře vidět i přes válec.
 

@@ -412,10 +412,10 @@ function markCons(n0) {
 }
 function toggleCons() {
   if (!sk) return;
-  const e = sk.f.ents[sk.selEnt];
+  const e = sk.f.ents[sk.selEnt], si = skSel();
   if (!sk.tool && e) {
-    if (e.cons) delete e.cons; else e.cons = true;
-    toast(e.cons ? 'Prvek je pomocný: kreslí se čárkovaně a netvoří profil.' : 'Prvek už není pomocný.');
+    const on = !e.cons; for (const i of si) { const x = sk.f.ents[i]; if (on) x.cons = true; else delete x.cons; }
+    toast(on ? (si.length > 1 ? 'Vybrané prvky jsou pomocné: kreslí se čárkovaně a netvoří profil.' : 'Prvek je pomocný: kreslí se čárkovaně a netvoří profil.') : (si.length > 1 ? 'Vybrané prvky už nejsou pomocné.' : 'Prvek už není pomocný.'));
     renderPalette(); redrawSketch(); return;
   }
   sk.consMode = !sk.consMode;
@@ -1777,7 +1777,7 @@ function redrawSketch() {
   for (const r of Engine.regions(sk.f)) live.add(regionMesh(P, r, tok.orange, 0.2, 0.01));
   if (sk.f.orig) { const g = sketchLines(P, sk.f.orig.map(e => ({ ...e, cons: true })), new THREE.Color(0x8a94a0), 0.02); live.add(g); }
   live.add(sketchLines(P, ents, tok.sketch, 0.04));
-  if (sk.selEnt >= 0 && ents[sk.selEnt]) live.add(sketchLines(P, [ents[sk.selEnt]], tok.orange, 0.06));
+  { const si = skSel(); if (si.length) live.add(sketchLines(P, si.map(i => ents[i]), tok.orange, 0.06)); }
   live.add(pointsObj(P, keyPoints(ents).slice(1), tok.sketch, 5));
   const d = draftEntity();
   if (d) { if (sk.consMode) d.cons = true; live.add(sketchLines(P, [d], tok.orange, 0.07)); }
@@ -1786,8 +1786,9 @@ function redrawSketch() {
   if (sk.segHover && sk.tool === 'sksegtrim') { const g = sketchLines(P, [{ t: 'poly', pts: sk.segHover, closed: false, cons: true }], tok.danger, 0.08); live.add(g); }
   if (sk.draft && isPolyTool(sk.tool)) live.add(pointsObj(P, sk.draft.pts, tok.orange, 6));
   const se = ents[sk.selEnt];
-  if (se && (se.t === 'spline' || se.t === 'poly') && !sk.tool) live.add(pointsObj(P, se.pts.filter((q, j) => !isSmoothPt(se, j)), tok.orange, 9));
-  if (!sk.tool) ents.forEach((e, i) => { if (e.t !== 'poly' && e.t !== 'spline' && (i === sk.selEnt || (e.t === 'circle' && sk.f.orig))) live.add(pointsObj(P, shapeHandles(e).map(h => h.p), tok.orange, 9)); });
+  if (se && (se.t === 'spline' || se.t === 'poly') && !sk.tool && skSel().length < 2) live.add(pointsObj(P, se.pts.filter((q, j) => !isSmoothPt(se, j)), tok.orange, 9));
+  const multi = skSel().length > 1;
+  if (!sk.tool) ents.forEach((e, i) => { if (e.t !== 'poly' && e.t !== 'spline' && ((i === sk.selEnt && !multi) || (e.t === 'circle' && sk.f.orig))) live.add(pointsObj(P, shapeHandles(e).map(h => h.p), tok.orange, 9)); });
   for (const e of ents) if (e.t === 'spline' && e !== se) live.add(pointsObj(P, e.pts, tok.sketch, 7));
   updateUndo();
   if (sk.snapPt) live.add(sk.snapMid ? midMarker(P, sk.snapPt, tok.accent) : pointsObj(P, [sk.snapPt], tok.accent, 10));
@@ -1871,7 +1872,7 @@ function setSketchTool(t) {
     sktext: 'Text: napište text a výšku písma v paletě, pak klepněte na místo, kde má text začínat (levý konec účaří)',
     sksegtrim: 'Oříznout: klepněte na úsek čáry mezi průsečíky, úsek se odstraní a navazující čáry se spojí do jednoho obrysu'
   };
-  setPrompt(PROMPTS[t] || 'Klepnutím vyberte prvek skici, tažením ho přesunete. Nástroje kreslení jsou v pásu nahoře.');
+  setPrompt(PROMPTS[t] || 'Klepnutím vyberte prvek skici, tažením ho přesunete. Víc prvků: Ctrl + klepnutí nebo Shift + tažení rámečku, všechny Ctrl+A.');
   dom.style.cursor = t && t !== 'skfillet' && t !== 'skoffset' && t !== 'sktrim' && t !== 'sksegtrim' && t !== 'skjoin' && t !== 'skmirror' ? 'crosshair' : '';
   renderRibbon(); redrawSketch(); renderPalette(); $('#dim').hidden = true;
 }
@@ -2014,6 +2015,7 @@ function applyShapeHandle(o, k, p, keep) {
 }
 /* draggable points: vertices of polylines and curves, size handles of the selected shape */
 function sketchHandleAt(ev) {
+  if (skSel().length > 1) return null; /* a multiple selection moves as a whole, no handles */
   const [mx, my] = evPx(ev), P = sk.f.plane;
   let best = null, bd = 10;
   sk.f.ents.forEach((e, ei) => {
@@ -2037,8 +2039,10 @@ function sketchDrag(ev) {
     /* the element's first key point (corner, centre or first point) is pulled onto a nearby grid crossing */
     const k0 = keyPoints([d.orig])[1];
     if (k0 && !ev.shiftKey) { const kp = [k0[0] + dx, k0[1] + dy], c = crossNear(kp); if (c) { dx += c[0] - kp[0]; dy += c[1] - kp[1]; sk.gridHot = c; } else sk.gridHot = onCross(kp) ? kp : null; }
-    sk.f.ents[d.ei] = translateEnt(d.orig, dx, dy);
-    if (sk.f.ents[d.ei].pts) sk.f.ents[d.ei].pts = sk.f.ents[d.ei].pts.map(q => [Math.round(q[0] * 1e4) / 1e4, Math.round(q[1] * 1e4) / 1e4]);
+    for (const [i, o] of d.group || [[d.ei, d.orig]]) {
+      sk.f.ents[i] = translateEnt(o, dx, dy);
+      if (sk.f.ents[i].pts) sk.f.ents[i].pts = sk.f.ents[i].pts.map(q => [Math.round(q[0] * 1e4) / 1e4, Math.round(q[1] * 1e4) / 1e4]);
+    }
     const el = $('#dim'), px = evPx(ev); el.textContent = `${EN() ? 'Move' : 'Posun'} X ${fmtc(dx, 2)} · Y ${fmtc(dy, 2)} mm`; el.hidden = false; el.style.left = px[0] + 'px'; el.style.top = px[1] + 'px';
     redrawSketch(); return;
   }
@@ -2165,9 +2169,25 @@ function finishPolyline0(closed) {
   if (pts.length >= 2) { sk.f.ents.push({ t: sk.tool === 'spline' ? 'spline' : 'poly', pts: pts.map(p => p.slice()), closed: !!closed && pts.length >= 3 }); sk.selEnt = sk.f.ents.length - 1; }
   sk.draft = null; renderPalette(); redrawSketch(); $('#dim').hidden = true;
 }
+/* several sketch elements selected (Ctrl / Cmd + click, Shift + drag frame, Ctrl+A): sk.multi holds them, valid while it
+   still contains sk.selEnt (anything that selects one element some other way leaves the set stale) */
+function skSel() {
+  if (!sk) return [];
+  if (sk.multi && sk.multi.size > 1 && sk.multi.has(sk.selEnt)) return [...sk.multi].filter(i => sk.f.ents[i]).sort((a, b) => a - b);
+  return sk.selEnt >= 0 && sk.f.ents[sk.selEnt] ? [sk.selEnt] : [];
+}
+function skSetSel(list) {
+  const a = [...new Set(list)].filter(i => sk.f.ents[i]);
+  sk.multi = a.length > 1 ? new Set(a) : null; sk.selEnt = a.length ? a[a.length - 1] : -1;
+}
 function pickSketchEntity(ev) {
   const best = hitSketchEntity(ev);
-  sk.selEnt = best; renderPalette(); redrawSketch();
+  if (ev && (ev.ctrlKey || ev.metaKey) && best >= 0) {
+    const cur0 = skSel(), has = cur0.includes(best);
+    skSetSel(has ? cur0.filter(i => i !== best) : [...cur0, best]);
+    renderPalette(); redrawSketch(); return;
+  }
+  sk.multi = null; sk.selEnt = best; renderPalette(); redrawSketch();
   if (best >= 0) { const row = $(`#dialog [data-ent-row="${best}"]`); if (row) row.scrollIntoView({ block: 'nearest' }); }
 }
 function hitSketchEntity(ev) {
@@ -2520,8 +2540,9 @@ function offsetClick(ev) {
 }
 function deleteSketchEntity() {
   if (!sk) return;
-  if (sk.selEnt < 0 || !sk.f.ents[sk.selEnt]) { toast('Nejprve vyberte prvek skici.'); return; }
-  sk.f.ents.splice(sk.selEnt, 1); sk.selEnt = -1; renderPalette(); redrawSketch();
+  const si = skSel(); if (!si.length) { toast('Nejprve vyberte prvek skici.'); return; }
+  for (const i of si.slice().reverse()) sk.f.ents.splice(i, 1);
+  sk.selEnt = -1; sk.multi = null; renderPalette(); redrawSketch();
 }
 const ENT_LABEL = { text: 'Text', spline: 'Křivka', rect: 'Obdélník', circle: 'Kružnice', poly: 'Čára', ngon: 'Mnohoúhelník', slot: 'Drážka', ellipse: 'Elipsa' };
 function openPalette() {
@@ -2563,6 +2584,7 @@ function renderPalette() {
   $('#pal-note').textContent = ents.length ? `${sk.f.name} · ${nr} ${nr === 1 ? 'uzavřený profil' : nr >= 2 && nr <= 4 ? 'uzavřené profily' : 'uzavřených profilů'}` : 'Skica je prázdná. Nakreslete obdélník, kružnici nebo čáru.';
   const num = (i, k, label, val) => `<label class="fnum" title="${label}"><span class="ax">${label}</span><input id="ent-${i}-${k}" data-ent="${i}" data-k="${k}" value="${fmtc(val, 3)}" inputmode="decimal" autocomplete="off" aria-label="${label}"></label>`;
   const uniChk = i => `<label class="chk"><input type="checkbox" id="ent-${i}-uni" data-ent="${i}" data-k="uni"${sk.uniform ? ' checked' : ''}><span>Zachovat poměr stran</span></label>`;
+  const skSelSet = new Set(skSel());
   box.innerHTML = ents.map((e, i) => {
     let body = '';
     if (e.t === 'rect') body = `<div class="grid2">${num(i, 'x', 'X', e.x)}${num(i, 'y', 'Y', e.y)}${num(i, 'w', 'Š', e.w)}${num(i, 'h', 'V', e.h)}${num(i, 'fr', 'R', e.fr || 0)}</div>`;
@@ -2600,7 +2622,7 @@ function renderPalette() {
       body = `<div class="note">${n} bodů · ${e.closed ? 'uzavřený obrys' : 'otevřená čára (lze použít jako osu rotace)'}</div>${rows.join('')}${e.closed ? `<div class="grid2">${num(i, 'fr', 'R', e.fr || 0)}</div>${uniChk(i)}` : ''}`;
     }
     body += `<label class="chk"><input type="checkbox" id="ent-${i}-cons" data-ent="${i}" data-k="cons"${e.cons ? ' checked' : ''}><span>Pomocný prvek</span></label>`;
-    return `<div class="ent${sk.selEnt === i ? ' sel' : ''}${e.cons ? ' cons' : ''}" data-ent-row="${i}"><div class="eh"><span class="ico">${svg(e.t === 'poly' ? 'line' : e.t, 16)}</span>${ENT_LABEL[e.t]} ${i + 1}<button class="ibtn" data-entdup="${i}" aria-label="Duplikovat prvek" title="Duplikovat (Ctrl+D)">${svg('skdup', 14)}</button><button class="ibtn" data-entdel="${i}" aria-label="Smazat prvek" title="Smazat">${svg('skdel', 14)}</button></div>${body}</div>`;
+    return `<div class="ent${skSelSet.has(i) ? ' sel' : ''}${e.cons ? ' cons' : ''}" data-ent-row="${i}"><div class="eh"><span class="ico">${svg(e.t === 'poly' ? 'line' : e.t, 16)}</span>${ENT_LABEL[e.t]} ${i + 1}<button class="ibtn" data-entdup="${i}" aria-label="Duplikovat prvek" title="Duplikovat (Ctrl+D)">${svg('skdup', 14)}</button><button class="ibtn" data-entdel="${i}" aria-label="Smazat prvek" title="Smazat">${svg('skdel', 14)}</button></div>${body}</div>`;
   }).join('');
 }
 $('#dialog').addEventListener('click', e => {
@@ -5786,6 +5808,7 @@ function startCenter(editIndex, f, preset) {
   beginCmd(c); c.init();
 }
 function selectAll() {
+  if (sk) { if (!sk.tool && sk.f.ents.length) { skSetSel(sk.f.ents.map((e, i) => i)); renderPalette(); redrawSketch(); toast(`Vybráno prvků skici: ${sk.f.ents.length}`); } return; }
   if (cmd && !sk && cmd.selectAll) { cmd.selectAll(); return; }
   if (sk || cmd) return;
   const ids = cur.bodies.filter(b => bodiesVisible() && isVis(b.id)).map(b => b.id);
@@ -5805,8 +5828,8 @@ function translateEnt(e, dx, dy) {
 }
 function copySel() {
   if (sk) {
-    const e = sk.f.ents[sk.selEnt]; if (!e) { toast('Vyberte prvek skici, který chcete kopírovat.'); return; }
-    clip = { kind: 'ents', ents: [clone(e)], n: 0 }; toast('Prvek skici zkopírován. Vložíte ho Ctrl+V.'); return;
+    const si = skSel(); if (!si.length) { toast('Vyberte prvek skici, který chcete kopírovat.'); return; }
+    clip = { kind: 'ents', ents: si.map(i => clone(sk.f.ents[i])), n: 0 }; toast(si.length > 1 ? `Zkopírováno prvků skici: ${si.length}. Vložíte je Ctrl+V.` : 'Prvek skici zkopírován. Vložíte ho Ctrl+V.'); return;
   }
   if (cmd) return;
   if (!sel.size) { toast('Vyberte těleso, které chcete kopírovat.'); return; }
@@ -5823,8 +5846,9 @@ function pasteClip() {
     let du = W[0] * P.u[0] + W[1] * P.u[1] + W[2] * P.u[2], dv = W[0] * P.v[0] + W[1] * P.v[1] + W[2] * P.v[2]; const dl = Math.hypot(du, dv) || 1; du /= dl; dv /= dl;
     const proj = entityPolylines(clip.ents).flatMap(pl => pl.pts).map(q => q[0] * du + q[1] * dv);
     const width = proj.length ? Math.max(...proj) - Math.min(...proj) : 0, stepD = Math.ceil((width + 5) / settings.snap) * settings.snap, d = stepD * clip.n;
+    const n0 = sk.f.ents.length;
     for (const e of clip.ents) { const c = translateEnt(e, d * du, d * dv); if (c.pts) c.pts = c.pts.map(q => [Math.round(q[0] * 1e4) / 1e4, Math.round(q[1] * 1e4) / 1e4]); sk.f.ents.push(c); }
-    sk.selEnt = sk.f.ents.length - 1; renderPalette(); redrawSketch(); toast('Vloženo'); return;
+    skSetSel(clip.ents.map((e, i) => n0 + i)); renderPalette(); redrawSketch(); toast('Vloženo'); return;
   }
   if (cmd) return;
   if (!clip || clip.kind !== 'bodies') { toast('Schránka je prázdná. Těleso zkopírujete Ctrl+C.'); return; }
@@ -5835,8 +5859,8 @@ function pasteClip() {
 }
 function duplicateSel() {
   if (sk) {
-    const e = sk.f.ents[sk.selEnt]; if (!e) { toast('Vyberte prvek skici, který chcete duplikovat.'); return; }
-    sk.f.ents.push(translateEnt(e, 0, 0)); sk.selEnt = sk.f.ents.length - 1; renderPalette(); redrawSketch(); toast('Duplikováno na stejné místo. Kopii přesunete tažením.'); return;
+    const si = skSel(); if (!si.length) { toast('Vyberte prvek skici, který chcete duplikovat.'); return; }
+    const n0 = sk.f.ents.length; for (const i of si) sk.f.ents.push(translateEnt(sk.f.ents[i], 0, 0)); skSetSel(si.map((x, k) => n0 + k)); renderPalette(); redrawSketch(); toast('Duplikováno na stejné místo. Kopii přesunete tažením.'); return;
   }
   if (cmd) return;
   if (!sel.size) { toast('Vyberte těleso, které chcete duplikovat.'); return; }
@@ -7090,7 +7114,7 @@ dom.addEventListener('pointerdown', e => {
   try { dom.focus({ preventScroll: true }); } catch (er) {}
   if (NARROW()) { const pr = $('#prompt'); if (!pr.hidden) { pr.classList.remove('full'); pr.classList.add('min'); } }
   if (sk) sk.hoverMid = null;
-  if (sk && sk.drag && sk.drag.move && sk.drag.pid !== e.pointerId) { sk.f.ents[sk.drag.ei] = sk.drag.orig; sk.drag = null; controls.enabled = true; $('#dim').hidden = true; redrawSketch(); }
+  if (sk && sk.drag && sk.drag.move && sk.drag.pid !== e.pointerId) { for (const [i, o] of sk.drag.group || [[sk.drag.ei, sk.drag.orig]]) sk.f.ents[i] = o; sk.drag = null; controls.enabled = true; $('#dim').hidden = true; redrawSketch(); }
   down = { x: e.clientX, y: e.clientY, btn: e.button, gizmo: !!(transform.object && transform.axis), special: false };
   /* touch: holding a finger still for a moment opens the same menu as a right click */
   clearTimeout(longPressT);
@@ -7110,7 +7134,7 @@ dom.addEventListener('pointerdown', e => {
     }, 550);
   }
   if (e.button === 0 && cmd && cmd.onDown && cmd.onDown(e)) { down.special = true; try { dom.setPointerCapture(e.pointerId); } catch (er) {} }
-  else if (e.pointerType !== 'touch' && e.button === 0 && e.shiftKey && !sk && (!cmd || cmd.onMarquee) && !faceMode && !down.gizmo) { down.marquee = true; controls.enabled = false; try { dom.setPointerCapture(e.pointerId); } catch (er) {} }
+  else if (e.pointerType !== 'touch' && e.button === 0 && e.shiftKey && (sk ? !sk.tool : (!cmd || cmd.onMarquee)) && !faceMode && !down.gizmo) { down.marquee = true; controls.enabled = false; try { dom.setPointerCapture(e.pointerId); } catch (er) {} }
   else if (sk && isDrawTool(sk.tool) && (drawDrag || e.button === 0)) {
     if (drawDrag) { cancelDrawDrag(); down.moved = true; }
     else { drawDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, ev0: e, started: false }; controls.enabled = false; }
@@ -7120,8 +7144,10 @@ dom.addEventListener('pointerdown', e => {
     if (h) { sk.drag = h; sk.selEnt = h.ei; down.special = true; controls.enabled = false; try { dom.setPointerCapture(e.pointerId); } catch (er) {} }
     else {
       /* pressing on an element and dragging moves the whole element */
-      const ei = hitSketchEntity(e), p = ei >= 0 ? sketchRawPoint(e) : null;
-      if (p) { sk.drag = { move: true, ei, pid: e.pointerId, p0: p, orig: clone(sk.f.ents[ei]) }; sk.selEnt = ei; down.special = true; controls.enabled = false; try { dom.setPointerCapture(e.pointerId); } catch (er) {} }
+      const ei = (e.ctrlKey || e.metaKey) ? -1 : hitSketchEntity(e), p = ei >= 0 ? sketchRawPoint(e) : null;
+      /* an element of a multiple selection drags the whole selection along */
+      const grp = p ? skSel() : [], all = grp.length > 1 && grp.includes(ei) ? grp : [ei];
+      if (p) { sk.drag = { move: true, ei, pid: e.pointerId, p0: p, orig: clone(sk.f.ents[ei]), group: all.length > 1 ? all.map(i => [i, clone(sk.f.ents[i])]) : null }; if (!sk.drag.group) sk.multi = null; sk.selEnt = ei; down.special = true; controls.enabled = false; try { dom.setPointerCapture(e.pointerId); } catch (er) {} }
     }
   }
 }, true);
@@ -7191,6 +7217,18 @@ function marqueeHide() { if (marqueeEl) marqueeEl.hidden = true; }
 function marqueeSelect(d, e) {
   const r = dom.getBoundingClientRect(), x0 = Math.min(d.x, e.clientX) - r.left, x1 = Math.max(d.x, e.clientX) - r.left, y0 = Math.min(d.y, e.clientY) - r.top, y1 = Math.max(d.y, e.clientY) - r.top;
   const cross = e.clientX < d.x, hit = [];
+  if (sk) {
+    /* sketch elements: right = fully inside, left = touched (by the bounding box of the element on screen) */
+    const P = sk.f.plane, add = [];
+    sk.f.ents.forEach((en, i) => {
+      const c = entityPolylines([en]).flatMap(pl => pl.pts).map(q => toPx(P3(P, q[0], q[1])));
+      if (!c.length) return;
+      const bx0 = Math.min(...c.map(q => q[0])), bx1 = Math.max(...c.map(q => q[0])), by0 = Math.min(...c.map(q => q[1])), by1 = Math.max(...c.map(q => q[1]));
+      if (cross ? (bx1 >= x0 && bx0 <= x1 && by1 >= y0 && by0 <= y1) : (bx0 >= x0 && bx1 <= x1 && by0 >= y0 && by1 <= y1)) add.push(i);
+    });
+    if (add.length) { skSetSel([...skSel(), ...add]); renderPalette(); redrawSketch(); }
+    return;
+  }
   if (cmd && cmd.onMarquee) { cmd.onMarquee(x0, x1, y0, y1, cross); return; }
   for (const m of visibleMeshes()) {
     const bb = new THREE.Box3().setFromObject(m), c = [];
@@ -7270,7 +7308,7 @@ document.addEventListener('keydown', e => {
   if (faceMode && selFace && !cmd && !sk && FE_KEYS[k.toLowerCase()] && faceList().every(x => x.kind === 'plane' && x.bodyId === selFace.bodyId)) { e.preventDefault(); const l = faceList(); setFaceMode(false, true); startFaceEdit(undefined, undefined, l, FE_KEYS[k.toLowerCase()]); return; }
   if (k === 'Escape') {
     $('#ctxmenu').hidden = true;
-    if (sk) { if (sk.cut && (sk.cut.parts || sk.cut.target !== undefined)) { sk.cut = null; setSketchTool('sktrim'); return; } if (sk.draft) { sk.draft = null; redrawSketch(); $('#dim').hidden = true; } else if (sk.tool) setSketchTool(null); return; }
+    if (sk) { if (sk.cut && (sk.cut.parts || sk.cut.target !== undefined)) { sk.cut = null; setSketchTool('sktrim'); return; } if (sk.draft) { sk.draft = null; redrawSketch(); $('#dim').hidden = true; } else if (sk.tool) setSketchTool(null); else if (sk.selEnt >= 0 || sk.multi) { sk.selEnt = -1; sk.multi = null; renderPalette(); redrawSketch(); } return; }
     if (cmd) { endCmd(false); return; }
     if (faceMode && selFace) { selFace = null; selFaces = []; drawFaces(); updateInfo(); return; }
     if (faceMode) { setFaceMode(false); return; }
@@ -7303,10 +7341,13 @@ function nudgeKeys(v, big, fine) {
   const st = fine ? (big ? 1 : 0.1) : (settings.snap || 1) * (big ? 10 : 1);
   if (sk) {
     if (sk.tool || v[2]) return false;
-    const e = sk.f.ents[sk.selEnt];
-    if (!e) { panView(v, big, fine); return true; }
-    sk.f.ents[sk.selEnt] = translateEnt(e, v[0] * st, v[1] * st);
-    const n = sk.f.ents[sk.selEnt], r4 = x => Math.round(x * 1e4) / 1e4; if (n.pts) n.pts = n.pts.map(q => [r4(q[0]), r4(q[1])]); for (const kk of ['x', 'y', 'x1', 'y1', 'x2', 'y2']) if (typeof n[kk] === 'number') n[kk] = r4(n[kk]);
+    const si = skSel();
+    if (!si.length) { panView(v, big, fine); return true; }
+    const r4 = x => Math.round(x * 1e4) / 1e4;
+    for (const i of si) {
+      const n = sk.f.ents[i] = translateEnt(sk.f.ents[i], v[0] * st, v[1] * st);
+      if (n.pts) n.pts = n.pts.map(q => [r4(q[0]), r4(q[1])]); for (const kk of ['x', 'y', 'x1', 'y1', 'x2', 'y2']) if (typeof n[kk] === 'number') n[kk] = r4(n[kk]);
+    }
     renderPalette(); redrawSketch(); return true;
   }
   if (cmd) { if (!cmd.nudge) return false; cmd.nudge(v.map(x => x * st)); return true; }
