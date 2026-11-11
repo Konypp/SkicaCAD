@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.48
+- Import DXF / SVG do skici: v panelu importu přibyl Posun X a Posun Y, vložený obrys tak posunete kamkoli ve skice (posun zůstane i při změně velikosti).
+
 ## Beta 2.47
 - Import DXF / SVG do otevřené skici: v paletě skici se po vložení objeví Šířka, Výška, Měřítko a Vycentrovat na počátek, takže i velký soubor hned zmenšíte na potřebný rozměr; Hotovo panel zavře (zavře se i po jiné úpravě vložených prvků).
 

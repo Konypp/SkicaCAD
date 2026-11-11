@@ -1540,6 +1540,7 @@ $('#dialog').addEventListener('change', e => {
     skImpApply(Math.min(1e5, Math.max(1e-6, sc)), m.center);
   }
   if (sk && sk.imp && e.target.id === 'pal-impc') skImpApply(sk.imp.scale, e.target.checked);
+  if (sk && sk.imp && /^pal-imp[xy]$/.test(e.target.id)) { const v = parseNum(e.target.value); if (isFinite(v)) sk.imp['d' + e.target.id.slice(-1)] = v; skImpApply(sk.imp.scale, sk.imp.center); }
   if (sk && e.target.id === 'pal-fr') { const v = parseNum(e.target.value); if (v > 0) sk.frR = v; e.target.value = fmtc(sk.frR, 3); }
 });
 $('#dialog').addEventListener('keydown', e => {
@@ -2530,7 +2531,7 @@ function renderPalette() {
     tb.hidden = !want;
   }
   const ib = $('#pal-imp');
-  if (ib) { const html = skImpHTML(), key = html ? sk.imp.scale + '|' + sk.imp.center + '|' + sk.imp.i0 : ''; if (ib.dataset.key !== key) { ib.dataset.key = key; ib.innerHTML = html; ib.hidden = !html; fitDialogRows($('#dialog')); } }
+  if (ib) { const html = skImpHTML(), key = html ? [sk.imp.scale, sk.imp.center, sk.imp.dx, sk.imp.dy, sk.imp.i0].join('|') : ''; if (ib.dataset.key !== key) { ib.dataset.key = key; ib.innerHTML = html; ib.hidden = !html; fitDialogRows($('#dialog')); } }
   $('#pal-note').textContent = ents.length ? `${sk.f.name} · ${nr} ${nr === 1 ? 'uzavřený profil' : nr >= 2 && nr <= 4 ? 'uzavřené profily' : 'uzavřených profilů'}` : 'Skica je prázdná. Nakreslete obdélník, kružnici nebo čáru.';
   const num = (i, k, label, val) => `<label class="fnum" title="${label}"><span class="ax">${label}</span><input id="ent-${i}-${k}" data-ent="${i}" data-k="${k}" value="${fmtc(val, 3)}" inputmode="decimal" autocomplete="off" aria-label="${label}"></label>`;
   const uniChk = i => `<label class="chk"><input type="checkbox" id="ent-${i}-uni" data-ent="${i}" data-k="uni"${sk.uniform ? ' checked' : ''}><span>Zachovat poměr stran</span></label>`;
@@ -6910,7 +6911,7 @@ function importIntoSketch(r, ext, name) {
   const cx = center ? (r.bbox[0] + r.bbox[2]) / 2 : 0, cy = center ? (r.bbox[1] + r.bbox[3]) / 2 : 0;
   const ents = transformEnts(r.ents, r.scale, cx, cy);
   /* the inserted entities stay adjustable (scale, size, centring) in the palette until Hotovo or another edit */
-  sk.imp = { r, name, ext, scale: r.scale, center, i0: sk.f.ents.length, ents };
+  sk.imp = { r, name, ext, scale: r.scale, center, dx: 0, dy: 0, i0: sk.f.ents.length, ents };
   sk.f.ents.push(...ents); sk.selEnt = -1; renderPalette(); redrawSketch();
   toast(`Vloženo ${plural(ents.length, 'prvek', 'prvky', 'prvků')} ze souboru ${name}. Měřítko ${fmtc(r.scale, 4)} mm na jednotku${r.unitsKnown ? '' : ', jednotky nebyly v souboru uvedené'}.`);
 }
@@ -6926,7 +6927,7 @@ function skImpApply(scale, center) {
   const m = sk.imp, r = m.r;
   m.scale = scale; m.center = center;
   const cx = center ? (r.bbox[0] + r.bbox[2]) / 2 : 0, cy = center ? (r.bbox[1] + r.bbox[3]) / 2 : 0;
-  m.ents = transformEnts(r.ents, scale, cx, cy);
+  m.ents = transformEnts(r.ents, scale, cx, cy).map(e => (m.dx || m.dy ? translateEnt(e, m.dx, m.dy) : e));
   sk.f.ents.splice(m.i0, m.ents.length, ...m.ents); sk.selEnt = -1; renderPalette(); redrawSketch();
 }
 function skImpHTML() {
@@ -6937,6 +6938,8 @@ function skImpHTML() {
     + `<div class="frow"><label for="pal-imph">Výška</label><span class="fnum"><input id="pal-imph" value="${fmtc(h, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div>`
     + `<div class="frow"><label for="pal-imps">Měřítko</label><span class="fnum"><input id="pal-imps" value="${fmtc(m.scale, 4)}" inputmode="decimal" autocomplete="off"><span class="u">mm/j.</span></span></div>`
     + `<label class="chk"><input type="checkbox" id="pal-impc"${m.center ? ' checked' : ''}><span>Vycentrovat na počátek</span></label>`
+    + `<div class="frow"><label for="pal-impx">Posun X</label><span class="fnum"><input id="pal-impx" value="${fmtc(m.dx, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div>`
+    + `<div class="frow"><label for="pal-impy">Posun Y</label><span class="fnum"><input id="pal-impy" value="${fmtc(m.dy, 3)}" inputmode="decimal" autocomplete="off"><span class="u">mm</span></span></div>`
     + `<div class="frow wide"><button class="btn" data-impdone="1">Hotovo</button></div>`;
 }
 function startImport2D(info) {
