@@ -2714,7 +2714,8 @@ function startExtrude(editIndex, f, opts) {
       openDialog({
         title: 'Vysunutí', icon: 'extrude',
         fields: [{ k: 'opt', id: 'sk', label: 'Skica', options: [['', '– vyberte –'], ...sketches.map(s => [s.id, s.name || 'Skica'])], value: this.sketch || '' },
-          { k: 'sel', id: 'prof', label: 'Profil' }, { k: 'seg', id: 'dir', label: 'Směr', options: [['one', 'Jedna strana'], ['sym', 'Symetricky']], value: this.sym ? 'sym' : 'one' },
+          { k: 'sel', id: 'prof', label: 'Profil' }, { k: 'btns', id: 'pick', label: '', options: [['all', 'Vybrat vše'], ['none', 'Zrušit výběr']] },
+          { k: 'seg', id: 'dir', label: 'Směr', options: [['one', 'Jedna strana'], ['sym', 'Symetricky']], value: this.sym ? 'sym' : 'one' },
           { k: 'num', id: 'dist', label: 'Vzdálenost', value: this.dist }, { k: 'opt', id: 'op', label: 'Operace', options: OPS, value: this.op }, { k: 'note', id: 'n' }],
         onChange: (id, live) => {
           if (id === 'sk') { const v = dlg.get('sk'); if (v) { this.chooseSketch(v, true); this.buildOverlay(); } }
@@ -2722,9 +2723,37 @@ function startExtrude(editIndex, f, opts) {
           if (id === 'dir') this.sym = dlg.get('dir') === 'sym';
           if (id === 'op') { this.op = dlg.get('op'); this.autoOp = false; }
           this.update();
-        }
+        },
+        onBtn: (id, v) => { if (id === 'pick') { if (v === 'all') this.selectAll(); else { this.regions = new Set(); this.update(); } } }
       });
       this.update();
+    },
+    /* Shift + drag: a frame adds profiles – dragging right those fully inside, dragging left every one it touches */
+    onMarquee(x0, x1, y0, y1, cross) {
+      const bySk = new Map();
+      for (const m of this.regionMeshes) {
+        const s = cur.sketches.get(m.userData.sid); if (!s) continue;
+        const r = Engine.regions(s).find(q => q.ei === m.userData.ei); if (!r) continue;
+        const c = r.pts.map(p => toPx(P3(s.plane, p[0], p[1])));
+        const bx0 = Math.min(...c.map(p => p[0])), bx1 = Math.max(...c.map(p => p[0])), by0 = Math.min(...c.map(p => p[1])), by1 = Math.max(...c.map(p => p[1]));
+        if (cross ? (bx1 >= x0 && bx0 <= x1 && by1 >= y0 && by0 <= y1) : (bx0 >= x0 && bx1 <= x1 && by0 >= y0 && by1 <= y1)) {
+          if (!bySk.has(s.id)) bySk.set(s.id, []); bySk.get(s.id).push(r.ei);
+        }
+      }
+      if (!bySk.size) return;
+      /* profiles of one sketch only: the chosen one if the frame took any of it, else the first */
+      const sid = bySk.has(this.sketch) ? this.sketch : [...bySk.keys()][0];
+      if (sid !== this.sketch) { this.sketch = sid; this.regions = new Set(); this.buildOverlay(); }
+      for (const ei of bySk.get(sid)) this.regions.add(ei);
+      this.update();
+    },
+    /* all free profiles of the chosen sketch (e.g. every cell of an imported Voronoi pattern); Ctrl+A too */
+    selectAll() {
+      const s = cur.sketches.get(this.sketch) || [...cur.sketches.values()].find(x => this.regionMeshes.some(m => m.userData.sid === x.id));
+      if (!s) return;
+      this.sketch = s.id;
+      const regs = f ? Engine.regions(s).filter(r => !(used.get(s.id) || new Set()).has(r.ei) || this.regions.has(r.ei)) : freeRegions(s, used);
+      this.regions = new Set(regs.map(r => r.ei)); this.buildOverlay(); this.update();
     },
     preSketch: opts.sketch || (() => { if (f || tlSel === null) return null; const t = doc.features[tlSel]; return t && t.type === 'sketch' ? t.id : null; })(),
     applied: false,
@@ -5719,6 +5748,7 @@ function startCenter(editIndex, f, preset) {
   beginCmd(c); c.init();
 }
 function selectAll() {
+  if (cmd && !sk && cmd.selectAll) { cmd.selectAll(); return; }
   if (sk || cmd) return;
   const ids = cur.bodies.filter(b => bodiesVisible() && isVis(b.id)).map(b => b.id);
   if (!ids.length) { toast('Model neobsahuje žádná viditelná tělesa.'); return; }
@@ -7013,7 +7043,7 @@ dom.addEventListener('pointerdown', e => {
     }, 550);
   }
   if (e.button === 0 && cmd && cmd.onDown && cmd.onDown(e)) { down.special = true; try { dom.setPointerCapture(e.pointerId); } catch (er) {} }
-  else if (e.pointerType !== 'touch' && e.button === 0 && e.shiftKey && !sk && !cmd && !faceMode && !down.gizmo) { down.marquee = true; controls.enabled = false; try { dom.setPointerCapture(e.pointerId); } catch (er) {} }
+  else if (e.pointerType !== 'touch' && e.button === 0 && e.shiftKey && !sk && (!cmd || cmd.onMarquee) && !faceMode && !down.gizmo) { down.marquee = true; controls.enabled = false; try { dom.setPointerCapture(e.pointerId); } catch (er) {} }
   else if (sk && isDrawTool(sk.tool) && (drawDrag || e.button === 0)) {
     if (drawDrag) { cancelDrawDrag(); down.moved = true; }
     else { drawDrag = { id: e.pointerId, x: e.clientX, y: e.clientY, ev0: e, started: false }; controls.enabled = false; }
@@ -7094,6 +7124,7 @@ function marqueeHide() { if (marqueeEl) marqueeEl.hidden = true; }
 function marqueeSelect(d, e) {
   const r = dom.getBoundingClientRect(), x0 = Math.min(d.x, e.clientX) - r.left, x1 = Math.max(d.x, e.clientX) - r.left, y0 = Math.min(d.y, e.clientY) - r.top, y1 = Math.max(d.y, e.clientY) - r.top;
   const cross = e.clientX < d.x, hit = [];
+  if (cmd && cmd.onMarquee) { cmd.onMarquee(x0, x1, y0, y1, cross); return; }
   for (const m of visibleMeshes()) {
     const bb = new THREE.Box3().setFromObject(m), c = [];
     for (let i = 0; i < 8; i++) c.push(toPx(new THREE.Vector3(i & 1 ? bb.max.x : bb.min.x, i & 2 ? bb.max.y : bb.min.y, i & 4 ? bb.max.z : bb.min.z)));

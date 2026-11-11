@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.46
+- Vysunutí: tlačítka Vybrat vše a Zrušit výběr pro profily skici (i Ctrl+A), a výběr profilů rámečkem tažením se Shift (doprava celé uvnitř, doleva všechny dotčené) – např. všechny buňky importovaného Voronoi SVG najednou.
+
 ## Beta 2.45
 - Součásti › Spona: nová volba Vycentrovaná (zapnutá pro novou sponu). Jazýčky samce jsou vysoké jako celý samec a samice je o dno, strop a vůli vyšší, takže po zapnutí z ní samec vychází přesně uprostřed; tiskne se dál naplocho bez podpěr. Kód zarovnané spony bez dna (2.39) odstraněn.
 
