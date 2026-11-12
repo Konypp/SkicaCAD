@@ -344,7 +344,7 @@ function texCellsOf(f, C, z0, z1) {
 function texBand(f) {
   const R = Number(f.r), C = 2 * Math.PI * R, L = Number(f.len);
   const a = Math.max(1, Number(f.size) || 6), g = Math.max(0, Number(f.gap) || 0), h = Math.max(0.1, Number(f.height) || 0.8);
-  const z0 = Math.max(0, Math.min(L, Number(f.z0) || 0)), z1 = Math.max(z0, Math.min(L, f.z1 === undefined || f.z1 === '' ? L : Number(f.z1)));
+  const mg = Math.max(0, Number(f.margin) || 0), z0 = Math.max(mg, Math.min(L, Number(f.z0) || 0)), z1 = Math.max(z0, Math.min(L - mg, f.z1 === undefined || f.z1 === '' ? L : Number(f.z1)));
   if (z1 - z0 < Math.min(a * 0.5, 2)) throw new Error('Rozsah textury je pro tuto velikost buněk příliš malý');
   const cut = f.op === 'cut', under = [], flat = [], tris = [], e = texEmbed(R), fl = 0.06, /* the joint floor stands a little above the face, clear of the facets' sag */ hb = cut ? -(h + e) : -e;
   const rr = cut ? 0 : Math.max(0, Math.min(1, (f.round === undefined || f.round === '' ? 60 : Number(f.round)) / 100)) * h, K = rr > 0.05 ? 3 : 0, M = 12;
@@ -417,6 +417,8 @@ function texMotif(f, sketches) {
   const cx = (bx0 + bx1) / 2, cy = (by0 + by1) / 2, e = texEmbed(R), fl = 0.06, hb = cut ? -(h + e) : -e;
   const z0 = Math.max(0, zc - ((rows - 1) / 2) * pitch - (by1 - by0) * k / 2 - 1), z1 = Math.min(L, zc + ((rows - 1) / 2) * pitch + (by1 - by0) * k / 2 + 1);
   if (z1 - z0 < 0.5) throw new Error('Motiv leží mimo plochu');
+  const mg = Math.max(0, Number(f.margin) || 0);
+  if (mg > 0 && (zc - ((rows - 1) / 2) * pitch - (by1 - by0) * k / 2 < mg - 1e-6 || zc + ((rows - 1) / 2) * pitch + (by1 - by0) * k / 2 > L - mg + 1e-6)) throw new Error('Motiv zasahuje do odsazení od kraje plochy');
   const B = { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] }, rect = (a, b, c, d) => [{ t: 'poly', pts: [[a, c], [b, c], [b, d], [a, d]] }];
   let acc = KK.extrudeProfiles(rect(0, C, z0, z1), B, hb, fl);
   const tools = [];
@@ -474,9 +476,24 @@ function texPlaneFace(polys, f) {
   const to2 = q => { const w = KK.vsub(q, o); return [KK.vdot(w, u), KK.vdot(w, v)]; };
   const loops = loops3.map(l => l.map(to2)).sort((a, b) => Math.abs(KK.area2D(b)) - Math.abs(KK.area2D(a)));
   const outer = KK.area2D(loops[0]) < 0 ? loops[0].slice().reverse() : loops[0];
-  const holes = loops.slice(1).filter(l => KK.inPoly2D(l[0], outer));
-  const xs = outer.map(q => q[0]), ys = outer.map(q => q[1]);
-  return { o, u, v, n, outer, holes, x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  let holes = loops.slice(1).filter(l => KK.inPoly2D(l[0], outer)).map(l => (KK.area2D(l) > 0 ? l.slice().reverse() : l));
+  /* Odsazení: the pattern keeps this far from the face's edge (and its holes) */
+  const mg = Math.max(0, Number(f.margin) || 0);
+  if (mg > 0) {
+    const off = L => L.map((q, i) => {
+      const a = L[(i + L.length - 1) % L.length], b = L[(i + 1) % L.length];
+      const n1 = KK.vnorm([-(q[1] - a[1]), q[0] - a[0], 0]), n2 = KK.vnorm([-(b[1] - q[1]), b[0] - q[0], 0]), m = KK.vnorm([n1[0] + n2[0], n1[1] + n2[1], 0]);
+      const c = Math.max(0.25, m[0] * n1[0] + m[1] * n1[1]); return [q[0] + m[0] * mg / c, q[1] + m[1] * mg / c];
+    });
+    const o2 = off(outer);
+    if (KK.area2D(o2) <= 1 || KK.area2D(o2) > KK.area2D(outer)) throw new Error('Odsazení je pro tuto plochu příliš velké');
+    return texPlaneDone({ o, u, v, n, outer: o2, holes: holes.map(off) });
+  }
+  return texPlaneDone({ o, u, v, n, outer, holes });
+}
+function texPlaneDone(P) {
+  const xs = P.outer.map(q => q[0]), ys = P.outer.map(q => q[1]);
+  return { ...P, x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
 }
 function texPlaneTool(polys, f, sketches) {
   const P = texPlaneFace(polys, f), cut = f.op === 'cut', h = Math.max(0.1, Number(f.height) || 0.8), tris = [], edge = [];

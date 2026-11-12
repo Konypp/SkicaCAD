@@ -5984,7 +5984,7 @@ function startTexture(editIndex, f) {
           { k: 'btns', id: 'file', label: '', options: [['load', 'Načíst SVG / DXF…']] },
           { k: 'seg', id: 'op', label: 'Provedení', options: [['raise', 'Vystouplý'], ['cut', 'Vyrytý']], value: v.op === 'cut' ? 'cut' : 'raise' },
           { k: 'num', id: 'size', label: 'Velikost buňky', value: v.size }, { k: 'num', id: 'gap', label: 'Spára', value: v.gap },
-          { k: 'num', id: 'height', label: 'Výška / hloubka', value: v.height }, { k: 'num', id: 'round', label: 'Zaoblení', unit: '%', value: v.round },
+          { k: 'num', id: 'height', label: 'Výška / hloubka', value: v.height }, { k: 'num', id: 'margin', label: 'Odsazení od kraje', value: v.margin || 0 }, { k: 'num', id: 'round', label: 'Zaoblení', unit: '%', value: v.round },
           { k: 'num', id: 'rand', label: 'Nepravidelnost', unit: '%', value: v.rand }, { k: 'btns', id: 'seedb', label: '', options: [['next', 'Jiné rozložení']] },
           { k: 'num', id: 'z0', label: 'Od (mm od začátku plochy)', value: v.z0 }, { k: 'num', id: 'z1', label: 'Do (prázdné = konec plochy)', value: v.z1 },
           { k: 'num', id: 'width', label: 'Šířka motivu', value: v.width }, { k: 'num', id: 'rep', label: 'Počet dokola', unit: '×', value: v.rep },
@@ -6023,7 +6023,7 @@ function startTexture(editIndex, f) {
       this.update();
     },
     feature() {
-      const v = this.v, out = { id: f ? f.id : 'tmp', type: 'texture', body: this.body, ...this.face, mode: v.mode === 'motif' ? 'motif' : 'cells', op: v.op === 'cut' ? 'cut' : 'raise', height: v.height };
+      const v = this.v, out = { id: f ? f.id : 'tmp', type: 'texture', body: this.body, ...this.face, mode: v.mode === 'motif' ? 'motif' : 'cells', op: v.op === 'cut' ? 'cut' : 'raise', height: v.height, ...(v.margin > 0 ? { margin: v.margin } : {}) };
       if (out.mode === 'motif') Object.assign(out, v.ents ? { ents: v.ents, entsName: v.entsName } : { sketch: v.sketch }, { width: v.width, rep: v.rep, rows: v.rows, rowGap: v.rowGap, stagger: !!v.stagger, angle: v.angle, zc: v.zc });
       else Object.assign(out, { pattern: v.pattern, size: v.size, gap: v.gap, round: v.round, rand: v.rand, seed: v.seed || 1, z0: v.z0, z1: v.z1 });
       return out;

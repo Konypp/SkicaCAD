@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.56
+- Textura: Odsazení od kraje – vzor i vlastní motiv začíná zadaný kus od okraje plochy (na rovné ploše od jejího obrysu i otvorů, na válci od obou konců pláště).
+
 ## Beta 2.55
 - Posuvníky přidané v 2.54 (Textura, Pole, Přesunout, Text) zase odebrány.
 
