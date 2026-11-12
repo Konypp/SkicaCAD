@@ -373,9 +373,9 @@ function texBand(f) {
     }
     if (P.cut && f.whole === true && f.pattern !== 'pebbles') P.dot = null;
     if (P.dot === null) { for (let k = 0; k < P.length; k++) { const A = P[k], B = P[(k + 1) % P.length]; tris.push([[pc[0], pc[1], fl], [A[0], A[1], fl], [B[0], B[1], fl]]); } continue; }
-    const onEnd = (A, B, d) => (f.whole !== true && ((near(A[1], z0) && near(B[1], z0)) || (near(A[1], z1) && near(B[1], z1))) ? Math.min(d, 0.1) : d); /* cells cut by the range reach (all but a hair) right to its ends */
+    const onEnd = (A, B, d) => (f.whole !== true && !cut && ((near(A[1], z0) && near(B[1], z0)) || (near(A[1], z1) && near(B[1], z1))) ? 0 : d); /* cells cut by the range reach right to its ends */
     let F = P.dot ? (KK.area2D(P.dot) < 0 ? P.dot.slice().reverse() : P.dot) : g > 0.01 ? insetConvex(P, g / 2, onEnd) : P;
-    const dg = f.whole === true ? g / 2 : 0.1; if (F && P.dot) { F = halfClip(F, [0, z0 + dg], [0, 1], 0); if (F.length >= 3) F = halfClip(F, [0, z1 - dg], [0, -1], 0); if (F.length < 3 || Math.abs(KK.area2D(F)) < 1e-4) F = null; } /* a dot cut by the range keeps a joint's width from its end */
+    const dg = f.whole === true || cut ? g / 2 : 0; if (F && P.dot) { F = halfClip(F, [0, z0 + dg], [0, 1], 0); if (F.length >= 3) F = halfClip(F, [0, z1 - dg], [0, -1], 0); if (F.length < 3 || Math.abs(KK.area2D(F)) < 1e-4) F = null; } /* a dot cut by the range keeps a joint's width from its end */
     if (!F) { for (let k = 0; k < P.length; k++) { const A = P[k], B = P[(k + 1) % P.length]; tris.push([[pc[0], pc[1], fl], [A[0], A[1], fl], [B[0], B[1], fl]]); } continue; }
     /* rings: on the floor, then the shoulder and the rounded top (raised) or the bottom of the recess (sunk) */
     const lv = [[0, fl], cut ? [0, -h] : [0, h - rr]];
@@ -401,8 +401,10 @@ function texBand(f) {
       const nO = O.length, nI = I.length; let i = 0, j = 0;
       const oA = k => (k < nO ? aO[k] : aO[k - nO] + 2 * Math.PI), iA = k => (k < nI ? aI[k] : aI[k - nI] + 2 * Math.PI);
       while (i < nO || j < nI) {
-        if (j >= nI || (i < nO && oA(i + 1) <= iA(j + 1))) { tris.push([O[i % nO], O[(i + 1) % nO], I[j % nI]]); i++; }
-        else { tris.push([O[i % nO], I[(j + 1) % nI], I[j % nI]]); j++; }
+        /* where the cell reaches the end of the range the floor has no width there: flat triangles are left out */
+        const put = (A, B, Cq) => { if (Math.abs((B[0] - A[0]) * (Cq[1] - A[1]) - (B[1] - A[1]) * (Cq[0] - A[0])) > 1e-7) tris.push([A, B, Cq]); };
+        if (j >= nI || (i < nO && oA(i + 1) <= iA(j + 1))) { put(O[i % nO], O[(i + 1) % nO], I[j % nI]); i++; }
+        else { put(O[i % nO], I[(j + 1) % nI], I[j % nI]); j++; }
       }
     }
     for (let i = 0; i < rings.length - 1; i++) { const A = rings[i], B = rings[i + 1]; for (let j = 0; j < NA; j++) { const k = (j + 1) % NA; tris.push([A[j], A[k], B[k]], [A[j], B[k], B[j]]); } }
@@ -596,7 +598,7 @@ function textureApply(polys, f, sketches) {
   const ringAt = (list, z, r, tl) => { const m = new Map(); for (const p of list) for (const q of p.v) { const l = loc(q); if (Math.abs(l.z - z) < 1e-4 && Math.abs(l.r - r) < tl) m.set(KK.qk(q), q); } return [...m.values()].map(q => ({ q, t: loc(q).t })).sort((x, y) => x.t - y.t); };
   const extra = [];
   for (const [z, down] of [[B.z0, true], [B.z1, false]]) {
-    const I = ringAt(kept, z, R, tol), O = ringAt(top, z, R + B.fl, 0.01);
+    const I = ringAt(kept, z, R, tol), O = ringAt(top, z, R + B.fl, 2e-4);
     if (I.length < 3 || O.length < 3) throw new Error('Okraj textury se nepodařilo napojit');
     const nI = I.length, nO = O.length, tI = k => (k < nI ? I[k].t : I[k - nI].t + 2 * Math.PI), tO = k => (k < nO ? O[k].t : O[k - nO].t + 2 * Math.PI);
     let i = 0, j = 0; const tris = [];

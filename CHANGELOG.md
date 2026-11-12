@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.61
+- Textura, Vyplnit k okraji: krajní buňky sahají přesně k okraji rozsahu (už ne 0,1 mm od něj).
+
 ## Beta 2.60
 - Textura, Vyplnit k okraji: krajní (rozpůlené) buňky už nemají spáru u okraje rozsahu ani u okraje rovné plochy – sahají až k němu (zbude jen 0,1 mm), takže mezi vzorem a okrajem nezůstává pruh.
 
