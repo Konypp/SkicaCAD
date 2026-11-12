@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.59
+- Textura: volba U okraje – Vyplnit k okraji (výchozí): řady se mírně protáhnou, aby přesně vyšly do rozsahu, a krajní řady jsou souměrně rozpůlené, takže vzor navazuje na okraj nahoře i dole bez prázdného místa; Jen celé buňky: řady se protáhnou tak, aby celé buňky sahaly od kraje ke kraji. Na rovné ploše se vzor přizpůsobí jejímu rozměru.
+
 ## Beta 2.58
 - Textura: výchozí zaoblení je 0 % (ostré hrany buněk).
 
