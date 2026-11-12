@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.52
+- Nový nástroj Textura (TĚLESO › Vytvořit): vzor na vnější válcové ploše (plášť válce, nádoby). Hotové vzory Kamínky (Voronoi, nepravidelnost, jiné rozložení), Plástev, Kosočtverce (vroubkování), Trojúhelníky, Cihly, Čtverce, Puntíky a Žebrování – velikost buňky, spára, výška, zaoblení, rozsah od–do; vystouplé nebo vyryté. Vzor se navine bez švu. Vlastní motiv ze skici nebo načteného SVG / DXF: šířka, počet dokola, počet řad, mezera a posun řad, natočení a výška středu.
+
 ## Beta 2.51
 - Skica: výběr více prvků – Ctrl (Cmd) + klepnutí přidá nebo odebere prvek, Shift + tažení vybere rámečkem (doprava celé uvnitř, doleva dotčené), Ctrl+A vybere všechny, Esc výběr zruší. Vybrané prvky se společně přesouvají tažením i šipkami, mažou, kopírují (Ctrl+C / Ctrl+V), duplikují (Ctrl+D) a přepínají na pomocné.
 

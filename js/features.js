@@ -8,7 +8,7 @@ const PLANES = {
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
 const FEATURE_LABEL = { buckle: 'Spona', articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Konektory', libpart: 'Vložený díl', ribs: 'Žebra', jointpart: 'Kloubový spoj', curvecut: 'Rozříznout křivkou', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
-  fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', faceedit: 'Modelovat plochy', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
+  fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', faceedit: 'Modelovat plochy', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', texture: 'Textura povrchu', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
 /* ready-made parts (js/partslib.js): packed meshes, unpacked once */
@@ -226,6 +226,279 @@ function threadTool(f) {
     if (sp.rRoot <= 0.05) throw new Error('Stoupání je pro tento průměr příliš velké');
   }
   return KK.threadGroove({ ...sp, o, ax, len, pitch: P, left: !!f.left, z0, segs: Math.max(36, Math.min(72, Math.round(Math.PI * d / 0.6))) });
+}
+/* ---------- Textura povrchu: a pattern wrapped onto a cylindrical face ----------
+   Everything is built flat, in unrolled coordinates (s along the circumference, z along the axis, h out from the surface),
+   cut into narrow strips along s (so no facet spans much of the curve) and wrapped onto the cylinder (r + h). */
+function texFrame(f) {
+  const a = KK.vnorm(f.ax.map(Number)), u = KK.vnorm(Math.abs(a[0]) < 0.9 ? KK.cross(a, [1, 0, 0]) : KK.cross(a, [0, 1, 0])), v = KK.cross(a, u);
+  return { a, u, v, c: f.c.map(Number), R: Number(f.r) };
+}
+function texWrap(tris, f, raw) {
+  const F = texFrame(f), R = F.R, C = 2 * Math.PI * R, dS = C / Math.max(8, Math.round(C / Math.max(0.6, Math.min(4, Math.sqrt(0.24 * R))))), arr = []; /* a facet this wide sags at most 0.03 mm; a whole number of strips round, so the cuts match across the seam */
+  /* the cut point of an edge is worked out from its ends in a fixed order, so both triangles sharing it agree */
+  const cmp = (p, q) => p[0] - q[0] || p[1] - q[1] || p[2] - q[2];
+  const at = (p, q, x) => { if (cmp(p, q) > 0) [p, q] = [q, p]; const t = (x - p[0]) / (q[0] - p[0]); return [x, p[1] + (q[1] - p[1]) * t, p[2] + (q[2] - p[2]) * t]; };
+  const clip = (P, x, keepAbove) => {
+    const out = [], inside = q => (keepAbove ? q[0] >= x - 1e-9 : q[0] <= x + 1e-9);
+    for (let i = 0; i < P.length; i++) {
+      const p = P[(i + P.length - 1) % P.length], q = P[i], pi = inside(p), qi = inside(q);
+      if (qi) { if (!pi) out.push(at(p, q, x)); out.push(q); } else if (pi) out.push(at(p, q, x));
+    }
+    return out;
+  };
+  const put = q => { const th = q[0] / R, rr = R + q[2], cs = Math.cos(th) * rr, sn = Math.sin(th) * rr; for (let k = 0; k < 3; k++) arr.push(Math.round((F.c[k] + F.a[k] * q[1] + F.u[k] * cs + F.v[k] * sn) * 1e6) / 1e6 + 0); }; /* + 0: no -0 (a different key) */
+  const tri = (a, b, c) => { put(a); put(b); put(c); };
+  for (const T of tris) {
+    const mn = Math.min(T[0][0], T[1][0], T[2][0]), mx = Math.max(T[0][0], T[1][0], T[2][0]);
+    const k0 = Math.floor(mn / dS + 1e-9), k1 = Math.ceil(mx / dS - 1e-9);
+    if (k1 - k0 <= 1) { tri(T[0], T[1], T[2]); continue; }
+    for (let k = k0; k < k1; k++) {
+      let P = clip(T, k * dS, true); if (P.length < 3) continue;
+      P = clip(P, (k + 1) * dS, false); if (P.length < 3) continue;
+      for (let i = 1; i < P.length - 1; i++) tri(P[0], P[i], P[i + 1]);
+    }
+  }
+  if (raw) { const out = []; for (let i = 0; i + 8 < arr.length; i += 9) { const q = KK.mkPoly([[arr[i], arr[i + 1], arr[i + 2]], [arr[i + 3], arr[i + 4], arr[i + 5]], [arr[i + 6], arr[i + 7], arr[i + 8]]]); if (q) out.push(q); } return out; }
+  return KK.fromTriangles(arr).polys;
+}
+/* flat solids (polys in x = s, y = z, z = h) to triangles */
+function texTris(polys) {
+  const out = [];
+  for (const p of polys) {
+    if (p.v.length === 3) { out.push(p.v); continue; }
+    /* faces left by the booleans need not be convex: ear-clipped, each triangle turned the face's way */
+    for (const t of KK.capTris(p.v)) { const n = KK.cross(KK.vsub(t[1], t[0]), KK.vsub(t[2], t[0])); out.push(KK.vdot(n, p.n) >= 0 ? t : [t[0], t[2], t[1]]); }
+  }
+  return out;
+}
+function texRng(seed) { let a = (Number(seed) || 1) >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+/* keep the part of a convex polygon (CCW) where (p - a)·n >= d */
+function halfClip(P, a, n, d) {
+  const out = [], f = q => (q[0] - a[0]) * n[0] + (q[1] - a[1]) * n[1] - d;
+  for (let i = 0; i < P.length; i++) {
+    const p = P[(i + P.length - 1) % P.length], q = P[i], fp = f(p), fq = f(q);
+    if (fq >= 0) { if (fp < 0) { const t = fp / (fp - fq); out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]); } out.push(q); }
+    else if (fp >= 0) { const t = fp / (fp - fq); out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]); }
+  }
+  return out;
+}
+function insetConvex(P, d) {
+  let Q = P;
+  for (let i = 0; i < P.length && Q.length >= 3; i++) {
+    const a = P[i], b = P[(i + 1) % P.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (l < 1e-12) continue;
+    Q = halfClip(Q, a, [-(b[1] - a[1]) / l, (b[0] - a[0]) / l], d);
+  }
+  return Q.length >= 3 && Math.abs(KK.area2D(Q)) > 1e-6 ? Q : null;
+}
+/* the cells of a pattern (convex polygons, CCW, in s / z), seamless round the circumference: a whole number of them fits */
+const TEX_PATTERNS = ['pebbles', 'hex', 'diamond', 'triangles', 'bricks', 'squares', 'dots', 'ribs'];
+function texCellsOf(f, C, z0, z1) {
+  const a = Math.max(1, Number(f.size) || 6), pat = TEX_PATTERNS.includes(f.pattern) ? f.pattern : 'pebbles', cells = [];
+  const jit = Math.max(0, Math.min(1, (f.rand === undefined || f.rand === '' ? 60 : Number(f.rand)) / 100)), rnd = texRng(f.seed || 1);
+  const grid = (cw, rhOf, off, mk) => { /* columns across C (a whole number of them), rows from below z0 to above z1 */
+    const ns = Math.max(3, Math.round(C / cw)), w = C / ns, rh = typeof rhOf === 'function' ? rhOf(w) : rhOf, j0 = -1, j1 = Math.ceil((z1 - z0) / rh) + 1;
+    if (ns * (j1 - j0) > 8000) throw new Error('Vzor by měl příliš mnoho buněk; zvětšete jejich velikost');
+    for (let j = j0; j <= j1; j++) for (let i = 0; i < ns; i++) cells.push(mk((i + 0.5 + (off && (j & 1) ? 0.5 : 0)) * w, z0 + (j + 0.5) * rh, w, rh));
+  };
+  const ngon = (cx, cy, r, n, a0) => Array.from({ length: n }, (_, k) => [cx + r * Math.cos(a0 + 2 * Math.PI * k / n), cy + r * Math.sin(a0 + 2 * Math.PI * k / n)]);
+  if (pat === 'pebbles') {
+    const ns = Math.max(3, Math.round(C / a)), ds = C / ns, nz = Math.max(1, Math.round((z1 - z0) / (a * 0.87))), dz = (z1 - z0) / nz;
+    if (ns * nz > 6000) throw new Error('Kamínků by bylo příliš mnoho; zvětšete jejich velikost');
+    const sites = [];
+    for (let j = 0; j < nz; j++) for (let i = 0; i < ns; i++) sites.push([(i + 0.5 + (j % 2) * 0.5) * ds + (rnd() - 0.5) * jit * ds, z0 + (j + 0.5) * dz + (rnd() - 0.5) * jit * dz * 0.9]);
+    const all = sites.concat(sites.map(p => [p[0] - C, p[1]]), sites.map(p => [p[0] + C, p[1]])), reach = 2.6 * Math.max(ds, dz);
+    for (const p of sites) {
+      let P = [[p[0] - reach, p[1] - reach], [p[0] + reach, p[1] - reach], [p[0] + reach, p[1] + reach], [p[0] - reach, p[1] + reach]];
+      for (const q of all) {
+        if (q === p) continue; const dx = q[0] - p[0], dy = q[1] - p[1]; if (Math.abs(dx) > reach || Math.abs(dy) > reach || (dx === 0 && dy === 0)) continue;
+        const l = Math.hypot(dx, dy); P = halfClip(P, [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], [-dx / l, -dy / l], 0); if (P.length < 3) break;
+      }
+      if (P.length >= 3) cells.push(P);
+    }
+  } else if (pat === 'hex') grid(a, w => w * Math.sqrt(3) / 2, true, (x, y, w) => ngon(x, y, w / Math.sqrt(3), 6, Math.PI / 2)); /* honeycomb */
+  else if (pat === 'diamond') grid(a, a * 0.6, true, (x, y, w) => [[x, y - a * 0.6], [x + w / 2, y], [x, y + a * 0.6], [x - w / 2, y]]); /* knurling */
+  else if (pat === 'triangles') { /* rows of triangles pointing up and down in turn */
+    const ns = Math.max(3, Math.round(C / a)), w = C / ns, th = w * Math.sqrt(3) / 2, j1 = Math.ceil((z1 - z0) / th) + 1;
+    if (ns * 2 * (j1 + 2) > 8000) throw new Error('Vzor by měl příliš mnoho buněk; zvětšete jejich velikost');
+    for (let j = -1; j <= j1; j++) for (let i = 0; i < ns; i++) {
+      const x = (i + (j & 1 ? 0.5 : 0)) * w, y = z0 + j * th;
+      cells.push([[x, y], [x + w, y], [x + w / 2, y + th]], [[x + w / 2, y + th], [x + w, y], [x + 1.5 * w, y + th]]);
+    }
+  }
+  else if (pat === 'bricks') grid(a * 2, a, true, (x, y, w) => [[x - w / 2, y - a / 2], [x + w / 2, y - a / 2], [x + w / 2, y + a / 2], [x - w / 2, y + a / 2]]);
+  else if (pat === 'squares') grid(a, a, false, (x, y, w) => [[x - w / 2, y - a / 2], [x + w / 2, y - a / 2], [x + w / 2, y + a / 2], [x - w / 2, y + a / 2]]);
+  else if (pat === 'dots') grid(a, w => w * Math.sqrt(3) / 2, true, (x, y, w) => { const P = ngon(x, y, w / Math.sqrt(3), 6, Math.PI / 2); P.dot = ngon(x, y, w * 0.36, 18, 0); return P; }); /* round bumps, each in a honeycomb tile */
+  else if (pat === 'ribs') { /* ribs along the axis, the full height of the range */
+    const ns = Math.max(3, Math.round(C / a)), w = C / ns;
+    for (let i = 0; i < ns; i++) cells.push([[i * w, z0 - 1], [(i + 1) * w, z0 - 1], [(i + 1) * w, z1 + 1], [i * w, z1 + 1]]);
+  }
+  /* keep each cell inside the range */
+  const clipZ = P => { let Q = halfClip(P, [0, z0], [0, 1], 0); if (Q.length >= 3) Q = halfClip(Q, [0, z1], [0, -1], 0); return Q.length >= 3 && Math.abs(KK.area2D(Q)) > 1e-4 ? Q : null; };
+  return cells.map(P => { const Q = clipZ(P); if (Q && P.dot) { const D = clipZ(P.dot); if (D) Q.dot = D; else Q.dot = null; } return Q; }).filter(Boolean);
+}
+/* a pattern of cells as one closed band round the surface: underneath (inside the body) the cells themselves, on top the
+   floor of the joints between them (0.06 mm above the surface) and the cells raised (rounded) or sunk into it, and a wall
+   at each end of the range. The body only meets the band along its two end circles, so joining them is quick and sound
+   however many cells there are. */
+function texBand(f) {
+  const R = Number(f.r), C = 2 * Math.PI * R, L = Number(f.len);
+  const a = Math.max(1, Number(f.size) || 6), g = Math.max(0, Number(f.gap) || 0), h = Math.max(0.1, Number(f.height) || 0.8);
+  const z0 = Math.max(0, Math.min(L, Number(f.z0) || 0)), z1 = Math.max(z0, Math.min(L, f.z1 === undefined || f.z1 === '' ? L : Number(f.z1)));
+  if (z1 - z0 < Math.min(a * 0.5, 2)) throw new Error('Rozsah textury je pro tuto velikost buněk příliš malý');
+  const cut = f.op === 'cut', under = [], flat = [], tris = [], e = texEmbed(R), fl = 0.06, /* the joint floor stands a little above the face, clear of the facets' sag */ hb = cut ? -(h + e) : -e;
+  const rr = cut ? 0 : Math.max(0, Math.min(1, (f.round === undefined || f.round === '' ? 60 : Number(f.round)) / 100)) * h, K = rr > 0.05 ? 3 : 0, M = 12;
+  const near = (x, y) => Math.abs(x - y) < 1e-6;
+  for (let P of texCellsOf(f, C, z0, z1)) {
+    if (KK.area2D(P) < 0) { const d = P.dot; P = P.slice().reverse(); P.dot = d; }
+    const pc = P.reduce((s, q) => [s[0] + q[0] / P.length, s[1] + q[1] / P.length], [0, 0]);
+    /* underneath, and the end walls */
+    for (let k = 0; k < P.length; k++) {
+      const A = P[k], B = P[(k + 1) % P.length];
+      under.push([[pc[0], pc[1], hb], [B[0], B[1], hb], [A[0], A[1], hb]]);
+      flat.push([[pc[0], pc[1], fl], [A[0], A[1], fl], [B[0], B[1], fl]]);
+      if ((near(A[1], z0) && near(B[1], z0)) || (near(A[1], z1) && near(B[1], z1))) under.push([[A[0], A[1], hb], [B[0], B[1], hb], [B[0], B[1], fl]], [[A[0], A[1], hb], [B[0], B[1], fl], [A[0], A[1], fl]]);
+    }
+    if (P.dot === null) { for (let k = 0; k < P.length; k++) { const A = P[k], B = P[(k + 1) % P.length]; tris.push([[pc[0], pc[1], fl], [A[0], A[1], fl], [B[0], B[1], fl]]); } continue; }
+    let F = P.dot ? (KK.area2D(P.dot) < 0 ? P.dot.slice().reverse() : P.dot) : g > 0.01 ? insetConvex(P, g / 2) : P;
+    if (F && P.dot) { F = halfClip(F, [0, z0 + g / 2], [0, 1], 0); if (F.length >= 3) F = halfClip(F, [0, z1 - g / 2], [0, -1], 0); if (F.length < 3 || Math.abs(KK.area2D(F)) < 1e-4) F = null; } /* a dot cut by the range keeps a joint's width from its end */
+    if (!F) { for (let k = 0; k < P.length; k++) { const A = P[k], B = P[(k + 1) % P.length]; tris.push([[pc[0], pc[1], fl], [A[0], A[1], fl], [B[0], B[1], fl]]); } continue; }
+    /* rings: on the floor, then the shoulder and the rounded top (raised) or the bottom of the recess (sunk) */
+    const lv = [[0, fl], cut ? [0, -h] : [0, h - rr]];
+    for (let k = 1; k <= K; k++) { const t = k / K * Math.PI / 2; lv.push([rr * (1 - Math.cos(t)), h - rr + rr * Math.sin(t)]); }
+    const polys = []; for (const [d] of lv) { const Q = d > 1e-9 ? insetConvex(F, d) : F; if (!Q) break; polys.push(Q); }
+    const top = polys[polys.length - 1], gc = top.reduce((s, q) => [s[0] + q[0] / top.length, s[1] + q[1] / top.length], [0, 0]);
+    /* rays from the centre in a frame stretched to the cell's proportions (a long rib samples like a square), at fixed
+       angles plus the directions of the corners, so the rings match up and the corners stay sharp */
+    const sx = Math.max(...F.map(q => Math.abs(q[0] - gc[0]))) || 1, sy = Math.max(...F.map(q => Math.abs(q[1] - gc[1]))) || 1;
+    const angs = Array.from({ length: M }, (_, j) => 2 * Math.PI * j / M);
+    for (const Q of [F, top]) for (const q of Q) angs.push((Math.atan2((q[1] - gc[1]) / sy, (q[0] - gc[0]) / sx) + 2 * Math.PI) % (2 * Math.PI));
+    angs.sort((x, y) => x - y);
+    const AN = angs.filter((x, i) => i === 0 || x - angs[i - 1] > 1e-3);
+    const ray = (Q, ang) => { const dx = Math.cos(ang) * sx, dy = Math.sin(ang) * sy; let best = Infinity; for (let i = 0; i < Q.length; i++) { const A = Q[i], B = Q[(i + 1) % Q.length], ex = B[0] - A[0], ey = B[1] - A[1], den = dx * ey - dy * ex; if (Math.abs(den) < 1e-12) continue; const t = ((A[0] - gc[0]) * ey - (A[1] - gc[1]) * ex) / den, u = ((A[0] - gc[0]) * dy - (A[1] - gc[1]) * dx) / den; if (t > 0 && u >= -1e-9 && u <= 1 + 1e-9 && t < best) best = t; } return [gc[0] + dx * best, gc[1] + dy * best]; };
+    const NA = AN.length, rings = polys.map((Q, i) => AN.map(an => { const q = ray(Q, an); return [q[0], q[1], lv[i][1]]; }));
+    /* the joint floor: from the cell's edge in to its first ring, zipped round by angle */
+    const I = rings[0], ang = q => Math.atan2(q[1] - gc[1], q[0] - gc[0]), b0 = ang(I[0]), rel = q => { let t = ang(q) - b0; while (t < -1e-9) t += 2 * Math.PI; while (t >= 2 * Math.PI - 1e-9) t -= 2 * Math.PI; return t; };
+    if (F !== P) {
+      let s0 = 0; P.forEach((q, k) => { if (rel(q) < rel(P[s0])) s0 = k; });
+      const O = P.map((q, k) => P[(s0 + k) % P.length]).map(q => [q[0], q[1], fl]), aO = O.map(rel), aI = I.map(rel);
+      aI[0] = 0; for (let k = 1; k < aI.length; k++) if (aI[k] < aI[k - 1]) aI[k] += 2 * Math.PI;
+      for (let k = 1; k < aO.length; k++) if (aO[k] < aO[k - 1]) aO[k] += 2 * Math.PI;
+      const nO = O.length, nI = I.length; let i = 0, j = 0;
+      const oA = k => (k < nO ? aO[k] : aO[k - nO] + 2 * Math.PI), iA = k => (k < nI ? aI[k] : aI[k - nI] + 2 * Math.PI);
+      while (i < nO || j < nI) {
+        if (j >= nI || (i < nO && oA(i + 1) <= iA(j + 1))) { tris.push([O[i % nO], O[(i + 1) % nO], I[j % nI]]); i++; }
+        else { tris.push([O[i % nO], I[(j + 1) % nI], I[j % nI]]); j++; }
+      }
+    }
+    for (let i = 0; i < rings.length - 1; i++) { const A = rings[i], B = rings[i + 1]; for (let j = 0; j < NA; j++) { const k = (j + 1) % NA; tris.push([A[j], A[k], B[k]], [A[j], B[k], B[j]]); } }
+    const T = rings[rings.length - 1], ct = [gc[0], gc[1], T[0][2]];
+    for (let j = 0; j < NA; j++) { const k = (j + 1) % NA; tris.push([ct, T[j], T[k]]); }
+  }
+  if (!tris.length) throw new Error('Do rozsahu se nevešla žádná buňka vzoru');
+  return { under, flat, top: tris, tris: under.concat(tris), z0, z1, h, e, fl };
+}
+const texEmbed = R => 0.3 + R * (1 - Math.cos(Math.PI / 36));
+/* a sketch or an imported SVG / DXF laid onto the surface (scaled to a width, turned round the axis, repeated round and in
+   rows): built flat as a slab the size of the motifs' range with the motifs joined to it (or cut into it), cut off at the
+   seam (copies reach across it), and its top kept */
+function texMotif(f, sketches) {
+  const sk = f.ents ? { ents: f.ents } : sketches.get(f.sketch);
+  if (!sk) throw new Error('Vyberte skicu nebo načtěte SVG / DXF');
+  const regs = regions(sk); if (!regs.length) throw new Error('Skica nemá žádný uzavřený profil');
+  const R = Number(f.r), C = 2 * Math.PI * R, L = Number(f.len), cut = f.op === 'cut', h = Math.max(0.1, Number(f.height) || 0.8);
+  const xs = regs.flatMap(r => r.pts.map(q => q[0])), ys = regs.flatMap(r => r.pts.map(q => q[1]));
+  const bx0 = Math.min(...xs), bx1 = Math.max(...xs), by0 = Math.min(...ys), by1 = Math.max(...ys), w0 = bx1 - bx0 || 1;
+  const k = Number(f.width) > 0 ? Number(f.width) / w0 : 1, rep = Math.max(1, Math.min(200, Math.round(Number(f.rep) || 1)));
+  const rows = Math.max(1, Math.min(200, Math.round(Number(f.rows) || 1))), pitch = (by1 - by0) * k + Math.max(0, Number(f.rowGap) || 0);
+  if (rep * rows > 600) throw new Error('Příliš mnoho opakování motivu');
+  if (w0 * k * rep > C + 1e-6) throw new Error(`Motiv je pro ${rep > 1 ? 'tolik opakování ' : ''}příliš široký (obvod plochy je ${(Math.round(C * 10) / 10 + '').replace('.', ',')} mm)`);
+  const zc = f.zc === undefined || f.zc === '' ? L / 2 : Number(f.zc), s0 = (Number(f.angle) || 0) * Math.PI / 180 * R;
+  const cx = (bx0 + bx1) / 2, cy = (by0 + by1) / 2, e = texEmbed(R), fl = 0.06, hb = cut ? -(h + e) : -e;
+  const z0 = Math.max(0, zc - ((rows - 1) / 2) * pitch - (by1 - by0) * k / 2 - 1), z1 = Math.min(L, zc + ((rows - 1) / 2) * pitch + (by1 - by0) * k / 2 + 1);
+  if (z1 - z0 < 0.5) throw new Error('Motiv leží mimo plochu');
+  const B = { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] }, rect = (a, b, c, d) => [{ t: 'poly', pts: [[a, c], [b, c], [b, d], [a, d]] }];
+  let acc = KK.extrudeProfiles(rect(0, C, z0, z1), B, hb, fl);
+  const tools = [];
+  for (let rw = 0; rw < rows; rw++) for (let i = 0; i < rep; i++) {
+    const off0 = s0 + (i + (f.stagger && (rw & 1) ? 0.5 : 0)) * C / rep, zr = zc + (rw - (rows - 1) / 2) * pitch;
+    const off = ((off0 % C) + C) % C;
+    for (const sh of [-C, 0, C]) { /* the copies across the seam too */
+      const mp = q => [(q[0] - cx) * k + off + sh, (q[1] - cy) * k + zr];
+      const lo = (bx0 - cx) * k + off + sh, hi = (bx1 - cx) * k + off + sh;
+      if (hi < 0 || lo > C) continue;
+      let one = [];
+      for (const r of regs) {
+        const solid = KK.extrudeProfiles([{ t: 'poly', pts: r.pts.map(mp) }, ...r.holes.map(hh => ({ t: 'poly', pts: hh.pts.map(mp) }))], B, cut ? -h : -e / 2, cut ? fl + 0.5 : h);
+        one = one.length ? KK.boolean(one, solid, 'union') : solid;
+      }
+      tools.push(...one); /* the copies do not overlap one another (they fit round and the rows are a motif apart) */
+    }
+  }
+  if (tools.length) acc = KK.boolean(acc, tools, cut ? 'subtract' : 'union');
+  /* back to the band: cut at the seam and at the ends, drop its underside, ends and seam walls */
+  acc = KK.boolean(acc, KK.extrudeProfiles(rect(0, C, z0, z1), B, hb - 1, h + 1), 'intersect');
+  const on = (p, kk, v) => p.v.every(q => Math.abs(q[kk] - v) < 1e-6);
+  const top = acc.filter(p => !on(p, 0, 0) && !on(p, 0, C) && !on(p, 1, z0) && !on(p, 1, z1) && !on(p, 2, hb));
+  return { top: texTris(top), z0, z1, fl };
+}
+/* the result on the body: a motif is joined to / cut from it; a pattern of cells comes as a band (for sunk cells the body
+   first loses a ring as deep as the band reaches, which the band then fills again) */
+function textureApply(polys, f, sketches) {
+  if (!(Number(f.r) > 0) || !f.ax || !f.c) throw new Error('Vyberte válcovou plochu');
+  /* a pattern of cells (or a motif) replaces the face between the two heights: the body's faces of that cylinder are cut at both
+     heights and dropped in between, the patterned surface goes in their place and a narrow ring at each end (the 0.06 mm
+     the joint floor stands above the face) closes the gap. No boolean, so it stays quick and sound however many cells. */
+  const B = f.mode === 'motif' ? texMotif(f, sketches) : texBand(f), F = texFrame(f), R = F.R, tol = Math.max(0.05, R * 0.02);
+  const loc = q => { const w = KK.vsub(q, F.c), z = KK.vdot(w, F.a), x = KK.vdot(w, F.u), y = KK.vdot(w, F.v); return { z, r: Math.hypot(x, y), t: Math.atan2(y, x) }; };
+  const onCyl = p => Math.abs(KK.vdot(p.n, F.a)) < 0.02 && p.v.every(q => Math.abs(loc(q).r - R) < tol);
+  const split = (v, z, keepBelow) => { /* convex polygon against the plane at height z */
+    const out = [], d = q => loc(q).z - z, ins = q => (keepBelow ? d(q) <= 1e-7 : d(q) >= -1e-7);
+    for (let i = 0; i < v.length; i++) {
+      const p = v[(i + v.length - 1) % v.length], q = v[i], pi = ins(p), qi = ins(q);
+      const X = () => { let A = p, Bq = q; if (KK.qk(A) > KK.qk(Bq)) [A, Bq] = [Bq, A]; const da = d(A), db = d(Bq), t = da / (da - db); return [0, 1, 2].map(k => Math.round((A[k] + (Bq[k] - A[k]) * t) * 1e6) / 1e6 + 0); };
+      if (qi) { if (!pi) out.push(X()); out.push(q); } else if (pi) out.push(X());
+    }
+    return out.length >= 3 ? KK.mkPoly(out) : null;
+  };
+  const kept = [];
+  let hit = false;
+  for (const p of polys) {
+    if (!onCyl(p)) { kept.push(p); continue; }
+    const zs = p.v.map(q => loc(q).z), lo = Math.min(...zs), hi = Math.max(...zs);
+    if (hi <= B.z0 + 1e-7 || lo >= B.z1 - 1e-7) { kept.push(p); continue; }
+    hit = true;
+    if (lo < B.z0 - 1e-7) { const q = split(p.v, B.z0, true); if (q) kept.push(q); }
+    if (hi > B.z1 + 1e-7) { const q = split(p.v, B.z1, false); if (q) kept.push(q); }
+  }
+  if (!hit) throw new Error('Válcová plocha v tělese nebyla nalezena');
+  const top = texWrap(B.top, f, true);
+  /* the end rings: the cut edge of the face (inner) to the pattern's edge (outer), zipped round by angle */
+  const ringAt = (list, z, r, tl) => { const m = new Map(); for (const p of list) for (const q of p.v) { const l = loc(q); if (Math.abs(l.z - z) < 1e-4 && Math.abs(l.r - r) < tl) m.set(KK.qk(q), q); } return [...m.values()].map(q => ({ q, t: loc(q).t })).sort((x, y) => x.t - y.t); };
+  const extra = [];
+  for (const [z, down] of [[B.z0, true], [B.z1, false]]) {
+    const I = ringAt(kept, z, R, tol), O = ringAt(top, z, R + B.fl, 0.01);
+    if (I.length < 3 || O.length < 3) throw new Error('Okraj textury se nepodařilo napojit');
+    const nI = I.length, nO = O.length, tI = k => (k < nI ? I[k].t : I[k - nI].t + 2 * Math.PI), tO = k => (k < nO ? O[k].t : O[k - nO].t + 2 * Math.PI);
+    let i = 0, j = 0; const tris = [];
+    /* start both rings at the same angle */
+    while (j < nO && O[j].t < I[0].t) j++;
+    const jo = j % nO, Oo = O.slice(jo).concat(O.slice(0, jo)).map((x, k) => ({ q: x.q, t: k < nO - jo ? x.t : x.t + 2 * Math.PI }));
+    const tO2 = k => (k < nO ? Oo[k].t : Oo[k - nO].t + 2 * Math.PI);
+    i = 0; j = 0;
+    while (i < nI || j < nO) {
+      if (j >= nO || (i < nI && tI(i + 1) <= tO2(j + 1))) { tris.push([I[i % nI].q, I[(i + 1) % nI].q, Oo[j % nO].q]); i++; }
+      else { tris.push([I[i % nI].q, Oo[(j + 1) % nO].q, Oo[j % nO].q]); j++; }
+    }
+    const want = down ? KK.vmul(F.a, -1) : F.a;
+    for (const t of tris) { const pq = KK.mkPoly(t); if (!pq) continue; extra.push(KK.vdot(pq.n, want) >= 0 ? pq : KK.mkPoly([t[0], t[2], t[1]])); }
+  }
+  return KK.fixOrientation(KK.clean(kept.concat(top, extra.filter(Boolean))));
+}
+/* what the preview shows: the motif or the band */
+function textureTool(f, sketches) {
+  if (!(Number(f.r) > 0) || !f.ax || !f.c) throw new Error('Vyberte válcovou plochu');
+  return texWrap(f.mode === 'motif' ? texMotif(f, sketches).top : texBand(f).top, f, true);
 }
 /* column-major matrix mapping local (x, y, z) to a frame with z along ax starting at o */
 function frameMatrix(o, ax) {
@@ -2829,6 +3102,13 @@ function step(state, f) {
       out = bodies.filter(x => !drop.has(x.id)).map(x => (x === t ? { ...x, polys: pieces[0] } : x)).filter(x => x.polys.length).concat(pieces.length > 1 ? extra(1) : []);
       break;
     }
+    case 'texture': {
+      const b = bodies.find(x => x.id === f.body);
+      if (!b) throw new Error('Těleso neexistuje');
+      const res = textureApply(b.polys, f, sketches);
+      out = bodies.map(x => (x === b ? { ...x, polys: res } : x));
+      break;
+    }
     case 'thread': {
       const b = bodies.find(x => x.id === f.body);
       if (!b) throw new Error('Těleso neexistuje');
@@ -3079,7 +3359,7 @@ function makeRebuilder() {
   };
 }
 
-return { sectionAt, faceEditRun, feStep, feLoopRing, feRegion, feCentre, feInner, ribsTool, curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { textureTool, textureApply, TEX_PATTERNS, texCellsOf, texBand, texWrap, sectionAt, faceEditRun, feStep, feLoopRing, feRegion, feCentre, feInner, ribsTool, curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

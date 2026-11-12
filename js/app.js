@@ -101,6 +101,7 @@ const ICONS = {
   center: '<path d="M12 2v5M12 17v5M2 12h5M17 12h5"/><rect class="b" x="7" y="7" width="10" height="10" rx="1"/><rect x="7" y="7" width="10" height="10" rx="1"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/>',
   selall: '<rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 2"/><rect class="b" x="7" y="7" width="5" height="5"/><rect class="b2" x="13" y="12" width="5" height="5"/><rect x="7" y="7" width="5" height="5"/><rect x="13" y="12" width="5" height="5"/>',
   scale: '<rect class="b" x="3" y="11" width="10" height="10" rx="1"/><rect x="3" y="11" width="10" height="10" rx="1"/><path d="M8 11V4h12v12h-7" stroke-dasharray="2 2"/><path d="M13 11l6-6M14.5 5H19v4.5"/>',
+  texture: '<path class="b" d="M6 5h12v14H6z"/><path d="M6 5h12v14H6z"/><circle cx="9" cy="8.5" r="1.3"/><circle cx="14.5" cy="8" r="1.6"/><circle cx="11.5" cy="12.5" r="1.5"/><circle cx="8.5" cy="16" r="1.2"/><circle cx="15" cy="15.5" r="1.4"/>',
   thread: '<path class="b" d="M8 4h8v16H8z"/><path d="M8 4h8v16H8z"/><path d="M8 7.5 16 6M8 11 16 9.5M8 14.5 16 13M8 18 16 16.5"/><path d="M5 4v16" stroke-dasharray="2 2" opacity=".6"/>',
   rotate: '<path class="b" d="M9 8.5 14 6l5 2.5v6L14 17l-5-2.5z"/><path d="M9 8.5 14 6l5 2.5v6L14 17l-5-2.5zM9 8.5l5 2.5 5-2.5M14 11v6"/><path d="M6.5 18.5A8.5 8.5 0 0 1 5 7"/><path d="M3 9l2-2.4 2.4 1.6"/>',
   revolve: '<path class="o" d="M13 4h4v15h-4z" opacity=".7"/><path d="M13 4h4v15h-4z"/><path d="M9 2v20" stroke-dasharray="2 2"/><path class="b" d="M5.5 8.5c-2 .8-2 6.2 0 7l1.2-1.8c-.9-1-.9-2.4 0-3.4z" opacity=".9"/><path d="M5.5 8.5c-2 .8-2 6.2 0 7M5.5 15.5l-.2-2.3 2.1.9"/>',
@@ -1280,7 +1281,7 @@ function facePie(x, y) {
    (rarely used or related tools); its button shows the tool used last */
 const RIBBON = {
   solid: [
-    ['Vytvořit', [['sketch', 'Vytvořit skicu', 'D'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'],
+    ['Vytvořit', [['sketch', 'Vytvořit skicu', 'D'], ['extrude', 'Vysunutí', 'E'], ['revolve', 'Rotace'], ['thread', 'Závit', 'T'], ['texture', 'Textura'],
       { menu: 'prim', label: 'Základní tělesa', items: [['box', 'Krychle'], ['cylinder', 'Válec'], ['sphere', 'Koule'], ['cone', 'Kužel'], ['torus', 'Torus'], ['text3d', 'Text']] },
       { menu: 'parts', label: 'Součásti', items: [['bolt', 'Šroub'], ['nut', 'Matice'], ['hinge', 'Pant'], ['latch', 'Západka'], ['buckle', 'Spona'], ['jointpart', 'Kloubové díly']] }]],
     ['Upravit', [{ menu: 'edge', label: 'Hrany', items: [['fillet', 'Zaoblení', 'F'], ['chamfer', 'Zkosení']] }, ['hole', 'Díra', 'H'], ['shell', 'Skořepina'], ['move', 'Přesunout', 'M'], ['scale', 'Měřítko', 'S'], ['rotate', 'Otočit', 'R'], ['facemode', 'Plochy', 'G'], ['faceedit', 'Modelovat'],
@@ -1370,6 +1371,7 @@ function runCommand(id) {
     case 'move': startMove(); break;
     case 'rotate': startRotate(); break;
     case 'thread': startThread(); break;
+    case 'texture': startTexture(); break;
     case 'scale': startScale(); break;
     case 'center': startCenter(); break;
     case 'selall': if (faceMode) setFaceMode(false); selectAll(); break;
@@ -1612,6 +1614,7 @@ function editFeature(i) {
     case 'move': startMove(i, ef); break;
     case 'rotate': startRotate(i, ef); break;
     case 'thread': startThread(i, ef); break;
+    case 'texture': startTexture(i, ef); break;
     case 'scale': startScale(i, ef); break;
     case 'center': startCenter(i, ef); break;
     case 'offsetface': case 'movefaces': startPressFace(i, ef); break;
@@ -5960,6 +5963,124 @@ const TOL_HINGE = 0.35, TOL_LATCH = 0.3; /* from the user's test prints: hinges 
 const jointGap = style => (style === 'hinge' ? 0.5 : 0.4);
 const TOL_BOLT = 0.15, TOL_NUT = 0.35;
 const threadLabel = (d, p) => `M${fmtc(d, 1)} × ${fmtc(p, 2)}`;
+/* Textura povrchu: a pattern (pebbles, honeycomb, knurling…) or a motif of one's own (a sketch, an SVG / DXF) on a
+   cylindrical face */
+const TEX_PAT_LABELS = [['pebbles', 'Kamínky'], ['hex', 'Plástev'], ['diamond', 'Kosočtverce (vroubkování)'], ['triangles', 'Trojúhelníky'], ['bricks', 'Cihly'], ['squares', 'Čtverce'], ['dots', 'Puntíky'], ['ribs', 'Žebrování']];
+function startTexture(editIndex, f) {
+  const sks = () => Array.from(cur.sketches.values()).filter(x => Engine.regions(x).length);
+  const v0 = f ? { ...f } : { mode: 'cells', pattern: 'pebbles', op: 'raise', size: 6, gap: 0.8, height: 1, round: 60, rand: 60, seed: 1, z0: 0, z1: '', width: 20, rep: 6, rows: 1, rowGap: 3, stagger: false, angle: 0, zc: '' };
+  const c = {
+    editIndex, v: v0, body: f ? f.body : null, face: f ? { c: f.c, ax: f.ax, r: f.r, len: f.len } : null, hover: null, timer: null, tool: null,
+    init() {
+      if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
+      const v = this.v, skOpts = sks().map(x => [x.id, x.name || 'Skica']);
+      if (v.mode === 'motif' && !v.ents && !v.sketch && skOpts.length) v.sketch = skOpts[0][0];
+      openDialog({
+        title: 'Textura povrchu', icon: 'texture',
+        fields: [{ k: 'sel', id: 'face', label: 'Plocha' },
+          { k: 'seg', id: 'mode', label: 'Vzor', options: [['cells', 'Hotový vzor'], ['motif', 'Vlastní (skica / SVG)']], value: v.mode === 'motif' ? 'motif' : 'cells' },
+          { k: 'opt', id: 'pattern', label: 'Druh', options: TEX_PAT_LABELS, value: v.pattern || 'pebbles' },
+          { k: 'opt', id: 'sketch', label: 'Skica', options: skOpts.length ? skOpts : [['', '(žádná skica s profilem)']], value: v.sketch || (skOpts[0] ? skOpts[0][0] : '') },
+          { k: 'btns', id: 'file', label: '', options: [['load', 'Načíst SVG / DXF…']] },
+          { k: 'seg', id: 'op', label: 'Provedení', options: [['raise', 'Vystouplý'], ['cut', 'Vyrytý']], value: v.op === 'cut' ? 'cut' : 'raise' },
+          { k: 'num', id: 'size', label: 'Velikost buňky', value: v.size }, { k: 'num', id: 'gap', label: 'Spára', value: v.gap },
+          { k: 'num', id: 'height', label: 'Výška / hloubka', value: v.height }, { k: 'num', id: 'round', label: 'Zaoblení', unit: '%', value: v.round },
+          { k: 'num', id: 'rand', label: 'Nepravidelnost', unit: '%', value: v.rand }, { k: 'btns', id: 'seedb', label: '', options: [['next', 'Jiné rozložení']] },
+          { k: 'num', id: 'z0', label: 'Od (mm od začátku plochy)', value: v.z0 }, { k: 'num', id: 'z1', label: 'Do (prázdné = konec plochy)', value: v.z1 },
+          { k: 'num', id: 'width', label: 'Šířka motivu', value: v.width }, { k: 'num', id: 'rep', label: 'Počet dokola', unit: '×', value: v.rep },
+          { k: 'num', id: 'rows', label: 'Počet řad', unit: '×', value: v.rows }, { k: 'num', id: 'rowGap', label: 'Mezera mezi řadami', value: v.rowGap },
+          { k: 'chk', id: 'stagger', label: 'Každou druhou řadu posunout', value: !!v.stagger },
+          { k: 'num', id: 'angle', label: 'Natočení', unit: '°', value: v.angle }, { k: 'num', id: 'zc', label: 'Výška středu (prázdné = uprostřed)', value: v.zc },
+          { k: 'note', id: 'n' }],
+        onChange: id => {
+          const g = dlg.get(id);
+          if (id === 'mode') { v.mode = g === 'motif' ? 'motif' : 'cells'; if (v.mode === 'motif' && !v.ents && !v.sketch && dlg.get('sketch')) v.sketch = dlg.get('sketch'); }
+          else if (id === 'sketch') { v.sketch = g; delete v.ents; delete v.entsName; }
+          else if (id === 'stagger') v.stagger = g;
+          else if (['pattern', 'op'].includes(id)) v[id] = g;
+          else if (['z1', 'zc'].includes(id)) { const raw = $(`#dialog [data-row="${id}"] input`); v[id] = raw && raw.value.trim() === '' ? '' : g; }
+          else if (typeof g === 'number' && isFinite(g)) v[id] = g;
+          this.update();
+        },
+        onBtn: id => {
+          if (id === 'seedb') { v.seed = (v.seed || 1) + 1; this.update(); }
+          else if (id === 'file') {
+            const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.svg,.dxf';
+            inp.onchange = async () => {
+              const file = inp.files && inp.files[0]; if (!file) return;
+              try {
+                const ext = (file.name.split('.').pop() || '').toLowerCase(), r = ext === 'dxf' ? Importers.parseDXF(await file.text()) : Importers.parseSVG(await file.text());
+                if (!r.ents.length) throw new Error('V souboru nebyla nalezena žádná podporovaná geometrie.');
+                v.ents = transformEnts(r.ents, r.scale, (r.bbox[0] + r.bbox[2]) / 2, (r.bbox[1] + r.bbox[3]) / 2); v.entsName = file.name; v.mode = 'motif'; dlg.set('mode', 'motif');
+                if (!Engine.regions({ ents: v.ents }).length) toast('Soubor nemá žádný uzavřený obrys.');
+                this.update();
+              } catch (e) { toast(e.message); }
+            };
+            inp.click();
+          }
+        }
+      });
+      this.update();
+    },
+    feature() {
+      const v = this.v, out = { id: f ? f.id : 'tmp', type: 'texture', body: this.body, ...this.face, mode: v.mode === 'motif' ? 'motif' : 'cells', op: v.op === 'cut' ? 'cut' : 'raise', height: v.height };
+      if (out.mode === 'motif') Object.assign(out, v.ents ? { ents: v.ents, entsName: v.entsName } : { sketch: v.sketch }, { width: v.width, rep: v.rep, rows: v.rows, rowGap: v.rowGap, stagger: !!v.stagger, angle: v.angle, zc: v.zc });
+      else Object.assign(out, { pattern: v.pattern, size: v.size, gap: v.gap, round: v.round, rand: v.rand, seed: v.seed || 1, z0: v.z0, z1: v.z1 });
+      return out;
+    },
+    update() {
+      const v = this.v, fc = this.face, motif = v.mode === 'motif';
+      dlg.set('face', { text: fc ? `Válcová plocha Ø${fmtc(fc.r * 2, 2)} · délka ${fmtc(fc.len, 2)} mm` : 'Klepněte na vnější válcovou plochu', has: !!fc, active: true });
+      for (const k of ['pattern', 'size', 'gap', 'round', 'z0', 'z1']) dlg.show(k, !motif);
+      dlg.show('rand', !motif && v.pattern === 'pebbles'); dlg.show('seedb', !motif && v.pattern === 'pebbles');
+      dlg.show('round', !motif && v.op !== 'cut');
+      for (const k of ['sketch', 'file', 'width', 'rep', 'rows', 'angle', 'zc']) dlg.show(k, motif);
+      dlg.show('rowGap', motif && v.rows > 1); dlg.show('stagger', motif && v.rows > 1);
+      dlg.show('sketch', motif && !v.ents);
+      setPrompt(fc ? 'Klepnutím na jinou válcovou plochu výběr změníte.' : 'Klepněte na vnější válcovou plochu tělesa (plášť válce, nádoby…)');
+      clearTimeout(this.timer); clearGroup(G.preview); this.tool = null;
+      if (!fc) { dlg.set('n', 'Vyberte vnější válcovou plochu.'); dlg.okEnabled(false); requestRender(); return; }
+      if (motif && !v.ents && !v.sketch) { dlg.set('n', '!Vyberte skicu s uzavřeným profilem nebo načtěte SVG / DXF.'); dlg.okEnabled(false); requestRender(); return; }
+      dlg.set('n', (motif && v.ents ? `Motiv ze souboru ${v.entsName || ''}. ` : '') + 'Počítám náhled…'); dlg.okEnabled(false);
+      this.timer = setTimeout(() => {
+        if (cmd !== this) return;
+        try {
+          this.tool = Engine.textureTool(this.feature(), cur.sketches);
+          clearGroup(G.preview); G.preview.add(previewMesh(this.tool, v.op === 'cut' ? 'cut' : 'new'));
+          const C = Math.PI * 2 * fc.r;
+          dlg.set('n', (motif && v.ents ? `Motiv ze souboru ${v.entsName || ''}. ` : '') + `Obvod plochy ${fmtc(C, 1)} mm. ` + (motif ? 'Motiv se navine na plášť.' : 'Vzor se navine na plášť bez švu; spáry stojí 0,06 mm nad plochou.'));
+          dlg.okEnabled(true);
+        } catch (e) { dlg.set('n', '!' + e.message); }
+        requestRender();
+      }, 300);
+    },
+    pick(ev) {
+      const h = hitBodies(ev); if (!h) return null;
+      const { pi } = polyOfHit(h), polys = h.object.userData.polys, id = h.object.userData.bodyId;
+      if (this.hover && this.hover.polys === polys && this.hover.cyl && this.hover.cyl.group.has(pi)) return this.hover;
+      const cy = cylinderAt(polys, pi); return { id, polys, cyl: cy && !cy.partial && !cy.internal ? cy : null };
+    },
+    onMove(ev) {
+      const p = this.pick(ev);
+      if (p !== this.hover) {
+        this.hover = p; clearGroup(G.overlay);
+        if (p && p.cyl) G.overlay.add(meshFromPolys([...p.cyl.group].map(i => p.polys[i]), new THREE.MeshBasicMaterial({ color: tok.accent, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
+        requestRender();
+      }
+      dom.style.cursor = p && p.cyl ? 'pointer' : '';
+    },
+    onClick(ev) {
+      const p = this.pick(ev); if (!p) return;
+      if (!p.cyl) { toast('Texturu lze vytvořit na celé vnější válcové ploše.'); return; }
+      this.body = p.id; this.face = { c: p.cyl.c, ax: p.cyl.ax, r: p.cyl.r, len: p.cyl.len };
+      if (!f && !this.sized) { this.sized = true; this.v.size = Math.max(2, Math.round(p.cyl.r * 2 * Math.PI / 36)); dlg.set('size', this.v.size); }
+      this.update();
+    },
+    ok() { if (!this.tool || !this.face) return null; const out = this.feature(); out.id = f ? f.id : newId(); return out; },
+    cleanup() { clearTimeout(this.timer); clearGroup(G.overlay); }
+  };
+  beginCmd(c); c.init();
+}
 function startThread(editIndex, f) {
   const c = {
     editIndex, body: f ? f.body : null, face: f ? { c: f.c, ax: f.ax, r: f.r, len: f.len, internal: f.internal } : null,
