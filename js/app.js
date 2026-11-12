@@ -5978,10 +5978,9 @@ function startTexture(editIndex, f) {
       openDialog({
         title: 'Textura povrchu', icon: 'texture',
         fields: [{ k: 'sel', id: 'face', label: 'Plocha' },
-          { k: 'seg', id: 'mode', label: 'Vzor', options: [['cells', 'Hotový vzor'], ['motif', 'Vlastní (skica / SVG)']], value: v.mode === 'motif' ? 'motif' : 'cells' },
+          { k: 'seg', id: 'mode', label: 'Vzor', options: [['cells', 'Hotový vzor'], ['motif', 'Vlastní (skica)']], value: v.mode === 'motif' ? 'motif' : 'cells' },
           { k: 'opt', id: 'pattern', label: 'Druh', options: TEX_PAT_LABELS, value: v.pattern || 'pebbles' },
           { k: 'opt', id: 'sketch', label: 'Skica', options: skOpts.length ? skOpts : [['', '(žádná skica s profilem)']], value: v.sketch || (skOpts[0] ? skOpts[0][0] : '') },
-          { k: 'btns', id: 'file', label: '', options: [['load', 'Načíst SVG / DXF…']] },
           { k: 'seg', id: 'op', label: 'Provedení', options: [['raise', 'Vystouplý'], ['cut', 'Vyrytý']], value: v.op === 'cut' ? 'cut' : 'raise' },
           { k: 'num', id: 'size', label: 'Velikost buňky', value: v.size }, { k: 'num', id: 'gap', label: 'Spára', value: v.gap },
           { k: 'seg', id: 'whole', label: 'U okraje', options: [['fit', 'Vyplnit k okraji'], ['whole', 'Jen celé buňky']], value: v.whole === true ? 'whole' : 'fit' }, { k: 'num', id: 'height', label: 'Výška / hloubka', value: v.height }, { k: 'num', id: 'margin', label: 'Odsazení od kraje', value: v.margin || 0 }, { k: 'num', id: 'round', label: 'Zaoblení', unit: '%', value: v.round },
@@ -6006,21 +6005,6 @@ function startTexture(editIndex, f) {
         onBtn: id => {
           if (id === 'seedb') { v.seed = (v.seed || 1) + 1; this.update(); }
           else if (id === 'fitw') { this.fitWidth(true); this.update(); }
-          else if (id === 'file') {
-            const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.svg,.dxf';
-            inp.onchange = async () => {
-              const file = inp.files && inp.files[0]; if (!file) return;
-              try {
-                const ext = (file.name.split('.').pop() || '').toLowerCase(), r = ext === 'dxf' ? Importers.parseDXF(await file.text()) : Importers.parseSVG(await file.text());
-                if (!r.ents.length) throw new Error('V souboru nebyla nalezena žádná podporovaná geometrie.');
-                v.ents = transformEnts(r.ents, r.scale, (r.bbox[0] + r.bbox[2]) / 2, (r.bbox[1] + r.bbox[3]) / 2); v.entsName = file.name; v.mode = 'motif'; dlg.set('mode', 'motif');
-                if (this.fitWidth(false)) toast(`Motiv byl příliš široký, šířka je upravena na ${fmtc(v.width, 1)} mm.`);
-                if (!Engine.regions({ ents: v.ents }).length) toast('Soubor nemá žádný uzavřený obrys.');
-                this.update();
-              } catch (e) { toast(e.message); }
-            };
-            inp.click();
-          }
         }
       });
       this.update();
@@ -6051,13 +6035,13 @@ function startTexture(editIndex, f) {
       dlg.show('whole', !motif && v.pattern !== 'pebbles' && v.pattern !== 'ribs');
       dlg.show('rand', !motif && v.pattern === 'pebbles'); dlg.show('seedb', !motif && v.pattern === 'pebbles');
       dlg.show('round', !motif && v.op !== 'cut');
-      for (const k of ['sketch', 'file', 'width', 'fitw', 'rep', 'rows', 'angle', 'zc']) dlg.show(k, motif);
+      for (const k of ['sketch', 'width', 'fitw', 'rep', 'rows', 'angle', 'zc']) dlg.show(k, motif);
       dlg.show('rowGap', motif && (v.rows > 1 || (plane && v.rep > 1))); dlg.show('stagger', motif && v.rows > 1); dlg.show('zc', motif && !plane);
       dlg.show('sketch', motif && !v.ents);
       setPrompt(fc ? 'Klepnutím na jinou plochu výběr změníte.' : 'Klepněte na vnější válcovou plochu (plášť válce, nádoby…) nebo na rovnou plochu tělesa');
       clearTimeout(this.timer); clearGroup(G.preview); this.tool = null;
       if (!fc) { dlg.set('n', 'Vyberte válcovou nebo rovnou plochu.'); dlg.okEnabled(false); requestRender(); return; }
-      if (motif && !v.ents && !v.sketch) { dlg.set('n', '!Vyberte skicu s uzavřeným profilem nebo načtěte SVG / DXF.'); dlg.okEnabled(false); requestRender(); return; }
+      if (motif && !v.ents && !v.sketch) { dlg.set('n', '!Vyberte skicu s uzavřeným profilem.'); dlg.okEnabled(false); requestRender(); return; }
       dlg.set('n', (motif && v.ents ? `Motiv ze souboru ${v.entsName || ''}. ` : '') + 'Počítám náhled…'); dlg.okEnabled(false);
       this.timer = setTimeout(() => {
         if (cmd !== this) return;

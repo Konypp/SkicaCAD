@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 2.63
+- Textura: načítání motivu ze souboru SVG / DXF odebráno; vlastní motiv se bere ze skici (SVG lze dál importovat do skici). Textury s motivem načteným dřív zůstávají funkční.
+- Textura, vlastní motiv: rychlejší výpočet – jemné křivky se zjednoduší (0,01 mm), motivy, které se nepřekrývají, se nespojují booleanem a pás s motivy i rovná plocha se skládají přímo (triangulace earcut).
+
 ## Beta 2.62
 - Textura, vlastní motiv: tlačítko Přizpůsobit šířku nastaví největší šířku, která se vejde (na válci podle obvodu a počtu dokola, na rovné ploše podle její šířky a počtu sloupců). Příliš široké SVG / DXF se po načtení zmenší samo; chyba „příliš široký“ radí, jak pokračovat.
 
