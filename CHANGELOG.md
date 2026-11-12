@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.55
+- Posuvníky přidané v 2.54 (Textura, Pole, Přesunout, Text) zase odebrány.
+
 ## Beta 2.54
 - Posuvníky u dalších hodnot: Textura (velikost buňky, spára, výška, zaoblení, nepravidelnost, šířka motivu, počet dokola / sloupců, počet řad, mezera, natočení), Pole (počet, celkový úhel, počet v X a Y), Přesunout (počet kopií) a Text (šířka písmen, řádkování).
 
