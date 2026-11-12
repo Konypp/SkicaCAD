@@ -5970,7 +5970,7 @@ function startTexture(editIndex, f) {
   const sks = () => Array.from(cur.sketches.values()).filter(x => Engine.regions(x).length);
   const v0 = f ? { ...f } : { mode: 'cells', pattern: 'pebbles', op: 'raise', size: 6, gap: 0.8, height: 1, round: 60, rand: 60, seed: 1, z0: 0, z1: '', width: 20, rep: 6, rows: 1, rowGap: 3, stagger: false, angle: 0, zc: '' };
   const c = {
-    editIndex, v: v0, body: f ? f.body : null, face: f ? { c: f.c, ax: f.ax, r: f.r, len: f.len } : null, hover: null, timer: null, tool: null,
+    editIndex, v: v0, body: f ? f.body : null, face: f ? (f.kind === 'plane' ? { kind: 'plane', n: f.n, w: f.w, p: f.p } : { c: f.c, ax: f.ax, r: f.r, len: f.len }) : null, hover: null, timer: null, tool: null,
     init() {
       if (!cur.bodies.length) { endCmd(false); toast('Model zatím neobsahuje žádné těleso.'); return; }
       const v = this.v, skOpts = sks().map(x => [x.id, x.name || 'Skica']);
@@ -6029,26 +6029,29 @@ function startTexture(editIndex, f) {
       return out;
     },
     update() {
-      const v = this.v, fc = this.face, motif = v.mode === 'motif';
-      dlg.set('face', { text: fc ? `Válcová plocha Ø${fmtc(fc.r * 2, 2)} · délka ${fmtc(fc.len, 2)} mm` : 'Klepněte na vnější válcovou plochu', has: !!fc, active: true });
-      for (const k of ['pattern', 'size', 'gap', 'round', 'z0', 'z1']) dlg.show(k, !motif);
+      const v = this.v, fc = this.face, motif = v.mode === 'motif', plane = fc && fc.kind === 'plane';
+      dlg.set('face', { text: fc ? (plane ? 'Rovná plocha' : `Válcová plocha Ø${fmtc(fc.r * 2, 2)} · délka ${fmtc(fc.len, 2)} mm`) : 'Klepněte na válcovou nebo rovnou plochu', has: !!fc, active: true });
+      for (const k of ['pattern', 'size', 'gap', 'round']) dlg.show(k, !motif);
+      for (const k of ['z0', 'z1']) dlg.show(k, !motif && !plane);
+      const rl = $('#dialog [data-row="rep"] label'), rt = plane ? 'Počet sloupců' : 'Počet dokola'; if (rl && rl.dataset.cz !== rt) { rl.dataset.cz = rt; rl.textContent = rt; }
       dlg.show('rand', !motif && v.pattern === 'pebbles'); dlg.show('seedb', !motif && v.pattern === 'pebbles');
       dlg.show('round', !motif && v.op !== 'cut');
       for (const k of ['sketch', 'file', 'width', 'rep', 'rows', 'angle', 'zc']) dlg.show(k, motif);
-      dlg.show('rowGap', motif && v.rows > 1); dlg.show('stagger', motif && v.rows > 1);
+      dlg.show('rowGap', motif && (v.rows > 1 || (plane && v.rep > 1))); dlg.show('stagger', motif && v.rows > 1); dlg.show('zc', motif && !plane);
       dlg.show('sketch', motif && !v.ents);
-      setPrompt(fc ? 'Klepnutím na jinou válcovou plochu výběr změníte.' : 'Klepněte na vnější válcovou plochu tělesa (plášť válce, nádoby…)');
+      setPrompt(fc ? 'Klepnutím na jinou plochu výběr změníte.' : 'Klepněte na vnější válcovou plochu (plášť válce, nádoby…) nebo na rovnou plochu tělesa');
       clearTimeout(this.timer); clearGroup(G.preview); this.tool = null;
-      if (!fc) { dlg.set('n', 'Vyberte vnější válcovou plochu.'); dlg.okEnabled(false); requestRender(); return; }
+      if (!fc) { dlg.set('n', 'Vyberte válcovou nebo rovnou plochu.'); dlg.okEnabled(false); requestRender(); return; }
       if (motif && !v.ents && !v.sketch) { dlg.set('n', '!Vyberte skicu s uzavřeným profilem nebo načtěte SVG / DXF.'); dlg.okEnabled(false); requestRender(); return; }
       dlg.set('n', (motif && v.ents ? `Motiv ze souboru ${v.entsName || ''}. ` : '') + 'Počítám náhled…'); dlg.okEnabled(false);
       this.timer = setTimeout(() => {
         if (cmd !== this) return;
         try {
-          this.tool = Engine.textureTool(this.feature(), cur.sketches);
+          const bp = (cur.bodies.find(b => b.id === this.body) || {}).polys || [];
+          this.tool = Engine.textureTool(this.feature(), cur.sketches, bp);
           clearGroup(G.preview); G.preview.add(previewMesh(this.tool, v.op === 'cut' ? 'cut' : 'new'));
-          const C = Math.PI * 2 * fc.r;
-          dlg.set('n', (motif && v.ents ? `Motiv ze souboru ${v.entsName || ''}. ` : '') + `Obvod plochy ${fmtc(C, 1)} mm. ` + (motif ? 'Motiv se navine na plášť.' : 'Vzor se navine na plášť bez švu; spáry stojí 0,06 mm nad plochou.'));
+          const C = Math.PI * 2 * (fc.r || 0);
+          dlg.set('n', (motif && v.ents ? `Motiv ze souboru ${v.entsName || ''}. ` : '') + (plane ? (motif ? 'Motivy jsou rozmístěné kolem středu plochy a oříznuté jejím obrysem.' : 'Vzor pokryje celou plochu a ořízne se jejím obrysem.') : `Obvod plochy ${fmtc(C, 1)} mm. ` + (motif ? 'Motiv se navine na plášť.' : 'Vzor se navine na plášť bez švu; spáry stojí 0,06 mm nad plochou.')));
           dlg.okEnabled(true);
         } catch (e) { dlg.set('n', '!' + e.message); }
         requestRender();
@@ -6058,21 +6061,30 @@ function startTexture(editIndex, f) {
       const h = hitBodies(ev); if (!h) return null;
       const { pi } = polyOfHit(h), polys = h.object.userData.polys, id = h.object.userData.bodyId;
       if (this.hover && this.hover.polys === polys && this.hover.cyl && this.hover.cyl.group.has(pi)) return this.hover;
-      const cy = cylinderAt(polys, pi); return { id, polys, cyl: cy && !cy.partial && !cy.internal ? cy : null };
+      if (this.hover && this.hover.polys === polys && this.hover.plane && this.hover.plane.group.has(pi)) return this.hover;
+      const cy = cylinderAt(polys, pi);
+      if (cy && !cy.partial && !cy.internal) return { id, polys, cyl: cy };
+      /* a flat face: the whole planar area round the hit */
+      const poly = polys[pi], at = h.point.toArray(), g = K.planarFace(polys, poly.n, poly.w, at);
+      if (cy || !g || !g.length) return { id, polys };
+      return { id, polys, plane: { group: new Set(g), n: poly.n.slice(), w: poly.w, p: at } };
     },
     onMove(ev) {
       const p = this.pick(ev);
       if (p !== this.hover) {
         this.hover = p; clearGroup(G.overlay);
-        if (p && p.cyl) G.overlay.add(meshFromPolys([...p.cyl.group].map(i => p.polys[i]), new THREE.MeshBasicMaterial({ color: tok.accent, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
+        const grp = p && (p.cyl ? p.cyl.group : p.plane ? p.plane.group : null);
+        if (grp) G.overlay.add(meshFromPolys([...grp].map(i => p.polys[i]), new THREE.MeshBasicMaterial({ color: tok.accent, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })));
         requestRender();
       }
-      dom.style.cursor = p && p.cyl ? 'pointer' : '';
+      dom.style.cursor = p && (p.cyl || p.plane) ? 'pointer' : '';
     },
     onClick(ev) {
       const p = this.pick(ev); if (!p) return;
-      if (!p.cyl) { toast('Texturu lze vytvořit na celé vnější válcové ploše.'); return; }
-      this.body = p.id; this.face = { c: p.cyl.c, ax: p.cyl.ax, r: p.cyl.r, len: p.cyl.len };
+      if (!p.cyl && !p.plane) { toast('Texturu lze vytvořit na celé vnější válcové ploše nebo na rovné ploše.'); return; }
+      this.body = p.id;
+      if (p.plane) { this.face = { kind: 'plane', n: p.plane.n, w: p.plane.w, p: p.plane.p }; this.update(); return; }
+      this.face = { c: p.cyl.c, ax: p.cyl.ax, r: p.cyl.r, len: p.cyl.len };
       if (!f && !this.sized) { this.sized = true; this.v.size = Math.max(2, Math.round(p.cyl.r * 2 * Math.PI / 36)); dlg.set('size', this.v.size); }
       this.update();
     },

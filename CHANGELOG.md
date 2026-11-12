@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.53
+- Textura i na rovných plochách (víčko, stěna krabičky…): hotové vzory pokryjí celou plochu a oříznou se jejím obrysem (i s otvory); vlastní motiv ze skici / SVG se rozmístí do sloupců a řad kolem středu plochy, s mezerou, posunem řad a natočením.
+
 ## Beta 2.52
 - Nový nástroj Textura (TĚLESO › Vytvořit): vzor na vnější válcové ploše (plášť válce, nádoby). Hotové vzory Kamínky (Voronoi, nepravidelnost, jiné rozložení), Plástev, Kosočtverce (vroubkování), Trojúhelníky, Cihly, Čtverce, Puntíky a Žebrování – velikost buňky, spára, výška, zaoblení, rozsah od–do; vystouplé nebo vyryté. Vzor se navine bez švu. Vlastní motiv ze skici nebo načteného SVG / DXF: šířka, počet dokola, počet řad, mezera a posun řad, natočení a výška středu.
 

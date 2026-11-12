@@ -442,9 +442,95 @@ function texMotif(f, sketches) {
   const top = acc.filter(p => !on(p, 0, 0) && !on(p, 0, C) && !on(p, 1, z0) && !on(p, 1, z1) && !on(p, 2, hb));
   return { top: texTris(top), z0, z1, fl };
 }
+/* ---------- the same on a flat face ---------- */
+/* rings of a cell (convex F) at the levels lv = [[inset, h], …], sampled along matching rays (as in texBand) */
+function cellRings(F, lv, M) {
+  const polys = []; for (const [d] of lv) { const Q = d > 1e-9 ? insetConvex(F, d) : F; if (!Q) break; polys.push(Q); }
+  if (polys.length < 2) return null;
+  const top = polys[polys.length - 1], gc = top.reduce((s, q) => [s[0] + q[0] / top.length, s[1] + q[1] / top.length], [0, 0]);
+  const sx = Math.max(...F.map(q => Math.abs(q[0] - gc[0]))) || 1, sy = Math.max(...F.map(q => Math.abs(q[1] - gc[1]))) || 1;
+  const angs = Array.from({ length: M }, (_, j) => 2 * Math.PI * j / M);
+  for (const Q of [F, top]) for (const q of Q) angs.push((Math.atan2((q[1] - gc[1]) / sy, (q[0] - gc[0]) / sx) + 2 * Math.PI) % (2 * Math.PI));
+  angs.sort((x, y) => x - y);
+  const AN = angs.filter((x, i) => i === 0 || x - angs[i - 1] > 1e-3);
+  const ray = (Q, ang) => { const dx = Math.cos(ang) * sx, dy = Math.sin(ang) * sy; let best = Infinity; for (let i = 0; i < Q.length; i++) { const A = Q[i], B = Q[(i + 1) % Q.length], ex = B[0] - A[0], ey = B[1] - A[1], den = dx * ey - dy * ex; if (Math.abs(den) < 1e-12) continue; const t = ((A[0] - gc[0]) * ey - (A[1] - gc[1]) * ex) / den, u = ((A[0] - gc[0]) * dy - (A[1] - gc[1]) * dx) / den; if (t > 0 && u >= -1e-9 && u <= 1 + 1e-9 && t < best) best = t; } return [gc[0] + dx * best, gc[1] + dy * best]; };
+  return { gc, rings: polys.map((Q, i) => AN.map(an => { const q = ray(Q, an); return [q[0], q[1], lv[i][1]]; })) };
+}
+/* a closed solid from rings (bottom first) */
+function ringSolid(R0, out) {
+  const { rings, gc } = R0, NA = rings[0].length;
+  for (let i = 0; i < rings.length - 1; i++) { const A = rings[i], B = rings[i + 1]; for (let j = 0; j < NA; j++) { const k = (j + 1) % NA; out.push([A[j], A[k], B[k]], [A[j], B[k], B[j]]); } }
+  const T = rings[rings.length - 1], Bt = rings[0], ct = [gc[0], gc[1], T[0][2]], cb = [gc[0], gc[1], Bt[0][2]];
+  for (let j = 0; j < NA; j++) { const k = (j + 1) % NA; out.push([ct, T[j], T[k]], [cb, Bt[k], Bt[j]]); }
+}
+/* the face: its outline (outer and holes) in its own frame (u across, v up the face, n out of it) */
+function texPlaneFace(polys, f) {
+  const n = KK.vnorm(f.n.map(Number)), up = Math.abs(n[2]) < 0.9 ? [0, 0, 1] : [0, 1, 0];
+  const v = KK.vnorm(KK.vsub(up, KK.vmul(n, KK.vdot(up, n)))), u = KK.cross(v, n);
+  const g = KK.planarFace(polys, n, Number(f.w), f.p.map(Number));
+  if (!g || !g.length) throw new Error('Rovná plocha v tělese nebyla nalezena');
+  const loops3 = KK.faceLoops(polys, g); if (!loops3.length) throw new Error('Obrys plochy se nepodařilo zjistit');
+  const all = loops3.flat(), o = all.reduce((s, q) => KK.vadd(s, KK.vmul(q, 1 / all.length)), [0, 0, 0]);
+  const to2 = q => { const w = KK.vsub(q, o); return [KK.vdot(w, u), KK.vdot(w, v)]; };
+  const loops = loops3.map(l => l.map(to2)).sort((a, b) => Math.abs(KK.area2D(b)) - Math.abs(KK.area2D(a)));
+  const outer = KK.area2D(loops[0]) < 0 ? loops[0].slice().reverse() : loops[0];
+  const holes = loops.slice(1).filter(l => KK.inPoly2D(l[0], outer));
+  const xs = outer.map(q => q[0]), ys = outer.map(q => q[1]);
+  return { o, u, v, n, outer, holes, x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+}
+function texPlaneTool(polys, f, sketches) {
+  const P = texPlaneFace(polys, f), cut = f.op === 'cut', h = Math.max(0.1, Number(f.height) || 0.8), tris = [], edge = [];
+  const inside = q => KK.inPoly2D(q, P.outer) && !P.holes.some(hh => KK.inPoly2D(q, hh));
+  const B = { o: [0, 0, 0], u: [1, 0, 0], v: [0, 1, 0], n: [0, 0, 1] };
+  if (f.mode === 'motif') {
+    const sk = f.ents ? { ents: f.ents } : sketches.get(f.sketch);
+    if (!sk) throw new Error('Vyberte skicu nebo načtěte SVG / DXF');
+    const regs = regions(sk); if (!regs.length) throw new Error('Skica nemá žádný uzavřený profil');
+    const xs = regs.flatMap(r => r.pts.map(q => q[0])), ys = regs.flatMap(r => r.pts.map(q => q[1]));
+    const bx0 = Math.min(...xs), bx1 = Math.max(...xs), by0 = Math.min(...ys), by1 = Math.max(...ys), w0 = bx1 - bx0 || 1;
+    const k = Number(f.width) > 0 ? Number(f.width) / w0 : 1, cols = Math.max(1, Math.min(200, Math.round(Number(f.rep) || 1))), rows = Math.max(1, Math.min(200, Math.round(Number(f.rows) || 1)));
+    if (cols * rows > 600) throw new Error('Příliš mnoho opakování motivu');
+    const gap = Math.max(0, Number(f.rowGap) || 0), px = (bx1 - bx0) * k + gap, py = (by1 - by0) * k + gap, cx = (bx0 + bx1) / 2, cy = (by0 + by1) / 2;
+    const fc = [(P.x0 + P.x1) / 2, (P.y0 + P.y1) / 2], an = (Number(f.angle) || 0) * Math.PI / 180, ca = Math.cos(an), sa = Math.sin(an);
+    for (let rw = 0; rw < rows; rw++) for (let i = 0; i < cols; i++) {
+      const ox = (i - (cols - 1) / 2 + (f.stagger && (rw & 1) ? 0.5 : 0)) * px, oy = (rw - (rows - 1) / 2) * py;
+      const mp = q => { const x = (q[0] - cx) * k + ox, y = (q[1] - cy) * k + oy; return [fc[0] + x * ca - y * sa, fc[1] + x * sa + y * ca]; };
+      let one = [];
+      for (const r of regs) { const sol = KK.extrudeProfiles([{ t: 'poly', pts: r.pts.map(mp) }, ...r.holes.map(hh => ({ t: 'poly', pts: hh.pts.map(mp) }))], B, cut ? -h : -0.5, cut ? 1 : h); one = one.length ? KK.boolean(one, sol, 'union') : sol; }
+      const pts = regs.flatMap(r => r.pts.map(mp));
+      if (pts.every(inside)) tris.push(...texTris(one)); else if (pts.some(inside) || true) edge.push(...one);
+    }
+  } else {
+    const a = Math.max(1, Number(f.size) || 6), g = Math.max(0.2, Number(f.gap) || 0), rr = cut ? 0 : Math.max(0, Math.min(1, (f.round === undefined || f.round === '' ? 60 : Number(f.round)) / 100)) * h, K = rr > 0.05 ? 3 : 0;
+    const W = P.x1 - P.x0 + 2 * a, cells = texCellsOf(f, W, P.y0 - a, P.y1 + a).map(Q => { const R0 = Q.map(q => [q[0] + P.x0 - a, q[1]]); if (Q.dot) R0.dot = Q.dot.map(q => [q[0] + P.x0 - a, q[1]]); return R0; });
+    if (cells.length > 6000) throw new Error('Vzor by měl příliš mnoho buněk; zvětšete jejich velikost');
+    for (let Q of cells) {
+      if (KK.area2D(Q) < 0) { const d = Q.dot; Q = Q.slice().reverse(); Q.dot = d; }
+      let F = Q.dot ? (KK.area2D(Q.dot) < 0 ? Q.dot.slice().reverse() : Q.dot) : insetConvex(Q, g / 2); if (!F) continue;
+      const lv = cut ? [[0, -h], [0, 1]] : [[0, -0.5], [0, h - rr]];
+      if (!cut) for (let kk = 1; kk <= K; kk++) { const t = kk / K * Math.PI / 2; lv.push([rr * (1 - Math.cos(t)), h - rr + rr * Math.sin(t)]); }
+      const R0 = cellRings(F, lv, 12); if (!R0) continue;
+      const ins = F.map(inside), all = ins.every(Boolean), none = !ins.some(Boolean);
+      if (none && !KK.inPoly2D(R0.gc, P.outer)) continue;
+      const t = []; ringSolid(R0, t);
+      if (all && !P.holes.some(hh => hh.some(q => KK.inPoly2D(q, F)))) tris.push(...t);
+      else for (const tr of t) { const q = KK.mkPoly(tr); if (q) edge.push(q); }
+    }
+  }
+  /* pieces crossing the outline are cut to it */
+  let pieces = KK.fromTriangles(tris.flat(2)).polys;
+  if (edge.length) {
+    const lim = KK.extrudeProfiles([{ t: 'poly', pts: P.outer }, ...P.holes.map(hh => ({ t: 'poly', pts: hh }))], B, -h - 2, h + 2);
+    pieces = pieces.concat(KK.boolean(KK.fixOrientation(edge), lim, 'intersect'));
+  }
+  if (!pieces.length) throw new Error('Na plochu se nevešlo nic ze vzoru');
+  const m = [P.u[0], P.u[1], P.u[2], 0, P.v[0], P.v[1], P.v[2], 0, P.n[0], P.n[1], P.n[2], 0, P.o[0], P.o[1], P.o[2], 1];
+  return KK.transform(pieces, m);
+}
 /* the result on the body: a motif is joined to / cut from it; a pattern of cells comes as a band (for sunk cells the body
    first loses a ring as deep as the band reaches, which the band then fills again) */
 function textureApply(polys, f, sketches) {
+  if (f.kind === 'plane') return KK.boolean(polys, texPlaneTool(polys, f, sketches), f.op === 'cut' ? 'subtract' : 'union');
   if (!(Number(f.r) > 0) || !f.ax || !f.c) throw new Error('Vyberte válcovou plochu');
   /* a pattern of cells (or a motif) replaces the face between the two heights: the body's faces of that cylinder are cut at both
      heights and dropped in between, the patterned surface goes in their place and a narrow ring at each end (the 0.06 mm
@@ -496,7 +582,8 @@ function textureApply(polys, f, sketches) {
   return KK.fixOrientation(KK.clean(kept.concat(top, extra.filter(Boolean))));
 }
 /* what the preview shows: the motif or the band */
-function textureTool(f, sketches) {
+function textureTool(f, sketches, polys) {
+  if (f.kind === 'plane') return texPlaneTool(polys, f, sketches);
   if (!(Number(f.r) > 0) || !f.ax || !f.c) throw new Error('Vyberte válcovou plochu');
   return texWrap(f.mode === 'motif' ? texMotif(f, sketches).top : texBand(f).top, f, true);
 }
