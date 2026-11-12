@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.57
+- Textura: řady buněk se vycentrují v rozsahu (stejný okraj nahoře i dole) a nová volba Jen celé buňky (zapnutá) – buňky, které by okraj rozsahu nebo plochy usekl, se vynechají, takže dole nezůstanou useknuté buňky a nahoře výčnělky. Vypnutím se vrátí oříznuté buňky až k okraji.
+
 ## Beta 2.56
 - Textura: Odsazení od kraje – vzor i vlastní motiv začíná zadaný kus od okraje plochy (na rovné ploše od jejího obrysu i otvorů, na válci od obou konců pláště).
 

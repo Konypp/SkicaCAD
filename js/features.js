@@ -296,10 +296,14 @@ const TEX_PATTERNS = ['pebbles', 'hex', 'diamond', 'triangles', 'bricks', 'squar
 function texCellsOf(f, C, z0, z1) {
   const a = Math.max(1, Number(f.size) || 6), pat = TEX_PATTERNS.includes(f.pattern) ? f.pattern : 'pebbles', cells = [];
   const jit = Math.max(0, Math.min(1, (f.rand === undefined || f.rand === '' ? 60 : Number(f.rand)) / 100)), rnd = texRng(f.seed || 1);
-  const grid = (cw, rhOf, off, mk) => { /* columns across C (a whole number of them), rows from below z0 to above z1 */
-    const ns = Math.max(3, Math.round(C / cw)), w = C / ns, rh = typeof rhOf === 'function' ? rhOf(w) : rhOf, j0 = -1, j1 = Math.ceil((z1 - z0) / rh) + 1;
-    if (ns * (j1 - j0) > 8000) throw new Error('Vzor by měl příliš mnoho buněk; zvětšete jejich velikost');
-    for (let j = j0; j <= j1; j++) for (let i = 0; i < ns; i++) cells.push(mk((i + 0.5 + (off && (j & 1) ? 0.5 : 0)) * w, z0 + (j + 0.5) * rh, w, rh));
+  const grid = (cw, rhOf, off, mk) => { /* columns across C (a whole number of them), rows centred in the range so the
+       whole cells sit evenly between its two ends */
+    const ns = Math.max(3, Math.round(C / cw)), w = C / ns, rh = typeof rhOf === 'function' ? rhOf(w) : rhOf;
+    const smp = mk(0, 0, w, rh), ch = Math.max(...smp.map(q => q[1])) - Math.min(...smp.map(q => q[1])), Z = z1 - z0;
+    const n = Math.max(1, Math.floor((Z - ch) / rh + 1e-9) + 1), yc0 = z0 + (Z - ((n - 1) * rh + ch)) / 2 + ch / 2;
+    const j0 = -Math.ceil(ch / rh) - 1, j1 = n + Math.ceil(ch / rh);
+    if (ns * (j1 - j0 + 1) > 8000) throw new Error('Vzor by měl příliš mnoho buněk; zvětšete jejich velikost');
+    for (let j = j0; j <= j1; j++) for (let i = 0; i < ns; i++) cells.push(mk((i + 0.5 + (off && (j & 1) ? 0.5 : 0)) * w, yc0 + j * rh, w, rh));
   };
   const ngon = (cx, cy, r, n, a0) => Array.from({ length: n }, (_, k) => [cx + r * Math.cos(a0 + 2 * Math.PI * k / n), cy + r * Math.sin(a0 + 2 * Math.PI * k / n)]);
   if (pat === 'pebbles') {
@@ -319,10 +323,10 @@ function texCellsOf(f, C, z0, z1) {
   } else if (pat === 'hex') grid(a, w => w * Math.sqrt(3) / 2, true, (x, y, w) => ngon(x, y, w / Math.sqrt(3), 6, Math.PI / 2)); /* honeycomb */
   else if (pat === 'diamond') grid(a, a * 0.6, true, (x, y, w) => [[x, y - a * 0.6], [x + w / 2, y], [x, y + a * 0.6], [x - w / 2, y]]); /* knurling */
   else if (pat === 'triangles') { /* rows of triangles pointing up and down in turn */
-    const ns = Math.max(3, Math.round(C / a)), w = C / ns, th = w * Math.sqrt(3) / 2, j1 = Math.ceil((z1 - z0) / th) + 1;
+    const ns = Math.max(3, Math.round(C / a)), w = C / ns, th = w * Math.sqrt(3) / 2, nt = Math.max(1, Math.floor((z1 - z0) / th + 1e-9)), pad = (z1 - z0 - nt * th) / 2, j1 = nt + 1;
     if (ns * 2 * (j1 + 2) > 8000) throw new Error('Vzor by měl příliš mnoho buněk; zvětšete jejich velikost');
     for (let j = -1; j <= j1; j++) for (let i = 0; i < ns; i++) {
-      const x = (i + (j & 1 ? 0.5 : 0)) * w, y = z0 + j * th;
+      const x = (i + (j & 1 ? 0.5 : 0)) * w, y = z0 + pad + j * th;
       cells.push([[x, y], [x + w, y], [x + w / 2, y + th]], [[x + w / 2, y + th], [x + w, y], [x + 1.5 * w, y + th]]);
     }
   }
@@ -335,7 +339,8 @@ function texCellsOf(f, C, z0, z1) {
   }
   /* keep each cell inside the range */
   const clipZ = P => { let Q = halfClip(P, [0, z0], [0, 1], 0); if (Q.length >= 3) Q = halfClip(Q, [0, z1], [0, -1], 0); return Q.length >= 3 && Math.abs(KK.area2D(Q)) > 1e-4 ? Q : null; };
-  return cells.map(P => { const Q = clipZ(P); if (Q && P.dot) { const D = clipZ(P.dot); if (D) Q.dot = D; else Q.dot = null; } return Q; }).filter(Boolean);
+  /* a cell cut by the range is marked: with whole cells only (Jen celé buňky) it stays a plain joint floor */
+  return cells.map(P => { const Q = clipZ(P); if (!Q) return null; if (Math.abs(KK.area2D(Q)) < Math.abs(KK.area2D(P)) - 1e-4) Q.cut = true; if (P.dot) { const D = clipZ(P.dot); Q.dot = D || null; Q.cut = !D || Math.abs(KK.area2D(D)) < Math.abs(KK.area2D(P.dot)) - 1e-4; } return Q; }).filter(Boolean);
 }
 /* a pattern of cells as one closed band round the surface: underneath (inside the body) the cells themselves, on top the
    floor of the joints between them (0.06 mm above the surface) and the cells raised (rounded) or sunk into it, and a wall
@@ -350,7 +355,7 @@ function texBand(f) {
   const rr = cut ? 0 : Math.max(0, Math.min(1, (f.round === undefined || f.round === '' ? 60 : Number(f.round)) / 100)) * h, K = rr > 0.05 ? 3 : 0, M = 12;
   const near = (x, y) => Math.abs(x - y) < 1e-6;
   for (let P of texCellsOf(f, C, z0, z1)) {
-    if (KK.area2D(P) < 0) { const d = P.dot; P = P.slice().reverse(); P.dot = d; }
+    if (KK.area2D(P) < 0) { const d = P.dot, c = P.cut; P = P.slice().reverse(); P.dot = d; P.cut = c; }
     const pc = P.reduce((s, q) => [s[0] + q[0] / P.length, s[1] + q[1] / P.length], [0, 0]);
     /* underneath, and the end walls */
     for (let k = 0; k < P.length; k++) {
@@ -359,6 +364,7 @@ function texBand(f) {
       flat.push([[pc[0], pc[1], fl], [A[0], A[1], fl], [B[0], B[1], fl]]);
       if ((near(A[1], z0) && near(B[1], z0)) || (near(A[1], z1) && near(B[1], z1))) under.push([[A[0], A[1], hb], [B[0], B[1], hb], [B[0], B[1], fl]], [[A[0], A[1], hb], [B[0], B[1], fl], [A[0], A[1], fl]]);
     }
+    if (P.cut && f.whole !== false && f.pattern !== 'pebbles') P.dot = null;
     if (P.dot === null) { for (let k = 0; k < P.length; k++) { const A = P[k], B = P[(k + 1) % P.length]; tris.push([[pc[0], pc[1], fl], [A[0], A[1], fl], [B[0], B[1], fl]]); } continue; }
     let F = P.dot ? (KK.area2D(P.dot) < 0 ? P.dot.slice().reverse() : P.dot) : g > 0.01 ? insetConvex(P, g / 2) : P;
     if (F && P.dot) { F = halfClip(F, [0, z0 + g / 2], [0, 1], 0); if (F.length >= 3) F = halfClip(F, [0, z1 - g / 2], [0, -1], 0); if (F.length < 3 || Math.abs(KK.area2D(F)) < 1e-4) F = null; } /* a dot cut by the range keeps a joint's width from its end */
@@ -529,6 +535,7 @@ function texPlaneTool(polys, f, sketches) {
       const R0 = cellRings(F, lv, 12); if (!R0) continue;
       const ins = F.map(inside), all = ins.every(Boolean), none = !ins.some(Boolean);
       if (none && !KK.inPoly2D(R0.gc, P.outer)) continue;
+      if (!all && f.whole !== false && f.pattern !== 'pebbles') continue; /* only whole cells */
       const t = []; ringSolid(R0, t);
       if (all && !P.holes.some(hh => hh.some(q => KK.inPoly2D(q, F)))) tris.push(...t);
       else for (const tr of t) { const q = KK.mkPoly(tr); if (q) edge.push(q); }

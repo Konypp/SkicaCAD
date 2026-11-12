@@ -5984,7 +5984,7 @@ function startTexture(editIndex, f) {
           { k: 'btns', id: 'file', label: '', options: [['load', 'Načíst SVG / DXF…']] },
           { k: 'seg', id: 'op', label: 'Provedení', options: [['raise', 'Vystouplý'], ['cut', 'Vyrytý']], value: v.op === 'cut' ? 'cut' : 'raise' },
           { k: 'num', id: 'size', label: 'Velikost buňky', value: v.size }, { k: 'num', id: 'gap', label: 'Spára', value: v.gap },
-          { k: 'num', id: 'height', label: 'Výška / hloubka', value: v.height }, { k: 'num', id: 'margin', label: 'Odsazení od kraje', value: v.margin || 0 }, { k: 'num', id: 'round', label: 'Zaoblení', unit: '%', value: v.round },
+          { k: 'chk', id: 'whole', label: 'Jen celé buňky', value: v.whole !== false }, { k: 'num', id: 'height', label: 'Výška / hloubka', value: v.height }, { k: 'num', id: 'margin', label: 'Odsazení od kraje', value: v.margin || 0 }, { k: 'num', id: 'round', label: 'Zaoblení', unit: '%', value: v.round },
           { k: 'num', id: 'rand', label: 'Nepravidelnost', unit: '%', value: v.rand }, { k: 'btns', id: 'seedb', label: '', options: [['next', 'Jiné rozložení']] },
           { k: 'num', id: 'z0', label: 'Od (mm od začátku plochy)', value: v.z0 }, { k: 'num', id: 'z1', label: 'Do (prázdné = konec plochy)', value: v.z1 },
           { k: 'num', id: 'width', label: 'Šířka motivu', value: v.width }, { k: 'num', id: 'rep', label: 'Počet dokola', unit: '×', value: v.rep },
@@ -5997,6 +5997,7 @@ function startTexture(editIndex, f) {
           if (id === 'mode') { v.mode = g === 'motif' ? 'motif' : 'cells'; if (v.mode === 'motif' && !v.ents && !v.sketch && dlg.get('sketch')) v.sketch = dlg.get('sketch'); }
           else if (id === 'sketch') { v.sketch = g; delete v.ents; delete v.entsName; }
           else if (id === 'stagger') v.stagger = g;
+          else if (id === 'whole') v.whole = g;
           else if (['pattern', 'op'].includes(id)) v[id] = g;
           else if (['z1', 'zc'].includes(id)) { const raw = $(`#dialog [data-row="${id}"] input`); v[id] = raw && raw.value.trim() === '' ? '' : g; }
           else if (typeof g === 'number' && isFinite(g)) v[id] = g;
@@ -6025,7 +6026,7 @@ function startTexture(editIndex, f) {
     feature() {
       const v = this.v, out = { id: f ? f.id : 'tmp', type: 'texture', body: this.body, ...this.face, mode: v.mode === 'motif' ? 'motif' : 'cells', op: v.op === 'cut' ? 'cut' : 'raise', height: v.height, ...(v.margin > 0 ? { margin: v.margin } : {}) };
       if (out.mode === 'motif') Object.assign(out, v.ents ? { ents: v.ents, entsName: v.entsName } : { sketch: v.sketch }, { width: v.width, rep: v.rep, rows: v.rows, rowGap: v.rowGap, stagger: !!v.stagger, angle: v.angle, zc: v.zc });
-      else Object.assign(out, { pattern: v.pattern, size: v.size, gap: v.gap, round: v.round, rand: v.rand, seed: v.seed || 1, z0: v.z0, z1: v.z1 });
+      else Object.assign(out, { pattern: v.pattern, whole: v.whole !== false, size: v.size, gap: v.gap, round: v.round, rand: v.rand, seed: v.seed || 1, z0: v.z0, z1: v.z1 });
       return out;
     },
     update() {
@@ -6034,6 +6035,7 @@ function startTexture(editIndex, f) {
       for (const k of ['pattern', 'size', 'gap', 'round']) dlg.show(k, !motif);
       for (const k of ['z0', 'z1']) dlg.show(k, !motif && !plane);
       const rl = $('#dialog [data-row="rep"] label'), rt = plane ? 'Počet sloupců' : 'Počet dokola'; if (rl && rl.dataset.cz !== rt) { rl.dataset.cz = rt; rl.textContent = rt; }
+      dlg.show('whole', !motif && v.pattern !== 'pebbles' && v.pattern !== 'ribs');
       dlg.show('rand', !motif && v.pattern === 'pebbles'); dlg.show('seedb', !motif && v.pattern === 'pebbles');
       dlg.show('round', !motif && v.op !== 'cut');
       for (const k of ['sketch', 'file', 'width', 'rep', 'rows', 'angle', 'zc']) dlg.show(k, motif);
