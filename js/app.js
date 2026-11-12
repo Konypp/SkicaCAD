@@ -5968,7 +5968,7 @@ const threadLabel = (d, p) => `M${fmtc(d, 1)} × ${fmtc(p, 2)}`;
 const TEX_PAT_LABELS = [['pebbles', 'Kamínky'], ['hex', 'Plástev'], ['diamond', 'Kosočtverce (vroubkování)'], ['triangles', 'Trojúhelníky'], ['bricks', 'Cihly'], ['squares', 'Čtverce'], ['dots', 'Puntíky'], ['ribs', 'Žebrování']];
 function startTexture(editIndex, f) {
   const sks = () => Array.from(cur.sketches.values()).filter(x => Engine.regions(x).length);
-  const v0 = f ? { ...f } : { mode: 'cells', pattern: 'pebbles', op: 'raise', size: 6, gap: 0.8, height: 1, round: 60, rand: 60, seed: 1, z0: 0, z1: '', width: 20, rep: 6, rows: 1, rowGap: 3, stagger: false, angle: 0, zc: '' };
+  const v0 = f ? { ...f } : { mode: 'cells', pattern: 'pebbles', op: 'raise', size: 6, gap: 0.8, height: 1, round: 0, rand: 60, seed: 1, z0: 0, z1: '', width: 20, rep: 6, rows: 1, rowGap: 3, stagger: false, angle: 0, zc: '' };
   const c = {
     editIndex, v: v0, body: f ? f.body : null, face: f ? (f.kind === 'plane' ? { kind: 'plane', n: f.n, w: f.w, p: f.p } : { c: f.c, ax: f.ax, r: f.r, len: f.len }) : null, hover: null, timer: null, tool: null,
     init() {

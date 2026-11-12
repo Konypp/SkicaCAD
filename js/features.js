@@ -352,7 +352,7 @@ function texBand(f) {
   const mg = Math.max(0, Number(f.margin) || 0), z0 = Math.max(mg, Math.min(L, Number(f.z0) || 0)), z1 = Math.max(z0, Math.min(L - mg, f.z1 === undefined || f.z1 === '' ? L : Number(f.z1)));
   if (z1 - z0 < Math.min(a * 0.5, 2)) throw new Error('Rozsah textury je pro tuto velikost buněk příliš malý');
   const cut = f.op === 'cut', under = [], flat = [], tris = [], e = texEmbed(R), fl = 0.06, /* the joint floor stands a little above the face, clear of the facets' sag */ hb = cut ? -(h + e) : -e;
-  const rr = cut ? 0 : Math.max(0, Math.min(1, (f.round === undefined || f.round === '' ? 60 : Number(f.round)) / 100)) * h, K = rr > 0.05 ? 3 : 0, M = 12;
+  const rr = cut ? 0 : Math.max(0, Math.min(1, (f.round === undefined || f.round === '' ? 0 : Number(f.round)) / 100)) * h, K = rr > 0.05 ? 3 : 0, M = 12;
   const near = (x, y) => Math.abs(x - y) < 1e-6;
   for (let P of texCellsOf(f, C, z0, z1)) {
     if (KK.area2D(P) < 0) { const d = P.dot, c = P.cut; P = P.slice().reverse(); P.dot = d; P.cut = c; }
@@ -524,7 +524,7 @@ function texPlaneTool(polys, f, sketches) {
       if (pts.every(inside)) tris.push(...texTris(one)); else if (pts.some(inside) || true) edge.push(...one);
     }
   } else {
-    const a = Math.max(1, Number(f.size) || 6), g = Math.max(0.2, Number(f.gap) || 0), rr = cut ? 0 : Math.max(0, Math.min(1, (f.round === undefined || f.round === '' ? 60 : Number(f.round)) / 100)) * h, K = rr > 0.05 ? 3 : 0;
+    const a = Math.max(1, Number(f.size) || 6), g = Math.max(0.2, Number(f.gap) || 0), rr = cut ? 0 : Math.max(0, Math.min(1, (f.round === undefined || f.round === '' ? 0 : Number(f.round)) / 100)) * h, K = rr > 0.05 ? 3 : 0;
     const W = P.x1 - P.x0 + 2 * a, cells = texCellsOf(f, W, P.y0 - a, P.y1 + a).map(Q => { const R0 = Q.map(q => [q[0] + P.x0 - a, q[1]]); if (Q.dot) R0.dot = Q.dot.map(q => [q[0] + P.x0 - a, q[1]]); return R0; });
     if (cells.length > 6000) throw new Error('Vzor by měl příliš mnoho buněk; zvětšete jejich velikost');
     for (let Q of cells) {
