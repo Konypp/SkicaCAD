@@ -5987,7 +5987,7 @@ function startTexture(editIndex, f) {
           { k: 'seg', id: 'whole', label: 'U okraje', options: [['fit', 'Vyplnit k okraji'], ['whole', 'Jen celé buňky']], value: v.whole === true ? 'whole' : 'fit' }, { k: 'num', id: 'height', label: 'Výška / hloubka', value: v.height }, { k: 'num', id: 'margin', label: 'Odsazení od kraje', value: v.margin || 0 }, { k: 'num', id: 'round', label: 'Zaoblení', unit: '%', value: v.round },
           { k: 'num', id: 'rand', label: 'Nepravidelnost', unit: '%', value: v.rand }, { k: 'btns', id: 'seedb', label: '', options: [['next', 'Jiné rozložení']] },
           { k: 'num', id: 'z0', label: 'Od (mm od začátku plochy)', value: v.z0 }, { k: 'num', id: 'z1', label: 'Do (prázdné = konec plochy)', value: v.z1 },
-          { k: 'num', id: 'width', label: 'Šířka motivu', value: v.width }, { k: 'num', id: 'rep', label: 'Počet dokola', unit: '×', value: v.rep },
+          { k: 'num', id: 'width', label: 'Šířka motivu', value: v.width }, { k: 'btns', id: 'fitw', label: '', options: [['fit', 'Přizpůsobit šířku']] }, { k: 'num', id: 'rep', label: 'Počet dokola', unit: '×', value: v.rep },
           { k: 'num', id: 'rows', label: 'Počet řad', unit: '×', value: v.rows }, { k: 'num', id: 'rowGap', label: 'Mezera mezi řadami', value: v.rowGap },
           { k: 'chk', id: 'stagger', label: 'Každou druhou řadu posunout', value: !!v.stagger },
           { k: 'num', id: 'angle', label: 'Natočení', unit: '°', value: v.angle }, { k: 'num', id: 'zc', label: 'Výška středu (prázdné = uprostřed)', value: v.zc },
@@ -6005,6 +6005,7 @@ function startTexture(editIndex, f) {
         },
         onBtn: id => {
           if (id === 'seedb') { v.seed = (v.seed || 1) + 1; this.update(); }
+          else if (id === 'fitw') { this.fitWidth(true); this.update(); }
           else if (id === 'file') {
             const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.svg,.dxf';
             inp.onchange = async () => {
@@ -6013,6 +6014,7 @@ function startTexture(editIndex, f) {
                 const ext = (file.name.split('.').pop() || '').toLowerCase(), r = ext === 'dxf' ? Importers.parseDXF(await file.text()) : Importers.parseSVG(await file.text());
                 if (!r.ents.length) throw new Error('V souboru nebyla nalezena žádná podporovaná geometrie.');
                 v.ents = transformEnts(r.ents, r.scale, (r.bbox[0] + r.bbox[2]) / 2, (r.bbox[1] + r.bbox[3]) / 2); v.entsName = file.name; v.mode = 'motif'; dlg.set('mode', 'motif');
+                if (this.fitWidth(false)) toast(`Motiv byl příliš široký, šířka je upravena na ${fmtc(v.width, 1)} mm.`);
                 if (!Engine.regions({ ents: v.ents }).length) toast('Soubor nemá žádný uzavřený obrys.');
                 this.update();
               } catch (e) { toast(e.message); }
@@ -6022,6 +6024,17 @@ function startTexture(editIndex, f) {
         }
       });
       this.update();
+    },
+    /* the widest the motif can be: round a cylinder (with the repeats and a little room between them), or across a flat face */
+    maxWidth() {
+      const fc = this.face; if (!fc) return null;
+      if (fc.kind === 'plane') { try { const P = Engine.texPlaneFace((cur.bodies.find(b => b.id === this.body) || {}).polys || [], { ...fc, margin: this.v.margin }); return (P.x1 - P.x0 - Math.max(0, (this.v.rep || 1) - 1) * (this.v.rowGap || 0)) / Math.max(1, this.v.rep || 1); } catch (e) { return null; } }
+      return Math.PI * 2 * fc.r / Math.max(1, Math.round(this.v.rep || 1)) * 0.97;
+    },
+    fitWidth(always) {
+      const m = this.maxWidth(); if (!(m > 0)) return false;
+      if (!always && !(this.v.width > m)) return false;
+      this.v.width = Math.floor(m * 10) / 10; dlg.set('width', this.v.width); return true;
     },
     feature() {
       const v = this.v, out = { id: f ? f.id : 'tmp', type: 'texture', body: this.body, ...this.face, mode: v.mode === 'motif' ? 'motif' : 'cells', op: v.op === 'cut' ? 'cut' : 'raise', height: v.height, ...(v.margin > 0 ? { margin: v.margin } : {}) };
@@ -6038,7 +6051,7 @@ function startTexture(editIndex, f) {
       dlg.show('whole', !motif && v.pattern !== 'pebbles' && v.pattern !== 'ribs');
       dlg.show('rand', !motif && v.pattern === 'pebbles'); dlg.show('seedb', !motif && v.pattern === 'pebbles');
       dlg.show('round', !motif && v.op !== 'cut');
-      for (const k of ['sketch', 'file', 'width', 'rep', 'rows', 'angle', 'zc']) dlg.show(k, motif);
+      for (const k of ['sketch', 'file', 'width', 'fitw', 'rep', 'rows', 'angle', 'zc']) dlg.show(k, motif);
       dlg.show('rowGap', motif && (v.rows > 1 || (plane && v.rep > 1))); dlg.show('stagger', motif && v.rows > 1); dlg.show('zc', motif && !plane);
       dlg.show('sketch', motif && !v.ents);
       setPrompt(fc ? 'Klepnutím na jinou plochu výběr změníte.' : 'Klepněte na vnější válcovou plochu (plášť válce, nádoby…) nebo na rovnou plochu tělesa');

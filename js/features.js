@@ -428,7 +428,7 @@ function texMotif(f, sketches) {
   const k = Number(f.width) > 0 ? Number(f.width) / w0 : 1, rep = Math.max(1, Math.min(200, Math.round(Number(f.rep) || 1)));
   const rows = Math.max(1, Math.min(200, Math.round(Number(f.rows) || 1))), pitch = (by1 - by0) * k + Math.max(0, Number(f.rowGap) || 0);
   if (rep * rows > 600) throw new Error('Příliš mnoho opakování motivu');
-  if (w0 * k * rep > C + 1e-6) throw new Error(`Motiv je pro ${rep > 1 ? 'tolik opakování ' : ''}příliš široký (obvod plochy je ${(Math.round(C * 10) / 10 + '').replace('.', ',')} mm)`);
+  if (w0 * k * rep > C + 1e-6) throw new Error(`Motiv je pro ${rep > 1 ? 'tolik opakování ' : ''}příliš široký (obvod plochy je ${(Math.round(C * 10) / 10 + '').replace('.', ',')} mm); zmenšete Šířku motivu nebo klepněte na Přizpůsobit šířku`);
   const zc = f.zc === undefined || f.zc === '' ? L / 2 : Number(f.zc), s0 = (Number(f.angle) || 0) * Math.PI / 180 * R;
   const cx = (bx0 + bx1) / 2, cy = (by0 + by1) / 2, e = texEmbed(R), fl = 0.06, hb = cut ? -(h + e) : -e;
   const z0 = Math.max(0, zc - ((rows - 1) / 2) * pitch - (by1 - by0) * k / 2 - 1), z1 = Math.min(L, zc + ((rows - 1) / 2) * pitch + (by1 - by0) * k / 2 + 1);
@@ -3481,7 +3481,7 @@ function makeRebuilder() {
   };
 }
 
-return { textureTool, textureApply, TEX_PATTERNS, texCellsOf, texBand, texWrap, sectionAt, faceEditRun, feStep, feLoopRing, feRegion, feCentre, feInner, ribsTool, curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { texPlaneFace, textureTool, textureApply, TEX_PATTERNS, texCellsOf, texBand, texWrap, sectionAt, faceEditRun, feStep, feLoopRing, feRegion, feCentre, feInner, ribsTool, curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.62
+- Textura, vlastní motiv: tlačítko Přizpůsobit šířku nastaví největší šířku, která se vejde (na válci podle obvodu a počtu dokola, na rovné ploše podle její šířky a počtu sloupců). Příliš široké SVG / DXF se po načtení zmenší samo; chyba „příliš široký“ radí, jak pokračovat.
+
 ## Beta 2.61
 - Textura, Vyplnit k okraji: krajní buňky sahají přesně k okraji rozsahu (už ne 0,1 mm od něj).
 
