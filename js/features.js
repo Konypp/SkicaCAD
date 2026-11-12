@@ -283,11 +283,13 @@ function halfClip(P, a, n, d) {
   }
   return out;
 }
-function insetConvex(P, d) {
+/* edgeD(a, b): another inset for some edges (an edge on the end of the range keeps only a hair's width) */
+function insetConvex(P, d, edgeD) {
   let Q = P;
   for (let i = 0; i < P.length && Q.length >= 3; i++) {
     const a = P[i], b = P[(i + 1) % P.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (l < 1e-12) continue;
-    Q = halfClip(Q, a, [-(b[1] - a[1]) / l, (b[0] - a[0]) / l], d);
+    const dd = edgeD ? edgeD(a, b, d) : d;
+    Q = halfClip(Q, a, [-(b[1] - a[1]) / l, (b[0] - a[0]) / l], dd);
   }
   return Q.length >= 3 && Math.abs(KK.area2D(Q)) > 1e-6 ? Q : null;
 }
@@ -371,13 +373,14 @@ function texBand(f) {
     }
     if (P.cut && f.whole === true && f.pattern !== 'pebbles') P.dot = null;
     if (P.dot === null) { for (let k = 0; k < P.length; k++) { const A = P[k], B = P[(k + 1) % P.length]; tris.push([[pc[0], pc[1], fl], [A[0], A[1], fl], [B[0], B[1], fl]]); } continue; }
-    let F = P.dot ? (KK.area2D(P.dot) < 0 ? P.dot.slice().reverse() : P.dot) : g > 0.01 ? insetConvex(P, g / 2) : P;
-    if (F && P.dot) { F = halfClip(F, [0, z0 + g / 2], [0, 1], 0); if (F.length >= 3) F = halfClip(F, [0, z1 - g / 2], [0, -1], 0); if (F.length < 3 || Math.abs(KK.area2D(F)) < 1e-4) F = null; } /* a dot cut by the range keeps a joint's width from its end */
+    const onEnd = (A, B, d) => (f.whole !== true && ((near(A[1], z0) && near(B[1], z0)) || (near(A[1], z1) && near(B[1], z1))) ? Math.min(d, 0.1) : d); /* cells cut by the range reach (all but a hair) right to its ends */
+    let F = P.dot ? (KK.area2D(P.dot) < 0 ? P.dot.slice().reverse() : P.dot) : g > 0.01 ? insetConvex(P, g / 2, onEnd) : P;
+    const dg = f.whole === true ? g / 2 : 0.1; if (F && P.dot) { F = halfClip(F, [0, z0 + dg], [0, 1], 0); if (F.length >= 3) F = halfClip(F, [0, z1 - dg], [0, -1], 0); if (F.length < 3 || Math.abs(KK.area2D(F)) < 1e-4) F = null; } /* a dot cut by the range keeps a joint's width from its end */
     if (!F) { for (let k = 0; k < P.length; k++) { const A = P[k], B = P[(k + 1) % P.length]; tris.push([[pc[0], pc[1], fl], [A[0], A[1], fl], [B[0], B[1], fl]]); } continue; }
     /* rings: on the floor, then the shoulder and the rounded top (raised) or the bottom of the recess (sunk) */
     const lv = [[0, fl], cut ? [0, -h] : [0, h - rr]];
     for (let k = 1; k <= K; k++) { const t = k / K * Math.PI / 2; lv.push([rr * (1 - Math.cos(t)), h - rr + rr * Math.sin(t)]); }
-    const polys = []; for (const [d] of lv) { const Q = d > 1e-9 ? insetConvex(F, d) : F; if (!Q) break; polys.push(Q); }
+    const polys = []; for (const [d] of lv) { const Q = d > 1e-9 ? insetConvex(F, d, onEnd) : F; if (!Q) break; polys.push(Q); }
     const top = polys[polys.length - 1], gc = top.reduce((s, q) => [s[0] + q[0] / top.length, s[1] + q[1] / top.length], [0, 0]);
     /* rays from the centre in a frame stretched to the cell's proportions (a long rib samples like a square), at fixed
        angles plus the directions of the corners, so the rings match up and the corners stay sharp */
@@ -534,7 +537,8 @@ function texPlaneTool(polys, f, sketches) {
     if (cells.length > 6000) throw new Error('Vzor by měl příliš mnoho buněk; zvětšete jejich velikost');
     for (let Q of cells) {
       if (KK.area2D(Q) < 0) { const d = Q.dot; Q = Q.slice().reverse(); Q.dot = d; }
-      let F = Q.dot ? (KK.area2D(Q.dot) < 0 ? Q.dot.slice().reverse() : Q.dot) : insetConvex(Q, g / 2); if (!F) continue;
+      const nr = (x, y) => Math.abs(x - y) < 1e-6, onEnd = (A, B, d) => (f.whole !== true && ((nr(A[1], P.y0) && nr(B[1], P.y0)) || (nr(A[1], P.y1) && nr(B[1], P.y1)) || (nr(A[0], P.x0) && nr(B[0], P.x0)) || (nr(A[0], P.x1) && nr(B[0], P.x1))) ? 0 : d); /* cells cut by the face's extent reach right to its edge */
+      let F = Q.dot ? (KK.area2D(Q.dot) < 0 ? Q.dot.slice().reverse() : Q.dot) : insetConvex(Q, g / 2, onEnd); if (!F) continue;
       const lv = cut ? [[0, -h], [0, 1]] : [[0, -0.5], [0, h - rr]];
       if (!cut) for (let kk = 1; kk <= K; kk++) { const t = kk / K * Math.PI / 2; lv.push([rr * (1 - Math.cos(t)), h - rr + rr * Math.sin(t)]); }
       const R0 = cellRings(F, lv, 12); if (!R0) continue;
