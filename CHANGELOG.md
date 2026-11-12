@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.54
+- Posuvníky u dalších hodnot: Textura (velikost buňky, spára, výška, zaoblení, nepravidelnost, šířka motivu, počet dokola / sloupců, počet řad, mezera, natočení), Pole (počet, celkový úhel, počet v X a Y), Přesunout (počet kopií) a Text (šířka písmen, řádkování).
+
 ## Beta 2.53
 - Textura i na rovných plochách (víčko, stěna krabičky…): hotové vzory pokryjí celou plochu a oříznou se jejím obrysem (i s otvory); vlastní motiv ze skici / SVG se rozmístí do sloupců a řad kolem středu plochy, s mezerou, posunem řad a natočením.
 
