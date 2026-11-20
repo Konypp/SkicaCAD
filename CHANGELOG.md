@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.66
+- Duplikovat (Ctrl+D) těleso: kopie zůstane na stejném místě jako originál (dřív se posunula vedle o šířku + 5 mm), stejně jako ve skice. Kopie je vybraná, přesune se nástrojem Přesunout nebo úpravou prvku v časové ose. Vložit (Ctrl+V) dál dává kopii vedle originálu.
+
 ## Beta 2.65
 - Pant, Ohebný půlkruh: pásek už neleží na horní hraně, ale o r = mezera/π níž na vnějších stěnách. Po zavření víka se ohne do přesného půlkruhu o poloměru r kolem zadní hrany, ohyb je rozložený po celé délce (dřív se lámal v ostrém záhybu u hran). Mezera 3–25 mm, doporučeno 10–15 mm; dialog ukazuje poloměr a protažení pásku (varuje nad 4 / 6 %), volba Ukázat zavřenou zobrazí víko a pásek v zavřené poloze.
 

@@ -5896,11 +5896,12 @@ function duplicateSel() {
   }
   if (cmd) return;
   if (!sel.size) { toast('Vyberte těleso, které chcete duplikovat.'); return; }
-  const ids = [...sel], bb = K.bbox(ids.flatMap(id => bodyById(id).polys));
-  const f = { id: newId(), type: 'move', bodies: ids, t: [Math.round((bb.max[0] - bb.min[0] + 5) * 10) / 10, 0, 0], r: [0, 0, 0], copy: true, count: 1, dir: 'free' };
+  /* the copy stays exactly where the original is (like in the sketch); move it with Přesunout or by editing the feature */
+  const ids = [...sel];
+  const f = { id: newId(), type: 'move', bodies: ids, t: [0, 0, 0], r: [0, 0, 0], copy: true, count: 1, dir: 'free' };
   doc.features.splice(doc.marker, 0, f); doc.marker++;
   pushHist(); saveDoc();
-  refreshBusy(() => { sel = new Set(cur.bodies.filter(b => b.from === f.id).map(b => b.id)); styleBodies(); renderBrowser(); updateInfo(); toast('Duplikováno vedle originálu. Polohu upravíte dvojklikem na prvek v časové ose.'); });
+  refreshBusy(() => { sel = new Set(cur.bodies.filter(b => b.from === f.id).map(b => b.id)); styleBodies(); renderBrowser(); updateInfo(); toast('Duplikováno na stejné místo. Kopie je vybraná, přesunete ji nástrojem Přesunout nebo dvojklikem na prvek v časové ose.'); });
 }
 
 /* ================= thread ================= */
