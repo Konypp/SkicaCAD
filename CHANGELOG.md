@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.70
+- Zaoblení a zkosení hran postupně: tvar rohu. Když se zaoblí (nebo zkosí) svislá hrana až po zkosení či zaoblení spodních hran, předchozí úprava teď obíhá nový roh ve stejné šířce (u zaoblení jako kuželový nebo prstencový pás). Dřív ji nová úprava jen protnula a zkosení se v rohu propadlo do tvaru V. Profil předchozí úpravy se změří na obou plochách a protáhne podél nového zaoblení; výsledek se liší od postupu v ideálním pořadí (nejdřív svislé hrany) jen o desetiny mm³. Na rovném zaobleném obrysu (např. horní hrana zaobleného kvádru) se nic nemění.
+
 ## Beta 2.69
 - Zaoblení a zkosení hran postupně: když už má těleso upravenou sousední hranu (např. zkosené nebo zaoblené spodní hrany) a pak se upraví svislá hrana, nová úprava doběhne až do konce přes tu předchozí. Dřív se zastavila na jejím začátku a v rohu zůstal ostrý schod. Výsledek je stejný, jako kdyby se svislá hrana upravila před spodními. Hrana stojící na výstupku se dál zastaví přesně na něm. Zaoblení a zkosení jde takto i kombinovat.
 
