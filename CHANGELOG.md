@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.69
+- Zaoblení a zkosení hran postupně: když už má těleso upravenou sousední hranu (např. zkosené nebo zaoblené spodní hrany) a pak se upraví svislá hrana, nová úprava doběhne až do konce přes tu předchozí. Dřív se zastavila na jejím začátku a v rohu zůstal ostrý schod. Výsledek je stejný, jako kdyby se svislá hrana upravila před spodními. Hrana stojící na výstupku se dál zastaví přesně na něm. Zaoblení a zkosení jde takto i kombinovat.
+
 ## Beta 2.68
 - Prohlížeč: přejmenování tělesa dvojklikem znovu funguje (první klepnutí překreslilo seznam, takže dvojklik nedošel). Pravé tlačítko (na telefonu dlouhý stisk) na tělese v Prohlížeči otevře stejnou nabídku jako na tělese v pohledu; na skice nabídne Upravit skicu a Skrýt / Zobrazit. Přejmenovat z nabídky v pohledu rozbalí Prohlížeč, pokud je sbalený.
 

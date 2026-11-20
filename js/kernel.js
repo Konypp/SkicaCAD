@@ -1204,9 +1204,27 @@ function removal(polys, ch, mode, k) {
     let ext0 = 0, ext1 = 0;
     if (!add) {
       const bvh = buildBVH(polys), lc = vmul(loop.reduce((acc, p) => vadd(acc, p), [0, 0, 0]), 1 / loop.length);
-      const past = s => vadd(lc, vmul(t, s - sM));
-      ext0 = insideSolid(past(-0.03), polys, bvh) ? 0 : 0.05;
-      ext1 = insideSolid(past(L + 0.03), polys, bvh) ? 0 : 0.05;
+      /* the body goes on beyond the end when the sharp corner itself (just inside it) is material there */
+      const cn = vadd(fr.M, vmul(vnorm(vsub(lc, fr.M)), 0.01));
+      const past = s => vadd(cn, vmul(t, s - sM));
+      /* past an open end the corner may already be cut by another edge (a chamfer or fillet of the bottom edges done
+         earlier): the removal runs on through it, so the new rounding goes right through to the end instead of stopping
+         and leaving the old sharp mitre there (a step at the corner). */
+      const bb = bbox(polys), corners = [];
+      for (const x of [bb.min[0], bb.max[0]]) for (const y of [bb.min[1], bb.max[1]]) for (const z of [bb.min[2], bb.max[2]]) corners.push([x, y, z]);
+      const reach = dirn => {
+        /* how far the body reaches past this end along the edge; the removal runs that far unless the corner fills with
+           material again on the way (another part of the body in line with the edge) */
+        const e = dirn > 0 ? p1 : p0, lim = Math.min(3 * k + 1, Math.max(0, ...corners.map(c => dirn * vdot(vsub(c, e), t)))) + 0.05;
+        const ds = Math.max(0.1, Math.min(0.5, lim / 40));
+        for (let d = 0.6; d < lim; d += ds) if (insideSolid(vadd(cn, vmul(t, dirn * d + (dirn > 0 ? L : 0) - sM)), polys, bvh)) return Math.max(0.05, d - ds);
+        return lim;
+      };
+      /* the body goes on beyond the end (an edge standing on a ledge) when the corner line is material just past it and
+         still a little further on (a rounded or bevelled edge below only touches it) */
+      const goesOn = s => insideSolid(past(s), polys, bvh) && insideSolid(past(s + (s > 0 ? 0.5 : -0.5)), polys, bvh);
+      ext0 = goesOn(-0.03) ? 0 : reach(-1);
+      ext1 = goesOn(L + 0.03) ? 0 : reach(1);
     }
     const A = loop.map(p => vadd(p, vmul(t, -ext0 - sM))), B = loop.map(p => vadd(p, vmul(t, L + ext1 - sM)));
     return { polys: fixOrientation(prism(A, B)), add };
