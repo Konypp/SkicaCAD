@@ -2539,6 +2539,80 @@ function applyBoxHinge(T, pb, pl, sep) {
   if (T.sockB) pl = KK.boolean(pl, T.sockB, 'subtract');
   return { box: pb, lid: pl };
 }
+/* ---------- living (film) hinge: box and lid stand side by side, open side up, rims at the same height; a thin strip
+   (t, default 0.4 mm = two layers) on the rim plane bridges the gap between the facing walls. After printing the lid is
+   folded 180° over it. The strip is printed as a short bridge, its lines run across the gap, i.e. across the bend.
+   Optional friction lip: the top of the box walls raised by h, minus the folded lid grown by the play (an octagon
+   around each point), and left off along the hinge wall, where the lid's back wall swings in while closing.
+   Needs a box wall thicker than the lid wall (e.g. 2.4 and 1.2 mm). Returns world-space tools and the fold matrix. */
+function flexHingeTools(f, boxPolys, lidPolys) {
+  const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys);
+  let ax = -1, G = -1, dir = 0;
+  for (const k of [0, 1]) {
+    const g1 = b.min[k] - a.max[k], g2 = a.min[k] - b.max[k];
+    if (g1 > G) { G = g1; ax = k; dir = 1; }
+    if (g2 > G) { G = g2; ax = k; dir = -1; }
+  }
+  if (G <= 0) throw new Error('Krabička a víko se překrývají, postavte je vedle sebe s mezerou');
+  if (G < 0.8) throw new Error('Mezera mezi krabičkou a víkem musí být aspoň 0,8 mm (doporučeno 1,5–3 mm)');
+  if (G > 8) throw new Error('Mezera mezi krabičkou a víkem je moc velká (' + (Math.round(G * 10) / 10).toString().replace('.', ',') + ' mm), ohebný pant ji má nejvýš 8 mm, doporučeno 1,5–3 mm');
+  const eA = dir > 0 ? a.max[ax] : a.min[ax], eB = dir > 0 ? b.min[ax] : b.max[ax];
+  const zR = rimTop(boxPolys, ax, eA);
+  if (Math.abs(zR - rimTop(lidPolys, ax, eB)) > 0.05) throw new Error('Krabička a víko musí mít horní hranu ve stejné výšce');
+  const t = Math.max(0.2, Math.min(2, Number(f.ft) || 0.4));
+  if (zR - t < Math.max(a.min[2], b.min[2]) + 0.6) throw new Error('Krabička je na ohebný pant příliš nízká');
+  const o = 1 - ax, s0 = Math.max(a.min[o], b.min[o]), s1 = Math.min(a.max[o], b.max[o]), span = s1 - s0;
+  const cnt = Math.max(1, Math.min(3, Math.round(Number(f.count) || 1)));
+  /* length 0 = automatic: the whole edge less 3 mm at each end (rounded corners, the walls are full there) */
+  let L = Number(f.len) || 0;
+  if (!(L > 0)) L = cnt === 1 ? span - 6 : (span - 6 - 4 * (cnt - 1)) / cnt;
+  if (L < 3) throw new Error('Hrana je na ohebný pant příliš krátká');
+  const sh = Number(f.shift) || 0;
+  if (span < L * cnt + 2 * (cnt - 1) - 1e-6) throw new Error('Pásky se nevejdou podél hrany (' + (Math.round(span * 10) / 10).toString().replace('.', ',') + ' mm)');
+  if (Math.abs(sh) > 1e-9 && (s0 + span * 0.5 / cnt + sh - L / 2 < s0 - 1e-6 || s0 + span * (cnt - 0.5) / cnt + sh + L / 2 > s1 + 1e-6)) throw new Error('Posunutý pant by přesahoval hranu');
+  const lo = Math.min(eA, eB), hi = Math.max(eA, eB), ov = 0.3; /* the strip reaches 0.3 mm into each wall to fuse with it */
+  const blk = (lo3, hi3) => KK.translate(KK.primitive('box', { w: hi3[0] - lo3[0], d: hi3[1] - lo3[1], h: hi3[2] - lo3[2] }), [0, 1, 2].map(k => (lo3[k] + hi3[k]) / 2));
+  let strip = [];
+  for (let j = 0; j < cnt; j++) {
+    const c = s0 + span * (j + 0.5) / cnt + sh, l3 = [0, 0, zR - t], h3 = [0, 0, zR];
+    l3[ax] = lo - ov; h3[ax] = hi + ov; l3[o] = c - L / 2; h3[o] = c + L / 2;
+    strip = strip.concat(blk(l3, h3));
+  }
+  /* the strip must lie on wall material at both ends, not over a hollow */
+  const onWall = P => { const e = 0.05, l3 = [0, 0, zR - t], h3 = [0, 0, zR]; l3[o] = s0; h3[o] = s1;
+    const side = (x0, x1) => { const q = l3.slice(), r = h3.slice(); q[ax] = x0; r[ax] = x1; return KK.signedVolume(KK.boolean(P, blk(q, r), 'intersect')); };
+    return P === boxPolys ? side(dir > 0 ? eA - ov : eA + e, dir > 0 ? eA - e : eA + ov) : side(dir > 0 ? eB + e : eB - ov, dir > 0 ? eB + ov : eB - e); };
+  /* the lid turned 180° about the rim line in the middle of the gap: where it lands when shut */
+  const mid = (eA + eB) / 2;
+  const fold = ax === 1 ? [1, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 0, 0, 2 * mid, 2 * zR, 1] : [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 2 * mid, 0, 2 * zR, 1];
+  const out = { strip, fold, G, L, cnt, t, zRim: zR, ax, dir };
+  if (onWall(boxPolys) < 1e-3 || onWall(lidPolys) < 1e-3) throw new Error('Pásek nemá kde držet: stěny krabičky a víka u mezery musí sahat až k horní hraně');
+  if (f.lip) {
+    const h = Math.max(0.5, Math.min(10, Number(f.liph) || 2)), c = Math.max(0, Math.min(1, f.tol === undefined ? 0.15 : Number(f.tol) || 0));
+    const big = [a.max[0] - a.min[0] + 20, a.max[1] - a.min[1] + 20];
+    const cx = (a.min[0] + a.max[0]) / 2, cy = (a.min[1] + a.max[1]) / 2;
+    const slab = KK.translate(KK.primitive('box', { w: big[0], d: big[1], h }), [cx, cy, zR - h / 2]);
+    let lip = KK.translate(KK.boolean(boxPolys, slab, 'intersect'), [0, 0, h]);
+    /* leave it off along the hinge wall (5 mm in from it) */
+    const q = [a.min[0] - 10, a.min[1] - 10, zR - 1], r = [a.max[0] + 10, a.max[1] + 10, zR + h + 1];
+    if (dir > 0) q[ax] = eA - 5; else r[ax] = eA + 5;
+    lip = KK.boolean(lip, blk(q, r), 'subtract');
+    const Lf = KK.transform(lidPolys, fold), d = c / Math.SQRT2;
+    for (const v of [[0, 0], [c, 0], [-c, 0], [0, c], [0, -c], [d, d], [-d, d], [d, -d], [-d, -d]]) {
+      if (!lip.length) break;
+      if (c === 0 && (v[0] || v[1])) continue;
+      lip = KK.boolean(lip, v[0] || v[1] ? KK.translate(Lf, [v[0], v[1], 0]) : Lf, 'subtract');
+    }
+    if (!lip.length || KK.signedVolume(lip) < 0.5) throw new Error('Lem se nevešel: stěna krabičky musí být silnější než stěna víka (např. Skořepina 2,4 mm krabička, 1,2 mm víko)');
+    out.lip = lip; out.lipH = h; out.lipC = c;
+  }
+  return out;
+}
+function applyFlexHinge(T, pb, pl) {
+  let box = KK.boolean(pb, T.strip, 'union');
+  if (T.lip) box = KK.boolean(box, T.lip, 'union');
+  return KK.boolean(box, pl, 'union');
+}
 /* ---------- box hinge designed on the CLOSED box: the lid lies on the box, back walls flush. The axis is on the
    parting plane behind (or, flush, just outside) the chosen back wall; the lid is turned 180° about it, the hinge
    is built exactly as for the open pair, and then the lid is either left open beside the box (printed in one piece)
@@ -3906,7 +3980,15 @@ function step(state, f) {
       out = applyTool(bodies, f, toolForPrimitive(f), newBody); break;
     case 'bolt': case 'nut':
       out = applyTool(bodies, f, toolForFastener(f), polys => ({ id: f.id, name: (f.type === 'bolt' ? 'Šroub M' + f.size + '×' + f.len : 'Matice M' + f.size + (f.low ? ' nízká' : '')).replace('.', ','), polys, from: f.id })); break;
-    case 'hinge': if (f.kind === 'box' || f.kind === 'closed') {
+    case 'hinge': if (f.kind === 'flex') {
+      const bx = bodies.find(b => b.id === f.box), ld = bodies.find(b => b.id === f.lid);
+      if (!bx || !ld) throw new Error('Krabička nebo víko chybí');
+      if (bx === ld) throw new Error('Krabička a víko musí být dvě různá tělesa');
+      /* the box, the strip and the lid become one body (they print as one piece) */
+      const T = flexHingeTools(f, bx.polys, ld.polys), polys = applyFlexHinge(T, bx.polys, ld.polys);
+      out = bodies.filter(b => b !== ld).map(b => (b === bx ? { ...b, polys } : b));
+      break;
+    } else if (f.kind === 'box' || f.kind === 'closed') {
       const bx = bodies.find(b => b.id === f.box), ld = bodies.find(b => b.id === f.lid);
       if (!bx || !ld) throw new Error('Krabička nebo víko chybí');
       if (bx === ld) throw new Error('Krabička a víko musí být dvě různá tělesa');
@@ -4306,7 +4388,7 @@ function makeRebuilder() {
   };
 }
 
-return { texPlaneFace, textureTool, textureApply, TEX_PATTERNS, texCellsOf, texBand, texWrap, sectionAt, faceEditRun, feStep, feLoopRing, feRegion, feCentre, feInner, ribsTool, curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { flexHingeTools, applyFlexHinge, texPlaneFace, textureTool, textureApply, TEX_PATTERNS, texCellsOf, texBand, texWrap, sectionAt, faceEditRun, feStep, feLoopRing, feRegion, feCentre, feInner, ribsTool, curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

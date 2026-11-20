@@ -3356,9 +3356,9 @@ function screwLen(L, d) { const F = Engine.FASTENERS[d]; return F ? Math.floor(L
 const HINGE_LIFT = { out: 0.15, flush: 0.15 };
 function startHinge(editIndex, f) {
   const pivot = new THREE.Object3D(); scene.add(pivot);
-  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_HINGE, holes: 2, hd: 3, part: 'both', rot: 0, count: 1, side: '+y', join: 'print', pinKind: 'fil', pinTight: false, recess: true, gap: 1, shift: 0, out: 'join', lift: HINGE_LIFT.flush };
+  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_HINGE, holes: 2, hd: 3, part: 'both', rot: 0, count: 1, side: '+y', join: 'print', pinKind: 'fil', pinTight: false, recess: true, gap: 1, shift: 0, out: 'join', lift: HINGE_LIFT.flush, ft: 0.4, lip: true, liph: 2 };
   const c = {
-    editIndex, tool: null, tools: null, gizmoDrag: false, timer: null, liftSet: !!f,
+    editIndex, tool: null, tools: null, gizmoDrag: false, timer: null, liftSet: !!f, tolSet: !!f,
     v: f ? { ...D0, style: 'out', pinTight: false, recess: false, ...f } : { ...D0 }, /* an older hinge keeps its free axle hole */
     pos: f && f.pos ? f.pos.slice() : [0, 0, 0], op: f && f.op ? f.op : 'new',
     box: f ? f.box || null : null, lid: f ? f.lid || null : null, pick: 'box', highlight: new Set(),
@@ -3366,7 +3366,7 @@ function startHinge(editIndex, f) {
       if (!f && sel.size === 2) { [this.box, this.lid] = [...sel]; }
       openDialog({
         title: 'Pant', icon: 'hinge',
-        fields: [{ k: 'opt', id: 'kind', label: 'Typ', options: [['print', 'Samostatný, tištěný vcelku'], ['screw', 'Samostatný, na šroub'], ['closed', 'Krabička navržená zavřená'], ['box', 'Krabička a víko vedle sebe']], value: this.v.kind },
+        fields: [{ k: 'opt', id: 'kind', label: 'Typ', options: [['print', 'Samostatný, tištěný vcelku'], ['screw', 'Samostatný, na šroub'], ['closed', 'Krabička navržená zavřená'], ['box', 'Krabička a víko vedle sebe'], ['flex', 'Ohebný (krabička a víko vedle sebe)']], value: this.v.kind },
           { k: 'seg', id: 'join', label: 'Spojení', options: [['print', 'Tisk vcelku'], ['pin', 'Kolík / šroub']], value: this.v.join },
           { k: 'seg', id: 'pinKind', label: 'Kolík', options: [['fil', 'Filament 1,75'], ['m2', 'Šroub M2'], ['m3', 'Šroub M3']], value: this.v.pinKind },
           { k: 'chk', id: 'recess', label: 'Zapustit hlavu šroubu a matici', value: this.v.recess },
@@ -3376,6 +3376,9 @@ function startHinge(editIndex, f) {
           { k: 'num', id: 'gap', label: 'Mezera mezi díly po rozložení', value: this.v.gap },
           { k: 'sel', id: 'box', label: 'Krabička' }, { k: 'sel', id: 'lid', label: 'Víko' },
           { k: 'num', id: 'len', label: 'Délka pantu', value: this.v.len },
+          { k: 'num', id: 'ft', label: 'Tloušťka pásku', value: this.v.ft },
+          { k: 'chk', id: 'lip', label: 'Třecí lem na krabičce (víko drží zavřené)', value: this.v.lip },
+          { k: 'num', id: 'liph', label: 'Výška lemu', value: this.v.liph },
           { k: 'opt', id: 'count', label: 'Počet pantů', options: [['1', '1'], ['2', '2'], ['3', '3']], value: String(this.v.count) },
           { k: 'num', id: 'shift', label: 'Posun podél hrany', value: this.v.shift, range: [-50, 50, 0.5] },
           { k: 'seg', id: 'out', label: 'Výsledek', options: [['join', 'Přidat k tělesům'], ['new', 'Nová tělesa']], value: this.v.out },
@@ -3398,16 +3401,20 @@ function startHinge(editIndex, f) {
           else if (['kind', 'part', 'style', 'join', 'pinKind', 'side', 'out'].includes(id)) this.v[id] = dlg.get(id);
           else if (id === 'pinTight') this.v.pinTight = !!dlg.get('pinTight');
           else if (id === 'recess') this.v.recess = !!dlg.get('recess');
+          else if (id === 'lip') { this.v.lip = !!dlg.get('lip'); this.layout(); }
           else if (id === 'cnt') this.v.n = parseFloat(dlg.get('cnt'));
           else if (id === 'lift') { const x = dlg.get('lift'); if (isFinite(x) && x >= 0) { this.v.lift = x; this.liftSet = true; } }
           else if (id === 'holes' || id === 'rot' || id === 'hd' || id === 'count') this.v[id] = parseFloat(dlg.get(id));
-          else { const x = dlg.get(id); if (isFinite(x) && (x >= 0 || id === 'shift')) this.v[id] = x; }
+          else { const x = dlg.get(id); if (isFinite(x) && (x >= 0 || id === 'shift')) { this.v[id] = x; if (id === 'tol') this.tolSet = true; } }
           /* a new hinge takes the allowance of its placement until the user sets one */
           if (id === 'style' && !this.liftSet && HINGE_LIFT[this.v.style] !== undefined) { this.v.lift = HINGE_LIFT[this.v.style]; dlg.set('lift', this.v.lift); }
           if (id === 'join' || id === 'style' || id === 'pinKind' || id === 'kind') this.layout();
           if (id === 'kind') {
             const l = $('#dialog [data-row="pin"] label'); if (l) l.textContent = this.v.kind === 'screw' ? 'Průměr šroubu v ose' : 'Průměr čepu';
-            if (this.isBox() && this.v.len > 25) { this.v.len = 20; dlg.set('len', 20); }
+            if (this.isFlex()) { this.v.len = 0; dlg.set('len', 0); if (!this.tolSet) { this.v.tol = TOL_FLEX_LIP; dlg.set('tol', this.v.tol); } }
+            else if (this.isBox() && this.v.len > 25) { this.v.len = 20; dlg.set('len', 20); }
+            if (!this.isFlex() && !(this.v.len > 0)) { this.v.len = this.isBox() ? 20 : 40; dlg.set('len', this.v.len); }
+            if (!this.isFlex() && !this.tolSet && this.v.tol === TOL_FLEX_LIP) { this.v.tol = TOL_HINGE; dlg.set('tol', this.v.tol); }
             this.layout();
           }
           this.schedule();
@@ -3419,7 +3426,8 @@ function startHinge(editIndex, f) {
       this.layout();
       this.update();
     },
-    isBox() { return this.v.kind === 'box' || this.v.kind === 'closed'; },
+    isBox() { return this.v.kind === 'box' || this.v.kind === 'closed' || this.v.kind === 'flex'; },
+    isFlex() { return this.v.kind === 'flex'; },
     isClosed() { return this.v.kind === 'closed'; },
     layout() {
       const bx = this.isBox(), cl = this.isClosed(), hid = cl && this.v.style === 'hidden', pin = cl && (this.v.join === 'pin' || hid);
@@ -3428,10 +3436,17 @@ function startHinge(editIndex, f) {
       dlg.show('join', cl && !hid); dlg.show('side', cl); dlg.show('lift', bx && !pin); dlg.show('pinKind', pin && !hid); dlg.show('pinTight', pin && (hid || this.v.pinKind === 'fil')); dlg.show('recess', (pin && !hid && this.v.pinKind !== 'fil') || (!bx && this.v.kind === 'screw')); dlg.show('pin', !pin); dlg.show('gap', cl && !pin && this.v.style === 'flush');
       for (const id of ['w', 't', 'holes', 'hd', 'part', 'rot', 'pos', 'op']) dlg.show(id, !bx);
       if (bx) transform.detach(); else transform.attach(pivot);
+      /* living hinge: just the strip (length, count, shift, thickness) and the friction lip */
+      const fx = this.isFlex();
+      dlg.show('ft', fx); dlg.show('lip', fx); dlg.show('liph', fx && this.v.lip); dlg.show('tol', !fx || this.v.lip);
+      if (fx) for (const id of ['style', 'out', 'cnt', 'pin', 'lift']) dlg.show(id, false);
+      const lt = $('#dialog [data-row="tol"] label'); if (lt) lt.textContent = fx ? 'Vůle lemu' : 'Vůle pro 3D tisk';
+      const ll = $('#dialog [data-row="len"] label'); if (ll) ll.textContent = fx ? 'Délka pásku (0 = celá hrana)' : 'Délka pantu';
       if (bx && !this.box) this.pick = 'box'; else if (bx && !this.lid) this.pick = 'lid';
     },
     feature() {
       const v = this.v;
+      if (this.isFlex()) return { id: f ? f.id : 'tmp', type: 'hinge', kind: 'flex', box: this.box, lid: this.lid, len: v.len, count: v.count, shift: v.shift, ft: v.ft, lip: !!v.lip, liph: v.liph, tol: v.tol };
       if (this.isClosed()) return { id: f ? f.id : 'tmp', type: 'hinge', kind: 'closed', style: v.style, side: v.side, join: v.join, pinKind: v.pinKind, pinTight: !!v.pinTight, recess: !!v.recess, gap: v.gap, box: this.box, lid: this.lid, len: v.len, n: v.n, pin: v.pin, tol: v.tol, count: v.count, shift: v.shift, out: v.out, lift: v.lift };
       if (this.isBox()) return { id: f ? f.id : 'tmp', type: 'hinge', kind: 'box', style: v.style, box: this.box, lid: this.lid, len: v.len, n: v.n, pin: v.pin, tol: v.tol, count: v.count, shift: v.shift, out: v.out, lift: v.lift };
       return { id: f ? f.id : 'tmp', type: 'hinge', kind: v.kind, len: v.len, w: v.w, t: v.t, n: v.n, pin: v.pin, tol: v.tol, holes: v.holes, hd: v.hd, part: v.part, rot: v.rot, recess: !!v.recess, pos: this.pos.slice(), op: this.op };
@@ -3445,14 +3460,23 @@ function startHinge(editIndex, f) {
         const bb = this.box && bodyById(this.box), lb = this.lid && bodyById(this.lid);
         dlg.set('box', { text: bb ? bodyName(bb) : 'Klepněte na krabičku', has: !!bb, active: this.pick === 'box' });
         dlg.set('lid', { text: lb ? bodyName(lb) : 'Klepněte na víko', has: !!lb, active: this.pick === 'lid' });
-        if (this.isClosed()) setPrompt(this.pick === 'box' ? 'Klepněte na zadní stěnu krabičky, kde má být pant. Víko má ležet na krabičce (zavřená krabička).' : 'Klepněte na víko, které leží na krabičce.');
+        if (this.isFlex()) setPrompt(this.pick === 'box' ? 'Klepněte na krabičku. Krabička a víko mají stát vedle sebe otevřené nahoru, horní hrany ve stejné výšce, mezera asi 2 mm.' : 'Klepněte na víko, které stojí vedle krabičky.');
+        else if (this.isClosed()) setPrompt(this.pick === 'box' ? 'Klepněte na zadní stěnu krabičky, kde má být pant. Víko má ležet na krabičce (zavřená krabička).' : 'Klepněte na víko, které leží na krabičce.');
         else setPrompt(this.pick === 'box' ? 'Klepněte na krabičku. Krabička a víko mají stát vedle sebe otevřené nahoru, horní hrany ve stejné výšce.' : 'Klepněte na víko, které stojí vedle krabičky.');
         if (!bb || !lb) { dlg.set('n', ''); dlg.set('n2', ''); dlg.set('n3', ''); dlg.okEnabled(false); requestRender(); return; }
       } else if (!this.gizmoDrag) pivot.position.set(this.pos[0], this.pos[1], this.pos[2]);
       try {
         const F = this.feature();
         this.hideBodies = null;
-        if (this.isClosed()) {
+        if (this.isFlex()) {
+          if (this.box === this.lid) throw new Error('Krabička a víko musí být dvě různá tělesa');
+          const T = Engine.flexHingeTools(F, bodyById(this.box).polys, bodyById(this.lid).polys);
+          this.tool = T.strip.concat(T.lip || []);
+          G.preview.add(previewMesh(this.tool, 'join'));
+          dlg.set('n', `Pásek ${T.cnt > 1 ? T.cnt + ' × ' : ''}${fmtc(T.L, 1)} mm, tloušťka ${fmtc(T.t, 2)} mm, mezera ${fmtc(T.G, 1)} mm${T.lip ? `; lem ${fmtc(T.lipH, 1)} mm, vůle ${fmtc(T.lipC, 2)} mm` : ''}.`);
+          dlg.set('n2', 'Krabička, pásek a víko budou jedno těleso. Tiskne se vcelku bez podpěr, výška vrstvy ' + (Math.abs(T.t - 0.4) < 1e-6 ? '0,2 mm (pásek = 2 vrstvy)' : 'tak, aby pásek měl aspoň 2 vrstvy') + '. Po tisku víko překlopte o 180° na krabičku.');
+          dlg.set('n3', 'Nejvíc ohybů vydrží PP, dobře PETG; PLA po čase praskne. Pant ohněte několikrát hned po sejmutí z podložky, dokud je teplý.' + (T.lip ? ' Lem potřebuje stěnu krabičky silnější než stěnu víka (např. 2,4 a 1,2 mm).' : ''));
+        } else if (this.isClosed()) {
           if (this.box === this.lid) throw new Error('Krabička a víko musí být dvě různá tělesa');
           const Rz = Engine.closedHingeResult(F, bodyById(this.box).polys, bodyById(this.lid).polys), H = Rz.T.H;
           this.tool = Rz.box.concat(Rz.lid, Rz.partA || [], Rz.partB || []); this.hideBodies = new Set([this.box, this.lid]); styleBodies();
@@ -5958,7 +5982,7 @@ function cylinderAt(polys, pi) {
   return { c: cOut.map(r6), ax: aOut.map(r6), r: r6(r), len: r6(t1 - t0), internal, group, partial };
 }
 /* default 3D-print clearances on the diameter, from print tests: bolt / pin 0.15 mm, nut / hole 0.35 mm */
-const TOL_HINGE = 0.35, TOL_LATCH = 0.3; /* from the user's test prints: hinges 0.35 (0.3 held the lid ajar at the hinge), latches 0.3 */
+const TOL_HINGE = 0.35, TOL_LATCH = 0.3, TOL_FLEX_LIP = 0.15; /* from the user's test prints: hinges 0.35 (0.3 held the lid ajar at the hinge), latches 0.3; flex-hinge lip 0.15 (best fit in the bolt test) */
 /* default clearance of a print-in-place joint: the pin hinge (Pant) 0.5 mm, the others 0.4 mm */
 const jointGap = style => (style === 'hinge' ? 0.5 : 0.4);
 const TOL_BOLT = 0.15, TOL_NUT = 0.35;

@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.64
+- Pant: nový typ Ohebný (krabička a víko vedle sebe) – tenký pásek (výchozí 0,4 mm = 2 vrstvy) přes mezeru 0,8–8 mm na úrovni horní hrany spojí krabičku a víko v jedno těleso; délka pásku 0 = celá hrana bez 3 mm na koncích, počet 1–3, posun. Volitelný třecí lem na krabičce (výška, vůle 0,15 mm) drží víko zavřené; vynechá se u stěny s pantem. Kontroly mezery, výšky hran a opory pásku na stěnách.
+
 ## Beta 2.63
 - Textura: načítání motivu ze souboru SVG / DXF odebráno; vlastní motiv se bere ze skici (SVG lze dál importovat do skici). Textury s motivem načteným dřív zůstávají funkční.
 - Textura, vlastní motiv: rychlejší výpočet – jemné křivky se zjednoduší (0,01 mm), motivy, které se nepřekrývají, se nespojují booleanem a pás s motivy i rovná plocha se skládají přímo (triangulace earcut).
