@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.67
+- Skrytá tělesa: operace Vyříznout, Spojit a Průnik (vysunutí, rotace, základní tělesa, díra, pant a další) se skrytých těles v Prohlížeči netýkají. Skrytá tělesa se uloží do prvku (skip), takže výsledek se při přepočtu nemění; při úpravě prvku se vezme viditelnost v tu chvíli.
+
 ## Beta 2.66
 - Duplikovat (Ctrl+D) těleso: kopie zůstane na stejném místě jako originál (dřív se posunula vedle o šířku + 5 mm), stejně jako ve skice. Kopie je vybraná, přesune se nástrojem Přesunout nebo úpravou prvku v časové ose. Vložit (Ctrl+V) dál dává kopii vedle originálu.
 

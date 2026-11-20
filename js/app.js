@@ -1583,6 +1583,14 @@ function okCmd() {
   const f = cmd.ok();
   if (!f) return;
   const c = cmd;
+  /* bodies hidden in the browser are left alone: a cut, join or intersect only works on the visible ones it touches.
+     The hidden ones are remembered in the feature (skip), so later rebuilds give the same result; editing the feature
+     takes the visibility at that moment again (show the body and edit the feature to include it). */
+  const hid = cur.bodies.filter(b => !bodiesVisible() || !isVis(b.id)).map(b => b.id);
+  for (const g of Array.isArray(f) ? f : [f]) {
+    if (!g || (g.op || 'new') === 'new' || (g.targets && g.targets.length)) continue;
+    if (hid.length) g.skip = hid; else delete g.skip;
+  }
   if (c.editIndex !== undefined && c.editIndex !== null) doc.features[c.editIndex] = f;
   else if (Array.isArray(f)) { doc.features.splice(doc.marker, 0, ...f); doc.marker += f.length; }
   else { doc.features.splice(doc.marker, 0, f); doc.marker++; }

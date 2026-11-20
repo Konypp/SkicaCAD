@@ -3039,7 +3039,7 @@ function xformMatrix(f, polys) {
 function applyTool(bodies, f, tool, newBody) {
   const op = f.op || 'new';
   if (op === 'new') return bodies.concat([newBody(tool)]);
-  let targets = (f.targets && f.targets.length) ? bodies.filter(b => f.targets.includes(b.id)) : bodies.filter(b => b.visible !== false && overlaps(b.polys, tool));
+  let targets = (f.targets && f.targets.length) ? bodies.filter(b => f.targets.includes(b.id)) : bodies.filter(b => b.visible !== false && !(f.skip && f.skip.includes(b.id)) && overlaps(b.polys, tool));
   if (op === 'join') {
     if (!targets.length) return bodies.concat([newBody(tool)]);
     let acc = targets[0].polys;
@@ -4026,7 +4026,7 @@ function step(state, f) {
       let ff = f;
       if ((f.op || 'new') !== 'new' && !(f.targets && f.targets.length)) {
         const e = 0.05, touches = b => [[0, 0, 0], [0, 0, -e], [0, 0, e], [-e, 0, 0], [e, 0, 0], [0, -e, 0], [0, e, 0]].some(d => KK.signedVolume(KK.boolean(b.polys, d[0] || d[1] || d[2] ? KK.translate(tool, d) : tool, 'intersect')) > 1e-4);
-        const t = bodies.filter(b => b.visible !== false && overlaps(b.polys, tool) && touches(b)).map(b => b.id);
+        const t = bodies.filter(b => b.visible !== false && !(f.skip && f.skip.includes(b.id)) && overlaps(b.polys, tool) && touches(b)).map(b => b.id);
         ff = { ...f, targets: t.length ? t : ['\u0000none'] };
       }
       out = applyTool(bodies, ff, tool, polys => ({ id: f.id, name: ('Pant ' + f.len + '×' + (2 * f.w) + (f.part === 'a' ? ' – křídlo A' : f.part === 'b' ? ' – křídlo B' : '')).replace('.', ','), polys, from: f.id })); break;
