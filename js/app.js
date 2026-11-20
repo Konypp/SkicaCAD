@@ -3356,7 +3356,7 @@ function screwLen(L, d) { const F = Engine.FASTENERS[d]; return F ? Math.floor(L
 const HINGE_LIFT = { out: 0.15, flush: 0.15 };
 function startHinge(editIndex, f) {
   const pivot = new THREE.Object3D(); scene.add(pivot);
-  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_HINGE, holes: 2, hd: 3, part: 'both', rot: 0, count: 1, side: '+y', join: 'print', pinKind: 'fil', pinTight: false, recess: true, gap: 1, shift: 0, out: 'join', lift: HINGE_LIFT.flush, ft: 0.4, lip: true, liph: 2 };
+  const D0 = { kind: 'print', style: 'flush', len: 40, w: 15, t: 2.5, n: 3, pin: 3, tol: TOL_HINGE, holes: 2, hd: 3, part: 'both', rot: 0, count: 1, side: '+y', join: 'print', pinKind: 'fil', pinTight: false, recess: true, gap: 1, shift: 0, out: 'join', lift: HINGE_LIFT.flush, ft: 0.4, lip: true, liph: 2, shut: false };
   const c = {
     editIndex, tool: null, tools: null, gizmoDrag: false, timer: null, liftSet: !!f, tolSet: !!f,
     v: f ? { ...D0, style: 'out', pinTight: false, recess: false, ...f } : { ...D0 }, /* an older hinge keeps its free axle hole */
@@ -3366,7 +3366,7 @@ function startHinge(editIndex, f) {
       if (!f && sel.size === 2) { [this.box, this.lid] = [...sel]; }
       openDialog({
         title: 'Pant', icon: 'hinge',
-        fields: [{ k: 'opt', id: 'kind', label: 'Typ', options: [['print', 'Samostatný, tištěný vcelku'], ['screw', 'Samostatný, na šroub'], ['closed', 'Krabička navržená zavřená'], ['box', 'Krabička a víko vedle sebe'], ['flex', 'Ohebný (krabička a víko vedle sebe)']], value: this.v.kind },
+        fields: [{ k: 'opt', id: 'kind', label: 'Typ', options: [['print', 'Samostatný, tištěný vcelku'], ['screw', 'Samostatný, na šroub'], ['closed', 'Krabička navržená zavřená'], ['box', 'Krabička a víko vedle sebe'], ['flex', 'Ohebný půlkruh (krabička a víko vedle sebe)']], value: this.v.kind },
           { k: 'seg', id: 'join', label: 'Spojení', options: [['print', 'Tisk vcelku'], ['pin', 'Kolík / šroub']], value: this.v.join },
           { k: 'seg', id: 'pinKind', label: 'Kolík', options: [['fil', 'Filament 1,75'], ['m2', 'Šroub M2'], ['m3', 'Šroub M3']], value: this.v.pinKind },
           { k: 'chk', id: 'recess', label: 'Zapustit hlavu šroubu a matici', value: this.v.recess },
@@ -3379,6 +3379,7 @@ function startHinge(editIndex, f) {
           { k: 'num', id: 'ft', label: 'Tloušťka pásku', value: this.v.ft },
           { k: 'chk', id: 'lip', label: 'Třecí lem na krabičce (víko drží zavřené)', value: this.v.lip },
           { k: 'num', id: 'liph', label: 'Výška lemu', value: this.v.liph },
+          { k: 'chk', id: 'shut', label: 'Ukázat zavřenou', value: this.v.shut },
           { k: 'opt', id: 'count', label: 'Počet pantů', options: [['1', '1'], ['2', '2'], ['3', '3']], value: String(this.v.count) },
           { k: 'num', id: 'shift', label: 'Posun podél hrany', value: this.v.shift, range: [-50, 50, 0.5] },
           { k: 'seg', id: 'out', label: 'Výsledek', options: [['join', 'Přidat k tělesům'], ['new', 'Nová tělesa']], value: this.v.out },
@@ -3402,6 +3403,7 @@ function startHinge(editIndex, f) {
           else if (id === 'pinTight') this.v.pinTight = !!dlg.get('pinTight');
           else if (id === 'recess') this.v.recess = !!dlg.get('recess');
           else if (id === 'lip') { this.v.lip = !!dlg.get('lip'); this.layout(); }
+          else if (id === 'shut') this.v.shut = !!dlg.get('shut');
           else if (id === 'cnt') this.v.n = parseFloat(dlg.get('cnt'));
           else if (id === 'lift') { const x = dlg.get('lift'); if (isFinite(x) && x >= 0) { this.v.lift = x; this.liftSet = true; } }
           else if (id === 'holes' || id === 'rot' || id === 'hd' || id === 'count') this.v[id] = parseFloat(dlg.get(id));
@@ -3438,7 +3440,7 @@ function startHinge(editIndex, f) {
       if (bx) transform.detach(); else transform.attach(pivot);
       /* living hinge: just the strip (length, count, shift, thickness) and the friction lip */
       const fx = this.isFlex();
-      dlg.show('ft', fx); dlg.show('lip', fx); dlg.show('liph', fx && this.v.lip); dlg.show('tol', !fx || this.v.lip);
+      dlg.show('ft', fx); dlg.show('lip', fx); dlg.show('shut', fx); dlg.show('liph', fx && this.v.lip); dlg.show('tol', !fx || this.v.lip);
       if (fx) for (const id of ['style', 'out', 'cnt', 'pin', 'lift']) dlg.show(id, false);
       const lt = $('#dialog [data-row="tol"] label'); if (lt) lt.textContent = fx ? 'Vůle lemu' : 'Vůle pro 3D tisk';
       const ll = $('#dialog [data-row="len"] label'); if (ll) ll.textContent = fx ? 'Délka pásku (0 = celá hrana)' : 'Délka pantu';
@@ -3460,7 +3462,7 @@ function startHinge(editIndex, f) {
         const bb = this.box && bodyById(this.box), lb = this.lid && bodyById(this.lid);
         dlg.set('box', { text: bb ? bodyName(bb) : 'Klepněte na krabičku', has: !!bb, active: this.pick === 'box' });
         dlg.set('lid', { text: lb ? bodyName(lb) : 'Klepněte na víko', has: !!lb, active: this.pick === 'lid' });
-        if (this.isFlex()) setPrompt(this.pick === 'box' ? 'Klepněte na krabičku. Krabička a víko mají stát vedle sebe otevřené nahoru, horní hrany ve stejné výšce, mezera asi 2 mm.' : 'Klepněte na víko, které stojí vedle krabičky.');
+        if (this.isFlex()) setPrompt(this.pick === 'box' ? 'Klepněte na krabičku. Krabička a víko mají stát vedle sebe otevřené nahoru, horní hrany ve stejné výšce, mezera asi 12 mm (čím větší, tím víc ohybů pant vydrží).' : 'Klepněte na víko, které stojí vedle krabičky.');
         else if (this.isClosed()) setPrompt(this.pick === 'box' ? 'Klepněte na zadní stěnu krabičky, kde má být pant. Víko má ležet na krabičce (zavřená krabička).' : 'Klepněte na víko, které leží na krabičce.');
         else setPrompt(this.pick === 'box' ? 'Klepněte na krabičku. Krabička a víko mají stát vedle sebe otevřené nahoru, horní hrany ve stejné výšce.' : 'Klepněte na víko, které stojí vedle krabičky.');
         if (!bb || !lb) { dlg.set('n', ''); dlg.set('n2', ''); dlg.set('n3', ''); dlg.okEnabled(false); requestRender(); return; }
@@ -3473,9 +3475,12 @@ function startHinge(editIndex, f) {
           const T = Engine.flexHingeTools(F, bodyById(this.box).polys, bodyById(this.lid).polys);
           this.tool = T.strip.concat(T.lip || []);
           G.preview.add(previewMesh(this.tool, 'join'));
-          dlg.set('n', `Pásek ${T.cnt > 1 ? T.cnt + ' × ' : ''}${fmtc(T.L, 1)} mm, tloušťka ${fmtc(T.t, 2)} mm, mezera ${fmtc(T.G, 1)} mm${T.lip ? `; lem ${fmtc(T.lipH, 1)} mm, vůle ${fmtc(T.lipC, 2)} mm` : ''}.`);
+          /* how it looks shut: the lid folded over and the strip bent into a half circle */
+          if (this.v.shut) { G.preview.add(previewMesh(K.transform(bodyById(this.lid).polys, T.fold), 'new')); G.preview.add(previewMesh(T.arc, 'join')); }
+          const pct = Math.round(T.strain * 1000) / 10;
+          dlg.set('n', `Pásek ${T.cnt > 1 ? T.cnt + ' × ' : ''}${fmtc(T.L, 1)} mm, tloušťka ${fmtc(T.t, 2)} mm, mezera ${fmtc(T.G, 1)} mm; po zavření půlkruh o poloměru ${fmtc(T.r, 1)} mm, protažení ${fmtc(pct, 1)} %${T.lip ? `; lem ${fmtc(T.lipH, 1)} mm, vůle ${fmtc(T.lipC, 2)} mm` : ''}.`);
           dlg.set('n2', 'Krabička, pásek a víko budou jedno těleso. Tiskne se vcelku bez podpěr, výška vrstvy ' + (Math.abs(T.t - 0.4) < 1e-6 ? '0,2 mm (pásek = 2 vrstvy)' : 'tak, aby pásek měl aspoň 2 vrstvy') + '. Po tisku víko překlopte o 180° na krabičku.');
-          dlg.set('n3', 'Nejvíc ohybů vydrží PP, dobře PETG; PLA po čase praskne. Pant ohněte několikrát hned po sejmutí z podložky, dokud je teplý.' + (T.lip ? ' Lem potřebuje stěnu krabičky silnější než stěnu víka (např. 2,4 a 1,2 mm).' : ''));
+          dlg.set('n3', (pct > 6 ? 'Protažení je velké, pásek může prasknout: zvětšete mezeru nebo ztenčete pásek (PLA snese asi 4 %, PETG asi 6 %). ' : pct > 4 ? 'Pro PLA je protažení na hraně, lepší je PETG nebo větší mezera. ' : '') + 'Nejvíc ohybů vydrží PP, dobře PETG. Pant ohněte několikrát hned po sejmutí z podložky, dokud je teplý.' + (T.lip ? ' Lem potřebuje stěnu krabičky silnější než stěnu víka (např. 2,4 a 1,2 mm).' : ''));
         } else if (this.isClosed()) {
           if (this.box === this.lid) throw new Error('Krabička a víko musí být dvě různá tělesa');
           const Rz = Engine.closedHingeResult(F, bodyById(this.box).polys, bodyById(this.lid).polys), H = Rz.T.H;

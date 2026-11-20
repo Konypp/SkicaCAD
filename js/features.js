@@ -2539,12 +2539,15 @@ function applyBoxHinge(T, pb, pl, sep) {
   if (T.sockB) pl = KK.boolean(pl, T.sockB, 'subtract');
   return { box: pb, lid: pl };
 }
-/* ---------- living (film) hinge: box and lid stand side by side, open side up, rims at the same height; a thin strip
-   (t, default 0.4 mm = two layers) on the rim plane bridges the gap between the facing walls. After printing the lid is
-   folded 180° over it. The strip is printed as a short bridge, its lines run across the gap, i.e. across the bend.
+/* ---------- living (film) hinge: box and lid stand side by side, open side up, rims at the same height, gap G between
+   the facing walls. A thin strip (t, default 0.4 mm = two layers) bridges the gap flat, r = G/π below the rims, on the
+   outer faces of both walls. Folding the lid 180° about the rim line turns the strip into an exact half circle of radius
+   r round that line behind the shut box: the bend is spread evenly over the whole strip (strain t / 2r) instead of
+   kinking at the rims. Printed flat as a bridge, its lines run across the gap, i.e. along the bend, the strongest way.
    Optional friction lip: the top of the box walls raised by h, minus the folded lid grown by the play (an octagon
    around each point), and left off along the hinge wall, where the lid's back wall swings in while closing.
-   Needs a box wall thicker than the lid wall (e.g. 2.4 and 1.2 mm). Returns world-space tools and the fold matrix. */
+   Needs a box wall thicker than the lid wall (e.g. 2.4 and 1.2 mm). Returns world-space tools, the fold matrix and
+   the shut half circle (preview only). */
 function flexHingeTools(f, boxPolys, lidPolys) {
   const a = KK.bbox(boxPolys), b = KK.bbox(lidPolys);
   let ax = -1, G = -1, dir = 0;
@@ -2554,13 +2557,15 @@ function flexHingeTools(f, boxPolys, lidPolys) {
     if (g2 > G) { G = g2; ax = k; dir = -1; }
   }
   if (G <= 0) throw new Error('Krabička a víko se překrývají, postavte je vedle sebe s mezerou');
-  if (G < 0.8) throw new Error('Mezera mezi krabičkou a víkem musí být aspoň 0,8 mm (doporučeno 1,5–3 mm)');
-  if (G > 8) throw new Error('Mezera mezi krabičkou a víkem je moc velká (' + (Math.round(G * 10) / 10).toString().replace('.', ',') + ' mm), ohebný pant ji má nejvýš 8 mm, doporučeno 1,5–3 mm');
+  if (G < 3) throw new Error('Mezera mezi krabičkou a víkem musí být aspoň 3 mm (doporučeno 10–15 mm)');
+  if (G > 25) throw new Error('Mezera mezi krabičkou a víkem je moc velká (' + (Math.round(G * 10) / 10).toString().replace('.', ',') + ' mm), ohebný pant ji má nejvýš 25 mm, doporučeno 10–15 mm');
   const eA = dir > 0 ? a.max[ax] : a.min[ax], eB = dir > 0 ? b.min[ax] : b.max[ax];
   const zR = rimTop(boxPolys, ax, eA);
   if (Math.abs(zR - rimTop(lidPolys, ax, eB)) > 0.05) throw new Error('Krabička a víko musí mít horní hranu ve stejné výšce');
   const t = Math.max(0.2, Math.min(2, Number(f.ft) || 0.4));
-  if (zR - t < Math.max(a.min[2], b.min[2]) + 0.6) throw new Error('Krabička je na ohebný pant příliš nízká');
+  /* half circle when shut: its length π·r equals the gap, its centre line r below the rims */
+  const r = G / Math.PI, zc = zR - r, z0 = zc - t / 2, z1 = zc + t / 2;
+  if (z0 < Math.max(a.min[2], b.min[2]) + 0.6) throw new Error('Krabička je na ohebný pant příliš nízká (pásek je ' + (Math.round((r + t / 2) * 10) / 10).toString().replace('.', ',') + ' mm pod horní hranou); zmenšete mezeru');
   const o = 1 - ax, s0 = Math.max(a.min[o], b.min[o]), s1 = Math.min(a.max[o], b.max[o]), span = s1 - s0;
   const cnt = Math.max(1, Math.min(3, Math.round(Number(f.count) || 1)));
   /* length 0 = automatic: the whole edge less 3 mm at each end (rounded corners, the walls are full there) */
@@ -2574,19 +2579,33 @@ function flexHingeTools(f, boxPolys, lidPolys) {
   const blk = (lo3, hi3) => KK.translate(KK.primitive('box', { w: hi3[0] - lo3[0], d: hi3[1] - lo3[1], h: hi3[2] - lo3[2] }), [0, 1, 2].map(k => (lo3[k] + hi3[k]) / 2));
   let strip = [];
   for (let j = 0; j < cnt; j++) {
-    const c = s0 + span * (j + 0.5) / cnt + sh, l3 = [0, 0, zR - t], h3 = [0, 0, zR];
+    const c = s0 + span * (j + 0.5) / cnt + sh, l3 = [0, 0, z0], h3 = [0, 0, z1];
     l3[ax] = lo - ov; h3[ax] = hi + ov; l3[o] = c - L / 2; h3[o] = c + L / 2;
     strip = strip.concat(blk(l3, h3));
   }
   /* the strip must lie on wall material at both ends, not over a hollow */
-  const onWall = P => { const e = 0.05, l3 = [0, 0, zR - t], h3 = [0, 0, zR]; l3[o] = s0; h3[o] = s1;
+  const onWall = P => { const e = 0.05, l3 = [0, 0, z0], h3 = [0, 0, z1]; l3[o] = s0; h3[o] = s1;
     const side = (x0, x1) => { const q = l3.slice(), r = h3.slice(); q[ax] = x0; r[ax] = x1; return KK.signedVolume(KK.boolean(P, blk(q, r), 'intersect')); };
     return P === boxPolys ? side(dir > 0 ? eA - ov : eA + e, dir > 0 ? eA - e : eA + ov) : side(dir > 0 ? eB + e : eB - ov, dir > 0 ? eB + ov : eB - e); };
   /* the lid turned 180° about the rim line in the middle of the gap: where it lands when shut */
   const mid = (eA + eB) / 2;
   const fold = ax === 1 ? [1, 0, 0, 0, 0, -1, 0, 0, 0, 0, -1, 0, 0, 2 * mid, 2 * zR, 1] : [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -1, 0, 2 * mid, 0, 2 * zR, 1];
-  const out = { strip, fold, G, L, cnt, t, zRim: zR, ax, dir };
-  if (onWall(boxPolys) < 1e-3 || onWall(lidPolys) < 1e-3) throw new Error('Pásek nemá kde držet: stěny krabičky a víka u mezery musí sahat až k horní hraně');
+  /* the strip when shut (preview): a half circle round the rim line at the box's back wall, bulging outwards */
+  const arc = [], N = 24;
+  for (let j = 0; j < cnt; j++) {
+    const c = s0 + span * (j + 0.5) / cnt + sh, ya = c - L / 2, yb = c + L / 2;
+    const P = (rho, k, y) => { const ph = -Math.PI / 2 + Math.PI * k / N, q = [0, 0, zR + rho * Math.sin(ph)]; q[ax] = eA + dir * rho * Math.cos(ph); q[o] = y; return q; };
+    const quad = (p1, p2, p3, p4) => { const m = KK.mkPoly([p1, p2, p3, p4]); if (m) arc.push(m); };
+    for (let k = 0; k < N; k++) {
+      const ri = r - t / 2, ro = r + t / 2;
+      quad(P(ro, k, ya), P(ro, k + 1, ya), P(ro, k + 1, yb), P(ro, k, yb));
+      quad(P(ri, k, yb), P(ri, k + 1, yb), P(ri, k + 1, ya), P(ri, k, ya));
+      quad(P(ri, k, ya), P(ri, k + 1, ya), P(ro, k + 1, ya), P(ro, k, ya));
+      quad(P(ro, k, yb), P(ro, k + 1, yb), P(ri, k + 1, yb), P(ri, k, yb));
+    }
+  }
+  const out = { strip, fold, arc, G, L, cnt, t, r, strain: t / (2 * r), zRim: zR, ax, dir };
+  if (onWall(boxPolys) < 1e-3 || onWall(lidPolys) < 1e-3) throw new Error('Pásek nemá kde držet: stěny krabičky a víka u mezery musí být plné až ' + (Math.round((r + t / 2) * 10) / 10).toString().replace('.', ',') + ' mm pod horní hranu');
   if (f.lip) {
     const h = Math.max(0.5, Math.min(10, Number(f.liph) || 2)), c = Math.max(0, Math.min(1, f.tol === undefined ? 0.15 : Number(f.tol) || 0));
     const big = [a.max[0] - a.min[0] + 20, a.max[1] - a.min[1] + 20];

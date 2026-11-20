@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.65
+- Pant, Ohebný půlkruh: pásek už neleží na horní hraně, ale o r = mezera/π níž na vnějších stěnách. Po zavření víka se ohne do přesného půlkruhu o poloměru r kolem zadní hrany, ohyb je rozložený po celé délce (dřív se lámal v ostrém záhybu u hran). Mezera 3–25 mm, doporučeno 10–15 mm; dialog ukazuje poloměr a protažení pásku (varuje nad 4 / 6 %), volba Ukázat zavřenou zobrazí víko a pásek v zavřené poloze.
+
 ## Beta 2.64
 - Pant: nový typ Ohebný (krabička a víko vedle sebe) – tenký pásek (výchozí 0,4 mm = 2 vrstvy) přes mezeru 0,8–8 mm na úrovni horní hrany spojí krabičku a víko v jedno těleso; délka pásku 0 = celá hrana bez 3 mm na koncích, počet 1–3, posun. Volitelný třecí lem na krabičce (výška, vůle 0,15 mm) drží víko zavřené; vynechá se u stěny s pantem. Kontroly mezery, výšky hran a opory pásku na stěnách.
 
