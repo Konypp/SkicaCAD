@@ -1190,7 +1190,7 @@ function ringSolid(c, axis, loop, rg, closed) {
   }
   return fixOrientation(out);
 }
-function removal(polys, ch, mode, k, off = 0.02) {
+function removal(polys, ch, mode, k, off = 0.02, joins = null, jx = 0.03) {
   const fr = edgeFrame(polys, ch);
   if (!fr) return { err: 'Hranu nelze upravit.' };
   if (fr.alpha < 0.09 || fr.alpha > Math.PI - 0.09) return { err: 'Hrana je téměř rovná nebo příliš ostrá.' };
@@ -1225,8 +1225,17 @@ function removal(polys, ch, mode, k, off = 0.02) {
       const goesOn = s => insideSolid(past(s), polys, bvh) && insideSolid(past(s + (s > 0 ? 0.5 : -0.5)), polys, bvh);
       ext0 = goesOn(-0.03) ? 0 : reach(-1);
       ext1 = goesOn(L + 0.03) ? 0 : reach(1);
-      if (ext0 > 0.06) { const w = endSweep(polys, bvh, fr, loop, t, sM, 0, -1, mode, k, off); if (w) extra.push(w); }
-      if (ext1 > 0.06) { const w = endSweep(polys, bvh, fr, loop, t, sM, L, 1, mode, k, off); if (w) extra.push(w); }
+      if (ext0 > 0.06 && L > 0.2) { const w = endSweep(polys, bvh, fr, loop, t, sM, 0, -1, mode, k, off); if (w) extra.push(w); }
+      if (ext1 > 0.06 && L > 0.2) { const w = endSweep(polys, bvh, fr, loop, t, sM, L, 1, mode, k, off); if (w) extra.push(w); }
+    }
+    else {
+      /* an inner edge ending at an earlier inner fillet or chamfer (e.g. a pocket's corner above its rounded floor):
+         that treatment is swept round the new one down to the floor */
+      const bvh = buildBVH(polys);
+      /* where the next selected edge goes on at an angle (e.g. the facets of a rounded corner), the added pieces overlap
+         a little, so no notch is left between them */
+      if (joins) { if (joins[0]) ext0 = jx; if (joins[1]) ext1 = jx; }
+      if (L > 0.2) for (const [se, dn] of [[0, -1], [L, 1]]) { const w = endSweep(polys, bvh, fr, loop, t, sM, se, dn, mode, k, off, true); if (w) extra.push(w); }
     }
     const A = loop.map(p => vadd(p, vmul(t, -ext0 - sM))), B = loop.map(p => vadd(p, vmul(t, L + ext1 - sM)));
     return { polys: fixOrientation(prism(A, B)), add, extra };
@@ -1238,8 +1247,20 @@ function removal(polys, ch, mode, k, off = 0.02) {
     const pick = (n, f) => { const p = f2d(n), d = [vdot(f, rad), vdot(f, axis)]; return p[0] * d[0] + p[1] * d[1] >= 0 ? p : [-p[0], -p[1]]; };
     const g1 = pick(fr.n1, fr.f1), g2 = pick(fr.n2, fr.f2);
     const al = Math.acos(Math.max(-1, Math.min(1, g1[0] * g2[0] + g1[1] * g2[1])));
-    const loop = section(E2, g1, g2, al, k, mode);
-    if (loop.some(p => p[0] <= 1e-3)) return { err: 'Poloměr je pro tuto hranu příliš velký.' };
+    let loop = section(E2, g1, g2, al, k, mode);
+    if (loop.some(p => p[0] <= 1e-3)) {
+      if (!add) return { err: 'Poloměr je pro tuto hranu příliš velký.' };
+      /* an inner edge along a tighter rounding (e.g. the floor of a pocket round its rounded corner, the fillet bigger
+         than the corner's radius): the added material is cut off at the corner's axis, where the two sides meet */
+      const X = 0.02, cl = [];
+      for (let i = 0; i < loop.length; i++) {
+        const a = loop[i], b = loop[(i + 1) % loop.length], ia = a[0] >= X, ib = b[0] >= X;
+        if (ia) cl.push(a);
+        if (ia !== ib) { const q = (X - a[0]) / (b[0] - a[0]); cl.push([X, a[1] + q * (b[1] - a[1])]); }
+      }
+      if (cl.length < 3) return { err: 'Poloměr je pro tuto hranu příliš velký.' };
+      loop = cl;
+    }
     return { polys: ringSolid(c, axis, loop, ch.ring, ch.kind === 'circle'), add };
   }
   return { err: 'Tento typ hrany zatím nelze upravit.' };
@@ -1249,18 +1270,22 @@ function removal(polys, ch, mode, k, off = 0.02) {
    distance past the end) and swept along the new rounding (or bevel), so the earlier chamfer or fillet runs on round
    the new corner at the same width instead of being cut by it (which leaves a V-shaped dip). Returns the material to
    remove outside that swept surface, or null when there is no earlier treatment there. */
-function endSweep(polys, bvh, fr, loop, t, sM, sEnd, dirn, mode, k, off) {
+function endSweep(polys, bvh, fr, loop, t, sM, sEnd, dirn, mode, k, off, inner = false) {
+  /* inner: a concave edge (material is added): the earlier treatment is measured as how far its material reaches out
+     from the faces into the open, and the swept part is added instead of cut away (sg flips the sides) */
+  const sg = inner ? -1 : 1;
   const u = vmul(t, dirn), shift = vmul(t, sEnd - sM), E = vadd(fr.M, shift);
   const bnd = loop.slice(1).map(p => vadd(p, shift));        /* T1, arc..., T2 at the end of the edge */
   const T1 = bnd[0], T2 = bnd[bnd.length - 1];
   const dMax = 3 * k + 3, step = Math.max(0.04, Math.min(0.15, k / 25));
   /* depth of the material below the face (normal n) at a point q on the face, or -1 when there is none within dMax */
+  const hit = (q, n, d) => insideSolid(vadd(q, vmul(n, -sg * (d + 0.01))), polys, bvh) !== inner;
   const depth = (q, n) => {
     let a = -1;
-    for (let d = 0; d <= dMax; d += step) if (insideSolid(vadd(q, vmul(n, -(d + 0.01))), polys, bvh)) { a = d; break; }
+    for (let d = 0; d <= dMax; d += step) if (hit(q, n, d)) { a = d; break; }
     if (a < 0) return -1;
     let lo = Math.max(0, a - step), hi = a;
-    for (let i = 0; i < 6; i++) { const m = (lo + hi) / 2; if (insideSolid(vadd(q, vmul(n, -(m + 0.01))), polys, bvh)) hi = m; else lo = m; }
+    for (let i = 0; i < 6; i++) { const m = (lo + hi) / 2; if (hit(q, n, m)) hi = m; else lo = m; }
     return hi;
   };
   /* on a fillet the slices fan round its axis and must not reach it: where the earlier treatment goes deeper than the
@@ -1284,13 +1309,17 @@ function endSweep(polys, bvh, fr, loop, t, sM, sEnd, dirn, mode, k, off) {
   const sLast = prof[prof.length - 1][0], m = 0.3;
   /* outward normal of the new surface at each boundary point: the faces' at the ends, radial on a fillet, the bevel's normal on a chamfer */
   let O = null;
-  if (mode !== 'chamfer') { const half = fr.alpha / 2; O = vadd(E, vmul(vnorm(vadd(fr.f1, fr.f2)), k / Math.sin(half))); }
-  const nb = vnorm(cross(vsub(T2, T1), t)), nChamf = vdot(nb, vsub(E, T1)) > 0 ? nb : vmul(nb, -1);
+  if (mode !== 'chamfer') {
+    /* the fillet's axis: the centre of the circle through both tangent points and the middle of the arc */
+    const Mi = bnd[bnd.length >> 1], a2 = vsub(T1, Mi), b2 = vsub(T2, Mi), axb = cross(a2, b2), den = 2 * vdot(axb, axb);
+    O = inner && den > 1e-12 ? vadd(Mi, vmul(vadd(vmul(cross(axb, a2), vdot(b2, b2)), vmul(cross(b2, axb), vdot(a2, a2))), 1 / den)) : vadd(E, vmul(vnorm(vadd(fr.f1, fr.f2)), k / Math.sin(fr.alpha / 2)));
+  }
+  const nb = vnorm(cross(vsub(T2, T1), t)), nChamf = vmul(vdot(nb, vsub(E, T1)) > 0 ? nb : vmul(nb, -1), sg);
   /* the end slices stand a little out on the faces (there the swept profile is the faces' own), away from the tangent lines */
   const pts = mode === 'chamfer' ? [T1, vmul(vadd(T1, T2), 0.5), T2] : [vadd(T1, vmul(fr.f1, 0.3)), ...bnd, vadd(T2, vmul(fr.f2, 0.3))];
   const slices = pts.map((S, i) => {
     const w = i / (pts.length - 1);
-    let N = mode === 'chamfer' ? nChamf : vnorm(vsub(S, vsub(O, vmul(t, vdot(vsub(O, S), t)))));
+    let N = mode === 'chamfer' ? nChamf : vmul(vnorm(vsub(S, vsub(O, vmul(t, vdot(vsub(O, S), t))))), sg);
     if (mode !== 'chamfer' && i === 0) N = fr.n1; else if (mode !== 'chamfer' && i === pts.length - 1) N = fr.n2;
     const cap = Infinity;
     /* the profile of this slice (inward depth d at distance s past the end), blended between the two faces; below the
@@ -1301,13 +1330,15 @@ function endSweep(polys, bvh, fr, loop, t, sM, sEnd, dirn, mode, k, off) {
     /* cut 0.02 mm under the measured surface, square to it: the swept surface meets the earlier chamfer or fillet
        almost tangentially near the faces and the bottom, and a cut that only grazes it leaves slivers */
     /* it starts 0.05 mm above the end, 0.03 mm into the face, so it does not run along the earlier treatment's top line */
-    const P = [vadd(S, vmul(u, -0.05)), vadd(vadd(S, vmul(N, -0.03)), vmul(u, -0.05))];
+    /* behind the new surface the slice reaches past the corner line (inner) or a little into the open (outer) */
+    const mb = inner ? vlen(vsub(vsub(S, vmul(t, vdot(vsub(S, E), t))), E)) + 0.2 : m;
+    const P = [vadd(S, vmul(u, -0.05)), vadd(vadd(S, vmul(N, -0.03 * sg)), vmul(u, -0.05))];
     for (let j = 1; j < C.length; j++) {
       const a0 = C[Math.max(0, j - 1)], a1 = C[Math.min(C.length - 1, j + 1)], tl = Math.hypot(a1[0] - a0[0], a1[1] - a0[1]) || 1;
       const d = Math.min(cap, C[j][0] + off * (a1[1] - a0[1]) / tl), sv = j === C.length - 1 ? C[j][1] : C[j][1] - off * (a1[0] - a0[0]) / tl;
-      P.push(vadd(vadd(S, vmul(N, -d)), vmul(u, sv)));
+      P.push(vadd(vadd(S, vmul(N, -d * sg)), vmul(u, sv)));
     }
-    P.push(vadd(vadd(S, vmul(N, m)), vmul(u, sB)), vadd(vadd(S, vmul(N, m)), vmul(u, -0.05)));
+    P.push(vadd(vadd(S, vmul(N, mb * sg)), vmul(u, sB)), vadd(vadd(S, vmul(N, mb * sg)), vmul(u, -0.05)));
     return P;
   });
   /* consistent winding by construction: each cap faces away from its neighbouring slice, the strips between the
@@ -1366,27 +1397,37 @@ function openEdges(polys) {
   let n = 0; for (const c of D.values()) if (c !== 2) n++;
   return n;
 }
-function modifyEdgesOnce(polys, chains, mode, k, off) {
-  const parts = [];
+function modifyEdgesOnce(polys, chains, mode, k, off, jx) {
+  const parts = [], ends = new Map();
+  const endKeys = ch => ch.kind === 'line' ? [qk(ch.line.p0), qk(ch.line.p1)] : ch.kind === 'arc' && ch.pts ? [qk(ch.pts[0]), qk(ch.pts[ch.pts.length - 1])] : [];
+  const dirOf = ch => ch.kind === 'line' ? vnorm(vsub(ch.line.p1, ch.line.p0)) : null;
+  for (const ch of chains) for (const e of endKeys(ch)) { if (!ends.has(e)) ends.set(e, []); ends.get(e).push(ch); }
+  /* a join turns gently when the other edge there is an arc or a line at a small angle (the facets of a rounding; not a
+     straight edge split in two, nor a real corner, where the pieces already meet in a mitre) */
+  const turns = (ch, e) => (ends.get(e) || []).some(o => o !== ch && (!dirOf(o) || (Math.abs(vdot(dirOf(o), dirOf(ch))) < 0.9998 && Math.abs(vdot(dirOf(o), dirOf(ch))) > 0.94)));
   for (const ch of chains) {
-    const r = removal(polys, ch, mode, k, off);
+    const ek = endKeys(ch), joins = ch.kind === 'line' ? ek.map(e => turns(ch, e)) : null;
+    const r = removal(polys, ch, mode, k, off, joins, jx);
     if (r.err) return { err: r.err };
     parts.push(r);
-    for (const x of r.extra || []) parts.push({ polys: x, add: false, sweep: true });
+    for (const x of r.extra || []) parts.push({ polys: x, add: r.add, sweep: true });
   }
   if (mode !== 'chamfer') for (const c of filletCorners(polys, chains, k)) parts.push({ polys: c, add: false });
   let cur = polys;
   for (const r of parts.filter(p => !p.add)) cur = boolean(cur, r.polys, 'subtract');
   for (const r of parts.filter(p => p.add)) cur = boolean(cur, r.polys, 'union');
-  const swept = parts.some(p => p.sweep);
+  const swept = parts.some(p => p.sweep) || parts.some(p => p.add) && chains.some(c => c.kind !== 'line');
   return { polys: cur, swept };
 }
 function modifyEdges(polys, chains, mode, k) {
-  /* the swept ends (see endSweep) meet the earlier faces at shallow angles; a cut that leaves a hairline gap is
-     redone with the cut a little deeper, and the closest result is kept */
+  /* zero-length bits left at corners by earlier booleans are not edges */
+  chains = chains.filter(c => c.kind !== 'line' || vlen(vsub(c.line.p1, c.line.p0)) > 0.01);
+  if (!chains.length) return { polys };
+  /* the swept ends (see endSweep) meet the earlier faces at shallow angles, and inner pieces along a rounded outline meet
+     at small angles; a result with a hairline gap is redone with slightly different overlaps, and the closest is kept */
   let best = null;
-  for (const off of [0.02, 0.035, 0.05, 0.028, 0.042, 0.06]) {
-    const r = modifyEdgesOnce(polys, chains, mode, k, off);
+  for (const [off, jx] of [[0.02, 0.03], [0.035, 0], [0.05, 0.06], [0.028, 0.015], [0.042, 0.1], [0.06, 0.045]]) {
+    const r = modifyEdgesOnce(polys, chains, mode, k, off, jx);
     if (r.err) return r;
     r.polys = r.swept ? weldT(r.polys) : r.polys;
     if (!r.swept) return { polys: r.polys };

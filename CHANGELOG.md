@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta 2.71
+- Vnitřní hrany (zaoblení a zkosení), všechny kombinace:
+  - Postupně (nejdřív dno kapsy, pak svislé vnitřní rohy): úprava dna teď obíhá nový roh až k podlaze. Dřív pod svislým zaoblením zůstal schod (u velkého poloměru rohu a malého zaoblení dna bylo těleso i děravé). Výsledek se od opačného pořadí liší jen o desetiny mm³.
+  - Nejdřív svislé rohy, pak dno kolem zaobleného obrysu: zaoblení dna větší než poloměr rohu už nehlásí chybu „Poloměr je pro tuto hranu příliš velký“, přidaný materiál se v rohu sejde v ose; díly podél zaobleného obrysu se mírně překrývají, aby mezi nimi nezůstaly štěrbiny, a výsledek s vlasovou trhlinkou se přepočítá s jiným překryvem.
+  - Nulové kousky hran v rozích (zbytky po předchozích operacích) se přeskočí; dřív mohly přidat velký kus materiálu navíc.
+  - Vnitřní hrana končící na vnější stěně (L-profil) a úpravy všech hran najednou zůstávají beze změny.
+
 ## Beta 2.70
 - Zaoblení a zkosení hran postupně: tvar rohu. Když se zaoblí (nebo zkosí) svislá hrana až po zkosení či zaoblení spodních hran, předchozí úprava teď obíhá nový roh ve stejné šířce (u zaoblení jako kuželový nebo prstencový pás). Dřív ji nová úprava jen protnula a zkosení se v rohu propadlo do tvaru V. Profil předchozí úpravy se změří na obou plochách a protáhne podél nového zaoblení; výsledek se liší od postupu v ideálním pořadí (nejdřív svislé hrany) jen o desetiny mm³. Na rovném zaobleném obrysu (např. horní hrana zaobleného kvádru) se nic nemění.
 
