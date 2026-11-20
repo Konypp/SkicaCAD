@@ -1,5 +1,8 @@
 # Changelog
 
+## Beta 2.68
+- Prohlížeč: přejmenování tělesa dvojklikem znovu funguje (první klepnutí překreslilo seznam, takže dvojklik nedošel). Pravé tlačítko (na telefonu dlouhý stisk) na tělese v Prohlížeči otevře stejnou nabídku jako na tělese v pohledu; na skice nabídne Upravit skicu a Skrýt / Zobrazit. Přejmenovat z nabídky v pohledu rozbalí Prohlížeč, pokud je sbalený.
+
 ## Beta 2.67
 - Skrytá tělesa: operace Vyříznout, Spojit a Průnik (vysunutí, rotace, základní tělesa, díra, pant a další) se skrytých těles v Prohlížeči netýkají. Skrytá tělesa se uloží do prvku (skip), takže výsledek se při přepočtu nemění; při úpravě prvku se vezme viditelnost v tu chvíli.
 

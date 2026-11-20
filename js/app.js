@@ -1148,7 +1148,14 @@ $('#tree').addEventListener('click', e => {
   const ey = e.target.closest('[data-eye]');
   if (ey) { const k = ey.dataset.eye; doc.vis[k] = doc.vis[k] === false; if (doc.vis[k] === true) delete doc.vis[k]; saveDoc(); syncSketches(); styleBodies(); renderBrowser(); return; }
   const b = e.target.closest('[data-body]');
-  if (b) { bodyClick(b.dataset.body, e.ctrlKey || e.metaKey || e.shiftKey); return; }
+  if (b) {
+    /* a click re-renders the tree, so the browser's own dblclick never reaches the label: a second click on the same
+       body within 450 ms renames it */
+    const id = b.dataset.body, now = performance.now(), dbl = lastTreeClick.id === id && now - lastTreeClick.t < 450 && !e.ctrlKey && !e.metaKey && !e.shiftKey;
+    lastTreeClick = dbl ? { id: null, t: 0 } : { id, t: now };
+    if (dbl && !cmd && !sk) { renaming = id; renderBrowser(); return; }
+    bodyClick(id, e.ctrlKey || e.metaKey || e.shiftKey); return;
+  }
   if (e.target.closest('[data-selall]')) { selectAll(); return; }
   const sk1 = e.target.closest('[data-sketch]');
   if (sk1) {
@@ -1156,6 +1163,22 @@ $('#tree').addEventListener('click', e => {
     if (cmd || sk) return;
     const i = doc.features.findIndex(x => x.id === sk1.dataset.sketch);
     if (i >= 0) { sel = new Set(); tlSel = i; styleBodies(); renderBrowser(); renderTimeline(); updateInfo(); }
+  }
+});
+let lastTreeClick = { id: null, t: 0 };
+/* right click (long press on a phone) in the browser: the same menu as on the body in the view */
+$('#tree').addEventListener('contextmenu', e => {
+  if (e.target.closest('input')) return;
+  e.preventDefault();
+  if (cmd || sk) return;
+  const b = e.target.closest('[data-body]'); if (b) { bodyContext(e, b.dataset.body); return; }
+  const s = e.target.closest('[data-sketch]');
+  if (s) {
+    const id = s.dataset.sketch, i = doc.features.findIndex(f => f.id === id);
+    showCtx(e.clientX, e.clientY + 4, [
+      ['Upravit skicu', () => editFeature(i), i < 0],
+      [isVis(id) ? 'Skrýt' : 'Zobrazit', () => { doc.vis[id] = !isVis(id); if (doc.vis[id]) delete doc.vis[id]; saveDoc(); syncSketches(); renderBrowser(); }]
+    ]);
   }
 });
 $('#tree').addEventListener('dblclick', e => {
@@ -7440,7 +7463,7 @@ function bodyContext(e, id) {
     ['Duplikovat (Ctrl+D)', () => duplicateSel()],
     ['Vložit kopii (Ctrl+V)', () => pasteClip(), !clip || clip.kind !== 'bodies'],
     ['Zaoblit hrany…', () => startEdgeMod('fillet')],
-    ['Přejmenovat', () => { renaming = id; open.bodies = true; renderBrowser(); }],
+    ['Přejmenovat', () => { renaming = id; open.doc = true; open.bodies = true; const bw = $('#browser'); if (bw.classList.contains('collapsed') || (window.matchMedia('(max-width: 760px)').matches && !bw.classList.contains('open-m'))) $('#bw-toggle').click(); renderBrowser(); }],
     [isVis(id) ? 'Skrýt' : 'Zobrazit', () => { doc.vis[id] = !isVis(id); if (doc.vis[id]) delete doc.vis[id]; saveDoc(); styleBodies(); renderBrowser(); }],
     ['Upravit prvek, který těleso vytvořil', () => editFeature(idx), idx < 0],
     null,
