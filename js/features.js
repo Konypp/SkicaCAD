@@ -7,7 +7,7 @@ const PLANES = {
   XZ: { o: [0, 0, 0], u: [1, 0, 0], v: [0, 0, 1], n: [0, -1, 0] },
   YZ: { o: [0, 0, 0], u: [0, 1, 0], v: [0, 0, 1], n: [1, 0, 0] }
 };
-const FEATURE_LABEL = { buckle: 'Spona', articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Konektory', libpart: 'Vložený díl', ribs: 'Žebra', jointpart: 'Kloubový spoj', curvecut: 'Rozříznout křivkou', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
+const FEATURE_LABEL = { buckle: 'Spona', articulate: 'Kloubový model', blob: 'Měkké spojení', skin: 'Kostra', sweep: 'Tažení po křivce', loft: 'Přechod profilů', deform: 'Deformace', lattice: 'Mřížka', softmove: 'Měkký posun', subdiv: 'Vyhlazení dělením', sculpt: 'Sochání', remesh: 'Přesíťování', hollow: 'Vydutění', flatbase: 'Plochá podstava', pegsplit: 'Konektory', puzzle: 'Rozdělit na díly', libpart: 'Vložený díl', ribs: 'Žebra', jointpart: 'Kloubový spoj', curvecut: 'Rozříznout křivkou', text3d: 'Text', movefaces: 'Posunout plochy', boxpose: 'Poloha krabičky', latch: 'Západka', hinge: 'Pant', shell: 'Skořepina', hole: 'Díra', sketch: 'Skica', extrude: 'Vysunutí', revolve: 'Rotace', box: 'Krychle', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel', torus: 'Torus',
   fillet: 'Zaoblení', chamfer: 'Zkosení', combine: 'Kombinovat', move: 'Přesunout', rotate: 'Otočit', center: 'Zarovnat', offsetface: 'Upravit plochu', faceedit: 'Modelovat plochy', splitface: 'Rozdělit plochu', bendface: 'Ohnout plochu', splitbody: 'Rozříznout', thread: 'Závit', texture: 'Textura povrchu', bolt: 'Šroub', nut: 'Matice', scale: 'Měřítko', mirror: 'Zrcadlit', pattern: 'Pole', import: 'Import', del: 'Odstranit těleso' };
 let blobResolver = () => null;
 const blobCache = new Map();
@@ -3156,6 +3156,98 @@ function connectorCurve(polys, f) {
   const w = KK.vdot(n, [0, 1, 2].map(k => A2[0] * B0.u[k] + A2[1] * B0.v[k]));
   return { n, w, bb: KK.bbox(polys), top: r.a, bot: r.b };
 }
+/* ---------- Orientace pro tisk: try putting the body down on each of its big flat faces and on the six axis
+   directions; for each, estimate the support (overhangs steeper than 45° times their height above the bed), the bed
+   contact and the height, and rank them. Returns the rotation as Přesunout angles (THREE XYZ order, about the
+   body's centre) and the lift that puts it on the bed. */
+function orientCandidates(polys) {
+  const tris = [];
+  for (const p of polys) for (let i = 1; i < p.v.length - 1; i++) {
+    const a = p.v[0], b = p.v[i], c = p.v[i + 1], cr = KK.cross(KK.vsub(b, a), KK.vsub(c, a)), ar = Math.hypot(...cr) / 2;
+    if (ar > 1e-9) tris.push({ a, b, c, n: KK.vmul(cr, 0.5 / ar), ar });
+  }
+  const bb = KK.bbox(polys), ctr = [0, 1, 2].map(k => (bb.min[k] + bb.max[k]) / 2);
+  /* directions to put down: the axes and the normals of the biggest flat areas (normals summed by area) */
+  const dirs = [[0, 0, -1], [0, 0, 1], [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0]], acc = new Map();
+  for (const t of tris) { const key = t.n.map(x => Math.round(x * 50)).join(','); const e = acc.get(key) || { n: [0, 0, 0], ar: 0 }; e.n = KK.vadd(e.n, KK.vmul(t.n, t.ar)); e.ar += t.ar; acc.set(key, e); }
+  [...acc.values()].sort((x, y) => y.ar - x.ar).slice(0, 12).forEach(e => { const n = KK.vnorm(e.n); if (!dirs.some(d => KK.vdot(d, n) > 0.999)) dirs.push(n); });
+  const rotTo = d => { /* the rotation taking d to -Z (rows) */
+    const z = [0, 0, -1], cth = Math.max(-1, Math.min(1, KK.vdot(d, z)));
+    if (cth > 0.999999) return [[1, 0, 0], [0, 1, 0], [0, 0, 1]];
+    if (cth < -0.999999) return [[1, 0, 0], [0, -1, 0], [0, 0, -1]];
+    const k = KK.vnorm(KK.cross(d, z)), th = Math.acos(cth), s = Math.sin(th), c = Math.cos(th), v = 1 - c;
+    return [[c + k[0] * k[0] * v, k[0] * k[1] * v - k[2] * s, k[0] * k[2] * v + k[1] * s],
+      [k[1] * k[0] * v + k[2] * s, c + k[1] * k[1] * v, k[1] * k[2] * v - k[0] * s],
+      [k[2] * k[0] * v - k[1] * s, k[2] * k[1] * v + k[0] * s, c + k[2] * k[2] * v]];
+  };
+  const mul = (R, q) => [0, 1, 2].map(i => R[i][0] * q[0] + R[i][1] * q[1] + R[i][2] * q[2]);
+  const out = [], lim = -Math.cos(Math.PI / 4);
+  for (const d of dirs) {
+    const R = rotTo(d), z = q => R[2][0] * (q[0] - ctr[0]) + R[2][1] * (q[1] - ctr[1]) + R[2][2] * (q[2] - ctr[2]);
+    let zmin = Infinity, zmax = -Infinity;
+    for (const t of tris) for (const q of [t.a, t.b, t.c]) { const h = z(q); if (h < zmin) zmin = h; if (h > zmax) zmax = h; }
+    let support = 0, over = 0, contact = 0;
+    for (const t of tris) {
+      const nz = R[2][0] * t.n[0] + R[2][1] * t.n[1] + R[2][2] * t.n[2], zs = [z(t.a), z(t.b), z(t.c)], zc = (zs[0] + zs[1] + zs[2]) / 3;
+      if (nz < -0.999 && Math.max(...zs) - zmin < 0.05) { contact += t.ar; continue; }
+      if (nz < lim) { over += t.ar; support += t.ar * -nz * (zc - zmin); }
+    }
+    const R0 = R, y = Math.asin(Math.max(-1, Math.min(1, R0[0][2]))), x = Math.atan2(-R0[1][2], R0[2][2]), zr = Math.atan2(-R0[0][1], R0[0][0]);
+    const r = [x, y, zr].map(a => Math.round(a * 180 / Math.PI * 1e4) / 1e4 + 0);
+    /* the lift: Přesunout turns about the centre; this puts the lowest point on the bed */
+    const m = eulerMatrix(ctr, [0, 0, 0], r);
+    let lo = Infinity; for (const p of polys) for (const q of p.v) lo = Math.min(lo, m[2] * q[0] + m[6] * q[1] + m[10] * q[2] + m[14]);
+    out.push({ dir: d, r, t: [0, 0, Math.round(-lo * 1e4) / 1e4 + 0], support, over, contact, height: zmax - zmin, score: support + (contact < 1 ? 1e6 : 0) });
+  }
+  /* best first: least support; a body that only touches the bed in a point or an edge comes last */
+  out.sort((a, b) => a.score - b.score || a.height - b.height);
+  const uniq = [];
+  for (const o of out) if (!uniq.some(u => Math.abs(u.support - o.support) < 1e-3 * (1 + o.support) && Math.abs(u.height - o.height) < 0.01 && Math.abs(u.contact - o.contact) < 0.01)) uniq.push(o);
+  return uniq;
+}
+/* ---------- Rozdělit na díly (puzzle): a model too big for the printer is cut into a grid of parts joined by the
+   chosen connector (dovetail, peg, snap-fit or none). Cuts go across X, then Y, then Z; each cut gets its connector
+   (where it does not fit, the cut stays plain and is counted in warn). Parts are numbered bottom-up, front to back,
+   left to right: that is also the order to put them together. */
+function puzzleCounts(polys, f) {
+  const bb = KK.bbox(polys), size = [0, 1, 2].map(k => bb.max[k] - bb.min[k]);
+  if (f.split === 'count') return [f.nx, f.ny, f.nz].map(x => Math.max(1, Math.min(8, Math.round(Number(x) || 1))));
+  const bed = [f.bx, f.by, f.bz].map(x => Math.max(10, Number(x) || 200));
+  return size.map((s, k) => Math.max(1, Math.min(8, Math.ceil((s - 0.01) / bed[k]))));
+}
+function puzzleSplit(polys, f) {
+  const bb = KK.bbox(polys), counts = puzzleCounts(polys, f), kind = f.kind || 'dovetail';
+  if (counts[0] * counts[1] * counts[2] > 64) throw new Error('Příliš mnoho dílů (nejvýš 64)');
+  let parts = [{ polys, idx: [0, 0, 0] }], warn = 0;
+  for (let ax = 0; ax < 3; ax++) {
+    const n = counts[ax]; if (n < 2) continue;
+    const cuts = []; for (let j = 1; j < n; j++) cuts.push(bb.min[ax] + (bb.max[ax] - bb.min[ax]) * j / n);
+    const next = [];
+    for (const p of parts) {
+      let rest = p.polys, j0 = 0;
+      for (let j = 0; j < cuts.length; j++) {
+        const pb = KK.bbox(rest);
+        if (!(cuts[j] > pb.min[ax] + 0.3 && cuts[j] < pb.max[ax] - 0.3)) { if (cuts[j] >= pb.max[ax] - 0.3) break; j0 = j + 1; continue; }
+        let lower = null, upper = null;
+        if (kind !== 'none') {
+          try { const r = pegSplit(rest, { kind, axis: 'xyz'[ax], at: cuts[j], d: f.d, len: f.len, tol: f.tol, n: f.n || 1, style: 'attached', dir: f.dir || 'long' }); lower = r.lower; upper = r.upper; }
+          catch (e) { warn++; }
+        }
+        if (!lower) {
+          const { n: nn, w, bb: cb } = connectorPlane(rest, { axis: 'xyz'[ax], at: cuts[j] }), hs = cutTool({}, nn, w, cb);
+          upper = KK.boolean(rest, hs, 'intersect'); lower = KK.boolean(rest, hs, 'subtract');
+        }
+        if (lower.length) { const idx = p.idx.slice(); idx[ax] = j0; next.push({ polys: lower, idx }); }
+        rest = upper; j0 = j + 1;
+        if (!rest.length) break;
+      }
+      if (rest.length) { const idx = p.idx.slice(); idx[ax] = j0; next.push({ polys: rest, idx }); }
+    }
+    parts = next;
+  }
+  parts.sort((a, b) => a.idx[2] - b.idx[2] || a.idx[1] - b.idx[1] || a.idx[0] - b.idx[0]);
+  return { parts, counts, warn };
+}
 function pegSplit(polys, f) {
   const kind = f.kind || 'peg';
   let n, w, bb, top, bot;
@@ -4372,6 +4464,15 @@ function step(state, f) {
       out = bodies.map(x => (x === b ? { ...x, polys: r.lower, seams: undefined } : x)).concat(added);
       break;
     }
+    case 'puzzle': {
+      const b = bodies.find(x => x.id === f.body);
+      if (!b) throw new Error('Těleso neexistuje');
+      const r = puzzleSplit(b.polys, f), base = b.name || 'Těleso';
+      if (r.parts.length < 2) throw new Error('Těleso se vejde celé, není co dělit');
+      const made = r.parts.map((p, i) => ({ ...(i ? { id: f.id + '_d' + (i + 1), from: f.id } : b), name: base + ' – díl ' + (i + 1), polys: p.polys, seams: undefined }));
+      out = bodies.flatMap(x => (x === b ? made : [x]));
+      break;
+    }
     case 'del': {
       const ids = new Set(f.bodies || []);
       if (!bodies.some(b => ids.has(b.id))) throw new Error('Těleso neexistuje');
@@ -4407,7 +4508,7 @@ function makeRebuilder() {
   };
 }
 
-return { flexHingeTools, applyFlexHinge, texPlaneFace, textureTool, textureApply, TEX_PATTERNS, texCellsOf, texBand, texWrap, sectionAt, faceEditRun, feStep, feLoopRing, feRegion, feCentre, feInner, ribsTool, curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { flexHingeTools, applyFlexHinge, texPlaneFace, textureTool, textureApply, TEX_PATTERNS, texCellsOf, texBand, texWrap, sectionAt, faceEditRun, feStep, feLoopRing, feRegion, feCentre, feInner, ribsTool, curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, puzzleSplit, puzzleCounts, orientCandidates, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

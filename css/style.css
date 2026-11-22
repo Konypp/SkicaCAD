@@ -243,6 +243,9 @@ button { cursor: pointer; }
 .skdims g.moved path:not(.ah) { fill: none; stroke-dasharray: 4 3; }
 .skdims g.moved circle { fill: none; }
 .skdims text.moved { fill: var(--orange); stroke: var(--field); font-size: 10.5px; }
+/* sketch constraint marks */
+.skdims .cg rect { fill: var(--field); stroke: var(--accent); stroke-width: 1; stroke-opacity: 0.9; }
+.skdims .cg text { fill: var(--accent); stroke: none; fill-opacity: 1; font: 600 10px var(--font); text-anchor: middle; }
 .skdims .dhit { fill: transparent; stroke: none; pointer-events: all; cursor: text; }
 .skdims .dhit:hover + text { fill: var(--accent); fill-opacity: 1; }
 .dimedit { position: absolute; z-index: 7; transform: translate(-50%, -50%); width: 76px; padding: 3px 6px; border-radius: 4px; border: 1px solid var(--accent); background: var(--field); color: var(--ink); font: 13px var(--mono); text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,.18); outline: none; }

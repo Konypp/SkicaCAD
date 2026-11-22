@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta 2.72
+- Rozdělit na díly (Těleso › Nástroje › Pro tisk, Organické › Pro tisk): model větší než tiskárna se rozdělí na mřížku dílů podle tiskové plochy (X, Y, výška) nebo podle počtu dílů v osách; díly drží rybinový zámek, kolík, snap-fit, nebo jsou bez spoje k slepení. Kde se spoj nevejde, řez zůstane rovný a dialog to hlásí. Díly se číslují zdola, zepředu a zleva (Těleso – díl 1, 2, …), v tomto pořadí se i skládají; náhled je rozložený.
+- Orientace pro tisk: vyzkouší položení na největší rovné plochy i ve směrech os, odhadne podpěry (převisy nad 45° krát výška), výšku a plochu na podložce, nabídne nejlepší natočení a zobrazí převisy červeně; OK těleso otočí a položí na podložku (krok Přesunout).
+- Pohyb a kolize: vybraná tělesa se otáčejí kolem osy (rovná hrana, osa kruhové hrany čepu či otvoru, nebo X / Y / Z) nebo posouvají v zadaném rozsahu; v krocích se hlídá průnik s ostatními viditelnými tělesy, výsledek vypíše rozsahy kolizí a posuvník ukáže libovolnou polohu s průnikem červeně. Model se nemění.
+- Vazby ve skice (Skica › Vazby): Vodorovně, Svisle, Rovnoběžně, Kolmo, Stejná délka (i stejný poloměr kružnic), Soustředně, Shodný bod, Tečně (úsečka–kružnice, kružnice–kružnice), Pevně a Odebrat vazbu. Vazby se ukládají ve skice, platí i při tažení a úpravách rozměrů (řešič hýbe ostatními prvky, upravovaný drží), u prvků jsou značky H, V, ∥, ⊥, =, ◎, ●, T, ⚓; Zpět/Znovu je zahrnuje.
+- Otevřít ve sliceru (Soubor, Těleso › Nástroje › Pro tisk): 3MF pro Bambu Studio, PrusaSlicer, OrcaSlicer nebo Curu; díly se položí na podložku vedle sebe (nebo jak jsou v modelu) a vystředí na podložku zvoleného rozměru, jako samostatné objekty nebo jeden objekt z dílů; náhled s obrysem podložky a varováním, když se nevejdou. Uloží se 3MF, na telefonu ho lze sdílet rovnou do aplikace sliceru.
+
 ## Beta 2.71
 - Vnitřní hrany (zaoblení a zkosení), všechny kombinace:
   - Postupně (nejdřív dno kapsy, pak svislé vnitřní rohy): úprava dna teď obíhá nový roh až k podlaze. Dřív pod svislým zaoblením zůstal schod (u velkého poloměru rohu a malého zaoblení dna bylo těleso i děravé). Výsledek se od opačného pořadí liší jen o desetiny mm³.
