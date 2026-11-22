@@ -1,5 +1,12 @@
 # Changelog
 
+## Beta 2.73
+- Nápověda v aplikaci: uživatelská příručka přímo v SkicaCAD (tlačítko s otazníkem v horní liště, Soubor › Nápověda, klávesa F1), funguje i offline. Vlevo kapitoly, nahoře hledání (Enter skočí na další výskyt), na telefonu kapitoly v řádku nahoře. Příručka je zatím jen česky.
+- Otazník v záhlaví každého dialogu (a F1 při otevřeném dialogu, v paletě skici) otevře příručku rovnou u popisu daného nástroje a zvýrazní ho.
+- Krátké nápovědy: po najetí myší na nástroj v pásu (i v rozbalovacích nabídkách) se ukáže jeho název, klávesa a krátký popis, česky i anglicky.
+- Simulace a Pohyb a kolize sloučeny: jedno tlačítko Simulace, v dialogu volba Víko krabičky / Pohyb a kolize; model bez víka s pantem nebo západkou otevře rovnou Pohyb a kolize.
+- Příručka se do aplikace generuje z exportu dokumentu příručky (tools/prirucka.md → js/manual.js skriptem tools/manual.py).
+
 ## Beta 2.72
 - Rozdělit na díly (Těleso › Nástroje › Pro tisk, Organické › Pro tisk): model větší než tiskárna se rozdělí na mřížku dílů podle tiskové plochy (X, Y, výška) nebo podle počtu dílů v osách; díly drží rybinový zámek, kolík, snap-fit, nebo jsou bez spoje k slepení. Kde se spoj nevejde, řez zůstane rovný a dialog to hlásí. Díly se číslují zdola, zepředu a zleva (Těleso – díl 1, 2, …), v tomto pořadí se i skládají; náhled je rozložený.
 - Orientace pro tisk: vyzkouší položení na největší rovné plochy i ve směrech os, odhadne podpěry (převisy nad 45° krát výška), výšku a plochu na podložce, nabídne nejlepší natočení a zobrazí převisy červeně; OK těleso otočí a položí na podložku (krok Přesunout).

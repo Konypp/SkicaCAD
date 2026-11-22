@@ -34,6 +34,7 @@ const ICONS = {
   keq: '<path d="M4 8h16M4 16h16" style="stroke-width:2"/>', kconc: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" class="o"/>',
   kcoin: '<path d="M3 20 12 12 21 18"/><circle cx="12" cy="12" r="2.5" class="o"/>', ktan: '<circle cx="11" cy="13" r="6"/><path d="M3 7h18" style="stroke-width:2"/>',
   kfix: '<path d="M12 3v14M7 8h10M5 14a7 7 0 0 0 14 0"/>', kdel: '<path d="M5 17 15 5" style="stroke-width:2"/><path d="M14 14l6 6M20 14l-6 6" style="stroke:var(--danger)"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .8-1 1.5v.6"/><circle cx="12" cy="17" r=".6" fill="currentColor"/>',
   motion: '<path class="p" d="M4 14h7v6H4z" opacity=".55"/><path d="M4 14h7v6H4zM11 17h3"/><path d="M14 17l6-9" style="stroke:var(--orange);stroke-width:2"/><path d="M17 4a8 8 0 0 1 4 6" stroke-dasharray="2 1.6"/>',
   print: '<path class="p" d="M5 9h14v6H5z" opacity=".55"/><path d="M7 9V4h10v5M5 9h14v6H5zM8 15v5h8v-5"/>',
   slicer: '<path class="p" d="M4 6h16v3H4zM4 11h16v3H4zM4 16h16v3H4z" opacity=".55"/><path d="M4 6h16M4 11h16M4 16h16"/><path d="M17 2l4 4-4 4" style="stroke:var(--orange);stroke-width:2"/>',
@@ -1315,6 +1316,31 @@ function facePie(x, y) {
   return true;
 }
 
+/* short help for every tool: shown as the button's tooltip (with its name and key) */
+const TOOL_TIPS = {
+  sketch: 'Nakreslí 2D profil na rovinu nebo rovnou plochu tělesa; z něj pak vznikne těleso', extrude: 'Vysune uzavřený profil skici do tělesa, nebo ho vyřízne z tělesa',
+  revolve: 'Otočí profil skici kolem osy (čára skici nebo osa X / Y / Z)', thread: 'Vnější nebo vnitřní závit na válcové ploše, s vůlí pro tisk',
+  texture: 'Vzor na povrchu válce nebo rovné plochy (kamínky, šestiúhelníky, žebra…), nebo motiv ze skici', box: 'Kvádr zadaných rozměrů', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel nebo komolý kužel', torus: 'Prstenec (torus)',
+  text3d: 'Vystouplý nebo vyrytý text zvoleným písmem', bolt: 'Šroub podle normy (M3–M12) s modelovaným závitem', nut: 'Matice podle normy (normální nebo nízká)',
+  hinge: 'Pant: samostatný, na šroub, pro krabičku tištěnou vcelku nebo ohebný', latch: 'Západka krabičky: jazýček s háčkem a lištou', buckle: 'Spona pro řemínek nebo popruh (samec a samice)', jointpart: 'Hotové kloubové díly (kulový kloub, čep…) k vložení do modelu',
+  fillet: 'Zaoblí vybrané hrany (vnější i vnitřní)', chamfer: 'Zkosí vybrané hrany', hole: 'Díra: prostá, pro šroub, se zahloubením nebo pro matici, s vůlí pro tisk', shell: 'Vydlabe těleso na zadanou tloušťku stěny, s otevřenými plochami',
+  move: 'Posune nebo otočí tělesa, i jako kopii', scale: 'Změní velikost v procentech nebo na přesný rozměr', rotate: 'Otočí tělesa kolem osy', facemode: 'Režim výběru ploch: klepnutím vyberete plochu a upravíte ji',
+  faceedit: 'Modelování ploch jako v Blenderu: vytáhnout, vsadit, posunout, otočit, změnit velikost', combine: 'Spojí, odečte nebo protne tělesa', splitbody: 'Rozřízne těleso rovinou nebo plochou na dva díly', curvecut: 'Rozřízne těleso podél křivky klepnuté na modelu',
+  center: 'Zarovná tělesa k počátku, k jinému tělesu nebo plochu na plochu', mirror: 'Zrcadlí tělesa podle roviny', pattern: 'Pole kopií: v řadě, v mřížce nebo dokola', del: 'Odstraní vybraná tělesa',
+  selall: 'Vybere všechna tělesa', measure: 'Změří vzdálenost, úhel, průměr nebo délku hrany', simulate: 'Víko krabičky s pantem, nebo otáčení a posun libovolných těles, s kontrolou kolizí', motion: 'Otáčení nebo posun těles v rozsahu s kontrolou kolizí',
+  orient: 'Navrhne natočení na podložce s nejmenšími podpěrami', puzzle: 'Rozdělí velký model na díly, které se vejdou na tiskárnu, se zámky nebo kolíky', slicer: 'Připraví 3MF pro Bambu Studio, PrusaSlicer, OrcaSlicer nebo Curu', import: 'Vloží STL, OBJ, 3MF, DXF, SVG nebo návrh SkicaCAD',
+  blob: 'Měkce slité tvary (koule, kapsle…) pro postavičky', skin: 'Těleso z kostry bodů s tloušťkou v každém bodě', sweep: 'Profil tažený po křivce', loft: 'Plynulý přechod mezi profily v několika skicách',
+  deform: 'Ohnout, zkroutit, zúžit nebo zploštit těleso', lattice: 'Deformace mřížkou: táhnete body mřížky kolem tělesa', softmove: 'Táhne místo na tělese a okolí se plynule přizpůsobí', subdiv: 'Vyhladí těleso dělením (z krychle oblý kámen)',
+  sculpt: 'Sochání štětcem: nafouknout, stáhnout, vyhladit, uchopit', remesh: 'Převede těleso na rovnoměrnou síť (před sochaním nebo deformací)', articulate: 'Rozdělí těleso na články spojené klouby tištěnými vcelku', flatbase: 'Zarovná spodek tělesa, aby stálo a dobře se tisklo',
+  pegsplit: 'Rozřízne těleso a díly spojí kolíkem, snap-fitem, rybinou nebo kloubem', hollow: 'Vydutí tělesa s otvorem (pryskyřice, odlehčení)', printcheck: 'Ukáže převisy a příliš tenké stěny',
+  line: 'Úsečky a lomená čára; klepnutím na první bod obrys uzavřete', spline: 'Hladká křivka přes body, nebo kreslená od ruky', rect: 'Obdélník z rohu nebo ze středu', circle: 'Kružnice ze středu nebo ze dvou rohů', ellipse: 'Elipsa',
+  ngon: 'Pravidelný mnohoúhelník', slot: 'Drážka (dvě půlkružnice spojené rovně)', sksegtrim: 'Odstraní úsek čáry mezi průsečíky', skcons: 'Přepne kreslení pomocných čar (netvoří profil)', skdel: 'Smaže vybrané prvky skici',
+  skfillet: 'Zaoblí rohy obdélníku nebo obrysu', skoffset: 'Odsazená kopie obrysu', sktrim: 'Sjednotí, odečte nebo protne obrysy', skjoin: 'Spojí otevřené čáry do uzavřeného obrysu', skmirror: 'Zrcadlí prvek podle osy, nebo kreslí zrcadlově',
+  skimport: 'Vloží DXF nebo SVG do skici', finish: 'Ukončí skicu a vrátí se k tělesům',
+  kh: 'Úsečka bude vodorovná', kv: 'Úsečka bude svislá', kpar: 'Dvě úsečky budou rovnoběžné', kperp: 'Dvě úsečky budou kolmé', keq: 'Stejná délka úseček nebo stejný poloměr kružnic', kconc: 'Dvě kružnice se stejným středem',
+  kcoin: 'Dva body (konce čar, středy kružnic) splynou', ktan: 'Úsečka a kružnice (nebo dvě kružnice) se dotýkají', kfix: 'Prvek se při řešení vazeb nehýbe', kdel: 'Odebere vazby prvku'
+};
+const tipTitle = (id, label, key) => label + (key ? ' (' + key + ')' : '') + (TOOL_TIPS[id] ? ' – ' + TOOL_TIPS[id] : '');
 /* sketch constraint tools (see solveSketchCons) */
 const CONS_TOOLS = { kh: 'Vodorovně', kv: 'Svisle', kpar: 'Rovnoběžně', kperp: 'Kolmo', keq: 'Stejná délka', kconc: 'Soustředně', kcoin: 'Shodný bod', ktan: 'Tečně', kfix: 'Pevně', kdel: 'Odebrat vazbu' };
 /* ================= ribbon ================= */
@@ -1330,7 +1356,7 @@ const RIBBON = {
       { menu: 'xform', label: 'Uspořádat', items: [['center', 'Zarovnat'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole']] },
       ['del', 'Odstranit', 'Del']]],
     ['Nástroje', [['selall', 'Vybrat vše', 'Ctrl+A'], ['measure', 'Měřit', 'I'], ['simulate', 'Simulace'],
-      { menu: 'print', label: 'Pro tisk', items: [['motion', 'Pohyb a kolize'], ['orient', 'Orientace pro tisk'], ['puzzle', 'Rozdělit na díly'], ['slicer', 'Otevřít ve sliceru']] }, ['import', 'Importovat']]]
+      { menu: 'print', label: 'Pro tisk', items: [['orient', 'Orientace pro tisk'], ['puzzle', 'Rozdělit na díly'], ['slicer', 'Otevřít ve sliceru']] }, ['import', 'Importovat']]]
   ],
   organic: [
     ['Tvořit', [['blob', 'Měkké spojení'], ['skin', 'Kostra'], ['sweep', 'Tažení po křivce'], ['loft', 'Přechod profilů']]],
@@ -1359,7 +1385,7 @@ function renderRibbon() {
   $('#tab-sketch').setAttribute('aria-selected', String(!!sk));
   $('#tab-solid').disabled = !!sk; $('#tab-org').disabled = !!sk;
   $('.ribbon').classList.toggle('org', !sk && ribTab === 'organic');
-  const btn = ([id, label, key]) => { const pr = itemPressed(id); return `<button class="tool${id === 'finish' ? ' finish' : ''}" data-cmd="${id}" title="${label}${key ? ' (' + key + ')' : ''}"${pr === null ? '' : ` aria-pressed="${pr}"`}><span class="ico">${svg(id, 24)}</span><span>${label}</span></button>`; };
+  const btn = ([id, label, key]) => { const pr = itemPressed(id); return `<button class="tool${id === 'finish' ? ' finish' : ''}" data-cmd="${id}" title="${tipTitle(id, label, key)}"${pr === null ? '' : ` aria-pressed="${pr}"`}><span class="ico">${svg(id, 24)}</span><span>${label}</span></button>`; };
   body.innerHTML = RIBBON[mode].map(([g, items]) => `<div class="rgroup"><div class="rtools">${items.map(it => {
     if (!it.menu) return btn(it);
     const on = it.items.find(x => itemPressed(x[0])), shown = on || it.items.find(x => x[0] === ribMem[it.menu]) || it.items[0];
@@ -1374,7 +1400,7 @@ function openRibMenu(btn) {
   closeRibMenu(); if (was) return;
   const def = RIBBON[sk ? 'sketch' : ribTab].flatMap(g => g[1]).find(x => x.menu === btn.dataset.menu); if (!def) return;
   const m = document.createElement('div'); m.id = 'ribmenu'; m.className = 'ribmenu'; m.setAttribute('role', 'menu');
-  m.innerHTML = def.items.map(([id, label, key]) => { const pr = itemPressed(id); return `<button role="menuitem" data-cmd="${id}"${pr ? ' aria-pressed="true"' : ''}><span class="ico">${svg(id, 22)}</span><span class="lbl">${label}</span>${key ? `<kbd>${key}</kbd>` : ''}</button>`; }).join('');
+  m.innerHTML = def.items.map(([id, label, key]) => { const pr = itemPressed(id); return `<button role="menuitem" data-cmd="${id}" title="${TOOL_TIPS[id] || ''}"${pr ? ' aria-pressed="true"' : ''}><span class="ico">${svg(id, 22)}</span><span class="lbl">${label}</span>${key ? `<kbd>${key}</kbd>` : ''}</button>`; }).join('');
   m.addEventListener('click', e => { const b = e.target.closest('[data-cmd]'); if (!b) return; ribMem[def.menu] = b.dataset.cmd; closeRibMenu(); runCommand(b.dataset.cmd); renderRibbon(); });
   document.body.append(m);
   const r = btn.getBoundingClientRect();
@@ -1433,7 +1459,11 @@ function runCommand(id) {
     case 'mirror': startMirror(); break;
     case 'pattern': startPattern(); break;
     case 'measure': startMeasure(); break;
-    case 'simulate': startSimulate(); break;
+    case 'simulate': {
+      /* a model with a hinged or latched lid opens the lid simulation, anything else free motion */
+      const lid = cur.bodies.some(b => b.swing || cur.bodies.some(r => r.rides === b.id) || doc.features.some(f => (f.type === 'latch' || f.type === 'hinge') && f.lid === b.id));
+      if (lid) startSimulate(); else startMotion(); break;
+    }
     case 'import': pickImportFile('.stl,.obj,.dxf,.svg,.zip'); break;
     case 'del': deleteSelected(); break;
   }
@@ -1509,7 +1539,7 @@ function openDialog(spec) {
     }
     return '';
   }).join('');
-  el.innerHTML = `<div class="phead"><span class="ico">${svg(spec.icon, 18)}</span><span class="t"></span><button class="ibtn" data-act="cancel" aria-label="Zavřít">${svg('close', 14)}</button></div>
+  el.innerHTML = `<div class="phead"><span class="ico">${svg(spec.icon, 18)}</span><span class="t"></span><button class="ibtn" data-act="help" aria-label="Nápověda" title="Nápověda k tomuto nástroji">${svg('help', 15)}</button><button class="ibtn" data-act="cancel" aria-label="Zavřít">${svg('close', 14)}</button></div>
     <div class="dbody">${rows}</div>
     <div class="dfoot"><button class="btn" data-act="cancel">Zrušit</button><button class="btn primary" data-act="ok">OK</button></div>`;
   $('.phead .t', el).textContent = spec.title;
@@ -1561,6 +1591,7 @@ $('#dialog').addEventListener('click', e => {
     return;
   }
   const a = e.target.closest('[data-act]');
+  if (a && a.dataset.act === 'help') { openManual(sk && !dlg ? '4. Skicování' : dlg ? dlg.spec.title : ''); return; }
   if (a) { if (a.dataset.act === 'ok') { if (sk) finishSketch(true); else okCmd(); } else { if (sk) finishSketch(false); else endCmd(false); } return; }
   const sb = e.target.closest('[data-sel]'); if (sb && dlg && dlg.spec.onSel) { dlg.spec.onSel(sb.dataset.sel); return; }
   const bt = e.target.closest('[data-btn]'); if (bt && dlg && dlg.spec.onBtn) { dlg.spec.onBtn(bt.dataset.btn, bt.dataset.v); return; }
@@ -2808,7 +2839,7 @@ function deleteSketchEntity() {
 const ENT_LABEL = { text: 'Text', spline: 'Křivka', rect: 'Obdélník', circle: 'Kružnice', poly: 'Čára', ngon: 'Mnohoúhelník', slot: 'Drážka', ellipse: 'Elipsa' };
 function openPalette() {
   const el = $('#dialog'); el.hidden = false; dlg = null;
-  el.innerHTML = `<div class="phead"><span class="ico">${svg('sketch', 18)}</span><span class="t">PALETA SKICI</span><button class="ibtn" data-act="cancel" aria-label="Zrušit skicu" title="Zrušit změny">${svg('close', 14)}</button></div>
+  el.innerHTML = `<div class="phead"><span class="ico">${svg('sketch', 18)}</span><span class="t">PALETA SKICI</span><button class="ibtn" data-act="help" aria-label="Nápověda" title="Nápověda ke skicování">${svg('help', 15)}</button><button class="ibtn" data-act="cancel" aria-label="Zrušit skicu" title="Zrušit změny">${svg('close', 14)}</button></div>
     <div class="dbody palette"><div id="pal-imp" class="palimp" hidden></div><div id="pal-tool" hidden></div><div class="note" id="pal-note"></div><label class="chk"><input type="checkbox" id="pal-dims"${showSkDims() ? ' checked' : ''}><span>Zobrazit kóty</span></label><label class="chk"><input type="checkbox" id="pal-ghost"${sk.ghost ? ' checked' : ''}><span>Průhledná tělesa</span></label><div class="ents" id="pal-ents"></div></div>
     <div class="dfoot"><button class="btn" data-act="cancel">Zrušit</button><button class="btn primary" data-act="ok">Dokončit skicu</button></div>`;
   renderPalette();
@@ -3929,7 +3960,7 @@ function startSimulate(editIndex, ef) {
       const cands = cur.bodies.filter(b => b.swing || cur.bodies.some(r => r.rides === b.id) || doc.features.some(f => (f.type === 'latch' || f.type === 'hinge') && f.lid === b.id));
       const picked = [...sel].find(id => cands.some(b => b.id === id));
       this.lid = (ef && ef.lid) || picked || (cands[0] && cands[0].id) || null;
-      openDialog({ title: 'Simulace', icon: 'simulate', fields: [{ k: 'sel', id: 'lid', label: 'Víko' },
+      openDialog({ title: 'Simulace', icon: 'simulate', fields: [{ k: 'seg', id: 'kind', label: 'Simulovat', options: [['box', 'Víko krabičky'], ['free', 'Pohyb a kolize']], value: 'box' }, { k: 'sel', id: 'lid', label: 'Víko' },
         { k: 'num', id: 'prog', label: 'Průběh', unit: '%', value: 0, range: [0, 100, 1] },
         { k: 'btns', id: 'go', label: 'Přehrát', options: [['open', 'Otevřít'], ['close', 'Zavřít'], ['loop', 'Dokola']] },
         { k: 'note', id: 'n' }, { k: 'note', id: 'n2' },
@@ -3937,7 +3968,11 @@ function startSimulate(editIndex, ef) {
         { k: 'chk', id: 'keepO', label: 'Po zavření dialogu nechat krabičku otevřenou', value: !!ef && ef.state === 'open' }],
         onSel: () => {},
         onBtn: (id, v) => this.play(v),
-        onChange: id => { if (id === 'prog') { const x = dlg.get('prog'); if (isFinite(x)) { this.stop(); this.prog = Math.max(0, Math.min(100, x)); this.pose(); } } }
+        onChange: id => {
+          /* Simulace has two modes: the box lid, and free motion with collision checks (startMotion) */
+          if (id === 'kind' && dlg.get('kind') === 'free') { endCmd(false); startMotion(); return; }
+          if (id === 'prog') { const x = dlg.get('prog'); if (isFinite(x)) { this.stop(); this.prog = Math.max(0, Math.min(100, x)); this.pose(); } }
+        }
       });
       dlg.okLabel('Zavřít');
       this.setup();
@@ -6152,8 +6187,8 @@ function startMotion() {
     hideBodies: new Set(), res: null, scanT: null, poseT: null, anim: null,
     init() {
       if (cur.bodies.length < 2) { endCmd(false); toast('Na kontrolu kolizí jsou potřeba aspoň dvě tělesa.'); return; }
-      openDialog({ title: 'Pohyb a kolize', icon: 'motion',
-        fields: [{ k: 'sel', id: 'body', label: 'Pohyblivá tělesa' },
+      openDialog({ title: 'Simulace', icon: 'simulate',
+        fields: [{ k: 'seg', id: 'kind', label: 'Simulovat', options: [['box', 'Víko krabičky'], ['free', 'Pohyb a kolize']], value: 'free' }, { k: 'sel', id: 'body', label: 'Pohyblivá tělesa' },
           { k: 'seg', id: 'mode', label: 'Pohyb', options: [['rot', 'Otáčení'], ['lin', 'Posun']], value: this.mode },
           { k: 'seg', id: 'axis', label: 'Osa', options: [['edge', 'Hrana'], ['x', 'X'], ['y', 'Y'], ['z', 'Z']], value: this.axis },
           { k: 'sel', id: 'edge', label: 'Osa – hrana' },
@@ -6165,6 +6200,7 @@ function startMotion() {
         onSel: id => { this.pick = id === 'edge' ? 'edge' : 'body'; this.layout(); },
         onBtn: (id, v) => { if (v === 'check') this.scan(); else this.play(); },
         onChange: id => {
+          if (id === 'kind' && dlg.get('kind') === 'box') { endCmd(false); startSimulate(); return; }
           if (id === 'mode') { this.mode = dlg.get('mode'); if (this.mode === 'lin' && this.a1 === 90 && this.a0 === 0) { this.a1 = 20; dlg.set('a1', 20); } else if (this.mode === 'rot' && this.a1 === 20 && this.a0 === 0) { this.a1 = 90; dlg.set('a1', 90); } this.res = null; }
           if (id === 'axis') { this.axis = dlg.get('axis'); this.pick = this.axis === 'edge' ? 'edge' : 'body'; this.res = null; }
           for (const k of ['a0', 'a1', 'steps']) if (id === k) { const x = dlg.get(k); if (isFinite(x)) this[k] = x; this.res = null; }
@@ -6362,6 +6398,96 @@ function startSlicer() {
   };
   beginCmd(c); c.init();
 }
+/* ================= Nápověda: the user manual inside the app (js/manual.js, built from the manual doc) =================
+   A window with the chapters on the left, a search field and the text; openManual(term) opens it at the paragraph or
+   heading that names the term (a tool's name from its dialog), highlighted. Works offline (the manual is part of the app). */
+function mdInline(t) {
+  const e = x => x.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return e(t).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*([^*\s][^*]*?)\*(?!\*)/g, '$1<i>$2</i>')
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>').replace(/\\([*_`[\]#-])/g, '$1');
+}
+function mdRender(md) {
+  const L = md.split('\n'), out = [], toc = []; let i = 0, hid = 0;
+  const cells = l => l.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+  while (i < L.length) {
+    const l = L[i];
+    if (!l.trim()) { i++; continue; }
+    let m = l.match(/^(#{1,4}) (.*)$/);
+    if (m) { const lv = m[1].length, id = 'mh' + (++hid); if (lv > 1) toc.push({ id, lv, t: m[2] }); out.push(`<h${lv} id="${id}">${mdInline(m[2])}</h${lv}>`); i++; continue; }
+    if (/^\|/.test(l)) {
+      const rows = []; while (i < L.length && /^\|/.test(L[i])) rows.push(L[i++]);
+      const head = cells(rows[0]), body = rows.slice(/^\|[\s:|-]+\|?$/.test(rows[1] || '') ? 2 : 1).map(cells);
+      out.push(`<div class="mtab"><table><thead><tr>${head.map(c => `<th>${mdInline(c)}</th>`).join('')}</tr></thead><tbody>${body.map(r => `<tr>${r.map(c => `<td>${mdInline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`);
+      continue;
+    }
+    if (/^\s*([-*]|\d+\.) /.test(l)) {
+      const ord = /^\s*\d+\./.test(l), items = [];
+      while (i < L.length && /^\s*([-*]|\d+\.) /.test(L[i])) { let t = L[i++].replace(/^\s*([-*]|\d+\.) /, ''); while (i < L.length && /^\s{2,}\S/.test(L[i]) && !/^\s*([-*]|\d+\.) /.test(L[i])) t += ' ' + L[i++].trim(); items.push(t); }
+      out.push(`<${ord ? 'ol' : 'ul'}>${items.map(t => `<li>${mdInline(t)}</li>`).join('')}</${ord ? 'ol' : 'ul'}>`);
+      continue;
+    }
+    let t = l; i++;
+    while (i < L.length && L[i].trim() && !/^(#{1,4} |\||\s*([-*]|\d+\.) )/.test(L[i])) t += ' ' + L[i++].trim();
+    out.push(`<p>${mdInline(t)}</p>`);
+  }
+  return { html: out.join(''), toc };
+}
+let manualDoc = null;
+function openManual(term) {
+  closeMenu && closeMenu();
+  let box = $('#manual');
+  if (!box) {
+    if (!manualDoc) manualDoc = mdRender(self.SKICA_MANUAL || '# Příručka\n\nPříručka není k dispozici.');
+    box = document.createElement('div'); box.id = 'manual'; box.className = 'manual'; box.setAttribute('role', 'dialog'); box.setAttribute('aria-label', 'Nápověda');
+    box.innerHTML = `<div class="mn-box"><div class="mn-head"><span class="ico">${svg('help', 18)}</span><b>Nápověda</b><input type="search" id="mn-q" placeholder="Hledat v příručce" autocomplete="off"><button class="ibtn" id="mn-x" aria-label="Zavřít">${svg('close', 14)}</button></div>
+      <div class="mn-main"><nav class="mn-toc" translate="no">${manualDoc.toc.map(h => `<a href="#" data-h="${h.id}" class="lv${h.lv}">${mdInline(h.t)}</a>`).join('')}</nav><div class="mn-text" translate="no">${manualDoc.html}</div></div>
+      <div class="mn-foot" id="mn-st"></div></div>`;
+    document.body.appendChild(box);
+    const txt = $('.mn-text', box), st = $('#mn-st', box);
+    $('#mn-x', box).onclick = () => { box.hidden = true; };
+    box.addEventListener('pointerdown', e => { if (e.target === box) box.hidden = true; });
+    box.addEventListener('keydown', e => { if (e.key === 'Escape') { e.stopPropagation(); box.hidden = true; } });
+    $('.mn-toc', box).addEventListener('click', e => { const a = e.target.closest('[data-h]'); if (!a) return; e.preventDefault(); const h = document.getElementById(a.dataset.h); if (h) txt.scrollTop = h.offsetTop - txt.offsetTop - 6; });
+    let hits = [], hi = 0, qT = null;
+    const find = (q, jump) => {
+      txt.querySelectorAll('mark').forEach(m => m.replaceWith(...m.childNodes)); txt.normalize();
+      hits = []; hi = 0; q = (q || '').trim(); if (q.length < 2) { st.textContent = ''; return; }
+      const w = document.createTreeWalker(txt, NodeFilter.SHOW_TEXT), ql = q.toLocaleLowerCase('cs'), nodes = []; let n;
+      while ((n = w.nextNode())) if (n.nodeValue.toLocaleLowerCase('cs').includes(ql)) nodes.push(n);
+      for (const node of nodes) {
+        let cur = node;
+        for (;;) { const k = cur.nodeValue.toLocaleLowerCase('cs').indexOf(ql); if (k < 0) break; const r = cur.splitText(k), rest = r.splitText(q.length), mk = document.createElement('mark'); r.replaceWith(mk); mk.appendChild(r); hits.push(mk); cur = rest; }
+      }
+      st.textContent = hits.length ? `Nalezeno ${hits.length}× – Enter skočí na další` : 'Nic nenalezeno';
+      if (hits.length && jump !== false) show(0);
+    };
+    const show = k => { hits.forEach(m => m.classList.remove('on')); const m = hits[k]; if (!m) return; m.classList.add('on'); txt.scrollTop = m.offsetTop - txt.offsetTop - txt.clientHeight / 3; };
+    const q = $('#mn-q', box);
+    q.addEventListener('input', () => { clearTimeout(qT); qT = setTimeout(() => find(q.value), 200); });
+    q.addEventListener('keydown', e => { if (e.key === 'Enter' && hits.length) { e.preventDefault(); hi = (hi + 1) % hits.length; show(hi); } });
+    box.findTerm = find;
+  }
+  box.hidden = false;
+  if (I18N && I18N.lang === 'en') $('#mn-st', box).textContent = 'The manual is in Czech only for now.';
+  /* jump to the place that describes the tool: its heading, or the paragraph that starts with its name in bold */
+  const txt = $('.mn-text', box);
+  txt.querySelectorAll('.mn-on').forEach(x => x.classList.remove('mn-on'));
+  if (term) {
+    const els = [...txt.querySelectorAll('h2, h3, h4, p > b:first-child, td:first-child')], low = x => x.textContent.trim().toLocaleLowerCase('cs');
+    /* the whole name first, then without its last words (Textura povrchu → Textura) */
+    let el = null, words = String(term).replace(/[…:].*$/, '').trim().toLocaleLowerCase('cs').split(/\s+/);
+    for (let first = true; !el && words.length; first = false) { const base = words.join(' '); el = els.find(x => low(x) === base) || (first && (els.find(x => low(x).startsWith(base)) || els.find(x => low(x).includes(base)))) || null; words.pop(); }
+    const blk = el && (el.closest('p, tr, h2, h3, h4') || el);
+    if (blk) { blk.classList.add('mn-on'); requestAnimationFrame(() => { txt.scrollTop = blk.offsetTop - txt.offsetTop - 10; }); $('#mn-q', box).value = ''; }
+    else { $('#mn-q', box).value = term; box.findTerm(term); }
+  } else txt.scrollTop = 0;
+  setTimeout(() => $('#mn-q', box).focus({ preventScroll: true }), 50);
+}
+$('#helpbtn').addEventListener('click', () => openManual(''));
+$('#m-help').addEventListener('click', () => { closeMenu(); openManual(''); });
+window.addEventListener('keydown', e => {
+  if (e.key === 'F1') { e.preventDefault(); openManual(dlg ? dlg.spec.title : sk ? '4. Skicování' : ''); }
+});
 function selectAll() {
   if (sk) { if (!sk.tool && sk.f.ents.length) { skSetSel(sk.f.ents.map((e, i) => i)); renderPalette(); redrawSketch(); toast(`Vybráno prvků skici: ${sk.f.ents.length}`); } return; }
   if (cmd && !sk && cmd.selectAll) { cmd.selectAll(); return; }
@@ -9678,7 +9804,7 @@ $('#m-logout').addEventListener('click', () => { closeMenu(); if (syncFns) syncF
 if (window.I18N) I18N.onChange(() => syncMenu());
 
 if (window.__KOTA_TEST__) window.__kota = { get cmd() { return cmd; }, viewTo, startSplitFace, startFaceEdit, threeMfBytes, transform, get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart, makeThumb, libThumb, transform, persp, toPx, startMove, alignDesc,
-  cmdSnap, get doc() { return doc; }, get cur() { return cur; }, get cmd() { return cmd; }, get sk() { return sk; }, get dlg() { return dlg; }, get sel() { return sel; }, meshes, chainsFor };
+  cmdSnap, openManual, get doc() { return doc; }, get cur() { return cur; }, get cmd() { return cmd; }, get sk() { return sk; }, get dlg() { return dlg; }, get sel() { return sel; }, meshes, chainsFor };
 })();
 
 
