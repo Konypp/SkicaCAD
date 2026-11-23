@@ -308,7 +308,7 @@ function texCellsOf(f, C, z0, z1) {
     if (whole) { n = Math.max(1, Math.round((Z - ch) / rh) + 1); sY = Z / ((n - 1) * rh + ch); yc0 = z0 + ch * sY / 2; }
     else { n = Math.max(1, Math.round(Z / rh)); sY = Z / (n * rh); yc0 = z0; }
     const j0 = -Math.ceil(ch / rh) - 1, j1 = n + Math.ceil(ch / rh);
-    if (ns * (j1 - j0 + 1) > 8000) throw new Error('Vzor by měl příliš mnoho buněk; zvětšete jejich velikost');
+    if (ns * (j1 - j0 + 1) > (f._lim || 8000)) throw new Error('Vzor by měl příliš mnoho buněk; zvětšete jejich velikost');
     const sc = (P, y) => { const Q = P.map(q => [q[0], y + (q[1] - y) * sY]); if (P.dot) Q.dot = P.dot.map(q => [q[0], y + (q[1] - y) * sY]); return Q; };
     for (let j = j0; j <= j1; j++) for (let i = 0; i < ns; i++) { const y = yc0 + j * rh * sY; cells.push(sc(mk((i + 0.5 + (off && (j & 1) ? 0.5 : 0)) * w, y, w, rh), y)); }
   };
@@ -331,7 +331,7 @@ function texCellsOf(f, C, z0, z1) {
   else if (pat === 'diamond') grid(a, a * 0.6, true, (x, y, w) => [[x, y - a * 0.6], [x + w / 2, y], [x, y + a * 0.6], [x - w / 2, y]]); /* knurling */
   else if (pat === 'triangles') { /* rows of triangles pointing up and down in turn */
     const ns = Math.max(3, Math.round(C / a)), w = C / ns, nt = Math.max(1, Math.round((z1 - z0) / (w * Math.sqrt(3) / 2))), th = (z1 - z0) / nt, pad = 0, j1 = nt + 1; /* rows stretched to fill the range exactly */
-    if (ns * 2 * (j1 + 2) > 8000) throw new Error('Vzor by měl příliš mnoho buněk; zvětšete jejich velikost');
+    if (ns * 2 * (j1 + 2) > (f._lim || 8000)) throw new Error('Vzor by měl příliš mnoho buněk; zvětšete jejich velikost');
     for (let j = -1; j <= j1; j++) for (let i = 0; i < ns; i++) {
       const x = (i + (j & 1 ? 0.5 : 0)) * w, y = z0 + pad + j * th;
       cells.push([[x, y], [x + w, y], [x + w / 2, y + th]], [[x + w / 2, y + th], [x + w, y], [x + 1.5 * w, y + th]]);
@@ -349,17 +349,56 @@ function texCellsOf(f, C, z0, z1) {
   /* a cell cut by the range is marked: with whole cells only (Jen celé buňky) it stays a plain joint floor */
   return cells.map(P => { const Q = clipZ(P); if (!Q) return null; if (Math.abs(KK.area2D(Q)) < Math.abs(KK.area2D(P)) - 1e-4) Q.cut = true; if (P.dot) { const D = clipZ(P.dot); Q.dot = D || null; Q.cut = !D || Math.abs(KK.area2D(D)) < Math.abs(KK.area2D(P.dot)) - 1e-4; } return Q; }).filter(Boolean);
 }
-/* Natočení vzoru (f.rot, degrees). On a cylinder the rows are slanted (a shear along the circumference: the pattern
-   winds round like a screw thread and still meets itself at the seam, which a true rotation could not); each cell is
-   moved back by whole turns so it starts on the first one. On a flat face the pattern is really turned about the face's
-   middle: the cells are laid out over a square covering the face turned the other way, then turned onto it. */
-function texSlant(cells, f, C, z0) {
-  const deg = Math.max(-70, Math.min(70, Number(f.rot) || 0)); if (Math.abs(deg) < 1e-6) return cells;
-  const t = Math.tan(deg * Math.PI / 180), sh = q => [q[0] + (q[1] - z0) * t, q[1]];
-  return cells.map(P => {
-    const Q = P.map(sh), cx = Q.reduce((a, q) => a + q[0], 0) / Q.length, k = Math.floor(cx / C) * C, R = Q.map(q => [q[0] - k, q[1]]);
-    if (P.dot) R.dot = P.dot.map(sh).map(q => [q[0] - k, q[1]]); else if (P.dot === null) R.dot = null; R.cut = P.cut; return R;
-  });
+/* Natočení vzoru (f.rot, degrees). On a cylinder the pattern is really turned, but it has to meet itself round the
+   seam: the circumference must be a whole step of the pattern's lattice (m columns and n rows). So the nearest such
+   step is taken, and the pattern is scaled and turned a hair so that step is exactly once round (texCylLattice gives
+   the angle that results). Ribs turned to ±90° become rings round the axis. Pebbles (random) are not turned.
+   On a flat face the pattern is turned about the face's middle (texCellsTurned). */
+function texLattice(f) {
+  const a = Math.max(1, Number(f.size) || 6), pat = f.pattern, h3 = Math.sqrt(3) / 2;
+  if (pat === 'hex' || pat === 'dots') return { w: a, rh: a * h3, off: true };
+  if (pat === 'diamond') return { w: a, rh: a * 0.6, off: true };
+  if (pat === 'bricks') return { w: 2 * a, rh: a, off: true };
+  if (pat === 'squares') return { w: a, rh: a, off: false };
+  if (pat === 'triangles') return { w: a, rh: a * h3, off: true };
+  if (pat === 'ribs') return { w: a, rh: 0, off: false };
+  return null;
+}
+function texCylLattice(f, C) {
+  const deg = Math.max(-90, Math.min(90, Number(f.rot) || 0)), L = texLattice(f);
+  if (Math.abs(deg) < 1e-6 || !L) return null;
+  const th = deg * Math.PI / 180, Vx = C * Math.cos(th), Vy = -C * Math.sin(th);
+  let n, Tx, Ty;
+  if (L.rh === 0) { n = Math.abs(Vy) > 1e-9 ? 1 : 0; Ty = Vy; const m = Math.round(Vx / L.w); Tx = m * L.w; } /* ribs: only the columns repeat */
+  else { n = Math.round(Vy / L.rh); const ox = L.off ? L.w / 2 : 0, m = Math.round((Vx - n * ox) / L.w); Tx = m * L.w + n * ox; Ty = n * L.rh; }
+  if (Math.hypot(Tx, Ty) < 1e-9) return null;
+  const phi = -Math.atan2(Ty, Tx), s = C / Math.hypot(Tx, Ty);
+  return { ...L, phi, s, deg: phi * 180 / Math.PI, ring: L.rh === 0 && Math.abs(Tx) < 1e-9 };
+}
+function texCellsCyl(f, C, z0, z1) {
+  const Lt = texCylLattice(f, C); if (!Lt) return texCellsOf(f, C, z0, z1);
+  if (Lt.ring) { /* rings round the axis: strips the full circumference, fitted to the range */
+    const n = Math.max(1, Math.round((z1 - z0) / Lt.w)), w = (z1 - z0) / n, out = [];
+    for (let k = 0; k < n; k++) { const P = [[0, z0 + k * w], [C, z0 + k * w], [C, z0 + (k + 1) * w], [0, z0 + (k + 1) * w]]; P.ring = true; out.push(P); }
+    return out;
+  }
+  const ca = Math.cos(Lt.phi), sa = Math.sin(Lt.phi), s = Lt.s, rh = Lt.rh || Lt.w;
+  const mg = 2.5 * Math.max(Lt.w, rh) * s, toP = (u, z) => [(ca * u + sa * z) / s, (-sa * u + ca * z) / s], toS = q => [s * (ca * q[0] - sa * q[1]), s * (sa * q[0] + ca * q[1])];
+  const mu = mg + (Lt.rh ? 0 : (z1 - z0) * Math.abs(Math.tan(Lt.phi))); /* a slanted rib reaches far round: its whole length must be laid out */
+  const cs = [toP(-mu, z0 - mg), toP(C + mu, z0 - mg), toP(C + mu, z1 + mg), toP(-mu, z1 + mg)];
+  const px0 = Math.min(...cs.map(q => q[0])), px1 = Math.max(...cs.map(q => q[0])), py0 = Math.min(...cs.map(q => q[1])), py1 = Math.max(...cs.map(q => q[1]));
+  const K = Math.ceil((px1 - px0) / Lt.w) + 2, N = Math.ceil((py1 - py0) / rh) + 2, X0 = Math.floor(px0 / Lt.w) * Lt.w - Lt.w, Y0 = py0 - rh;
+  const raw = texCellsOf({ ...f, whole: false, _lim: 40000 }, K * Lt.w, Y0, Y0 + N * rh);
+  const clipZ = P => { let Q = halfClip(P, [0, z0], [0, 1], 0); if (Q.length >= 3) Q = halfClip(Q, [0, z1], [0, -1], 0); return Q.length >= 3 && Math.abs(KK.area2D(Q)) > 1e-4 ? Q : null; };
+  const out = [];
+  for (const P of raw) {
+    const M = P.map(q => toS([q[0] + X0, q[1]])), Q = clipZ(M); if (!Q) continue;
+    const cu = Q.reduce((t, q) => t + q[0], 0) / Q.length; if (cu < 0 || cu >= C) continue; /* one of each cell round */
+    if (Math.abs(KK.area2D(Q)) < Math.abs(KK.area2D(M)) - 1e-4) Q.cut = true;
+    if (P.dot) { const Dm = P.dot.map(q => toS([q[0] + X0, q[1]])), D = clipZ(Dm); Q.dot = D || null; Q.cut = !D || Math.abs(KK.area2D(D)) < Math.abs(KK.area2D(Dm)) - 1e-4; }
+    out.push(Q);
+  }
+  return out;
 }
 function texCellsTurned(f, x0, x1, y0, y1) {
   const deg = Number(f.rot) || 0, W = x1 - x0;
@@ -381,7 +420,7 @@ function texBand(f) {
   const cut = f.op === 'cut', under = [], flat = [], tris = [], e = texEmbed(R), fl = 0.06, /* the joint floor stands a little above the face, clear of the facets' sag */ hb = cut ? -(h + e) : -e;
   const rr = cut ? 0 : Math.max(0, Math.min(1, (f.round === undefined || f.round === '' ? 0 : Number(f.round)) / 100)) * h, K = rr > 0.05 ? 3 : 0, M = 12;
   const near = (x, y) => Math.abs(x - y) < 1e-6;
-  for (let P of texSlant(texCellsOf(f, C, z0, z1), f, C, z0)) {
+  for (let P of texCellsCyl(f, C, z0, z1)) {
     if (KK.area2D(P) < 0) { const d = P.dot, c = P.cut; P = P.slice().reverse(); P.dot = d; P.cut = c; }
     const pc = P.reduce((s, q) => [s[0] + q[0] / P.length, s[1] + q[1] / P.length], [0, 0]);
     /* underneath, and the end walls */
@@ -390,6 +429,23 @@ function texBand(f) {
       under.push([[pc[0], pc[1], hb], [B[0], B[1], hb], [A[0], A[1], hb]]);
       flat.push([[pc[0], pc[1], fl], [A[0], A[1], fl], [B[0], B[1], fl]]);
       if ((near(A[1], z0) && near(B[1], z0)) || (near(A[1], z1) && near(B[1], z1))) under.push([[A[0], A[1], hb], [B[0], B[1], hb], [B[0], B[1], fl]], [[A[0], A[1], hb], [B[0], B[1], fl], [A[0], A[1], fl]]);
+    }
+    if (P.ring) { /* a ring round the axis: its profile across z swept the whole way round, no ends (it meets itself) */
+      const za = Math.min(...P.map(q => q[1])), zb = Math.max(...P.map(q => q[1])), endA = !cut && near(za, z0), endB = !cut && near(zb, z1);
+      const lv = [[0, fl], cut ? [0, -h] : [0, h - rr]];
+      for (let k = 1; k <= K; k++) { const t = k / K * Math.PI / 2; lv.push([rr * (1 - Math.cos(t)), h - rr + rr * Math.sin(t)]); }
+      const L = lv.map(([d, y]) => [za + (endA ? 0 : g / 2 + d), zb - (endB ? 0 : g / 2 + d), y]).filter(q => q[1] - q[0] > 1e-6);
+      if (!L.length) continue;
+      const q4 = (A, B, Cq, D) => tris.push([A, B, Cq], [A, Cq, D]);
+      if (L[0][0] - za > 1e-6) q4([0, za, fl], [C, za, fl], [C, L[0][0], fl], [0, L[0][0], fl]); /* joint floor below and above */
+      if (zb - L[0][1] > 1e-6) q4([0, L[0][1], fl], [C, L[0][1], fl], [C, zb, fl], [0, zb, fl]);
+      for (let i = 0; i + 1 < L.length; i++) {
+        const A = L[i], B = L[i + 1];
+        q4([0, A[0], A[2]], [C, A[0], A[2]], [C, B[0], B[2]], [0, B[0], B[2]]); /* lower side */
+        q4([0, A[1], A[2]], [0, B[1], B[2]], [C, B[1], B[2]], [C, A[1], A[2]]); /* upper side */
+      }
+      const T = L[L.length - 1]; q4([0, T[0], T[2]], [C, T[0], T[2]], [C, T[1], T[2]], [0, T[1], T[2]]);
+      continue;
     }
     if (P.cut && f.whole === true && f.pattern !== 'pebbles') P.dot = null;
     if (P.dot === null) { for (let k = 0; k < P.length; k++) { const A = P[k], B = P[(k + 1) % P.length]; tris.push([[pc[0], pc[1], fl], [A[0], A[1], fl], [B[0], B[1], fl]]); } continue; }
@@ -4528,7 +4584,7 @@ function makeRebuilder() {
   };
 }
 
-return { flexHingeTools, applyFlexHinge, texPlaneFace, textureTool, textureApply, TEX_PATTERNS, texCellsOf, texBand, texWrap, sectionAt, faceEditRun, feStep, feLoopRing, feRegion, feCentre, feInner, ribsTool, curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, puzzleSplit, puzzleCounts, orientCandidates, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
+return { flexHingeTools, applyFlexHinge, texPlaneFace, textureTool, textureApply, texCylLattice, TEX_PATTERNS, texCellsOf, texBand, texWrap, sectionAt, faceEditRun, feStep, feLoopRing, feRegion, feCentre, feInner, ribsTool, curveRegion, inPoly3, LIB_PARTS, libPolys, JOINT_PARTS, jointParts, curveCut, tongueParts, buckleParts, articulate, orgModify, pegSplit, puzzleSplit, puzzleCounts, orientCandidates, blobTool, skinTool, sweepTool, loftTool, sketchCurves, sketchRegion, mirrorElements, bendFaceTool, halfSpace, cutTool, faceClip, clipRegion, seamSegments, seamPlane, FASTENERS, THIN_NUT, SCREW_HEADS: { slotted: SLOT_HEADS, phillips: PAN_HEADS }, toolForFastener, toolForHinge, toolForText, xformMatrix, latchTools, latchApply, latchLen, hingeDims, boxHingeTools, closedHingeTools, closedHingeResult, applyBoxHinge, CLOSED_PINS, toolForHole, HOLE_CLEAR, HOLE_CBORE, HOLE_CSINK, shellBody, offsetFace, offsetFaceTool, moveFaces, basisFromPlane, THREADS, suggestThread, threadTool, setBlobResolver: fn => { blobResolver = fn; blobCache.clear(); }, toolForRevolve, importPolys, revolveAxis, PLANES, FEATURE_LABEL, regions, closedLoops, describe, matchEdge, step, makeRebuilder, toolForExtrude, toolForPrimitive, eulerMatrix, overlaps };
 })();
 
 

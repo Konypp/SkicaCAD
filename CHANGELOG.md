@@ -1,5 +1,9 @@
 # Changelog
 
+## Beta 2.75
+
+- **Textura povrchu** – Natočení vzoru na válci teď vzor skutečně otočí (−90° až 90°), stejně jako na rovné ploše. Úhel se nepatrně doladí, aby vzor dokola navazoval bez švu (skutečný úhel ukáže poznámka v dialogu). Žebrování natočené o 90° vytvoří vodorovné prstence, jiné úhly šikmá žebra (šroubovici). U Kamínků se natočení na válci nepoužije.
+
 ## Beta 2.74
 
 - **Vzhled** – tlačítko vzhledu otevírá nabídku: Automaticky, Světlý, Tmavý a tři nové styly rozhraní – **Grafit** (tmavý, oranžový), **Dílna** (teplý, petrolejový) a **Studio** (minimalistický). Volba se pamatuje.

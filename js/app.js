@@ -6710,9 +6710,8 @@ function startTexture(editIndex, f) {
     update() {
       const v = this.v, fc = this.face, motif = v.mode === 'motif', plane = fc && fc.kind === 'plane';
       dlg.set('face', { text: fc ? (plane ? 'Rovná plocha' : `Válcová plocha Ø${fmtc(fc.r * 2, 2)} · délka ${fmtc(fc.len, 2)} mm`) : 'Klepněte na válcovou nebo rovnou plochu', has: !!fc, active: true });
-      for (const k of ['pattern', 'size', 'gap', 'round', 'rot']) dlg.show(k, !motif);
-      /* a cylinder slants the rows (a turned pattern would not meet itself round the seam), a flat face turns it */
-      { const rl2 = $('#dialog [data-row="rot"] label'), t2 = plane ? 'Natočení vzoru' : 'Sklon řad (šroubovice)'; if (rl2 && rl2.dataset.cz !== t2) { rl2.dataset.cz = t2; rl2.textContent = t2; } }
+      for (const k of ['pattern', 'size', 'gap', 'round']) dlg.show(k, !motif);
+      dlg.show('rot', !motif && (plane || v.pattern !== 'pebbles')); /* random pebbles are not turned round a cylinder */
       for (const k of ['z0', 'z1']) dlg.show(k, !motif && !plane);
       const rl = $('#dialog [data-row="rep"] label'), rt = plane ? 'Počet sloupců' : 'Počet dokola'; if (rl && rl.dataset.cz !== rt) { rl.dataset.cz = rt; rl.textContent = rt; }
       dlg.show('whole', !motif && v.pattern !== 'pebbles' && v.pattern !== 'ribs');
@@ -6733,7 +6732,7 @@ function startTexture(editIndex, f) {
           this.tool = Engine.textureTool(this.feature(), cur.sketches, bp);
           clearGroup(G.preview); G.preview.add(previewMesh(this.tool, v.op === 'cut' ? 'cut' : 'new'));
           const C = Math.PI * 2 * (fc.r || 0);
-          dlg.set('n', (motif && v.ents ? `Motiv ze souboru ${v.entsName || ''}. ` : '') + (plane ? (motif ? 'Motivy jsou rozmístěné kolem středu plochy a oříznuté jejím obrysem.' : 'Vzor pokryje celou plochu a ořízne se jejím obrysem.') : `Obvod plochy ${fmtc(C, 1)} mm. ` + (motif ? 'Motiv se navine na plášť.' : 'Vzor se navine na plášť bez švu; spáry stojí 0,06 mm nad plochou.')));
+          dlg.set('n', (motif && v.ents ? `Motiv ze souboru ${v.entsName || ''}. ` : '') + (plane ? (motif ? 'Motivy jsou rozmístěné kolem středu plochy a oříznuté jejím obrysem.' : 'Vzor pokryje celou plochu a ořízne se jejím obrysem.') : `Obvod plochy ${fmtc(C, 1)} mm. ` + (motif ? 'Motiv se navine na plášť.' : (() => { const Lt = Number(v.rot) ? Engine.texCylLattice(this.feature(), C) : null; return (Lt ? (Lt.ring ? 'Žebra vedou dokola jako prstence. ' : `Skutečné natočení ${fmtc(Lt.deg, 1)}° (doladěno, aby vzor dokola navazoval). `) : '') + 'Vzor se navine na plášť bez švu; spáry stojí 0,06 mm nad plochou.'; })())));
           dlg.okEnabled(true);
         } catch (e) { dlg.set('n', '!' + e.message); }
         requestRender();
