@@ -2,7 +2,7 @@
 
 Oct 15, 2026 · @Petr
 
-Příručka popisuje SkicaCAD Beta 2.73, parametrickou CAD aplikaci v prohlížeči pro modelování součástí ke 3D tisku. Model vzniká jako posloupnost kroků: nakreslíte skicu, vysunete ji do tělesa a dál ho upravujete; každý krok jde později změnit. Rozměry jsou v milimetrech, osa Z míří nahoru.
+Příručka popisuje SkicaCAD Beta 2.74, parametrickou CAD aplikaci v prohlížeči pro modelování součástí ke 3D tisku. Model vzniká jako posloupnost kroků: nakreslíte skicu, vysunete ji do tělesa a dál ho upravujete; každý krok jde později změnit. Rozměry jsou v milimetrech, osa Z míří nahoru.
 
 ## 1. Úvod a rozhraní
 
@@ -10,7 +10,7 @@ SkicaCAD běží v prohlížeči na počítači i v telefonu a dá se nainstalov
 
 | Část | Kde je | K čemu slouží |
 | --- | --- | --- |
-| Horní lišta | nahoře | název s označením Beta a číslem verze, menu Soubor, Zpět a Znovu, přepínač jazyka CZ/EN, přepínač světlého a tmavého vzhledu, název návrhu |
+| Horní lišta | nahoře | název s označením Beta a číslem verze, menu Soubor, Zpět a Znovu, přepínač jazyka CZ/EN, tlačítko Vzhled (nabídka Automaticky, Světlý, Tmavý a styly Grafit – tmavý s oranžovou, Dílna – teplý s petrolejovou a Studio – minimalistický), název návrhu |
 | Pás nástrojů | pod lištou | záložka TĚLESO se skupinami Vytvořit, Upravit, Výběr, Kontrola a Vložit; při kreslení přibude záložka SKICA |
 | Prohlížeč | vlevo nahoře | seznam těles a skic, viditelnost, přejmenování |
 | Kostka pohledů | vpravo nahoře | rychlé přepnutí pohledu; tlačítko domů vrací výchozí pohled |
@@ -110,7 +110,7 @@ Většina příkazů otevře dialog s parametry a náhled v pohledu. Pole **Oper
 | Vysunutí | E | skica a profil, směr (jedna strana / symetricky), vzdálenost, operace (vzdálenost začíná na 0, stejně jako posunutí u Upravit plochu); zbylý profil skici, ze které už něco vysunuté je, se nenabízí – vysunete ho po výběru skici na časové ose nebo v poli Skica |
 | Rotace | – | profil, osa (osa X skici), úhel, operace |
 | Závit | T | viz kapitola 7 |
-| Textura | – | vzor na vnější válcové ploše (plášť válce, nádoby) nebo na rovné ploše (víčko, stěna krabičky); na rovné ploše vzor pokryje celou plochu a ořízne se jejím obrysem, vlastní motiv se rozmístí do sloupců a řad kolem středu plochy. Klepněte na plochu a zvolte Hotový vzor – Kamínky, Plástev, Kosočtverce (vroubkování), Trojúhelníky, Cihly, Čtverce, Puntíky nebo Žebrování; nastavíte velikost buňky, spáru, výšku, zaoblení, u kamínků nepravidelnost a Jiné rozložení, a rozsah Od–Do (třeba bez oblasti závitu). Nebo Vlastní: motiv ze skici (SVG či DXF lze do skici importovat; tlačítko Přizpůsobit šířku nastaví největší šířku, která se vejde) se šířkou, počtem dokola, počtem řad, mezerou a posunem řad, natočením a výškou středu. Volba U okraje: Vyplnit k okraji (výchozí) – řady se mírně protáhnou, aby přesně vyšly do rozsahu, a krajní řady jsou souměrně rozpůlené a sahají až k okraji (bez spáry), takže vzor na okraj navazuje; Jen celé buňky – celé buňky od kraje ke kraji. Odsazení od kraje určí, jak daleko od okraje plochy vzor začíná (na rovné ploše od obrysu i otvorů, na válci od obou konců). Provedení Vystouplý nebo Vyrytý; vzor se navine dokola bez švu, spáry stojí 0,06 mm nad plochou. |
+| Textura | – | vzor na vnější válcové ploše (plášť válce, nádoby) nebo na rovné ploše (víčko, stěna krabičky); na rovné ploše vzor pokryje celou plochu a ořízne se jejím obrysem, vlastní motiv se rozmístí do sloupců a řad kolem středu plochy. Klepněte na plochu a zvolte Hotový vzor – Kamínky, Plástev, Kosočtverce (vroubkování), Trojúhelníky, Cihly, Čtverce, Puntíky nebo Žebrování; nastavíte velikost buňky, spáru, výšku, zaoblení, u kamínků nepravidelnost a Jiné rozložení, a rozsah Od–Do (třeba bez oblasti závitu). Nebo Vlastní: motiv ze skici (SVG či DXF lze do skici importovat; tlačítko Přizpůsobit šířku nastaví největší šířku, která se vejde) se šířkou, počtem dokola, počtem řad, mezerou a posunem řad, natočením a výškou středu. Volba U okraje: Vyplnit k okraji (výchozí) – řady se mírně protáhnou, aby přesně vyšly do rozsahu, a krajní řady jsou souměrně rozpůlené a sahají až k okraji (bez spáry), takže vzor na okraj navazuje; Jen celé buňky – celé buňky od kraje ke kraji. Natočení vzoru (°) otočí na rovné ploše celý vzor kolem středu plochy; na válcové ploše se pole jmenuje Sklon řad (šroubovice) a řady vzoru se navinou šikmo jako šroubovice, stále bez švu. Odsazení od kraje určí, jak daleko od okraje plochy vzor začíná (na rovné ploše od obrysu i otvorů, na válci od obou konců). Provedení Vystouplý nebo Vyrytý; vzor se navine dokola bez švu, spáry stojí 0,06 mm nad plochou. |
 | Krychle | – | šířka, hloubka a výška, poloha základny, volba Zachovat poměr stran (při tažení šipkou i při přepsání jednoho rozměru se ostatní změní ve stejném poměru) |
 | Válec, Koužel | – | průměr, výška, poloha základny |
 | Koule | – | průměr, poloha |

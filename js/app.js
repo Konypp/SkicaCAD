@@ -98,6 +98,7 @@ const ICONS = {
   hinge: '<path class="b" d="M2 6h7.5v12H2z"/><path d="M2 6h7.5v12H2zM14.5 6H22v12h-7.5z"/><rect x="9.5" y="4" width="5" height="5" rx="1.2"/><rect x="9.5" y="15" width="5" height="5" rx="1.2"/><rect class="o" x="9.5" y="9.5" width="5" height="5" rx="1.2" style="stroke:var(--orange)"/><path d="M12 3v18" stroke-dasharray="1.6 1.6"/>',
   thauto: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" style="fill:currentColor;stroke:none"/>',
   thlight: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8"/>',
+  thskin: '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.3-1.7-.4-1 .2-2.3 1.6-2.3H17a4 4 0 0 0 4-4c0-5.5-4-10-9-10z"/><circle cx="7.5" cy="11" r="1.3" class="o"/><circle cx="10.5" cy="7" r="1.3" class="b2"/><circle cx="15.5" cy="7.5" r="1.3" class="g"/>',
   thdark: '<path d="M19.5 14.5A8 8 0 0 1 9.5 4.5a8 8 0 1 0 10 10z"/>',
   globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.3 3.6 5.1 3.6 8.5s-1.2 6.2-3.6 8.5c-2.4-2.3-3.6-5.1-3.6-8.5s1.2-6.2 3.6-8.5z"/>',
   tfirst: '<path d="M6 5v14M18 5l-9 7 9 7z"/>',
@@ -6647,7 +6648,7 @@ const threadLabel = (d, p) => `M${fmtc(d, 1)} × ${fmtc(p, 2)}`;
 const TEX_PAT_LABELS = [['pebbles', 'Kamínky'], ['hex', 'Plástev'], ['diamond', 'Kosočtverce (vroubkování)'], ['triangles', 'Trojúhelníky'], ['bricks', 'Cihly'], ['squares', 'Čtverce'], ['dots', 'Puntíky'], ['ribs', 'Žebrování']];
 function startTexture(editIndex, f) {
   const sks = () => Array.from(cur.sketches.values()).filter(x => Engine.regions(x).length);
-  const v0 = f ? { ...f } : { mode: 'cells', pattern: 'pebbles', op: 'raise', size: 6, gap: 0.8, height: 1, round: 0, rand: 60, seed: 1, z0: 0, z1: '', width: 20, rep: 6, rows: 1, rowGap: 3, stagger: false, angle: 0, zc: '' };
+  const v0 = f ? { ...f } : { mode: 'cells', pattern: 'pebbles', op: 'raise', size: 6, gap: 0.8, height: 1, round: 0, rand: 60, seed: 1, z0: 0, z1: '', width: 20, rep: 6, rows: 1, rowGap: 3, stagger: false, angle: 0, zc: '', rot: 0 };
   const c = {
     editIndex, v: v0, body: f ? f.body : null, face: f ? (f.kind === 'plane' ? { kind: 'plane', n: f.n, w: f.w, p: f.p } : { c: f.c, ax: f.ax, r: f.r, len: f.len }) : null, hover: null, timer: null, tool: null,
     init() {
@@ -6662,6 +6663,7 @@ function startTexture(editIndex, f) {
           { k: 'opt', id: 'sketch', label: 'Skica', options: skOpts.length ? skOpts : [['', '(žádná skica s profilem)']], value: v.sketch || (skOpts[0] ? skOpts[0][0] : '') },
           { k: 'seg', id: 'op', label: 'Provedení', options: [['raise', 'Vystouplý'], ['cut', 'Vyrytý']], value: v.op === 'cut' ? 'cut' : 'raise' },
           { k: 'num', id: 'size', label: 'Velikost buňky', value: v.size }, { k: 'num', id: 'gap', label: 'Spára', value: v.gap },
+          { k: 'num', id: 'rot', label: 'Natočení vzoru', unit: '°', value: v.rot || 0 },
           { k: 'seg', id: 'whole', label: 'U okraje', options: [['fit', 'Vyplnit k okraji'], ['whole', 'Jen celé buňky']], value: v.whole === true ? 'whole' : 'fit' }, { k: 'num', id: 'height', label: 'Výška / hloubka', value: v.height }, { k: 'num', id: 'margin', label: 'Odsazení od kraje', value: v.margin || 0 }, { k: 'num', id: 'round', label: 'Zaoblení', unit: '%', value: v.round },
           { k: 'num', id: 'rand', label: 'Nepravidelnost', unit: '%', value: v.rand }, { k: 'btns', id: 'seedb', label: '', options: [['next', 'Jiné rozložení']] },
           { k: 'num', id: 'z0', label: 'Od (mm od začátku plochy)', value: v.z0 }, { k: 'num', id: 'z1', label: 'Do (prázdné = konec plochy)', value: v.z1 },
@@ -6702,13 +6704,15 @@ function startTexture(editIndex, f) {
     feature() {
       const v = this.v, out = { id: f ? f.id : 'tmp', type: 'texture', body: this.body, ...this.face, mode: v.mode === 'motif' ? 'motif' : 'cells', op: v.op === 'cut' ? 'cut' : 'raise', height: v.height, ...(v.margin > 0 ? { margin: v.margin } : {}) };
       if (out.mode === 'motif') Object.assign(out, v.ents ? { ents: v.ents, entsName: v.entsName } : { sketch: v.sketch }, { width: v.width, rep: v.rep, rows: v.rows, rowGap: v.rowGap, stagger: !!v.stagger, angle: v.angle, zc: v.zc });
-      else Object.assign(out, { pattern: v.pattern, whole: v.whole === true, size: v.size, gap: v.gap, round: v.round, rand: v.rand, seed: v.seed || 1, z0: v.z0, z1: v.z1 });
+      else Object.assign(out, { pattern: v.pattern, whole: v.whole === true, size: v.size, gap: v.gap, round: v.round, rand: v.rand, seed: v.seed || 1, z0: v.z0, z1: v.z1, ...(Number(v.rot) ? { rot: v.rot } : {}) });
       return out;
     },
     update() {
       const v = this.v, fc = this.face, motif = v.mode === 'motif', plane = fc && fc.kind === 'plane';
       dlg.set('face', { text: fc ? (plane ? 'Rovná plocha' : `Válcová plocha Ø${fmtc(fc.r * 2, 2)} · délka ${fmtc(fc.len, 2)} mm`) : 'Klepněte na válcovou nebo rovnou plochu', has: !!fc, active: true });
-      for (const k of ['pattern', 'size', 'gap', 'round']) dlg.show(k, !motif);
+      for (const k of ['pattern', 'size', 'gap', 'round', 'rot']) dlg.show(k, !motif);
+      /* a cylinder slants the rows (a turned pattern would not meet itself round the seam), a flat face turns it */
+      { const rl2 = $('#dialog [data-row="rot"] label'), t2 = plane ? 'Natočení vzoru' : 'Sklon řad (šroubovice)'; if (rl2 && rl2.dataset.cz !== t2) { rl2.dataset.cz = t2; rl2.textContent = t2; } }
       for (const k of ['z0', 'z1']) dlg.show(k, !motif && !plane);
       const rl = $('#dialog [data-row="rep"] label'), rt = plane ? 'Počet sloupců' : 'Počet dokola'; if (rl && rl.dataset.cz !== rt) { rl.dataset.cz = rt; rl.textContent = rt; }
       dlg.show('whole', !motif && v.pattern !== 'pebbles' && v.pattern !== 'ribs');
@@ -8520,23 +8524,45 @@ $('#redo').addEventListener('click', redo);
 /* ================= language ================= */
 /* appearance: automatic (follows the system), light or dark; stored in the settings */
 const THEMES = ['auto', 'light', 'dark'];
+/* Vzhled: the three basic ones (by the system, light, dark) and the skins, each with its own colours, type and (Studio)
+   ribbon layout; a skin is light or dark itself. Their typefaces load only when the skin is chosen. */
+const SKINS = { grafit: { dark: true, font: 'Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500' }, dilna: { dark: false, font: 'Nunito+Sans:opsz,wght@6..12,400;6..12,600;6..12,700' }, studio: { dark: false, font: 'Manrope:wght@400;500;600;700&family=Geist+Mono:wght@400;500' } };
+const THEME_NAMES = { auto: 'Automaticky podle systému', light: 'Světlý', dark: 'Tmavý', grafit: 'Grafit (tmavý, oranžový)', dilna: 'Dílna (teplý, petrolejový)', studio: 'Studio (minimalistický, ikony)' };
 function applyTheme() {
-  const t = settings.theme, r = document.documentElement;
-  if (t === 'light' || t === 'dark') r.dataset.theme = t; else delete r.dataset.theme;
-  const dark = t === 'dark' || (t !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const t = settings.theme, r = document.documentElement, skin = SKINS[t];
+  if (skin) {
+    r.dataset.skin = t; r.dataset.theme = skin.dark ? 'dark' : 'light';
+    if (!document.getElementById('skinfont-' + t)) { const l = document.createElement('link'); l.id = 'skinfont-' + t; l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=' + skin.font + '&display=swap'; document.head.appendChild(l); }
+  } else delete r.dataset.skin;
+  if (!skin) { if (t === 'light' || t === 'dark') r.dataset.theme = t; else delete r.dataset.theme; }
+  const dark = skin ? skin.dark : t === 'dark' || (t !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const mc = document.querySelector('meta[name="theme-color"]'); if (mc) mc.content = dark ? '#1B2430' : '#F4F6F8';
   syncThemeBtn();
 }
 function syncThemeBtn() {
-  const b = $('#themebtn'); if (!b) return; const t = THEMES.includes(settings.theme) ? settings.theme : 'auto', en = EN();
-  b.querySelector('.ico').innerHTML = svg('th' + t, 17);
+  const b = $('#themebtn'); if (!b) return; const t = THEMES.includes(settings.theme) || SKINS[settings.theme] ? settings.theme : 'auto', en = EN();
+  b.querySelector('.ico').innerHTML = svg(SKINS[t] ? 'thskin' : 'th' + t, 17);
+  if (SKINS[t]) { b.title = 'Vzhled: ' + THEME_NAMES[t]; b.setAttribute('aria-label', b.title); return; }
   b.title = en ? { auto: 'Appearance: automatic (follows the system)', light: 'Appearance: light', dark: 'Appearance: dark' }[t] : { auto: 'Vzhled: automaticky podle systému', light: 'Vzhled: světlý', dark: 'Vzhled: tmavý' }[t];
   b.setAttribute('aria-label', b.title);
 }
-if ($('#themebtn')) $('#themebtn').addEventListener('click', () => {
-  const t = THEMES[(THEMES.indexOf(THEMES.includes(settings.theme) ? settings.theme : 'auto') + 1) % 3];
-  settings.theme = t; saveSettings(); applyTheme(); requestRender();
-  toast(EN() ? { auto: 'Appearance: automatic', light: 'Appearance: light', dark: 'Appearance: dark' }[t] : { auto: 'Vzhled: automaticky podle systému', light: 'Vzhled: světlý', dark: 'Vzhled: tmavý' }[t]);
+/* the Vzhled button opens a short menu of all appearances */
+if ($('#themebtn')) $('#themebtn').addEventListener('click', e => {
+  e.stopPropagation();
+  let m = $('#thememenu');
+  if (m) { m.remove(); return; }
+  m = document.createElement('div'); m.id = 'thememenu'; m.className = 'ribmenu'; m.setAttribute('role', 'menu');
+  const cur = settings.theme in THEME_NAMES ? settings.theme : 'auto';
+  const item = k => `<button role="menuitemradio" data-th="${k}" aria-pressed="${k === cur}"><span class="ico">${svg(SKINS[k] ? 'thskin' : 'th' + k, 16)}</span><span class="lbl">${THEME_NAMES[k]}</span></button>`;
+  m.innerHTML = ['auto', 'light', 'dark'].map(item).join('') + '<hr class="mhr">' + Object.keys(SKINS).map(item).join('');
+  document.body.appendChild(m);
+  const r = $('#themebtn').getBoundingClientRect(); m.style.left = Math.min(r.left, innerWidth - m.offsetWidth - 8) + 'px'; m.style.top = (r.bottom + 4) + 'px';
+  m.addEventListener('click', ev => {
+    const bt = ev.target.closest('[data-th]'); if (!bt) return;
+    settings.theme = bt.dataset.th; saveSettings(); applyTheme(); onTheme(); requestRender(); m.remove();
+    toast('Vzhled: ' + THEME_NAMES[settings.theme]);
+  });
+  setTimeout(() => document.addEventListener('pointerdown', function off(ev) { if (!m.contains(ev.target)) { m.remove(); document.removeEventListener('pointerdown', off); } }), 0);
 });
 applyTheme();
 function syncLangBtn() { const b = $('#langbtn'); if (!b) return; const en = EN(); b.querySelector('.lc').textContent = en ? 'EN' : 'CZ'; b.title = en ? 'Language: English (switch to Czech)' : 'Jazyk: čeština (přepnout do angličtiny)'; }
@@ -8562,7 +8588,7 @@ function onTheme() {
   if (sk) { buildSketchGrid(); redrawSketch(); }
   styleBodies();
 }
-new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+new MutationObserver(onTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-skin'] });
 if (window.matchMedia) { const mq = window.matchMedia('(prefers-color-scheme: dark)'); if (mq.addEventListener) mq.addEventListener('change', () => { onTheme(); applyTheme(); }); }
 
 /* ================= start ================= */

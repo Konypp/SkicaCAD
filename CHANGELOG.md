@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 2.74
+
+- **Vzhled** – tlačítko vzhledu otevírá nabídku: Automaticky, Světlý, Tmavý a tři nové styly rozhraní – **Grafit** (tmavý, oranžový), **Dílna** (teplý, petrolejový) a **Studio** (minimalistický). Volba se pamatuje.
+- **Textura povrchu** – nové pole **Natočení vzoru** (°): na rovné ploše otočí celý vzor, na válcové ploše nastaví **sklon řad** (vzor se navine jako šroubovice, bez švu).
+
 ## Beta 2.73
 - Nápověda v aplikaci: uživatelská příručka přímo v SkicaCAD (tlačítko s otazníkem v horní liště, Soubor › Nápověda, klávesa F1), funguje i offline. Vlevo kapitoly, nahoře hledání (Enter skočí na další výskyt), na telefonu kapitoly v řádku nahoře. Příručka je zatím jen česky.
 - Otazník v záhlaví každého dialogu (a F1 při otevřeném dialogu, v paletě skici) otevře příručku rovnou u popisu daného nástroje a zvýrazní ho.

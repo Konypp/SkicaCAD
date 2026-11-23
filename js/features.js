@@ -349,6 +349,26 @@ function texCellsOf(f, C, z0, z1) {
   /* a cell cut by the range is marked: with whole cells only (Jen celé buňky) it stays a plain joint floor */
   return cells.map(P => { const Q = clipZ(P); if (!Q) return null; if (Math.abs(KK.area2D(Q)) < Math.abs(KK.area2D(P)) - 1e-4) Q.cut = true; if (P.dot) { const D = clipZ(P.dot); Q.dot = D || null; Q.cut = !D || Math.abs(KK.area2D(D)) < Math.abs(KK.area2D(P.dot)) - 1e-4; } return Q; }).filter(Boolean);
 }
+/* Natočení vzoru (f.rot, degrees). On a cylinder the rows are slanted (a shear along the circumference: the pattern
+   winds round like a screw thread and still meets itself at the seam, which a true rotation could not); each cell is
+   moved back by whole turns so it starts on the first one. On a flat face the pattern is really turned about the face's
+   middle: the cells are laid out over a square covering the face turned the other way, then turned onto it. */
+function texSlant(cells, f, C, z0) {
+  const deg = Math.max(-70, Math.min(70, Number(f.rot) || 0)); if (Math.abs(deg) < 1e-6) return cells;
+  const t = Math.tan(deg * Math.PI / 180), sh = q => [q[0] + (q[1] - z0) * t, q[1]];
+  return cells.map(P => {
+    const Q = P.map(sh), cx = Q.reduce((a, q) => a + q[0], 0) / Q.length, k = Math.floor(cx / C) * C, R = Q.map(q => [q[0] - k, q[1]]);
+    if (P.dot) R.dot = P.dot.map(sh).map(q => [q[0] - k, q[1]]); else if (P.dot === null) R.dot = null; R.cut = P.cut; return R;
+  });
+}
+function texCellsTurned(f, x0, x1, y0, y1) {
+  const deg = Number(f.rot) || 0, W = x1 - x0;
+  if (Math.abs(deg) < 1e-6) return texCellsOf(f, W, y0, y1).map(Q => { const R0 = Q.map(q => [q[0] + x0, q[1]]); if (Q.dot) R0.dot = Q.dot.map(q => [q[0] + x0, q[1]]); R0.cut = Q.cut; return R0; });
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, D = Math.hypot(W, y1 - y0) + 2 * Math.max(1, Number(f.size) || 6), a = deg * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+  const tf = q => { const x = q[0] - D / 2, y = q[1] - cy; return [cx + x * ca - y * sa, cy + x * sa + y * ca]; };
+  /* cells over the square, none marked as cut (the face's own outline decides which are whole) */
+  return texCellsOf({ ...f, whole: false }, D, cy - D / 2, cy + D / 2).map(Q => { const R0 = Q.map(tf); if (Q.dot) R0.dot = Q.dot.map(tf); return R0; });
+}
 /* a pattern of cells as one closed band round the surface: underneath (inside the body) the cells themselves, on top the
    floor of the joints between them (0.06 mm above the surface) and the cells raised (rounded) or sunk into it, and a wall
    at each end of the range. The body only meets the band along its two end circles, so joining them is quick and sound
@@ -361,7 +381,7 @@ function texBand(f) {
   const cut = f.op === 'cut', under = [], flat = [], tris = [], e = texEmbed(R), fl = 0.06, /* the joint floor stands a little above the face, clear of the facets' sag */ hb = cut ? -(h + e) : -e;
   const rr = cut ? 0 : Math.max(0, Math.min(1, (f.round === undefined || f.round === '' ? 0 : Number(f.round)) / 100)) * h, K = rr > 0.05 ? 3 : 0, M = 12;
   const near = (x, y) => Math.abs(x - y) < 1e-6;
-  for (let P of texCellsOf(f, C, z0, z1)) {
+  for (let P of texSlant(texCellsOf(f, C, z0, z1), f, C, z0)) {
     if (KK.area2D(P) < 0) { const d = P.dot, c = P.cut; P = P.slice().reverse(); P.dot = d; P.cut = c; }
     const pc = P.reduce((s, q) => [s[0] + q[0] / P.length, s[1] + q[1] / P.length], [0, 0]);
     /* underneath, and the end walls */
@@ -1305,7 +1325,7 @@ function texPlaneTool(polys, f, sketches, preview) {
     }
   } else {
     const a = Math.max(1, Number(f.size) || 6), g = Math.max(0.2, Number(f.gap) || 0), rr = cut ? 0 : Math.max(0, Math.min(1, (f.round === undefined || f.round === '' ? 0 : Number(f.round)) / 100)) * h, K = rr > 0.05 ? 3 : 0;
-    const W = P.x1 - P.x0, cells = texCellsOf(f, W, P.y0, P.y1).map(Q => { const R0 = Q.map(q => [q[0] + P.x0, q[1]]); if (Q.dot) R0.dot = Q.dot.map(q => [q[0] + P.x0, q[1]]); R0.cut = Q.cut; return R0; }); /* fitted to the face's extent */
+    const W = P.x1 - P.x0, cells = texCellsTurned(f, P.x0, P.x1, P.y0, P.y1); /* fitted to the face's extent, turned by Natočení vzoru */
     if (cells.length > 6000) throw new Error('Vzor by měl příliš mnoho buněk; zvětšete jejich velikost');
     for (let Q of cells) {
       if (KK.area2D(Q) < 0) { const d = Q.dot; Q = Q.slice().reverse(); Q.dot = d; }

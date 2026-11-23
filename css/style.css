@@ -128,6 +128,7 @@ button { cursor: pointer; }
 .ribmenu button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
 .ribmenu .lbl { flex: 1; }
 .ribmenu kbd { font: inherit; font-size: 11px; color: var(--muted); }
+.ribmenu .mhr { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 .tool.finish { width: 74px; color: var(--ok); font-weight: 600; }
 
 /* ---------- viewport and overlays ---------- */
@@ -430,3 +431,87 @@ button { cursor: pointer; }
   .mn-toc a.lv3, .mn-toc a.lv4 { display: none; }
   .mn-text { padding: 6px 14px 40px; }
 }
+
+
+/* ================= vzhledy (Vzhled: Grafit, Dílna, Studio) – každý určuje barvy i písmo, Studio i rozvržení pásu ================= */
+/* 1 · Grafit – tmavé profesionální pracoviště, oranžový akcent, kompaktní */
+html:root[data-skin="grafit"] {
+  --app: #121417; --panel: #1a1d21; --panel-2: #22262b; --panel-3: #2b3036; --field: #0f1113; --line: #2c3137;
+  --ink: #e8eaed; --muted: #8b939c; --accent: #ff8a3d; --accent-ink: #1a0d03; --accent-soft: #3a2616; --accent-hover: #ffb07a;
+  --orange: #ffb547; --ic-blue: #3d4a58; --ic-blue-2: #7f93a8; --ic-orange: #ff8a3d;
+  --vp-top: #2a2f36; --vp-bot: #0d0f11; --body: #a6adb5; --edge: #050607; --sketch: #ffb547; --grid: #23272c; --grid-major: #353b42;
+  --cube: #2b3036; --cube-ink: #e8eaed; --shadow: 0 10px 30px rgba(0,0,0,.55), 0 1px 0 rgba(255,255,255,.03) inset;
+  --font: 'Inter', system-ui, sans-serif; --mono: 'JetBrains Mono', ui-monospace, monospace; color-scheme: dark;
+}
+html[data-skin="grafit"] body { font-size: 12.5px; }
+[data-skin="grafit"] .appbar { background: #0c0e10; height: 38px; }
+[data-skin="grafit"] .ribbon { background: var(--panel); }
+[data-skin="grafit"] .rtab { letter-spacing: .12em; font-size: 10.5px; }
+[data-skin="grafit"] .rtab[aria-selected="true"] { color: var(--accent); }
+[data-skin="grafit"] .tool { min-height: 44px; font-size: 10.5px; color: #c9ced4; }
+[data-skin="grafit"] .tool:hover:not(:disabled) { background: var(--panel-3); border-color: transparent; }
+[data-skin="grafit"] .rlabel { color: #5d656e; }
+[data-skin="grafit"] .float { border-radius: 4px; border-color: #2c3137; }
+[data-skin="grafit"] .dialog .phead, [data-skin="grafit"] .browser .phead { background: #15181b; }
+[data-skin="grafit"] .beta { background: transparent; }
+[data-skin="grafit"] .btn.primary { box-shadow: 0 0 0 1px rgba(255,138,61,.4), 0 4px 14px rgba(255,138,61,.25); }
+[data-skin="grafit"] .timeline { background: #0c0e10; }
+
+/* 2 · Dílna – teplý, přívětivý „makerský“ vzhled: papírové tóny, petrolejový akcent, větší a zaoblené ovládání */
+html:root[data-skin="dilna"] {
+  --app: #efe9df; --panel: #fbf8f3; --panel-2: #f2ece2; --panel-3: #e6ddcf; --field: #ffffff; --line: #ddd3c4;
+  --ink: #2c2620; --muted: #7d7266; --accent: #0f7c78; --accent-ink: #ffffff; --accent-soft: #d5ece9; --accent-hover: #3aa8a2;
+  --orange: #e0702f; --ic-blue: #9fd1cc; --ic-blue-2: #3d9b95; --ic-orange: #f0a067; --ic-org: #d9b8e8;
+  --vp-top: #fbf8f3; --vp-bot: #dcd3c4; --body: #c8bcab; --edge: #4a3f33; --sketch: #0f7c78; --grid: #e2d9ca; --grid-major: #cbbfad;
+  --cube: #f6f1e9; --cube-ink: #4a3f33; --shadow: 0 8px 24px rgba(74, 55, 30, .14), 0 1px 2px rgba(74, 55, 30, .1);
+  --font: 'Nunito Sans', system-ui, sans-serif; --mono: 'IBM Plex Mono', ui-monospace, monospace; color-scheme: light;
+}
+html[data-skin="dilna"] body { font-size: 13.5px; }
+[data-skin="dilna"] .appbar { height: 46px; }
+[data-skin="dilna"] .brand { font-weight: 700; }
+[data-skin="dilna"] .rtabs { gap: 6px; padding-top: 4px; border-bottom: 0; }
+[data-skin="dilna"] .rtab { border-radius: 14px 14px 0 0; padding: 0 16px; font-size: 12px; letter-spacing: .03em; text-transform: none; }
+[data-skin="dilna"] .rtab[aria-selected="true"] { background: var(--panel-2); border-bottom-color: transparent; color: var(--accent); }
+[data-skin="dilna"] .rbody { background: var(--panel-2); padding: 6px 10px 2px; }
+[data-skin="dilna"] .tool { border-radius: 10px; min-height: 54px; font-size: 11.5px; }
+[data-skin="dilna"] .tool:hover:not(:disabled) { background: var(--panel); border-color: var(--line); box-shadow: 0 2px 6px rgba(74,55,30,.08); }
+[data-skin="dilna"] .rlabel { text-transform: none; letter-spacing: .02em; font-size: 10.5px; }
+[data-skin="dilna"] .float { border-radius: 14px; }
+[data-skin="dilna"] .phead { font-size: 12px; letter-spacing: .02em !important; }
+[data-skin="dilna"] .btn, [data-skin="dilna"] .fnum, [data-skin="dilna"] .fsel, [data-skin="dilna"] .seg, [data-skin="dilna"] .selbtn { border-radius: 8px; }
+[data-skin="dilna"] .btn { height: 34px; }
+[data-skin="dilna"] .navbar { border-radius: 24px; padding: 5px; }
+[data-skin="dilna"] .timeline { background: var(--panel); }
+[data-skin="dilna"] .tli { border-radius: 8px; }
+
+/* 3 · Studio – světlý minimalismus: celoplošný pohled, „skleněné“ plovoucí panely, nástroje jen ikonami v jedné liště, fialový akcent */
+html:root[data-skin="studio"] {
+  --app: #f4f4f7; --panel: rgba(255,255,255,.78); --panel-2: rgba(240,240,246,.9); --panel-3: #e6e6ef; --field: #ffffff; --line: rgba(30,30,60,.1);
+  --ink: #1d1d27; --muted: #72728a; --accent: #6d4aff; --accent-ink: #ffffff; --accent-soft: #ece7ff; --accent-hover: #9b85ff;
+  --orange: #ff6b4a; --ic-blue: #c9c0ff; --ic-blue-2: #7b62ff; --ic-orange: #ffb199;
+  --vp-top: #ffffff; --vp-bot: #e9e9f1; --body: #d2d2de; --edge: #3a3a4d; --sketch: #6d4aff; --grid: #e3e3ec; --grid-major: #cfcfdc;
+  --cube: #ffffff; --cube-ink: #3a3a4d; --shadow: 0 12px 40px rgba(40,30,90,.12), 0 1px 2px rgba(40,30,90,.08);
+  --font: 'Manrope', system-ui, sans-serif; --mono: 'Geist Mono', ui-monospace, monospace; color-scheme: light;
+}
+[data-skin="studio"] .app { grid-template-rows: auto auto minmax(0,1fr) auto; }
+[data-skin="studio"] .appbar { background: transparent; border-bottom: 0; position: relative; }
+[data-skin="studio"] .ribbon { background: transparent; border-bottom: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; padding-top: 2px; }
+[data-skin="studio"] .rtabs { height: 26px; border: 0; padding: 2px; gap: 2px; background: var(--panel-3); border-radius: 14px; }
+[data-skin="studio"] .rtab { border-radius: 12px; border-bottom: 0 !important; padding: 0 14px; font-size: 10.5px; }
+[data-skin="studio"] .rtab[aria-selected="true"] { background: var(--ink); color: #fff; }
+[data-skin="studio"] .rbody { margin: 0 auto 6px; background: var(--panel); backdrop-filter: blur(14px); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 5px 8px; width: max-content; max-width: calc(100% - 24px); }
+[data-skin="studio"] .rlabel { display: none; }
+[data-skin="studio"] .rgroup { border-right: 1px solid var(--line); padding: 0 4px; }
+[data-skin="studio"] .tool { min-width: 40px; max-width: 40px; min-height: 40px; font-size: 0; gap: 0; border-radius: 10px; }
+[data-skin="studio"] .tool .ico svg { width: 22px; height: 22px; }
+[data-skin="studio"] .tool .caret { display: none; }
+[data-skin="studio"] .tool:hover:not(:disabled) { background: var(--accent-soft); border-color: transparent; }
+[data-skin="studio"] .float { backdrop-filter: blur(16px); border-radius: 16px; }
+[data-skin="studio"] .phead { border-bottom-color: var(--line) !important; }
+[data-skin="studio"] .btn, [data-skin="studio"] .fnum, [data-skin="studio"] .fsel, [data-skin="studio"] .seg, [data-skin="studio"] .selbtn { border-radius: 9px; }
+[data-skin="studio"] .btn.primary { border-radius: 20px; padding: 0 18px; }
+[data-skin="studio"] .navbar { border-radius: 22px; }
+[data-skin="studio"] .timeline { background: transparent; border-top: 0; }
+[data-skin="studio"] .tltrack { background: var(--panel); border-radius: 12px; }
+[data-skin="studio"] .main { background: radial-gradient(120% 90% at 50% 30%, var(--vp-top), var(--vp-bot)); }
+
