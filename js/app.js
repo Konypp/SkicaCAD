@@ -114,6 +114,11 @@ const ICONS = {
   center: '<path d="M12 2v5M12 17v5M2 12h5M17 12h5"/><rect class="b" x="7" y="7" width="10" height="10" rx="1"/><rect x="7" y="7" width="10" height="10" rx="1"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/>',
   selall: '<rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 2"/><rect class="b" x="7" y="7" width="5" height="5"/><rect class="b2" x="13" y="12" width="5" height="5"/><rect x="7" y="7" width="5" height="5"/><rect x="13" y="12" width="5" height="5"/>',
   scale: '<rect class="b" x="3" y="11" width="10" height="10" rx="1"/><rect x="3" y="11" width="10" height="10" rx="1"/><path d="M8 11V4h12v12h-7" stroke-dasharray="2 2"/><path d="M13 11l6-6M14.5 5H19v4.5"/>',
+  rpaint: '<path class="b" d="M5 11 11 5l7 7-6 6z"/><path d="M5 11 11 5l7 7-6 6zM9 3l3 3M18 12c1.5 2 2.5 3.4 2.5 4.5a2.5 2.5 0 0 1-5 0c0-1.1 1-2.5 2.5-4.5z"/><path class="o" d="M3 21h18v1.5H3z"/>',
+  rface: '<path class="b" d="M3 9l9-5 9 5-9 5z"/><path d="M3 9l9-5 9 5-9 5zM3 9v7l9 5 9-5V9M12 14v7"/><path class="o" d="M12 14 3 9v7l9 5z" opacity=".7"/>',
+  rscene: '<circle class="o" cx="12" cy="9" r="3.5"/><path d="M12 2v2M12 14v2M5 9H3M21 9h-2M7 4l1.4 1.4M17 4l-1.4 1.4M7 14l1.4-1.4M17 14l-1.4-1.4M3 20h18M6 22h12"/>',
+  rturn: '<path class="b" d="M8 9h8v7H8z"/><path d="M8 9h8v7H8zM4 12a8 4 0 0 0 14 3M20 12a8 4 0 0 0-14-3M18 15l.5 2.5M18 15l2.4-.6"/>',
+  rshot: '<path class="b" d="M3 7h4l2-3h6l2 3h4v13H3z"/><path d="M3 7h4l2-3h6l2 3h4v13H3z"/><circle class="o" cx="12" cy="13" r="3.8"/><circle cx="12" cy="13" r="3.8"/>',
   texture: '<path class="b" d="M6 5h12v14H6z"/><path d="M6 5h12v14H6z"/><circle cx="9" cy="8.5" r="1.3"/><circle cx="14.5" cy="8" r="1.6"/><circle cx="11.5" cy="12.5" r="1.5"/><circle cx="8.5" cy="16" r="1.2"/><circle cx="15" cy="15.5" r="1.4"/>',
   thread: '<path class="b" d="M8 4h8v16H8z"/><path d="M8 4h8v16H8z"/><path d="M8 7.5 16 6M8 11 16 9.5M8 14.5 16 13M8 18 16 16.5"/><path d="M5 4v16" stroke-dasharray="2 2" opacity=".6"/>',
   rotate: '<path class="b" d="M9 8.5 14 6l5 2.5v6L14 17l-5-2.5z"/><path d="M9 8.5 14 6l5 2.5v6L14 17l-5-2.5zM9 8.5l5 2.5 5-2.5M14 11v6"/><path d="M6.5 18.5A8.5 8.5 0 0 1 5 7"/><path d="M3 9l2-2.4 2.4 1.6"/>',
@@ -387,7 +392,7 @@ function cmdSnap(c) {
     o[k] = j;
   }
   const fv = {};
-  if (dlg) for (const f of dlg.spec.fields) if (['num', 'xyz', 'opt', 'chk', 'seg', 'area', 'font'].includes(f.k)) { try { fv[f.id] = dlg.get(f.id); } catch (e) { /* skip */ } }
+  if (dlg) for (const f of dlg.spec.fields) if (['num', 'xyz', 'opt', 'chk', 'seg', 'area', 'font', 'swatch'].includes(f.k)) { try { fv[f.id] = dlg.get(f.id); } catch (e) { /* skip */ } }
   return JSON.stringify({ o, fv });
 }
 function cmdCheckpoint() {
@@ -526,10 +531,10 @@ function makeBodyEntry(b) {
   const edges = noRay(new THREE.LineSegments(eg, new THREE.LineBasicMaterial({ color: tok.edge.clone() })));
   mesh.add(edges);
   G.bodies.add(mesh);
-  return { mesh, edges, polys: b.polys, seams: b.seams };
+  return { mesh, edges, polys: b.polys, seams: b.seams, cadMat: mesh.material };
 }
 function disposeEntry(e) {
-  e.mesh.geometry.dispose(); e.mesh.material.dispose(); e.edges.geometry.dispose(); e.edges.material.dispose();
+  e.mesh.geometry.dispose(); e.cadMat.dispose(); if (e.rmat) e.rmat.dispose(); e.edges.geometry.dispose(); e.edges.material.dispose();
   if (e.facets) { e.facets.geometry.dispose(); e.facets.material.dispose(); }
   G.bodies.remove(e.mesh);
 }
@@ -546,11 +551,14 @@ function syncBodies() {
   styleBodies();
 }
 const bodyTint = new Map(); /* id -> 'target' | 'tool' (combine) */
+let renderOn = false, rTurn = false; /* the RENDER tab: bodies in their colours and materials, lit, with a shadow */
 function styleBodies() {
   const hideForPreview = cmd && cmd.hideBody;
   for (const [id, e] of meshes) {
     const visible = bodiesVisible() && isVis(id) && id !== hideForPreview && !(cmd && cmd.hideBodies && cmd.hideBodies.has(id));
     e.mesh.visible = visible;
+    if (renderOn) { styleRenderBody(id, e); continue; }
+    if (e.mesh.material !== e.cadMat) { e.mesh.material = e.cadMat; e.mesh.castShadow = e.mesh.receiveShadow = false; }
     const m = e.mesh.material, isSel = sel.has(id) || (cmd && cmd.highlight && cmd.highlight.has(id));
     const tint = bodyTint.get(id);
     m.color.copy(tok.body);
@@ -576,6 +584,7 @@ function styleBodies() {
     e.edges.material.transparent = !strong; e.edges.material.opacity = strong ? 1 : 0.55; e.edges.material.depthWrite = strong;
     if (wire && !strong) { e.edges.material.color.copy(tok.muted); e.edges.material.transparent = false; e.edges.material.opacity = 1; }
   }
+  if (renderOn) renderSceneSync();
   requestRender();
 }
 function softEdge() { return tok.body.clone().lerp(tok.edge, 0.6); }
@@ -781,6 +790,7 @@ function render() {
   const dist = c.position.distanceTo(controls.target);
   sun.position.copy(c.position).add(new V3(0.3, 0.2, 0.5).multiplyScalar(dist));
   sun.target.position.copy(controls.target);
+  if (renderOn) renderFrame();
   if (cmd && cmd.onFrame) cmd.onFrame();
   if (typeof syncFaceBar === 'function') syncFaceBar();
   if (sk) { const fg = G.skwork.getObjectByName('fine'); if (fg) fg.visible = 10 / worldPerPx(controls.target) > 90; }
@@ -1319,6 +1329,7 @@ function facePie(x, y) {
 
 /* short help for every tool: shown as the button's tooltip (with its name and key) */
 const TOOL_TIPS = {
+  rpaint: 'Barva a materiál tělesa (matný či lesklý plast, kov, pryž, průhledný) pro vzhled a obrázek modelu', rface: 'Obarví jednotlivé plochy, třeba části pro vícebarevný tisk', rscene: 'Pozadí, osvětlení, jas a stín pod modelem', rturn: 'Model se pomalu otáčí dokola', rshot: 'Uloží obrázek PNG z aktuálního pohledu ve zvoleném rozlišení',
   sketch: 'Nakreslí 2D profil na rovinu nebo rovnou plochu tělesa; z něj pak vznikne těleso', extrude: 'Vysune uzavřený profil skici do tělesa, nebo ho vyřízne z tělesa',
   revolve: 'Otočí profil skici kolem osy (čára skici nebo osa X / Y / Z)', thread: 'Vnější nebo vnitřní závit na válcové ploše, s vůlí pro tisk',
   texture: 'Vzor na povrchu válce nebo rovné plochy (kamínky, šestiúhelníky, žebra…), nebo motiv ze skici', box: 'Kvádr zadaných rozměrů', cylinder: 'Válec', sphere: 'Koule', cone: 'Kužel nebo komolý kužel', torus: 'Prstenec (torus)',
@@ -1365,6 +1376,11 @@ const RIBBON = {
     ['Sochat', [['sculpt', 'Sochat'], ['remesh', 'Přesíťovat']]],
     ['Pro tisk', [['articulate', 'Kloubový model'], ['flatbase', 'Plochá podstava'], ['pegsplit', 'Konektory'], ['puzzle', 'Rozdělit na díly'], ['orient', 'Orientace pro tisk'], ['hollow', 'Vydutit'], ['printcheck', 'Kontrola tisku']]]
   ],
+  render: [
+    ['Barvy', [['rpaint', 'Barva tělesa'], ['rface', 'Barva plochy']]],
+    ['Scéna', [['rscene', 'Prostředí'], ['rturn', 'Otáčet']]],
+    ['Výstup', [['rshot', 'Uložit obrázek']]]
+  ],
   sketch: [
     ['Vytvořit', [['line', 'Čára', 'L'], ['spline', 'Křivka', 'K'], ['rect', 'Obdélník', 'R'], ['circle', 'Kružnice', 'C'],
       { menu: 'skshape', label: 'Další tvary', items: [['ellipse', 'Elipsa', 'E'], ['ngon', 'Mnohoúhelník', 'P'], ['slot', 'Drážka', 'D']] }]],
@@ -1375,8 +1391,8 @@ const RIBBON = {
   ]
 };
 const ribMem = {};
-const itemPressed = id => sk ? (SK_TOOLS.includes(id) ? sk.tool === id : id === 'skcons' ? !!sk.consMode : null) : id === 'facemode' ? faceMode : null;
-let ribTab = 'solid'; /* TĚLESO or ORGANICKÉ (the sketch tab replaces both while a sketch is open) */
+const itemPressed = id => sk ? (SK_TOOLS.includes(id) ? sk.tool === id : id === 'skcons' ? !!sk.consMode : null) : id === 'facemode' ? faceMode : id === 'rturn' ? rTurn : null;
+let ribTab = 'solid'; /* TĚLESO, ORGANICKÉ or RENDER (the sketch tab replaces them while a sketch is open) */
 function renderRibbon() {
   const mode = sk ? 'sketch' : ribTab, body = $('#rbody');
   closeRibMenu();
@@ -1384,7 +1400,10 @@ function renderRibbon() {
   $('#tab-solid').setAttribute('aria-selected', String(!sk && ribTab === 'solid'));
   $('#tab-org').setAttribute('aria-selected', String(!sk && ribTab === 'organic'));
   $('#tab-sketch').setAttribute('aria-selected', String(!!sk));
-  $('#tab-solid').disabled = !!sk; $('#tab-org').disabled = !!sk;
+  $('#tab-render').setAttribute('aria-selected', String(!sk && ribTab === 'render'));
+  $('#tab-solid').disabled = !!sk; $('#tab-org').disabled = !!sk; $('#tab-render').disabled = !!sk;
+  $('.ribbon').classList.toggle('rnd', !sk && ribTab === 'render');
+  setRenderMode(!sk && ribTab === 'render');
   $('.ribbon').classList.toggle('org', !sk && ribTab === 'organic');
   const btn = ([id, label, key]) => { const pr = itemPressed(id); return `<button class="tool${id === 'finish' ? ' finish' : ''}" data-cmd="${id}" title="${tipTitle(id, label, key)}"${pr === null ? '' : ` aria-pressed="${pr}"`}><span class="ico">${svg(id, 24)}</span><span>${label}</span></button>`; };
   body.innerHTML = RIBBON[mode].map(([g, items]) => `<div class="rgroup"><div class="rtools">${items.map(it => {
@@ -1393,8 +1412,9 @@ function renderRibbon() {
     return `<button class="tool tmenu" data-menu="${it.menu}" aria-haspopup="true" aria-expanded="false" title="${it.label}"${on ? ' aria-pressed="true"' : ''}><span class="ico">${svg(shown[0], 24)}</span><span>${it.label}<i class="caret" aria-hidden="true"></i></span></button>`;
   }).join('')}</div><div class="rlabel">${g}</div></div>`).join('');
 }
-$('#tab-solid').addEventListener('click', () => { if (sk) return; ribTab = 'solid'; renderRibbon(); });
-$('#tab-org').addEventListener('click', () => { if (sk) return; ribTab = 'organic'; renderRibbon(); });
+$('#tab-solid').addEventListener('click', () => { if (sk) return; if (cmd && cmd.rtool) endCmd(false); ribTab = 'solid'; renderRibbon(); });
+$('#tab-org').addEventListener('click', () => { if (sk) return; if (cmd && cmd.rtool) endCmd(false); ribTab = 'organic'; renderRibbon(); });
+$('#tab-render').addEventListener('click', () => { if (sk) return; if (cmd) endCmd(false); ribTab = 'render'; renderRibbon(); });
 function closeRibMenu() { const m = document.getElementById('ribmenu'); if (m) m.remove(); document.querySelectorAll('#rbody [data-menu][aria-expanded="true"]').forEach(b => b.setAttribute('aria-expanded', 'false')); }
 function openRibMenu(btn) {
   const was = btn.getAttribute('aria-expanded') === 'true';
@@ -1425,7 +1445,14 @@ function runCommand(id) {
     return;
   }
   if (cmd) endCmd(false);
+  /* a modelling command leaves the render view: the model is shown as for modelling again */
+  if (ribTab === 'render' && !R_CMDS.includes(id) && !['selall', 'del', 'undo', 'redo'].includes(id)) { ribTab = 'solid'; renderRibbon(); }
   switch (id) {
+    case 'rpaint': startPaintBody(); break;
+    case 'rface': startPaintFace(); break;
+    case 'rscene': startRenderScene(); break;
+    case 'rturn': rTurn = !rTurn; controls.autoRotate = false; renderRibbon(); requestRender(); break;
+    case 'rshot': startRenderShot(); break;
     case 'sketch': startSketchCmd(); break;
     case 'extrude': startExtrude(); break;
     case 'box': case 'cylinder': case 'sphere': case 'cone': case 'torus': startPrimitive(id); break;
@@ -1537,6 +1564,7 @@ function openDialog(spec) {
       case 'area': return `<div class="frow wide" data-row="${f.id}">${f.label ? `<label for="${id}">${f.label}</label>` : ''}<textarea class="ftextarea" id="${id}" data-f="${f.id}" rows="${f.rows || 2}"></textarea></div>`;
       case 'chk': return `<label class="chk" data-row="${f.id}"><input type="checkbox" id="${id}" data-f="${f.id}"><span>${f.label}</span></label>`;
       case 'note': return `<div class="note" id="${id}"></div>`;
+      case 'swatch': return `<div class="frow wide" data-row="${f.id}"><span class="fl">${f.label}</span><div class="swatches" id="${id}" data-sw="${f.id}">${R_SWATCH.map(([c, n]) => `<button class="sw" data-c="${c}" style="background:${c}" title="${n}" aria-label="${n}" aria-pressed="false"></button>`).join('')}<label class="sw custom" title="Vlastní barva"><input type="color" aria-label="Vlastní barva"></label></div></div>`;
     }
     return '';
   }).join('');
@@ -1556,6 +1584,7 @@ function openDialog(spec) {
       if (f.k === 'area') return $('#dlg-' + id).value;
       if (f.k === 'font') return $('#dlg-' + id).dataset.value;
       if (f.k === 'seg') { const b = $(`#dlg-${id} [aria-pressed="true"]`); return b ? b.dataset.v : null; }
+      if (f.k === 'swatch') return $('#dlg-' + id).dataset.value;
       return undefined;
     },
     set(id, v) {
@@ -1568,6 +1597,7 @@ function openDialog(spec) {
       else if (f.k === 'font') fontPickerSet($('#dlg-' + id), v);
       else if (f.k === 'seg') $$(`#dlg-${id} button`).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v)));
       else if (f.k === 'note') { const n = $('#dlg-' + id); n.textContent = v || ''; n.classList.toggle('err', !!(v && v.startsWith('!'))); if (v && v.startsWith('!')) n.textContent = v.slice(1); }
+      else if (f.k === 'swatch') { const w = $('#dlg-' + id), c = String(v || '').toLowerCase(); w.dataset.value = c; let hit = false; $$('[data-c]', w).forEach(b => { const on = b.dataset.c.toLowerCase() === c; hit = hit || on; b.setAttribute('aria-pressed', String(on)); }); const cu = $('.custom', w); cu.classList.toggle('on', !hit); if (!hit) cu.style.background = c; else cu.style.background = ''; $('input', cu).value = /^#[0-9a-f]{6}$/.test(c) ? c : '#888888'; }
       else if (f.k === 'sel') { const b = $('#dlg-' + id); $('.tx', b).textContent = v.text; b.classList.toggle('has', !!v.has); b.classList.toggle('active', !!v.active); }
     },
     okEnabled(on) { $('[data-act="ok"]', el).disabled = !on; },
@@ -1596,9 +1626,12 @@ $('#dialog').addEventListener('click', e => {
   if (a) { if (a.dataset.act === 'ok') { if (sk) finishSketch(true); else okCmd(); } else { if (sk) finishSketch(false); else endCmd(false); } return; }
   const sb = e.target.closest('[data-sel]'); if (sb && dlg && dlg.spec.onSel) { dlg.spec.onSel(sb.dataset.sel); return; }
   const bt = e.target.closest('[data-btn]'); if (bt && dlg && dlg.spec.onBtn) { dlg.spec.onBtn(bt.dataset.btn, bt.dataset.v); return; }
+  const sw = e.target.closest('[data-c]'); if (sw && dlg) { const id = sw.parentElement.dataset.sw; dlg.set(id, sw.dataset.c); dlg.spec.onChange && dlg.spec.onChange(id); return; }
   const sg = e.target.closest('[data-seg] button');
   if (sg && dlg) { const id = sg.parentElement.dataset.seg; dlg.set(id, sg.dataset.v); dlg.spec.onChange && dlg.spec.onChange(id); }
 });
+/* the colour picker of a swatch row: the picked colour becomes the row's value */
+$('#dialog').addEventListener('input', e => { if (e.target.type !== 'color' || !dlg) return; const w = e.target.closest('[data-sw]'); if (!w) return; dlg.set(w.dataset.sw, e.target.value); dlg.spec.onChange && dlg.spec.onChange(w.dataset.sw, true); }, true);
 /* a slider under a number field writes its value into the field (the field stays the source of the value) */
 const syncRange = t => { if (t && t.dataset && t.dataset.range) { const n = $('#dlg-' + t.dataset.f); if (n) n.value = fmtc(parseFloat(t.value), 3); } };
 $('#dialog').addEventListener('input', e => { syncRange(e.target); const f = e.target.dataset && e.target.dataset.f; if (f && dlg && dlg.spec.onChange && e.target.type !== 'checkbox' && e.target.tagName !== 'SELECT') dlg.spec.onChange(f, true); });
@@ -4397,7 +4430,11 @@ let faceMode = false, selFace = null, hoverFace = null, selFaces = [];
 const faceList = () => (selFaces.length ? selFaces : selFace ? [selFace] : []);
 /* describe the face under a hit: whole cylinder (hole or boss) or a connected planar patch */
 function faceAtHit(h, seamsOv) {
-  const { pi, poly } = polyOfHit(h), polys = h.object.userData.polys, bodyId = h.object.userData.bodyId;
+  const { pi } = polyOfHit(h);
+  return faceAtPoly(h.object.userData.bodyId, h.object.userData.polys, pi, h.point.toArray(), seamsOv);
+}
+function faceAtPoly(bodyId, polys, pi, at, seamsOv) {
+  const poly = polys[pi];
   const smooth = !!smoothFor(polys)[pi];
   if (smooth) {
     const cyl = cylinderAt(polys, pi);
@@ -4408,7 +4445,7 @@ function faceAtHit(h, seamsOv) {
   const group = K.planarFace(polys, poly.n, poly.w, cen);
   if (!group) return null;
   /* a face split by dividing lines (Rozdělit plochu): only the part under the pointer */
-  const body = cur.bodies.find(b => b.id === bodyId), at = h.point.toArray();
+  const body = cur.bodies.find(b => b.id === bodyId);
   const seams = seamsOv !== undefined ? seamsOv : body && body.seams;
   const clip = seams && seams.length ? Engine.faceClip(polys, seams, poly.n, poly.w, group, at) : [];
   const cpolys = clip.length ? Engine.clipRegion(polys, group, clip) : null;
@@ -9828,7 +9865,327 @@ $('#m-login').addEventListener('click', () => { closeMenu(); if (syncFns) syncFn
 $('#m-logout').addEventListener('click', () => { closeMenu(); if (syncFns) syncFns.logout(); });
 if (window.I18N) I18N.onChange(() => syncMenu());
 
-if (window.__KOTA_TEST__) window.__kota = { get cmd() { return cmd; }, viewTo, startSplitFace, startFaceEdit, threeMfBytes, transform, get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart, makeThumb, libThumb, transform, persp, toPx, startMove, alignDesc,
+/* ================= RENDER: colours, materials, light and a picture of the model ================= */
+/* doc.looks keeps it all with the design: b = colour and material of each body, f = painted faces (a point on the face and
+   its normal, so the paint finds its face again after the model changes), s = the scene (background, light, shadow) */
+const R_CMDS = ['rpaint', 'rface', 'rscene', 'rturn', 'rshot'];
+const R_SWATCH = [['#f4f4f2', 'Bílá'], ['#1d1e20', 'Černá'], ['#8a8f96', 'Šedá'], ['#c4c8cc', 'Stříbrná'], ['#d32f2f', 'Červená'], ['#f57c00', 'Oranžová'],
+  ['#fbc02d', 'Žlutá'], ['#2e9d4f', 'Zelená'], ['#0097a7', 'Tyrkysová'], ['#1e63c4', 'Modrá'], ['#7b3fb5', 'Fialová'], ['#e75a9a', 'Růžová'],
+  ['#7a5233', 'Hnědá'], ['#d8c3a0', 'Béžová'], ['#c9a227', 'Zlatá']];
+const R_FIN = {
+  pla: { label: 'Matný plast (PLA)', r: 0.62 },
+  petg: { label: 'Lesklý plast (PETG)', r: 0.22, cc: 0.7, ccr: 0.12 },
+  silk: { label: 'Hedvábný plast', r: 0.3, mt: 0.45 },
+  metal: { label: 'Kov', r: 0.28, mt: 1 },
+  tpu: { label: 'Pryž (TPU)', r: 0.9 },
+  clear: { label: 'Průhledný', r: 0.08, cc: 1, ccr: 0.05, clear: true }
+};
+const R_LIGHTS = {
+  studio: { label: 'Studio', room: 0x6b7078, key: [0xffffff, 2.1, 48], fill: 0.25, hemi: 0.18, env: 0.8, shadow: 0.3, panels: [[0, 75, 3.2, 2.4], [0, 35, 5, 2.2], [150, 25, 2.2, 1.8], [250, 20, 1.2, 1.6]] },
+  soft: { label: 'Měkké', room: 0xb4b8be, key: [0xffffff, 0.9, 72], fill: 0.45, hemi: 0.45, env: 1.15, shadow: 0.18, panels: [[0, 85, 3, 5], [0, 40, 2, 3], [180, 40, 2, 3]] },
+  contrast: { label: 'Kontrastní', room: 0x24262a, key: [0xffffff, 2.6, 30], fill: 0.1, hemi: 0.06, env: 0.9, shadow: 0.42, panels: [[0, 30, 6, 1.6], [170, 15, 2.5, 1]] },
+  warm: { label: 'Teplé (západ slunce)', room: 0x3d4a5e, key: [0xffc58a, 2.4, 18], fill: 0.18, hemi: 0.16, env: 0.95, shadow: 0.34, panels: [[0, 18, 5, 2.2, 0xffc58a], [180, 60, 1.2, 3, 0x9db8e8]] }
+};
+const R_BG = [['light', 'Světlé'], ['white', 'Bílé'], ['dark', 'Tmavé'], ['none', 'Žádné']];
+const R_DEF_BODY = { c: '#b3b9c2', m: 'pla' };
+function ensureLooks() {
+  if (!doc.looks || typeof doc.looks !== 'object') doc.looks = {};
+  const L = doc.looks; if (!L.b) L.b = {}; if (!Array.isArray(L.f)) L.f = []; if (!L.s) L.s = {};
+  return L;
+}
+const rs = () => Object.assign({ bg: 'light', light: 'studio', rot: 30, exp: 100, shadow: true, edges: false }, (doc.looks && doc.looks.s) || {});
+const bodyLook = id => Object.assign({}, R_DEF_BODY, (doc.looks && doc.looks.b && doc.looks.b[id]) || {});
+const linCol = c => new THREE.Color(c).convertSRGBToLinear();
+function makeRMat(L, front) {
+  const F = R_FIN[L.m] || R_FIN.pla, P = R_LIGHTS[rs().light] || R_LIGHTS.studio;
+  const m = new THREE.MeshPhysicalMaterial({ color: linCol(L.c), roughness: F.r, metalness: F.mt || 0, clearcoat: F.cc || 0, clearcoatRoughness: F.ccr || 0.1,
+    side: THREE.DoubleSide, envMapIntensity: P.env, polygonOffset: true, polygonOffsetFactor: front ? -1 : 1, polygonOffsetUnits: front ? -1 : 1 });
+  m.shadowSide = THREE.BackSide; /* closed bodies: the back faces cast the shadow, so the lit faces carry no stripes */
+  if (F.clear) { m.transparent = true; m.opacity = 0.45; m.depthWrite = false; }
+  return m;
+}
+let rEnv = null, rEnvKey = '', rSun = null, rGround = null, rFaces = null, rFaceKey = '', rBgTex = null, rBgKey = '', rQuiet = false;
+const rPolyIds = new WeakMap(); let rPolyN = 0;
+const rPolyId = p => { if (!rPolyIds.has(p)) rPolyIds.set(p, ++rPolyN); return rPolyIds.get(p); };
+/* the surroundings the materials reflect: a room with soft light panels (made once per light set-up, turned with the light) */
+function rMakeEnv(P, rot) {
+  const pm = new THREE.PMREMGenerator(renderer), es = new THREE.Scene();
+  es.add(new THREE.Mesh(new THREE.BoxGeometry(10, 10, 10), new THREE.MeshBasicMaterial({ color: P.room, side: THREE.BackSide })));
+  const fl = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshBasicMaterial({ color: new THREE.Color(P.room).multiplyScalar(0.55) })); fl.position.z = -4.9; es.add(fl);
+  for (const [az, el, size, it, col] of P.panels) {
+    const a = (az + rot - 120) * D2R, e = el * D2R, m = new THREE.Mesh(new THREE.PlaneGeometry(size, size * 0.7), new THREE.MeshBasicMaterial({ color: new THREE.Color(col || 0xffffff).multiplyScalar(it), side: THREE.DoubleSide }));
+    m.position.set(4.5 * Math.cos(e) * Math.cos(a), 4.5 * Math.cos(e) * Math.sin(a), 4.5 * Math.sin(e)); m.lookAt(0, 0, 0); es.add(m);
+  }
+  const rt = pm.fromScene(es, 0.04); pm.dispose();
+  es.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+  return rt.texture;
+}
+function rGradient(top, bottom) {
+  const cv = document.createElement('canvas'); cv.width = 4; cv.height = 256;
+  const g = cv.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, top); gr.addColorStop(1, bottom);
+  g.fillStyle = gr; g.fillRect(0, 0, 4, 256);
+  const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; return t;
+}
+function setRenderMode(on) {
+  if (on === renderOn) return;
+  renderOn = on;
+  if (on) {
+    if (!rSun) {
+      rSun = new THREE.DirectionalLight(0xffffff, 1.6); rSun.castShadow = true;
+      rSun.shadow.mapSize.set(2048, 2048); rSun.shadow.bias = -0.0004; rSun.shadow.normalBias = 0.02; rSun.shadow.radius = 4;
+      rGround = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.3 })); rGround.receiveShadow = true; noRay(rGround);
+      rFaces = new THREE.Group();
+    }
+    renderer.outputEncoding = THREE.sRGBEncoding; renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; renderer.shadowMap.needsUpdate = true;
+    scene.add(rSun, rSun.target, rGround, rFaces);
+    if (faceMode) setFaceMode(false);
+  } else {
+    scene.remove(rSun, rSun.target, rGround, rFaces); clearGroup(rFaces); rFaceKey = '';
+    renderer.outputEncoding = THREE.LinearEncoding; renderer.toneMapping = THREE.NoToneMapping; renderer.toneMappingExposure = 1; renderer.shadowMap.enabled = false;
+    scene.environment = null; scene.background = null; hemi.intensity = 0.75; sun.intensity = 0.8;
+    rTurn = false; controls.autoRotate = false;
+    G.grid.visible = settings.grid && !sk; G.sketches.visible = true; G.origin.visible = doc.vis.__origin !== false; faceGroup.visible = true;
+    for (const e of meshes.values()) { if (e.rmat) { e.rmat.dispose(); e.rmat = null; e.rkey = ''; } }
+  }
+  vp.classList.toggle('rendering', on);
+  styleBodies(); renderBrowser(); requestRender();
+}
+/* the scene follows doc.looks.s; called whenever the bodies are styled in the render view */
+function renderSceneSync() {
+  const S = rs(), P = R_LIGHTS[S.light] || R_LIGHTS.studio, rot = Number(S.rot) || 0;
+  const ek = S.light + ':' + Math.round(rot);
+  if (ek !== rEnvKey) { if (rEnv) rEnv.dispose(); rEnv = rMakeEnv(P, rot); rEnvKey = ek; }
+  scene.environment = rEnv;
+  if (S.bg !== rBgKey) {
+    if (rBgTex) { rBgTex.dispose(); rBgTex = null; }
+    if (S.bg === 'light') rBgTex = rGradient('#f6f7f9', '#d5d9df');
+    else if (S.bg === 'dark') rBgTex = rGradient('#3b4048', '#131518');
+    rBgKey = S.bg;
+  }
+  scene.background = S.bg === 'white' ? new THREE.Color(0xffffff) : rBgTex;
+  renderer.toneMappingExposure = Math.max(0.2, (Number(S.exp) || 100) / 100);
+  hemi.intensity = P.hemi; sun.intensity = P.fill;
+  rSun.color.set(P.key[0]); rSun.intensity = P.key[1];
+  /* key light and shadow fitted round the visible bodies */
+  const box = new THREE.Box3();
+  for (const e of meshes.values()) { if (!e.mesh.visible) continue; e.mesh.geometry.computeBoundingBox(); box.union(e.mesh.geometry.boundingBox); }
+  if (box.isEmpty()) box.set(new V3(-20, -20, 0), new V3(20, 20, 20));
+  const sp = box.getBoundingSphere(new THREE.Sphere()), R = Math.max(sp.radius, 5), a = rot * D2R, el = P.key[2] * D2R;
+  const az = a - 120 * D2R, d = new V3(Math.cos(el) * Math.cos(az), Math.cos(el) * Math.sin(az), Math.sin(el)); /* 30° = from the front left */
+  rSun.position.copy(sp.center).addScaledVector(d, R * 4); rSun.target.position.copy(sp.center); rSun.target.updateMatrixWorld();
+  rSun.shadow.normalBias = R * 0.003; rSun.shadow.bias = -0.0005;
+  const ext = R * 1.4 / Math.max(0.25, Math.sin(el)), sc = rSun.shadow.camera; sc.left = sc.bottom = -ext; sc.right = sc.top = ext; sc.near = R * 0.5; sc.far = R * 4 + ext * 2; sc.updateProjectionMatrix();
+  rSun.castShadow = !!S.shadow; rGround.visible = !!S.shadow; rGround.material.opacity = P.shadow;
+  rGround.position.set(sp.center.x, sp.center.y, box.min.z - 0.02); rGround.scale.set(R * 12, R * 12, 1);
+  syncRenderFaces();
+}
+function styleRenderBody(id, e) {
+  const L = bodyLook(id), S = rs(), key = L.c + L.m + S.light;
+  if (!e.rmat || e.rkey !== key) { if (e.rmat) e.rmat.dispose(); e.rmat = makeRMat(L); e.rkey = key; }
+  e.mesh.material = e.rmat; e.mesh.castShadow = e.mesh.receiveShadow = true;
+  const mark = !rQuiet && (sel.has(id) || (cmd && cmd.rtool && hoverBody === id));
+  e.rmat.emissive.copy(mark ? (sel.has(id) ? tok.accent : tok['accent-hover']) : new THREE.Color(0)).multiplyScalar(mark ? (sel.has(id) ? 0.22 : 0.12) : 0);
+  if (e.facets) e.facets.visible = false;
+  e.edges.visible = !!S.edges; e.edges.material.color.copy(new THREE.Color(L.c).multiplyScalar(0.35)); e.edges.material.transparent = true; e.edges.material.opacity = 0.6;
+}
+/* a painted face: the face of that body that holds the stored point (its normal must match too) */
+function rPointIn(P, p) {
+  const n = P.n, ax = Math.abs(n[0]) > Math.abs(n[1]) ? (Math.abs(n[0]) > Math.abs(n[2]) ? 0 : 2) : (Math.abs(n[1]) > Math.abs(n[2]) ? 1 : 2);
+  const u = (ax + 1) % 3, v = (ax + 2) % 3, V = P.v; let inside = false;
+  for (let i = 0, j = V.length - 1; i < V.length; j = i++) {
+    const a = V[i], b = V[j];
+    if ((a[v] > p[v]) !== (b[v] > p[v]) && p[u] < (b[u] - a[u]) * (p[v] - a[v]) / (b[v] - a[v]) + a[u]) inside = !inside;
+  }
+  return inside;
+}
+function rResolveFace(fp) {
+  const b = cur.bodies.find(x => x.id === fp.b); if (!b) return null;
+  let best = -1, bd = 0.05;
+  b.polys.forEach((P, i) => {
+    if (K.vdot(P.n, fp.n) < 0.9) return;
+    const d = Math.abs(K.vdot(P.n, fp.p) - P.w); if (d > bd || !rPointIn(P, fp.p)) return;
+    best = i; bd = d;
+  });
+  if (best < 0) {
+    /* the face moved (a height changed): the nearest parallel face that still holds the point seen along its normal */
+    const bb = b.polys.reduce((m, P) => Math.max(m, ...P.v.map(v => Math.abs(v[0]) + Math.abs(v[1]) + Math.abs(v[2]))), 1);
+    let bd2 = bb * 0.15;
+    b.polys.forEach((P, i) => {
+      if (K.vdot(P.n, fp.n) < 0.995) return;
+      const d = K.vdot(P.n, fp.p) - P.w; if (Math.abs(d) > bd2) return;
+      const q = [fp.p[0] - P.n[0] * d, fp.p[1] - P.n[1] * d, fp.p[2] - P.n[2] * d]; if (!rPointIn(P, q)) return;
+      best = i; bd2 = Math.abs(d);
+    });
+    if (best < 0) return null;
+    const P = b.polys[best], d = K.vdot(P.n, fp.p) - P.w;
+    try { return faceAtPoly(b.id, b.polys, best, [fp.p[0] - P.n[0] * d, fp.p[1] - P.n[1] * d, fp.p[2] - P.n[2] * d]); } catch (e) { return null; }
+  }
+  try { return faceAtPoly(b.id, b.polys, best, fp.p); } catch (e) { return null; }
+}
+function syncRenderFaces() {
+  const L = doc.looks && doc.looks.f || [], S = rs();
+  const key = JSON.stringify(L) + S.light + '|' + cur.bodies.map(b => b.id + ':' + rPolyId(b.polys) + ':' + isVis(b.id) + ':' + bodyLook(b.id).m).join(',');
+  if (key === rFaceKey) return; rFaceKey = key;
+  clearGroup(rFaces);
+  for (const fp of L) {
+    if (!bodiesVisible() || !isVis(fp.b)) continue;
+    const face = rResolveFace(fp); if (!face) continue;
+    const m = meshFromPolys(facePolys(face), makeRMat({ c: fp.c, m: bodyLook(fp.b).m }, true));
+    m.receiveShadow = true; noRay(m); rFaces.add(m);
+  }
+}
+function renderFrame() {
+  G.grid.visible = false; G.origin.visible = false; G.sketches.visible = false; G.planes.visible = false; faceGroup.visible = false;
+  if (rTurn && !cmd) { controls.autoRotate = true; controls.autoRotateSpeed = 4; controls.update(); controls.autoRotate = false; requestRender(); }
+}
+/* pick bodies by clicking: Ctrl (Cmd) adds or takes away */
+function rPickBodies(c, e) {
+  const h = hitBodies(e); if (!h) return false;
+  const id = h.object.userData.bodyId, add = e.ctrlKey || e.metaKey || e.shiftKey;
+  if (add) { if (c.targets.has(id)) c.targets.delete(id); else c.targets.add(id); } else c.targets = new Set([id]);
+  sel = new Set(c.targets); renderBrowser(); return true;
+}
+function startPaintBody() {
+  const L0 = JSON.stringify(ensureLooks());
+  const first = () => [...c.targets][0];
+  const c = {
+    rtool: true, targets: new Set([...sel].filter(id => meshes.has(id))), looks: doc.looks,
+    init() {
+      const l = bodyLook(first());
+      openDialog({ title: 'Barva tělesa', icon: 'rpaint', fields: [
+        { k: 'sel', id: 'body', label: 'Tělesa' },
+        { k: 'swatch', id: 'c', label: 'Barva', value: l.c },
+        { k: 'opt', id: 'm', label: 'Materiál', options: Object.entries(R_FIN).map(([k, F]) => [k, F.label]), value: l.m },
+        { k: 'btns', id: 'reset', label: '', options: [['reset', 'Výchozí vzhled']] },
+        { k: 'note', id: 'n' }],
+      onChange: () => this.apply(), onBtn: () => { for (const id of this.targets) delete doc.looks.b[id]; this.load(); styleBodies(); cmdTick(); } });
+      this.update();
+    },
+    load() { const l = bodyLook(first()); dlg.set('c', l.c); dlg.set('m', l.m); },
+    apply() { const v = { c: dlg.get('c'), m: dlg.get('m') }; for (const id of this.targets) doc.looks.b[id] = { ...v }; styleBodies(); },
+    update() {
+      const n = this.targets.size;
+      dlg.set('body', { text: n ? (n === 1 ? bodyName(cur.bodies.find(b => b.id === first())) : plural(n, 'těleso', 'tělesa', 'těles')) : 'Klepněte na těleso', has: n > 0, active: true });
+      dlg.set('n', n ? 'Další těleso přidáte klepnutím s klávesou Ctrl.' : 'Klepněte na těleso, které chcete obarvit (s Ctrl jich vyberete víc).');
+      dlg.okEnabled(n > 0); setPrompt(n ? '' : 'Klepněte na těleso');
+    },
+    restored() { doc.looks = this.looks; styleBodies(); },
+    onMove(e) { const h = hitBodies(e), id = h ? h.object.userData.bodyId : null; if (id !== hoverBody) { hoverBody = id; styleBodies(); } dom.style.cursor = id ? 'pointer' : ''; },
+    onClick(e) { if (rPickBodies(this, e)) { this.load(); this.update(); styleBodies(); } },
+    ok() { pushHist(); saveDoc(); endCmd(true); return null; },
+    cleanup(applied) { if (!applied) { doc.looks = JSON.parse(L0); } hoverBody = null; sel = new Set(); renderBrowser(); styleBodies(); }
+  };
+  beginCmd(c); c.init();
+}
+function startPaintFace() {
+  const L0 = JSON.stringify(ensureLooks());
+  const c = {
+    rtool: true, looks: doc.looks, col: (doc.looks.f.length ? doc.looks.f[doc.looks.f.length - 1].c : '#d32f2f'), mode: 'paint',
+    init() {
+      openDialog({ title: 'Barva plochy', icon: 'rface', fields: [
+        { k: 'seg', id: 'mode', label: 'Štětec', options: [['paint', 'Obarvit'], ['erase', 'Smazat barvu']], value: 'paint' },
+        { k: 'swatch', id: 'c', label: 'Barva', value: this.col },
+        { k: 'btns', id: 'all', label: '', options: [['all', 'Smazat barvy všech ploch']] },
+        { k: 'note', id: 'n', value: 'Klepněte na plochy, které chcete obarvit. Plochu rozdělenou nástrojem Plochy → Rozdělit plochu obarvíte po částech – hodí se pro vícebarevný tisk.' }],
+      onChange: id => { if (id === 'c') { this.col = dlg.get('c'); dlg.set('mode', 'paint'); this.mode = 'paint'; } if (id === 'mode') this.mode = dlg.get('mode'); },
+      onBtn: () => { doc.looks.f.splice(0); styleBodies(); cmdTick(); } });
+      setPrompt('Klepněte na plochu');
+    },
+    restored() { doc.looks = this.looks; dlg.set('c', this.col); dlg.set('mode', this.mode); styleBodies(); },
+    faceUnder(e) { const h = hitBodies(e); if (!h) return null; const f = faceAtHit(h); if (!f) return null; const { poly } = polyOfHit(h); return { f, p: h.point.toArray().map(x => Math.round(x * 1000) / 1000), n: poly.n.map(x => Math.round(x * 1e6) / 1e6) }; },
+    onMove(e) {
+      const u = this.faceUnder(e), k = u ? faceKey(u.f) : '';
+      if (k === this.hoverK) return; this.hoverK = k; clearGroup(G.overlay);
+      if (u) G.overlay.add(faceMesh(u.f, this.mode === 'erase' ? tok.danger : new THREE.Color(this.col), 0.45));
+      dom.style.cursor = u ? 'pointer' : ''; requestRender();
+    },
+    onClick(e) {
+      const u = this.faceUnder(e); if (!u) return;
+      const k = faceKey(u.f), F = doc.looks.f;
+      for (let i = F.length - 1; i >= 0; i--) { const r = rResolveFace(F[i]); if (r && faceKey(r) === k) F.splice(i, 1); }
+      if (this.mode === 'paint') F.push({ b: u.f.bodyId, p: u.p, n: u.n, c: this.col });
+      this.hoverK = null; clearGroup(G.overlay); styleBodies();
+    },
+    ok() { pushHist(); saveDoc(); endCmd(true); return null; },
+    cleanup(applied) { if (!applied) doc.looks = JSON.parse(L0); styleBodies(); }
+  };
+  beginCmd(c); c.init();
+}
+function startRenderScene() {
+  const L0 = JSON.stringify(ensureLooks()), S = rs();
+  const c = {
+    rtool: true, looks: doc.looks,
+    init() {
+      openDialog({ title: 'Prostředí', icon: 'rscene', fields: [
+        { k: 'seg', id: 'bg', label: 'Pozadí', options: R_BG, value: S.bg },
+        { k: 'opt', id: 'light', label: 'Osvětlení', options: Object.entries(R_LIGHTS).map(([k, P]) => [k, P.label]), value: S.light },
+        { k: 'num', id: 'rot', label: 'Natočení světla', unit: '°', range: [0, 360, 5], value: S.rot },
+        { k: 'num', id: 'exp', label: 'Jas', unit: '%', range: [40, 200, 5], value: S.exp },
+        { k: 'chk', id: 'shadow', label: 'Stín pod modelem', value: S.shadow },
+        { k: 'chk', id: 'edges', label: 'Zvýraznit hrany', value: S.edges }],
+      onChange: () => this.apply() });
+    },
+    apply() {
+      const rot = dlg.get('rot'), exp = dlg.get('exp');
+      doc.looks.s = { bg: dlg.get('bg'), light: dlg.get('light'), rot: isFinite(rot) ? ((rot % 360) + 360) % 360 : 30, exp: isFinite(exp) ? Math.max(20, Math.min(300, exp)) : 100, shadow: dlg.get('shadow'), edges: dlg.get('edges') };
+      styleBodies();
+    },
+    restored() { doc.looks = this.looks; this.apply(); },
+    ok() { this.apply(); pushHist(); saveDoc(); endCmd(true); return null; },
+    cleanup(applied) { if (!applied) doc.looks = JSON.parse(L0); styleBodies(); }
+  };
+  beginCmd(c); c.init();
+}
+const R_SIZES = [['view', 'Jako okno'], ['1920x1080', '1920 × 1080 (Full HD)'], ['1080x1080', '1080 × 1080 (čtverec)'], ['1080x1350', '1080 × 1350 (na výšku)'], ['3840x2160', '3840 × 2160 (4K)']];
+function startRenderShot() {
+  const c = {
+    rtool: true,
+    init() {
+      openDialog({ title: 'Uložit obrázek', icon: 'rshot', fields: [
+        { k: 'opt', id: 'size', label: 'Velikost', options: R_SIZES, value: settings.rShot || '1920x1080' },
+        { k: 'note', id: 'n', value: 'Obrázek PNG z aktuálního pohledu, s vyhlazenými hranami. Pozadí, světlo a stín nastavíte v Prostředí (s pozadím Žádné bude obrázek průhledný).' }],
+      onChange: () => {} });
+      dlg.okLabel('Uložit');
+    },
+    ok() {
+      const v = dlg.get('size'); settings.rShot = v; saveSettings();
+      const [W, H] = v === 'view' ? [vp.clientWidth * 2, vp.clientHeight * 2] : v.split('x').map(Number);
+      endCmd(true);
+      rShot(W, H).then(blob => { if (blob) saveFile(fileBase() + '.png', blob, 'Obrázek uložen'); else toast('Obrázek se nepodařilo vytvořit.'); });
+      return null;
+    }
+  };
+  beginCmd(c); c.init();
+}
+/* the picture: rendered twice as large and scaled down (smooth edges), the camera keeping the view's height */
+function rShot(W, H) {
+  const gl = renderer.getContext(), maxS = Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE), gl.getParameter(gl.MAX_VIEWPORT_DIMS)[0], 8192);
+  let k = Math.min(1, maxS / Math.max(W, H)); W = Math.round(W * k); H = Math.round(H * k);
+  const ss = Math.max(1, Math.min(2, Math.floor(maxS / Math.max(W, H))));
+  const c0 = cam(); let c;
+  if (isOrtho) { c = c0.clone(); const h = (c0.top - c0.bottom) / 2, mx = (c0.left + c0.right) / 2; c.left = mx - h * W / H; c.right = mx + h * W / H; c.updateProjectionMatrix(); }
+  else { c = c0.clone(); c.aspect = W / H; c.updateProjectionMatrix(); }
+  const pr = renderer.getPixelRatio(), vw = vp.clientWidth, vh = vp.clientHeight, hide = [G.overlay, G.preview, transform], was = hide.map(o => o.visible);
+  let cv = null;
+  try {
+    rQuiet = true; styleBodies(); renderSceneSync(); renderFrame();
+    hide.forEach(o => { o.visible = false; });
+    renderer.setPixelRatio(1); renderer.setSize(W * ss, H * ss, false);
+    renderer.render(scene, c);
+    cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const g = cv.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+    g.drawImage(dom, 0, 0, W * ss, H * ss, 0, 0, W, H);
+  } catch (e) { cv = null; }
+  finally {
+    hide.forEach((o, i) => { o.visible = was[i]; }); rQuiet = false;
+    renderer.setPixelRatio(pr); if (vw && vh) renderer.setSize(vw, vh);
+    styleBodies(); render();
+  }
+  return cv ? new Promise(res => cv.toBlob(b => res(b), 'image/png')) : Promise.resolve(null);
+}
+
+if (window.__KOTA_TEST__) window.__kota = { rShot, rResolveFace, setRenderMode, get renderOn() { return renderOn; }, get cmd() { return cmd; }, viewTo, startSplitFace, startFaceEdit, threeMfBytes, transform, get idbOk() { return idbOk; }, setFaceMode, faceAtHit, faceToSketch, startPressFace, get selFace() { return selFace; }, set selFace(v) { selFace = v; }, exportZip, exportTris, fileBase, selectAll, startCenter, copySel, pasteClip, duplicateSel, get clip() { return clip; }, sketchHandleAt, startScale, startThread, cylinderAt, startRotate, importFile, startPattern, startMirror, startRevolve, get blobs() { return blobs; }, runCommand, editFeature, okCmd, endCmd, enterSketch, finishSketch, bodyClick, moveMarker, deleteFeature, undo, redo, exportMesh, loadDoc, exampleDoc, emptyDoc, setSketchTool, libList, showStart, makeThumb, libThumb, transform, persp, toPx, startMove, alignDesc,
   cmdSnap, openManual, get doc() { return doc; }, get cur() { return cur; }, get cmd() { return cmd; }, get sk() { return sk; }, get dlg() { return dlg; }, get sel() { return sel; }, meshes, chainsFor };
 })();
 

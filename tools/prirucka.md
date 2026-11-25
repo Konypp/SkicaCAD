@@ -2,7 +2,7 @@
 
 Oct 15, 2026 · @Petr
 
-Příručka popisuje SkicaCAD Beta 2.75, parametrickou CAD aplikaci v prohlížeči pro modelování součástí ke 3D tisku. Model vzniká jako posloupnost kroků: nakreslíte skicu, vysunete ji do tělesa a dál ho upravujete; každý krok jde později změnit. Rozměry jsou v milimetrech, osa Z míří nahoru.
+Příručka popisuje SkicaCAD Beta 2.76, parametrickou CAD aplikaci v prohlížeči pro modelování součástí ke 3D tisku. Model vzniká jako posloupnost kroků: nakreslíte skicu, vysunete ji do tělesa a dál ho upravujete; každý krok jde později změnit. Rozměry jsou v milimetrech, osa Z míří nahoru.
 
 ## 1. Úvod a rozhraní
 
@@ -350,3 +350,17 @@ Záložka **ORGANICKÉ** (fialová, vedle TĚLESO) obsahuje nástroje pro měkk�
 **Přechod profilů – jak na něj:** nakreslete dva nebo víc uzavřených tvarů (kružnice, obdélník, křivka…) v různých skicách nad sebou – druhou skicu založte na stejné rovině s Odsazením roviny, např. 30 mm. Pak zvolte Přechod profilů, v dialogu vyberte profily v pořadí zdola nahoru a těleso plynule přejde z jednoho tvaru do druhého (váza, trup, noha stolu, rukojeť).
 
 Tipy: postavičku začněte Šablonou v Měkkém spojení nebo v Kostře a upravujte; se zapnutou souměrností stačí modelovat jednu polovinu. Sochání a vydutění pracují na síti z voxelů – volba Jemnost určuje detail i rychlost (Hrubá je nejrychlejší). Než začnete sochat těleso vytvořené CAD nástroji (s ostrými hranami), je dobré ho nejdřív Přesíťovat.
+
+## 13. Render: barvy a obrázek modelu
+
+Záložka **RENDER** (oranžová, vedle ORGANICKÉ) ukáže model tak, jak bude vypadat vytištěný: tělesa ve svých barvách a materiálech, osvětlená, se stínem pod sebou. Mřížka, počátek a skici se skryjí; po návratu na záložku TĚLESO se pohled vrátí k modelování. Barvy a nastavení scény se ukládají do návrhu, tvar modelu ani export STL nemění.
+
+**Barva tělesa** – klepněte na těleso (s Ctrl na další) a zvolte barvu z palety filamentů nebo vlastní barvu (duhové kolečko). Materiál určuje povrch: Matný plast (PLA), Lesklý plast (PETG), Hedvábný plast, Kov, Pryž (TPU) nebo Průhledný. Tlačítko Výchozí vzhled barvu tělesa zruší.
+
+**Barva plochy** – vyberte barvu a klepejte na plochy; štětec Smazat barvu ji z plochy odebere. Plochu rozdělenou nástrojem Plochy → Rozdělit plochu lze obarvit po částech, takže se hodí i na náhled vícebarevného tisku. Když později změníte rozměry, barva zůstane na ploše, která se posunula.
+
+**Prostředí** – Pozadí (Světlé, Bílé, Tmavé nebo Žádné), Osvětlení (Studio, Měkké, Kontrastní, Teplé – západ slunce), Natočení světla, Jas, Stín pod modelem a Zvýraznit hrany.
+
+**Otáčet** – model se pomalu otáčí dokola, dokud tlačítko znovu nevypnete.
+
+**Uložit obrázek** – uloží PNG z aktuálního pohledu ve zvolené velikosti (Jako okno, Full HD, čtverec, na výšku pro sociální sítě nebo 4K) s vyhlazenými hranami. S pozadím Žádné je obrázek průhledný, jen se stínem pod modelem.

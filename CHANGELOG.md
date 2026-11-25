@@ -1,5 +1,15 @@
 # Changelog
 
+## Beta 2.76
+
+- **Nová záložka RENDER** – model ve skutečných barvách a materiálech, s osvětlením, odlesky a stínem.
+  - **Barva tělesa**: paleta filamentových barev i vlastní barva; materiál Matný plast (PLA), Lesklý plast (PETG), Hedvábný plast, Kov, Pryž (TPU), Průhledný.
+  - **Barva plochy**: obarvení jednotlivých ploch (i částí rozdělené plochy), barva drží i po změně rozměrů.
+  - **Prostředí**: pozadí (světlé, bílé, tmavé, žádné), osvětlení Studio / Měkké / Kontrastní / Teplé, natočení světla, jas, stín pod modelem, zvýraznění hran.
+  - **Otáčet**: model se pomalu otáčí dokola.
+  - **Uložit obrázek**: PNG v rozlišení okna, Full HD, čtverec, na výšku nebo 4K, s vyhlazenými hranami; s pozadím Žádné průhledný.
+  - Barvy a nastavení scény se ukládají do návrhu.
+
 ## Beta 2.75
 
 - **Textura povrchu** – Natočení vzoru na válci teď vzor skutečně otočí (−90° až 90°), stejně jako na rovné ploše. Úhel se nepatrně doladí, aby vzor dokola navazoval bez švu (skutečný úhel ukáže poznámka v dialogu). Žebrování natočené o 90° vytvoří vodorovné prstence, jiné úhly šikmá žebra (šroubovici). U Kamínků se natočení na válci nepoužije.
