@@ -1,5 +1,10 @@
 # Changelog
 
+## Beta 2.77
+
+- **Barevný model do sliceru** – Otevřít ve sliceru i Export 3MF posílají barvy: každá barva je jeden filament, obarvené plochy jsou v 3MF jako vícebarevné malování pro PrusaSlicer, Bambu Studio a OrcaSlicer (plus standardní barvy 3MF). Dialog vypíše, který filament má jakou barvu; volbou Poslat barvy jde vypnout. Plochy rozdělené nástrojem Rozdělit plochu se exportují po částech.
+- **Barvy těles i při modelování** – barva z Barvy tělesa je vidět i na záložce TĚLESO, takže se tělesa snadno rozliší. Nastavíte ji přes Nástroje › Barva nebo pravým tlačítkem na tělese › Barva tělesa…; volbou Barvy i při modelování jde vypnout.
+
 ## Beta 2.76
 
 - **Nová záložka RENDER** – model ve skutečných barvách a materiálech, s osvětlením, odlesky a stínem.

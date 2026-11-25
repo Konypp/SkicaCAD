@@ -560,10 +560,10 @@ function styleBodies() {
     if (renderOn) { styleRenderBody(id, e); continue; }
     if (e.mesh.material !== e.cadMat) { e.mesh.material = e.cadMat; e.mesh.castShadow = e.mesh.receiveShadow = false; }
     const m = e.mesh.material, isSel = sel.has(id) || (cmd && cmd.highlight && cmd.highlight.has(id));
-    const tint = bodyTint.get(id);
-    m.color.copy(tok.body);
+    const tint = bodyTint.get(id), own = cadColor(id), painting = cmd && cmd.rtool;
+    m.color.copy(own || tok.body);
     if (tint === 'tool') m.color.lerp(tok.orange, 0.5);
-    else if (isSel || tint === 'target') m.color.lerp(tok.accent, 0.45);
+    else if ((isSel && !painting) || tint === 'target') m.color.lerp(tok.accent, 0.45);
     /* wireframe: the edges of the facets the body is made of (every edge where the surface turns, however little, so curved
        faces show their shape), no triangle diagonals inside flat faces; sharp edges are drawn stronger over them */
     const wire = settings.style === 'w';
@@ -580,7 +580,7 @@ function styleBodies() {
     e.edges.visible = settings.style !== 's';
     /* sharp edges are drawn softly (a shade darker than the body); selection and hover keep strong colours */
     const strong = isSel || tint || hoverBody === id;
-    e.edges.material.color.copy(isSel || tint ? (tint === 'tool' ? tok.orange : tok.accent) : (hoverBody === id ? tok['accent-hover'] : softEdge()));
+    e.edges.material.color.copy(isSel || tint ? (tint === 'tool' ? tok.orange : tok.accent) : (hoverBody === id ? tok['accent-hover'] : own ? own.clone().lerp(tok.edge, 0.6) : softEdge()));
     e.edges.material.transparent = !strong; e.edges.material.opacity = strong ? 1 : 0.55; e.edges.material.depthWrite = strong;
     if (wire && !strong) { e.edges.material.color.copy(tok.muted); e.edges.material.transparent = false; e.edges.material.opacity = 1; }
   }
@@ -588,6 +588,8 @@ function styleBodies() {
   requestRender();
 }
 function softEdge() { return tok.body.clone().lerp(tok.edge, 0.6); }
+/* the colour given in Barva tělesa, shown while modelling too (unless switched off) */
+function cadColor(id) { const c = settings.cadColors !== false && doc.looks && doc.looks.b && doc.looks.b[id] && doc.looks.b[id].c; return c ? new THREE.Color(c) : null; }
 function visibleMeshes() { return Array.from(meshes.values()).filter(e => e.mesh.visible).map(e => e.mesh); }
 
 /* sketches (finished) */
@@ -1367,7 +1369,7 @@ const RIBBON = {
       { menu: 'shape', label: 'Tvar', items: [['combine', 'Kombinovat'], ['splitbody', 'Rozříznout'], ['curvecut', 'Rozříznout křivkou']] },
       { menu: 'xform', label: 'Uspořádat', items: [['center', 'Zarovnat'], ['mirror', 'Zrcadlit'], ['pattern', 'Pole']] },
       ['del', 'Odstranit', 'Del']]],
-    ['Nástroje', [['selall', 'Vybrat vše', 'Ctrl+A'], ['measure', 'Měřit', 'I'], ['simulate', 'Simulace'],
+    ['Nástroje', [['selall', 'Vybrat vše', 'Ctrl+A'], ['measure', 'Měřit', 'I'], ['rpaint', 'Barva'], ['simulate', 'Simulace'],
       { menu: 'print', label: 'Pro tisk', items: [['orient', 'Orientace pro tisk'], ['puzzle', 'Rozdělit na díly'], ['slicer', 'Otevřít ve sliceru']] }, ['import', 'Importovat']]]
   ],
   organic: [
@@ -6370,7 +6372,7 @@ function slicerLayout(bodies, mode, bed) {
   const gap = 5, out = [];
   if (mode === 'keep') {
     const bb = K.bbox(bodies.flatMap(b => b.polys)), sh = [bed[0] / 2 - (bb.min[0] + bb.max[0]) / 2, bed[1] / 2 - (bb.min[1] + bb.max[1]) / 2, -bb.min[2]];
-    return { list: bodies.map(b => ({ name: bodyName(b), polys: K.translate(b.polys, sh) })), size: [bb.max[0] - bb.min[0], bb.max[1] - bb.min[1]] };
+    return { list: bodies.map(b => ({ id: b.id, name: bodyName(b), sh, polys: K.translate(b.polys, sh) })), size: [bb.max[0] - bb.min[0], bb.max[1] - bb.min[1]] };
   }
   /* each body on the bed, set out in rows (biggest first), the whole layout centred */
   const items = bodies.map(b => { const bb = K.bbox(b.polys); return { b, bb, w: bb.max[0] - bb.min[0], d: bb.max[1] - bb.min[1] }; }).sort((x, y) => y.d - x.d || y.w - x.w);
@@ -6380,13 +6382,13 @@ function slicerLayout(bodies, mode, bed) {
     it.x = x; it.y = y; x += it.w + gap; row = Math.max(row, it.d); W = Math.max(W, it.x + it.w);
   }
   const H = y + row, ox = bed[0] / 2 - W / 2, oy = bed[1] / 2 - H / 2;
-  for (const it of items) out.push({ name: bodyName(it.b), polys: K.translate(it.b.polys, [ox + it.x - it.bb.min[0], oy + it.y - it.bb.min[1], -it.bb.min[2]]) });
+  for (const it of items) { const sh = [ox + it.x - it.bb.min[0], oy + it.y - it.bb.min[1], -it.bb.min[2]]; out.push({ id: it.b.id, name: bodyName(it.b), sh, polys: K.translate(it.b.polys, sh) }); }
   return { list: out, size: [W, H] };
 }
 function startSlicer() {
   const st = settings.slicer || {};
   const c = {
-    sl: st.sl || 'bambu', mode: st.mode || 'arrange', parts: !!st.parts, bx: st.bx || 256, by: st.by || 256,
+    sl: st.sl || 'bambu', mode: st.mode || 'arrange', parts: !!st.parts, bx: st.bx || 256, by: st.by || 256, colors: st.colors !== false,
     init() {
       const vis = cur.bodies.filter(b => bodiesVisible() && isVis(b.id));
       if (!vis.length) { endCmd(false); toast('Není co odeslat, model neobsahuje viditelná tělesa.'); return; }
@@ -6396,6 +6398,8 @@ function startSlicer() {
           { k: 'num', id: 'bx', label: 'Podložka X', value: this.bx }, { k: 'num', id: 'by', label: 'Podložka Y', value: this.by },
           { k: 'seg', id: 'mode', label: 'Rozmístění', options: [['arrange', 'Díly vedle sebe'], ['keep', 'Jak jsou v modelu']], value: this.mode },
           { k: 'chk', id: 'parts', label: 'Jeden objekt složený z dílů', value: this.parts },
+          { k: 'chk', id: 'colors', label: 'Poslat barvy (vícebarevný tisk)', value: this.colors },
+          { k: 'note', id: 'cols' },
           { k: 'btns', id: 'go', label: '', options: share ? [['save', 'Uložit 3MF'], ['share', 'Sdílet do aplikace']] : [['save', 'Uložit 3MF']] },
           { k: 'note', id: 'n' }, { k: 'note', id: 'tip' }],
         onBtn: (id, v) => this.send(v),
@@ -6404,6 +6408,7 @@ function startSlicer() {
           if (id === 'bx' || id === 'by') { const x = dlg.get(id); if (isFinite(x) && x > 10) this[id] = x; }
           if (id === 'mode') this.mode = dlg.get('mode');
           if (id === 'parts') this.parts = !!dlg.get('parts');
+          if (id === 'colors') this.colors = !!dlg.get('colors');
           this.update();
         } });
       dlg.okLabel('Zavřít');
@@ -6418,12 +6423,14 @@ function startSlicer() {
       G.preview.add(segLine([[0, 0, 0], [bx, 0, 0], [bx, by, 0], [0, by, 0], [0, 0, 0]].map(p => K.vadd(p, o)), big ? tok.danger : tok.orange));
       for (const it of L.list) G.preview.add(previewMesh(it.polys, 'new'));
       dlg.set('n', (big ? '!Díly se na podložku ' + fmtc(bx, 0) + ' × ' + fmtc(by, 0) + ' mm nevejdou (' + fmtc(L.size[0], 0) + ' × ' + fmtc(L.size[1], 0) + ' mm); zkuste Rozdělit na díly. ' : '') + `${L.list.length} ${L.list.length === 1 ? 'těleso' : L.list.length < 5 ? 'tělesa' : 'těles'} pro ${name}, rozmístění ${fmtc(L.size[0], 0)} × ${fmtc(L.size[1], 0)} mm.`);
+      const hc = hasColors(); dlg.show('colors', hc); dlg.show('cols', hc && this.colors);
+      if (hc && this.colors) { const sl = filamentSlots(L.list); dlg.set('cols', sl.length > 1 ? 'Filamenty: ' + sl.map((c, i) => `${i + 1} = ${rColorName(c)}`).join(', ') + '. Ve sliceru nastavte filamentům tyto barvy; plochy jsou obarvené jako vícebarevný tisk (PrusaSlicer, Bambu Studio, OrcaSlicer).' : 'Model má jednu barvu: ' + rColorName(sl[0] || R_DEF_BODY.c) + '.'); }
       dlg.set('tip', `Prohlížeč neumí slicer spustit sám: uložte 3MF a otevřete ho v aplikaci ${name} (dvojklikem na soubor, přetažením do okna nebo Soubor › Importovat). ` + (this.parts ? 'Jako jeden objekt z dílů: díly drží svá místa a každý může mít jiný filament. ' : 'Každé těleso je samostatný objekt. ') + 'Na telefonu můžete soubor Sdílet rovnou do aplikace sliceru.');
       requestRender();
     },
     async send(how) {
-      settings.slicer = { sl: this.sl, mode: this.mode, parts: this.parts, bx: this.bx, by: this.by }; saveSettings();
-      const L = this.layout(), z = threeMfBytes(this.parts, L.list); if (!z) return;
+      settings.slicer = { sl: this.sl, mode: this.mode, parts: this.parts, bx: this.bx, by: this.by, colors: this.colors }; saveSettings();
+      const L = this.layout(), z = threeMfBytes(this.parts, L.list, this.colors && hasColors()); if (!z) return;
       const fn = fileBase() + '.3mf';
       if (how === 'share') {
         try { const file = new File([z], fn, { type: 'model/3mf' }); if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: doc.name || 'model' }); return; } } catch (e) { if (e && e.name === 'AbortError') return; }
@@ -8121,6 +8128,7 @@ function bodyContext(e, id) {
     ['Duplikovat (Ctrl+D)', () => duplicateSel()],
     ['Vložit kopii (Ctrl+V)', () => pasteClip(), !clip || clip.kind !== 'bodies'],
     ['Zaoblit hrany…', () => startEdgeMod('fillet')],
+    ['Barva tělesa…', () => runCommand('rpaint')],
     ['Přejmenovat', () => { renaming = id; open.doc = true; open.bodies = true; const bw = $('#browser'); if (bw.classList.contains('collapsed') || (window.matchMedia('(max-width: 760px)').matches && !bw.classList.contains('open-m'))) $('#bw-toggle').click(); renderBrowser(); }],
     [isVis(id) ? 'Skrýt' : 'Zobrazit', () => { doc.vis[id] = !isVis(id); if (doc.vis[id]) delete doc.vis[id]; saveDoc(); styleBodies(); renderBrowser(); }],
     ['Upravit prvek, který těleso vytvořil', () => editFeature(idx), idx < 0],
@@ -8295,23 +8303,77 @@ function objText() {
 /* asParts: every visible body becomes a part of one object (in Bambu Studio / PrusaSlicer a single object whose parts
    keep their places and can each get their own filament, e.g. the links of an articulated strap); otherwise each body is
    an object of its own */
-function threeMfBytes(asParts, list) {
+/* colours for the slicer (Barva tělesa, Barva plochy): every colour is one filament. The file carries them three ways:
+   standard 3MF materials (shown by most programs), and each triangle painted with its filament the way PrusaSlicer
+   (slic3rpe:mmu_segmentation) and Bambu Studio / OrcaSlicer (paint_color) read multi-material painting */
+const hasColors = () => !!(doc.looks && ((doc.looks.b && Object.keys(doc.looks.b).length) || (doc.looks.f && doc.looks.f.length)));
+const paintCode = s => (s <= 0 ? '' : s === 1 ? '4' : s === 2 ? '8' : (s - 3).toString(16).toUpperCase() + 'C');
+function colorPolys(b) {
+  const body = cur.bodies.find(x => x.id === b.id), base = bodyLook(b.id).c;
+  if (!body) return { polys: b.polys, st: b.polys.map(() => base) };
+  let polys = body.polys.slice(), st = polys.map(() => base);
+  const whole = [], split = new Map();
+  for (const fp of (doc.looks && doc.looks.f) || []) {
+    if (fp.b !== b.id) continue;
+    const face = rResolveFace(fp); if (!face) continue;
+    if (face.clip && face.clip.length) { const k = face.group.join(','); let g = split.get(k); if (!g) split.set(k, g = { group: face.group, items: [] }); g.items.push({ clip: face.clip, c: fp.c }); }
+    else whole.push({ group: face.group, c: fp.c });
+  }
+  for (const w of whole) for (const i of w.group) st[i] = w.c;
+  if (split.size) {
+    /* a painted part of a divided face: the face is cut along its dividing lines into the painted part and the rest */
+    const inv = h => (h.poly ? { ...h, out: !h.out } : { m: h.m.map(x => -x), d: -h.d });
+    const idx = a => a.map((_, i) => i), drop = new Set(), addP = [], addS = [];
+    for (const g of split.values()) {
+      let rest = g.group.map(i => polys[i]); const keep = st[g.group[0]];
+      for (const it of g.items) {
+        const inside = Engine.clipRegion(rest, idx(rest), it.clip), out = [];
+        let curP = rest;
+        for (const h of it.clip) { out.push(...Engine.clipRegion(curP, idx(curP), [inv(h)])); curP = Engine.clipRegion(curP, idx(curP), [h]); if (!curP.length) break; }
+        addP.push(...inside); addS.push(...inside.map(() => it.c)); rest = out;
+      }
+      addP.push(...rest); addS.push(...rest.map(() => keep)); g.group.forEach(i => drop.add(i));
+    }
+    const np = [], ns = [];
+    polys.forEach((p, i) => { if (!drop.has(i)) { np.push(p); ns.push(st[i]); } });
+    np.push(...addP); ns.push(...addS);
+    polys = K.weldT(np); st = ns;
+  }
+  if (b.sh) polys = K.translate(polys, b.sh);
+  return { polys, st };
+}
+function filamentSlots(list) {
+  const slots = [], add = c => { if (!slots.includes(c)) slots.push(c); };
+  for (const b of list) { if (!b.id) continue; add(bodyLook(b.id).c); for (const fp of (doc.looks && doc.looks.f) || []) if (fp.b === b.id) add(fp.c); }
+  return slots;
+}
+function threeMfBytes(asParts, list, colors = hasColors()) {
   const esc = t => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-  const objs = [], items = []; let id = 1;
-  for (const b of list || cur.bodies.filter(b => bodiesVisible() && isVis(b.id))) {
-    const pk = K.pack(b.polys), V = [], T = [];
+  const objs = [], items = [], src = list || cur.bodies.filter(b => bodiesVisible() && isVis(b.id));
+  const parts = src.map(b => (colors && b.id ? { b, ...colorPolys(b) } : { b, polys: b.polys, st: null }));
+  const slots = colors ? filamentSlots(src) : []; if (colors) for (const P of parts) if (P.st) for (const c of [bodyLook(P.b.id).c, ...P.st]) if (!slots.includes(c)) slots.push(c);
+  const multi = slots.length > 1;
+  let id = colors && slots.length ? 2 : 1;
+  for (const P of parts) {
+    const b = P.b, pk = K.pack(P.polys), V = [], T = [];
+    const bs = P.st ? slots.indexOf(bodyLook(b.id).c) : -1;
     for (let i = 0; i < pk.v.length; i += 3) V.push(`<vertex x="${+pk.v[i].toFixed(5)}" y="${+pk.v[i + 1].toFixed(5)}" z="${+pk.v[i + 2].toFixed(5)}"/>`);
-    for (const f of pk.p) for (let i = 1; i < f.length - 1; i++) if (f[0] !== f[i] && f[i] !== f[i + 1] && f[0] !== f[i + 1]) T.push(`<triangle v1="${f[0]}" v2="${f[i]}" v3="${f[i + 1]}"/>`);
+    pk.p.forEach((f, pi) => {
+      const s = P.st ? Math.min(slots.indexOf(P.st[pi]), 15) : -1;
+      const at = s < 0 ? '' : (s !== bs ? ` p1="${s}"` : '') + (multi ? ` paint_color="${paintCode(s + 1)}" slic3rpe:mmu_segmentation="${paintCode(s + 1)}"` : '');
+      for (let i = 1; i < f.length - 1; i++) if (f[0] !== f[i] && f[i] !== f[i + 1] && f[0] !== f[i + 1]) T.push(`<triangle v1="${f[0]}" v2="${f[i]}" v3="${f[i + 1]}"${at}/>`);
+    });
     if (!T.length) continue;
-    objs.push(`<object id="${id}" name="${esc(bodyName(b))}" type="model"><mesh><vertices>${V.join('')}</vertices><triangles>${T.join('')}</triangles></mesh></object>`);
+    objs.push(`<object id="${id}" name="${esc(bodyName(b))}" type="model"${bs >= 0 ? ` pid="1" pindex="${bs}"` : ''}><mesh><vertices>${V.join('')}</vertices><triangles>${T.join('')}</triangles></mesh></object>`);
     items.push(`<item objectid="${id}"/>`); id++;
   }
+  if (colors && slots.length) objs.unshift(`<basematerials id="1">${slots.map((c, i) => `<base name="${esc(rColorName(c))} (${i + 1})" displaycolor="${c.toUpperCase()}FF"/>`).join('')}</basematerials>`);
   if (!objs.length) return null;
   if (asParts && objs.length > 1) {
     objs.push(`<object id="${id}" name="${esc(doc.name || 'model')}" type="model"><components>${items.map(t => t.replace('<item ', '<component ')).join('')}</components></object>`);
     items.length = 0; items.push(`<item objectid="${id}"/>`);
   }
-  const model = `<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="cs-CZ" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02"><metadata name="Title">${esc(doc.name || 'model')}</metadata><metadata name="Application">${esc(SKICA.full)}</metadata><resources>${objs.join('')}</resources><build>${items.join('')}</build></model>`;
+  const model = `<?xml version="1.0" encoding="UTF-8"?>\n<model unit="millimeter" xml:lang="cs-CZ" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02" xmlns:slic3rpe="http://schemas.slic3r.org/3mf/2017/06"><metadata name="slic3rpe:MmPaintingVersion">1</metadata><metadata name="Title">${esc(doc.name || 'model')}</metadata><metadata name="Application">${esc(SKICA.full)}</metadata><resources>${objs.join('')}</resources><build>${items.join('')}</build></model>`;
   const types = '<?xml version="1.0" encoding="UTF-8"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml"/></Types>';
   const rels = '<?xml version="1.0" encoding="UTF-8"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel"/></Relationships>';
   const te = new TextEncoder();
@@ -9888,6 +9950,7 @@ const R_LIGHTS = {
 };
 const R_BG = [['light', 'Světlé'], ['white', 'Bílé'], ['dark', 'Tmavé'], ['none', 'Žádné']];
 const R_DEF_BODY = { c: '#b3b9c2', m: 'pla' };
+const rColorName = c => { const h = String(c).toLowerCase(), s = R_SWATCH.find(x => x[0] === h); return s ? s[1] : h === R_DEF_BODY.c ? 'Šedá' : h; };
 function ensureLooks() {
   if (!doc.looks || typeof doc.looks !== 'object') doc.looks = {};
   const L = doc.looks; if (!L.b) L.b = {}; if (!Array.isArray(L.f)) L.f = []; if (!L.s) L.s = {};
@@ -10058,8 +10121,9 @@ function startPaintBody() {
         { k: 'swatch', id: 'c', label: 'Barva', value: l.c },
         { k: 'opt', id: 'm', label: 'Materiál', options: Object.entries(R_FIN).map(([k, F]) => [k, F.label]), value: l.m },
         { k: 'btns', id: 'reset', label: '', options: [['reset', 'Výchozí vzhled']] },
+        { k: 'chk', id: 'cad', label: 'Barvy i při modelování', value: settings.cadColors !== false },
         { k: 'note', id: 'n' }],
-      onChange: () => this.apply(), onBtn: () => { for (const id of this.targets) delete doc.looks.b[id]; this.load(); styleBodies(); cmdTick(); } });
+      onChange: id => { if (id === 'cad') { settings.cadColors = !!dlg.get('cad'); saveSettings(); styleBodies(); return; } this.apply(); }, onBtn: () => { for (const id of this.targets) delete doc.looks.b[id]; this.load(); styleBodies(); cmdTick(); } });
       this.update();
     },
     load() { const l = bodyLook(first()); dlg.set('c', l.c); dlg.set('m', l.m); },
@@ -10074,7 +10138,7 @@ function startPaintBody() {
     onMove(e) { const h = hitBodies(e), id = h ? h.object.userData.bodyId : null; if (id !== hoverBody) { hoverBody = id; styleBodies(); } dom.style.cursor = id ? 'pointer' : ''; },
     onClick(e) { if (rPickBodies(this, e)) { this.load(); this.update(); styleBodies(); } },
     ok() { pushHist(); saveDoc(); endCmd(true); return null; },
-    cleanup(applied) { if (!applied) { doc.looks = JSON.parse(L0); } hoverBody = null; sel = new Set(); renderBrowser(); styleBodies(); }
+    cleanup(applied) { if (!applied) { doc.looks = JSON.parse(L0); } hoverBody = null; sel = new Set(); renderBrowser(); updateInfo(); styleBodies(); }
   };
   beginCmd(c); c.init();
 }

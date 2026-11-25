@@ -2,7 +2,7 @@
 
 Oct 15, 2026 · @Petr
 
-Příručka popisuje SkicaCAD Beta 2.76, parametrickou CAD aplikaci v prohlížeči pro modelování součástí ke 3D tisku. Model vzniká jako posloupnost kroků: nakreslíte skicu, vysunete ji do tělesa a dál ho upravujete; každý krok jde později změnit. Rozměry jsou v milimetrech, osa Z míří nahoru.
+Příručka popisuje SkicaCAD Beta 2.77, parametrickou CAD aplikaci v prohlížeči pro modelování součástí ke 3D tisku. Model vzniká jako posloupnost kroků: nakreslíte skicu, vysunete ji do tělesa a dál ho upravujete; každý krok jde později změnit. Rozměry jsou v milimetrech, osa Z míří nahoru.
 
 ## 1. Úvod a rozhraní
 
@@ -347,6 +347,8 @@ Záložka **ORGANICKÉ** (fialová, vedle TĚLESO) obsahuje nástroje pro měkk�
 
 **Otevřít ve sliceru** (Soubor nebo Nástroje › Pro tisk) připraví 3MF pro Bambu Studio, PrusaSlicer, OrcaSlicer nebo Curu: díly položí na podložku vedle sebe (nebo nechá jak jsou v modelu) a vystředí je na podložku zadaného rozměru, jako samostatné objekty nebo jeden objekt z dílů. Náhled ukáže obrys podložky a varuje, když se díly nevejdou. Prohlížeč slicer spustit neumí, soubor se uloží a otevře se v sliceru; na telefonu jde Sdílet rovnou do aplikace sliceru.
 
+**Barvy pro vícebarevný tisk** – když mají tělesa nebo plochy barvy (Barva tělesa, Barva plochy), dialog nabídne volbu Poslat barvy a vypíše filamenty, např. 1 = Zelená, 2 = Žlutá. Každá barva je jeden filament: plochy jsou v 3MF obarvené tak, jak vícebarevné malování čtou PrusaSlicer, Bambu Studio a OrcaSlicer, a soubor nese i standardní barvy 3MF. Ve sliceru pak filamentům nastavte stejné barvy. Barevný je i export Soubor › Exportovat 3MF. Cura vícebarevné malování nepodporuje – pro ni dejte každé barvě vlastní těleso.
+
 **Přechod profilů – jak na něj:** nakreslete dva nebo víc uzavřených tvarů (kružnice, obdélník, křivka…) v různých skicách nad sebou – druhou skicu založte na stejné rovině s Odsazením roviny, např. 30 mm. Pak zvolte Přechod profilů, v dialogu vyberte profily v pořadí zdola nahoru a těleso plynule přejde z jednoho tvaru do druhého (váza, trup, noha stolu, rukojeť).
 
 Tipy: postavičku začněte Šablonou v Měkkém spojení nebo v Kostře a upravujte; se zapnutou souměrností stačí modelovat jednu polovinu. Sochání a vydutění pracují na síti z voxelů – volba Jemnost určuje detail i rychlost (Hrubá je nejrychlejší). Než začnete sochat těleso vytvořené CAD nástroji (s ostrými hranami), je dobré ho nejdřív Přesíťovat.
@@ -355,7 +357,7 @@ Tipy: postavičku začněte Šablonou v Měkkém spojení nebo v Kostře a uprav
 
 Záložka **RENDER** (oranžová, vedle ORGANICKÉ) ukáže model tak, jak bude vypadat vytištěný: tělesa ve svých barvách a materiálech, osvětlená, se stínem pod sebou. Mřížka, počátek a skici se skryjí; po návratu na záložku TĚLESO se pohled vrátí k modelování. Barvy a nastavení scény se ukládají do návrhu, tvar modelu ani export STL nemění.
 
-**Barva tělesa** – klepněte na těleso (s Ctrl na další) a zvolte barvu z palety filamentů nebo vlastní barvu (duhové kolečko). Materiál určuje povrch: Matný plast (PLA), Lesklý plast (PETG), Hedvábný plast, Kov, Pryž (TPU) nebo Průhledný. Tlačítko Výchozí vzhled barvu tělesa zruší.
+**Barva tělesa** – klepněte na těleso (s Ctrl na další) a zvolte barvu z palety filamentů nebo vlastní barvu (duhové kolečko). Materiál určuje povrch: Matný plast (PLA), Lesklý plast (PETG), Hedvábný plast, Kov, Pryž (TPU) nebo Průhledný. Tlačítko Výchozí vzhled barvu tělesa zruší. Barva tělesa je vidět i při modelování, takže se tělesa snadno rozliší (vypnete volbou Barvy i při modelování); bez přepínání na RENDER ji nastavíte přes TĚLESO › Nástroje › Barva nebo pravým tlačítkem na tělese › Barva tělesa…
 
 **Barva plochy** – vyberte barvu a klepejte na plochy; štětec Smazat barvu ji z plochy odebere. Plochu rozdělenou nástrojem Plochy → Rozdělit plochu lze obarvit po částech, takže se hodí i na náhled vícebarevného tisku. Když později změníte rozměry, barva zůstane na ploše, která se posunula.
 
